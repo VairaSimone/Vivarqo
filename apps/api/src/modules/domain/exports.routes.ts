@@ -121,6 +121,7 @@ export function createExportRouter() {
     if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const job = await prisma.exportJob.create({ data: { userId: auth.userId, status: "pending", expiresAt } });
+    let generatedStorageKey: string | null = null;
     try {
       const [
         animals, feedingSessions, feedingEntries, weights, sheds, notes, cycles, reproductiveEvents,
@@ -245,6 +246,7 @@ export function createExportRouter() {
       }
       const zip = zipFiles(files);
       const storageKey = await storePrivateObject("exports", "zip", zip);
+      generatedStorageKey = storageKey;
       const completed = await prisma.exportJob.update({
         where: { id: job.id },
         data: { status: "completed", storageKey },
@@ -253,7 +255,15 @@ export function createExportRouter() {
       await prisma.auditEvent.create({ data: { userId: auth.userId, action: "account.export_created", entityType: "export_job", entityId: job.id } });
       res.status(201).json({ export: completed, downloadPath: `/api/v1/exports/${job.id}/download`, includeDocuments: input.data.includeDocuments });
     } catch (error) {
-      await prisma.exportJob.updateMany({ where: { id: job.id, userId: auth.userId }, data: { status: "failed" } }).catch(() => undefined);
+      // If the database update or audit record fails after object upload, clean
+      // up the orphaned archive and remove its stale reference from the job.
+      if (generatedStorageKey) {
+        await deletePrivateObject(generatedStorageKey).catch(() => undefined);
+      }
+      await prisma.exportJob.updateMany({
+        where: { id: job.id, userId: auth.userId },
+        data: { status: "failed", storageKey: null },
+      }).catch(() => undefined);
       throw error;
     }
   });
