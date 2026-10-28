@@ -104,6 +104,7 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
       headers: signed.headers,
       ...(method === "PUT" ? { body: new Uint8Array(body) } : {}),
       signal: AbortSignal.timeout(30_000),
+      redirect: "error",
     });
   } catch {
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
@@ -175,6 +176,7 @@ async function s3UploadFile(config: S3Config, key: string, sourcePath: string, s
       body: body as never,
       duplex: "half",
       signal: AbortSignal.timeout(5 * 60_000),
+      redirect: "error",
     } as RequestInit);
   } catch {
     body.destroy();
@@ -278,6 +280,7 @@ export async function openPrivateObjectStream(
         method: "GET",
         headers: signed.headers,
         signal: AbortSignal.timeout(5 * 60_000),
+        redirect: "error",
       });
     } catch {
       throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
