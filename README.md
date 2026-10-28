@@ -157,3 +157,35 @@ Se sono presenti possibili duplicati per nome e specie, la conferma richiede `{"
 
 La CI avvia PostgreSQL 18, applica la migrazione versionata e abilita `RUN_DB_INTEGRATION=true`. I test coprono CRUD, filtri/archiviazione, creazione multipla, import CSV/XLSX con conferma, alimentazione multipla atomica, registri di cura, input non validi e isolamento tra account.
 
+## Operatività: attività, promemoria, Home «Oggi» e calendario
+
+Queste API leggono e scrivono dati reali PostgreSQL e sono private per account. Le richieste mutative richiedono la protezione CSRF descritta nella sezione di autenticazione.
+
+### Attività
+
+| Metodo | Endpoint | Scopo |
+|---|---|---|
+| GET / POST | `/api/v1/tasks` | Lista paginata/filtrata e creazione di attività |
+| GET | `/api/v1/tasks/:id` | Dettaglio dell’attività |
+| PATCH | `/api/v1/tasks/:id` | Modifica titolo, descrizione, categoria, scadenza, animale o stato aperto/ignorato |
+| POST | `/api/v1/tasks/:id/complete` | Completa un’attività senza cancellare lo storico |
+
+Categorie ammesse: `feeding`, `weighing`, `shed_check`, `cleaning`, `reproduction`, `document`, `inventory`, `custom`. Gli stati sono `open`, `completed`, `dismissed`. Il completamento passa da una rotta dedicata per gestire correttamente le ricorrenze. I filtri lista includono `page`, `pageSize` (max 100), `status`, `category`, `animalId`, `from`, `to`. I filtri data accettano date locali `YYYY-MM-DD` o date/ore con offset.
+
+### Promemoria ricorrenti
+
+| Metodo | Endpoint | Scopo |
+|---|---|---|
+| GET / POST | `/api/v1/tasks/reminder-rules` | Lista e crea regole ricorrenti |
+| PATCH | `/api/v1/tasks/reminder-rules/:id` | Aggiorna pianificazione, intervallo e attivazione |
+| DELETE | `/api/v1/tasks/reminder-rules/:id` | Disattiva la regola e chiude le occorrenze aperte come ignorate |
+
+Creare una regola attiva genera la sua prima attività. Quando questa viene completata, la transazione conserva la vecchia attività completata, aggiorna la regola e crea la successiva occorrenza; le scadenze ricorrenti mantengono l’ora locale dell’account anche attraverso i cambi di ora legale. L’intervallo ammesso è da 1 a 3.650 giorni.
+
+### Home «Oggi» e calendario
+
+- `GET /api/v1/home/today`: attività in scadenza oggi, scadute ancora aperte, completate oggi, promemoria imminenti, eventi recenti e collegamento rapido alla registrazione multipla delle alimentazioni. Il giorno è calcolato nel fuso orario dell’account.
+- `GET /api/v1/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD&view=month|week|list`: attività e record riproduttivi reali nel periodo selezionato, con date e fuso orario espliciti. Gli eventi di deposizione sono derivati anche dai record delle covate e vengono deduplicati quando esiste già un evento riproduttivo di deposizione nella stessa data/ciclo. Il calendario esclude per default le attività ignorate; `includeDismissed=true` permette di includerle.
+
+La Home e il calendario sono per ora endpoint backend: non includono ancora le relative schermate React. Le notifiche push web non fanno parte di questo incremento.
+
