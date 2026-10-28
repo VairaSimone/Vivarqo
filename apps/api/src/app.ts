@@ -22,14 +22,16 @@ import { createReproductionRouter } from "./modules/domain/reproduction.routes.j
 import { createInventoryRouter } from "./modules/domain/inventory.routes.js";
 import { createDocumentShareRouter } from "./modules/domain/documents-shares.routes.js";
 import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
-import { createBillingRouter } from "./modules/domain/billing.routes.js";
+import { createBillingRouter, type BillingRouterOptions } from "./modules/domain/billing.routes.js";
 import { createExportRouter } from "./modules/domain/exports.routes.js";
 import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
+import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
   emailSender?: EmailSender;
+  billing?: BillingRouterOptions;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -56,7 +58,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       origin: env.APP_ORIGIN,
       credentials: true,
       methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id"],
+      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id", "X-Document-Name", "X-Document-Category", "X-Animal-Id", "X-Cycle-Id"],
       maxAge: 600,
     }),
   );
@@ -91,6 +93,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/animals", createAnimalRouter());
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1/imports", createImportRouter());
+  app.use("/api/v1/imports", createDomainImportRouter());
   app.use("/api/v1/imports", createCareImportRouter());
   app.use("/api/v1/tasks", createTasksRouter());
   app.use("/api/v1", createHomeCalendarRouter());
@@ -100,7 +103,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
-  app.use("/api/v1", createBillingRouter());
+  app.use("/api/v1", createBillingRouter(dependencies.billing));
   app.use("/api/v1/exports", createExportRouter());
 
   app.get("/healthz", (_req, res) => {

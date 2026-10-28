@@ -2,8 +2,13 @@ import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { prisma } from "./db/prisma.js";
 import { createApp } from "./app.js";
+import { getVapidCredentials } from "./modules/domain/web-push.js";
+import { startNotificationWorker } from "./modules/domain/notification-worker.js";
+
+if (env.NODE_ENV === "production") getVapidCredentials();
 
 const app = createApp();
+const stopNotificationWorker = startNotificationWorker();
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
 });
@@ -14,6 +19,7 @@ function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Graceful shutdown started");
+  stopNotificationWorker();
 
   const forcedExit = setTimeout(() => {
     logger.error({ signal }, "Graceful shutdown timed out");

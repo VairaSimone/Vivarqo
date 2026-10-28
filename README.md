@@ -125,9 +125,11 @@ Parametri di lista: `page`, `pageSize` (massimo 100), `q`, `species`, `sex`, `mo
 
 Una sessione di alimentazione contiene da 1 a 500 animali e viene salvata insieme a tutte le voci nella stessa transazione PostgreSQL. Se anche un solo animale non appartiene all'account o non è attivo, l'intera operazione viene annullata. Esiti ammessi: `ate`, `refused`, `not_offered`, `unknown`; peso positivo in grammi per le pesate.
 
-### Importazione CSV/XLSX degli animali
+### Importazione CSV/XLSX guidata
 
-L'importazione segue due passaggi: caricamento e anteprima privata, poi conferma esplicita. Il file è conservato come report di anteprima nel database e scade dopo un'ora; non viene scritto in un bucket pubblico. I file sono limitati a 5 MB e 5.000 righe. Sono supportati CSV UTF-8 e XLSX, con scelta del foglio mediante il parametro `sheet`. Le intestazioni possono essere in italiano o in inglese; le colonne riconosciute vengono mappate automaticamente, le altre vengono riportate come non mappate.
+L'importazione segue due passaggi: caricamento e anteprima privata, poi conferma esplicita. Il report viene conservato nel database e scade dopo un'ora; il file sorgente non viene pubblicato. I file sono limitati a 5 MB e 5.000 righe. Sono supportati CSV UTF-8 e XLSX, con scelta del foglio tramite il parametro sheet. Le intestazioni riconosciute vengono mappate automaticamente; quelle sconosciute sono riportate come non mappate. Le righe non valide restano nell'anteprima con numero di riga/colonna e non vengono importate.
+
+Gli entity supportati sono animals, weights, sheds, notes, feedings, finance, inventory, reproductionCycles, reproductiveEvents, clutches, eggs, incubationLogs e offspringBatches. Per finance si può usare amountCents (intero) o amountEUR (valore decimale); per inventory, quantityOnHand crea anche il movimento di apertura. Le relazioni vengono risolte soltanto all'interno dell'account autenticato. Importare prima i cicli riproduttivi, poi eventi e covate, infine uova, registri d'incubazione e gruppi di nascita. Le righe riproduttive che referenziano cicli o covate devono usare UUID già esistenti.
 
 Caricare i byte del file nel body della richiesta:
 
@@ -140,7 +142,7 @@ curl -X POST 'http://localhost:3000/api/v1/imports?entity=animals' \
   -b cookies.txt
 ```
 
-La risposta fornisce `importId`, righe valide, errori con riga/colonna e possibili omonimie per nome e specie. Dopo aver controllato l'anteprima:
+La risposta fornisce importId, righe valide, errori con riga/colonna e possibili omonimie per nome/specie. Dopo aver controllato l'anteprima, confermare:
 
 ```bash
 curl -X POST 'http://localhost:3000/api/v1/imports/<importId>/confirm' \
@@ -151,7 +153,7 @@ curl -X POST 'http://localhost:3000/api/v1/imports/<importId>/confirm' \
   -d '{}'
 ```
 
-Se sono presenti possibili duplicati per nome e specie, la conferma richiede `{"allowPossibleDuplicates":true}`. La conferma usa una transazione: le righe non valide sono escluse e riportate nel report finale. `GET /api/v1/imports/:id` mostra stato e report dell'importazione.
+Se sono presenti possibili duplicati per nome e specie, la conferma di importazione animali richiede allowPossibleDuplicates=true. La conferma usa una transazione: le righe non valide sono escluse e riportate nel report finale. GET /api/v1/imports/:id mostra stato e report dell'importazione.
 
 ## Test d'integrazione PostgreSQL
 
@@ -187,7 +189,7 @@ Creare una regola attiva genera la sua prima attività. Quando questa viene comp
 - `GET /api/v1/home/today`: attività in scadenza oggi, scadute ancora aperte, completate oggi, promemoria imminenti, eventi recenti e collegamento rapido alla registrazione multipla delle alimentazioni. Il giorno è calcolato nel fuso orario dell’account.
 - `GET /api/v1/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD&view=month|week|list`: attività e record riproduttivi reali nel periodo selezionato, con date e fuso orario espliciti. Gli eventi di deposizione sono derivati anche dai record delle covate e vengono deduplicati quando esiste già un evento riproduttivo di deposizione nella stessa data/ciclo. Il calendario esclude per default le attività ignorate; `includeDismissed=true` permette di includerle.
 
-La Home e il calendario sono per ora endpoint backend: non includono ancora le relative schermate React. Le notifiche push web non fanno parte di questo incremento.
+La Home e il calendario sono per ora endpoint backend: non includono ancora le relative schermate React. Il worker backend controlla ogni minuto le attività aperte già scadute e crea notifiche deduplicate; l'invio push rispetta le preferenze e le fasce di quiet hours.
 
 ## Moduli di dominio: riproduzioni, inventario, documenti, finanze e notifiche
 
@@ -247,7 +249,7 @@ Gli importi sono espressi in centesimi interi, restituiti come stringhe per evit
 - `GET/PATCH /api/v1/notification-preferences`: canali, categorie e fascia di quiet hours.
 - `POST /api/v1/push-subscriptions` e `DELETE /api/v1/push-subscriptions/:id`: registra o rimuove una sottoscrizione del browser.
 
-Le sottoscrizioni browser sono persistite, ma l’invio push tramite VAPID non è ancora attivo; non viene quindi promessa la consegna di notifiche push.
+Il mittente Web Push usa VAPID ES256 e cifratura RFC 8291 (ECDH P-256, HKDF-SHA256, AES-128-GCM). GET /api/v1/push/public-key espone la chiave pubblica; POST /api/v1/notifications/test-push invia una notifica di prova all'account autenticato. Gli endpoint provider in uscita sono allowlistati per limitare SSRF; le sottoscrizioni che rispondono 404/410 vengono rimosse. Configurare VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT prima di attivare push. Generare una coppia con pnpm vapid:generate e conservare la chiave privata solo nel secret manager/ambiente.
 
 ### Importazione ed esportazione
 
@@ -262,7 +264,7 @@ L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono suppo
 - `GET /api/v1/billing/subscription`: restituisce stato locale e autorizzazione per la sottoscrizione.
 - `POST /api/v1/webhooks/stripe`: verifica la firma sul body raw e deduplica l’ID evento.
 
-Prima di attivare gli acquisti, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` e `STRIPE_WEBHOOK_SECRET`, quindi registra l’URL webhook nella dashboard Stripe. La CI non usa credenziali Stripe e non esegue pagamenti reali; l’integrazione va verificata con Stripe Test Mode nell’ambiente di staging. Gli stati locali sono aggiornati da eventi firmati, non dal redirect del browser.
+Prima di attivare gli acquisti, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` e `STRIPE_WEBHOOK_SECRET`, quindi registra l’URL webhook nella dashboard Stripe. La CI esegue test end-to-end deterministici con trasporto Stripe simulato e persistenza PostgreSQL: Checkout, Customer Portal, checkout.session.completed, aggiornamento, pagamento fallito/ripetuto e deduplicazione webhook. Non sono presenti credenziali per chiamare Stripe Test Mode reale, quindi prima del lancio va svolta una prova finale in staging con chiavi sk_test_... e webhook Stripe CLI/dashboard. Gli stati locali sono aggiornati da eventi firmati, non dal redirect del browser.
 
 
 Esempio di importazione dei pesi:
@@ -277,3 +279,14 @@ curl -X POST 'http://localhost:3000/api/v1/imports?entity=weights' \
 ```
 
 Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il sistema risolve l’identificativo all’interno del solo account autenticato. Confermare con `POST /api/v1/imports/:importId/confirm`, dopo aver controllato l’anteprima e gli eventuali errori.
+
+
+## Preparazione alla produzione, backup e ripristino
+
+Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HTTPS, un CSRF_SECRET non predefinito, credenziali email, configurazione Stripe, chiavi VAPID o storage S3. Le credenziali devono essere fornite tramite secret manager o variabili dell'ambiente e non devono essere inserite nel repository. Verificare /healthz per liveness e /readyz per la connessione PostgreSQL.
+
+- pnpm vapid:generate genera una coppia VAPID per sviluppo/staging. In produzione usare un secret manager e non rigenerare la coppia a ogni deploy.
+- DATABASE_URL=... pnpm db:backup crea un dump PostgreSQL custom in ./backups, verifica l'archivio e scrive un checksum SHA-256. La copia va poi trasferita in storage cifrato e separato dal database.
+- CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump verifica il checksum, se presente, e ripristina nel database di destinazione. Il comando non elimina gli oggetti esistenti: usare un database dedicato e vuoto e predisporre prima uno snapshot di rollback.
+
+La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend sono implementate ma le schermate React/PWA non fanno parte di questo incremento.
