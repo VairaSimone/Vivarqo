@@ -506,11 +506,13 @@ CREATE INDEX animal_notes_animal_occurred_idx ON animal_notes (animal_id, occurr
 CREATE INDEX reminder_rules_user_next_due_idx ON reminder_rules (user_id, next_due_at) WHERE is_enabled = TRUE;
 CREATE INDEX reminder_rules_animal_idx ON reminder_rules (animal_id);
 CREATE INDEX tasks_user_status_due_idx ON tasks (user_id, status, due_at);
+CREATE INDEX tasks_open_due_worker_idx ON tasks (due_at, id) WHERE status = 'open';
 CREATE INDEX tasks_animal_idx ON tasks (animal_id);
 CREATE INDEX tasks_reminder_rule_idx ON tasks (reminder_rule_id);
 CREATE INDEX push_subscriptions_user_idx ON push_subscriptions (user_id);
 CREATE INDEX notifications_user_created_idx ON notifications (user_id, created_at DESC);
 CREATE INDEX notifications_user_unread_idx ON notifications (user_id, created_at DESC) WHERE read_at IS NULL;
+CREATE INDEX notifications_user_category_target_idx ON notifications (user_id, category, target_path);
 CREATE INDEX reproduction_cycles_user_status_started_idx ON reproduction_cycles (user_id, status, started_on DESC);
 CREATE INDEX reproduction_cycles_parent_a_idx ON reproduction_cycles (parent_a_animal_id);
 CREATE INDEX reproduction_cycles_parent_b_idx ON reproduction_cycles (parent_b_animal_id);
@@ -518,8 +520,11 @@ CREATE INDEX reproductive_events_cycle_occurred_idx ON reproductive_events (cycl
 CREATE INDEX reproductive_events_animal_idx ON reproductive_events (animal_id);
 CREATE INDEX clutches_cycle_laid_idx ON clutches (cycle_id, laid_on);
 CREATE INDEX eggs_clutch_idx ON eggs (clutch_id);
+CREATE INDEX eggs_clutch_created_idx ON eggs (clutch_id, created_at);
+CREATE UNIQUE INDEX eggs_clutch_code_ci_unique ON eggs (clutch_id, lower(code)) WHERE code IS NOT NULL;
 CREATE INDEX incubation_logs_clutch_recorded_idx ON incubation_logs (clutch_id, recorded_at);
 CREATE INDEX offspring_batches_cycle_idx ON offspring_batches (cycle_id);
+CREATE INDEX offspring_batches_cycle_born_idx ON offspring_batches (cycle_id, born_on DESC);
 CREATE INDEX offspring_batches_clutch_idx ON offspring_batches (clutch_id);
 CREATE INDEX animals_origin_clutch_idx ON animals (origin_clutch_id);
 CREATE INDEX animals_origin_batch_idx ON animals (origin_offspring_batch_id);
@@ -535,6 +540,7 @@ CREATE INDEX export_jobs_user_created_idx ON export_jobs (user_id, created_at DE
 CREATE INDEX export_jobs_expiry_idx ON export_jobs (expires_at);
 CREATE INDEX api_rate_limit_buckets_reset_idx ON api_rate_limit_buckets (reset_at);
 CREATE INDEX animal_genetic_traits_animal_idx ON animal_genetic_traits (animal_id);
+CREATE INDEX animal_genetic_traits_history_idx ON animal_genetic_traits (animal_id, trait_name, created_at);
 CREATE INDEX animal_genetic_traits_source_animal_idx ON animal_genetic_traits (source_animal_id);
 CREATE INDEX finance_entries_user_date_idx ON finance_entries (user_id, occurred_on DESC);
 CREATE INDEX finance_entries_user_category_date_idx ON finance_entries (user_id, category, occurred_on DESC);
