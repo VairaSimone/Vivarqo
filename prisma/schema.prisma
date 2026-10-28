@@ -72,7 +72,7 @@ model Animal {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId                 String                @map("user_id") @db.Uuid
   name                   String                @db.VarChar(120)
-  identifier             String?               @db.VarChar(120)
+  identifier             String?               @db.Citext
   species                String                @db.VarChar(160)
   sex                    String                @default("unknown") @db.VarChar(12)
   morph                  String?               @db.VarChar(200)
