@@ -119,7 +119,7 @@ export function createDocumentShareRouter() {
           },
         });
         await tx.auditEvent.create({ data: { userId: auth.userId, action: "document.created", entityType: "document", entityId: created.id, requestId: requestId(res) } });
-        return document;
+        return created;
       });
       res.status(201).json({ document: { ...document, sizeBytes: document.sizeBytes.toString() } });
     } catch (error) {

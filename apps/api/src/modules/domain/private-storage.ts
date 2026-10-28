@@ -87,8 +87,8 @@ function signedHeaders(config: S3Config, method: "PUT" | "GET" | "DELETE", key: 
     },
   };
 }
-async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key: string, body = Buffer.alloc(0)): Promise<Buffer> {
-  const signed = signedHeaders(config, method, key, body);
+async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key: string, body: Uint8Array = Buffer.alloc(0)): Promise<Buffer> {
+  const signed = signedHeaders(config, method, key, Buffer.from(body));
   let response: Response;
   try {
     response = await fetch(signed.url, {
