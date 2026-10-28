@@ -24,8 +24,8 @@ function csvCell(value: unknown): string {
 
   // Spreadsheet apps may ignore leading whitespace/control characters
   // before formula prefixes, so protect those cells as well.
-  if (/^[\u0000-\u0020]*[=+@\-]/.test(rendered)) rendered = \`'\${rendered}\`;
-  return \`"\${rendered.replace(/"/g, '""')}"\`;
+  if (/^[\u0000-\u0020]*[=+@\-]/.test(rendered)) rendered = "'" + rendered;
+  return "\"" + rendered.replace(/"/g, '\"\"') + "\"";
 }
 
 function routeId(value: string | string[] | undefined): string {
