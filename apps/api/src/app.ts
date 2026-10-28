@@ -8,6 +8,7 @@ import { AppError } from "./errors/app-error.js";
 import { checkDatabaseConnection } from "./db/prisma.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { requestContext } from "./middleware/request-context.js";
+import { localizationMiddleware } from "./i18n/localization.js";
 import { csrfProtection } from "./modules/auth/csrf.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { loadOptionalSession } from "./modules/auth/session.js";
@@ -43,6 +44,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Default 0 avoids trusting attacker-controlled X-Forwarded-* headers.
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
   app.use(requestContext);
+  app.use(localizationMiddleware);
   app.use(
     helmet({
       contentSecurityPolicy: {
