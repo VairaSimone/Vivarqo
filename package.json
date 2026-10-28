@@ -8,15 +8,18 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @vivarqo/api dev",
-    "db:generate": "prisma generate --config prisma.config.ts",
-    "db:migrate:deploy": "prisma migrate deploy --config prisma.config.ts",
-    "db:migrate:dev": "prisma migrate dev --config prisma.config.ts",
+    "dev:frontend": "pnpm --filter @vivarqo/frontend dev",
+    "db:generate": "prisma generate --config backend/prisma.config.ts",
+    "db:migrate:deploy": "prisma migrate deploy --config backend/prisma.config.ts",
+    "db:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
     "test": "pnpm --filter @vivarqo/api test",
     "typecheck": "pnpm --filter @vivarqo/api typecheck",
-    "build": "pnpm --filter @vivarqo/api build",
-    "db:backup": "bash scripts/backup-postgres.sh",
-    "db:restore": "bash scripts/restore-postgres.sh",
-    "vapid:generate": "node scripts/generate-vapid-keys.mjs"
+    "build": "pnpm --filter @vivarqo/api build && pnpm --filter @vivarqo/frontend build",
+    "build:api": "pnpm --filter @vivarqo/api build",
+    "build:frontend": "pnpm --filter @vivarqo/frontend build",
+    "db:backup": "bash backend/scripts/backup-postgres.sh",
+    "db:restore": "bash backend/scripts/restore-postgres.sh",
+    "vapid:generate": "node backend/scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.3",

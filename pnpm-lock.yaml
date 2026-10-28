@@ -15,7 +15,7 @@ importers:
         specifier: ^7.0.0
         version: 7.10.1(@types/node@24.19.2)(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3)
 
-  apps/api:
+  backend/api:
     dependencies:
       '@prisma/adapter-pg':
         specifier: ^7.0.0
@@ -78,6 +78,19 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(tsx@4.23.15)
+
+  frontend:
+    dependencies:
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      vite:
+        specifier: ^7.3.7
+        version: 7.3.7(@types/node@24.19.2)(jiti@2.7.0)(tsx@4.23.15)
 
 packages:
 

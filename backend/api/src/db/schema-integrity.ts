@@ -6,9 +6,9 @@ import { prisma } from "./prisma.js";
 import { logger } from "../logger.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
-const prismaSchemaPath = resolve(projectRoot, "prisma/schema.prisma");
+const prismaSchemaPath = resolve(projectRoot, "backend/prisma/schema.prisma");
 const initialMigrationName = "20261028000000_initial";
-const initialMigrationPath = resolve(projectRoot, "prisma/migrations", initialMigrationName, "migration.sql");
+const initialMigrationPath = resolve(projectRoot, "backend/prisma/migrations", initialMigrationName, "migration.sql");
 
 type ExpectedModel = { table: string; columns: string[] };
 type ExpectedSchema = {
@@ -40,7 +40,7 @@ function parseExpectedSchema(): ExpectedSchema {
     migrationSource = readFileSync(initialMigrationPath, "utf8");
   } catch (error) {
     throw new Error(
-      "Database schema files are missing from the runtime image. Include prisma/schema.prisma and prisma/migrations in the deployment.",
+      "Database schema files are missing from the runtime image. Include backend/prisma/schema.prisma and backend/prisma/migrations in the deployment.",
       { cause: error },
     );
   }
@@ -184,7 +184,7 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
 
 function runPrismaMigrationCommand(args: string[]): Promise<void> {
   const cliPath = resolve(projectRoot, "node_modules/prisma/build/index.js");
-  const configPath = resolve(projectRoot, "prisma.config.ts");
+  const configPath = resolve(projectRoot, "backend/prisma.config.ts");
 
   return new Promise((promiseResolve, promiseReject) => {
     const child = spawn(

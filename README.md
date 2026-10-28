@@ -1,6 +1,6 @@
 # Vivarqo
 
-Vivarqo è una PWA gestionale mobile-first per piccoli e medi allevatori di rettili. Questa prima consegna è intenzionalmente backend-first: mette in piedi il runtime API, il controllo di configurazione, la connessione PostgreSQL, gli endpoint tecnici di health/readiness, la migrazione relazionale di riferimento e i test del perimetro implementato.
+Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository è organizzato come monorepo: `backend/` contiene l'API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi; `frontend/` contiene la base React + Vite da cui sviluppare le schermate della PWA.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -14,21 +14,21 @@ Dalla root del repository:
 ```bash
 corepack enable
 cp .env.example .env
-docker compose -f infra/docker/compose.yaml up -d postgres
+docker compose -f backend/infra/docker/compose.yaml up -d postgres
 pnpm install
 pnpm db:generate
 pnpm dev:api
 ```
 
-Questa modalità avvia l'API sul computer e PostgreSQL in Docker. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale esegui `pnpm dev:frontend`: Vite rende disponibile la prima interfaccia React su `http://localhost:5173` e inoltra le richieste API a `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
 
 ```bash
-docker compose -f infra/docker/compose.yaml up -d --build api
+docker compose -f backend/infra/docker/compose.yaml up -d --build api
 ```
 
 La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione; l'API, prima di aprire la porta HTTP, applica automaticamente le migrazioni e verifica la completezza dello schema.
 
-Lo schema SQL consolidato di riferimento è versionato in [`database/schema.sql`](database/schema.sql); le migrazioni incrementali eseguibili sono raccolte in `prisma/migrations/` e il modello ORM in `prisma/schema.prisma`. Per ogni modifica futura aggiungere una nuova migrazione versionata: non modificare una migrazione già applicata e non usare `prisma db push` in produzione.
+Lo schema SQL consolidato di riferimento è versionato in [`backend/database/schema.sql`](backend/database/schema.sql); le migrazioni incrementali eseguibili sono raccolte in `backend/prisma/migrations/` e il modello ORM in `backend/prisma/schema.prisma`. Per ogni modifica futura aggiungere una nuova migrazione versionata: non modificare una migrazione già applicata e non usare `prisma db push` in produzione.
 
 All'avvio l'API aspetta PostgreSQL, esegue `prisma migrate deploy` e controlla tabelle, colonne, indici, vincoli nominati, trigger, funzioni ed estensione `citext`. Se lo schema SQL completo è già stato applicato manualmente ma manca la cronologia Prisma, l'app lo registra come baseline solo dopo la verifica integrale. Se trova uno schema parziale non tracciato o una migrazione già applicata ma con oggetti mancanti, interrompe l'avvio senza cancellare o sovrascrivere dati: in quel caso va fatto un backup e va corretta la deriva con una migrazione revisionata.
 
@@ -45,7 +45,7 @@ curl http://localhost:3000/readyz
 
 - `GET /healthz`: liveness, non dipende da PostgreSQL.
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
-- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti sotto. Il frontend React/PWA non è ancora incluso.
+- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti sotto. Il frontend React è inizializzato con una dashboard dimostrativa; le schermate di dominio e l'esperienza PWA completa verranno sviluppate progressivamente.
 
 ## Account e autenticazione
 
@@ -78,6 +78,8 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | Comando | Scopo |
 |---|---|
 | `pnpm dev:api` | Avvia l'API in watch mode |
+| `pnpm dev:frontend` | Avvia il frontend React + Vite |
+| `pnpm build` | Compila API e frontend |
 | `pnpm db:generate` | Genera il client Prisma |
 | `pnpm db:migrate:deploy` | Applica le migrazioni versionate |
 | `pnpm db:migrate:dev` | Crea/applica una migrazione in sviluppo; solo su DB di sviluppo |
@@ -88,9 +90,9 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 ## Stato del repository
 Il repository contiene un backend API per account e impostazioni, autenticazione, animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti/condivisioni pubbliche, import/export, finanze, billing Stripe e notifiche. La presenza di un endpoint non sostituisce la verifica del suo stato operativo, della configurazione dei provider e dei processi di produzione.
 
-Non incluso in questo repository: frontend React/PWA e relative schermate, pagine legali pubblicabili, sistema completo self-service di cancellazione account, pannello di gestione del consenso per eventuali tracker del frontend e flusso completo di segnalazione/moderazione dei contenuti pubblici. Prima del lancio, verificare i punti in [docs/security-and-compliance-readiness.md](docs/security-and-compliance-readiness.md).
+Ancora da completare: schermate React collegate alle API, installabilità PWA (manifest/service worker), pagine legali pubblicabili, flusso self-service completo di cancellazione account, gestione del consenso per eventuali tracker e segnalazione/moderazione dei contenuti pubblici. Prima del lancio, verificare i punti in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md).
 
-Le discrepanze note sono annotate in [docs/architecture-decisions.md](docs/architecture-decisions.md). La specifica ricevuta è conservata in [docs/specification.md](docs/specification.md).
+Le discrepanze note sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica ricevuta è conservata in [backend/docs/specification.md](backend/docs/specification.md).
 
 ## Anagrafiche animali e registri di cura
 
@@ -192,7 +194,7 @@ Creare una regola attiva genera la sua prima attività. Quando questa viene comp
 - `GET /api/v1/home/today`: attività in scadenza oggi, scadute ancora aperte, completate oggi, promemoria imminenti, eventi recenti e collegamento rapido alla registrazione multipla delle alimentazioni. Il giorno è calcolato nel fuso orario dell’account.
 - `GET /api/v1/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD&view=month|week|list`: attività e record riproduttivi reali nel periodo selezionato, con date e fuso orario espliciti. Gli eventi di deposizione sono derivati anche dai record delle covate e vengono deduplicati quando esiste già un evento riproduttivo di deposizione nella stessa data/ciclo. Il calendario esclude per default le attività ignorate; `includeDismissed=true` permette di includerle.
 
-La Home e il calendario sono per ora endpoint backend: non includono ancora le relative schermate React. Il worker backend controlla ogni minuto le attività aperte già scadute e crea notifiche deduplicate; l'invio push rispetta le preferenze e le fasce di quiet hours.
+La Home e il calendario sono per ora endpoint backend: la base React è presente, ma queste schermate non sono ancora collegate ai dati reali. Il worker backend controlla ogni minuto le attività aperte già scadute e crea notifiche deduplicate; l'invio push rispetta le preferenze e le fasce di quiet hours.
 
 ## Moduli di dominio: riproduzioni, inventario, documenti, finanze e notifiche
 
@@ -290,11 +292,11 @@ Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il si
 - `TRUST_PROXY_HOPS=0` è il default sicuro. Impostarlo a un valore superiore solo se l'API è raggiungibile esclusivamente attraverso una catena nota di proxy fidati; non esporre direttamente l'API mantenendo una fiducia indiscriminata negli header forwarded.
 - Le risposte API e le schede pubbliche non sono memorizzate nelle cache HTTP (`Cache-Control: no-store`). Gli access log registrano il template della rotta e non il percorso grezzo, per evitare di registrare slug di condivisione e identificativi presenti nella URL.
 - Il worker di retention cancella token scaduti/consumati, sessioni scadute, anteprime di import scadute, contatori di rate limit scaduti ed export scaduti. Questo non sostituisce una policy documentata per log, backup, documenti cancellati e dati amministrativi.
-- Prima del lancio pubblico, consultare [la checklist sicurezza e conformità](docs/security-and-compliance-readiness.md). Non dichiarare conformità legale sulla sola base dei controlli tecnici.
+- Prima del lancio pubblico, consultare [la checklist sicurezza e conformità](backend/docs/security-and-compliance-readiness.md). Non dichiarare conformità legale sulla sola base dei controlli tecnici.
 
 ## Lingua del backend
 
-Le risposte API e le email transazionali supportano italiano e inglese. La lingua salvata nelle impostazioni dell'account prevale sulla lingua del browser; per le richieste non autenticate viene usato `Accept-Language`, con italiano come fallback. Per il comportamento completo e il contratto dei messaggi, vedere [la documentazione di localizzazione](docs/backend-localization.md).
+Le risposte API e le email transazionali supportano italiano e inglese. La lingua salvata nelle impostazioni dell'account prevale sulla lingua del browser; per le richieste non autenticate viene usato `Accept-Language`, con italiano come fallback. Per il comportamento completo e il contratto dei messaggi, vedere [la documentazione di localizzazione](backend/docs/backend-localization.md).
 
 ## Preparazione alla produzione, backup e ripristino
 
@@ -304,4 +306,4 @@ Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HT
 - DATABASE_URL=... pnpm db:backup crea un dump PostgreSQL custom in ./backups, verifica l'archivio e scrive un checksum SHA-256. La copia va poi trasferita in storage cifrato e separato dal database.
 - CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump verifica il checksum, se presente, e ripristina nel database di destinazione. Il comando non elimina gli oggetti esistenti: usare un database dedicato e vuoto e predisporre prima uno snapshot di rollback.
 
-La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend sono implementate ma le schermate React/PWA non fanno parte di questo incremento.
+La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend sono implementate e il frontend React è inizializzato; l'interfaccia completa e le funzionalità PWA restano da sviluppare.

@@ -18,11 +18,11 @@ services:
 
   api:
     build:
-      context: ../..
-      dockerfile: apps/api/Dockerfile
+      context: ../../..
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     env_file:
-      - ../../.env
+      - ../../../.env
     environment:
       NODE_ENV: production
       PORT: "3000"
