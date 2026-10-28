@@ -99,6 +99,7 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
       headers: signed.headers,
       ...(method === "PUT" ? { body: new Uint8Array(body) } : {}),
       signal: AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS),
+      redirect: "error",
     });
   } catch {
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
