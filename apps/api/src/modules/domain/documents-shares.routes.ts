@@ -146,8 +146,23 @@ export function createDocumentShareRouter() {
     const documentId = id(req.params.id, "document id");
     const document = await prisma.document.findFirst({ where: { id: documentId, userId: auth.userId, deletedAt: null } });
     if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-    await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+    // Delete the object before hiding its database record. If storage is
+    // temporarily unavailable, keep the document visible and retryable rather
+    // than soft-deleting it while leaving an inaccessible orphan in storage.
+    // Object deletion is idempotent, so a retry also recovers from a DB failure.
     await deletePrivateObject(document.storageKey);
+    await prisma.$transaction(async (tx) => {
+      await tx.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+      await tx.auditEvent.create({
+        data: {
+          userId: auth.userId,
+          action: "document.deleted",
+          entityType: "document",
+          entityId: documentId,
+          requestId: requestId(res),
+        },
+      });
+    });
     res.status(204).send();
   });
 
