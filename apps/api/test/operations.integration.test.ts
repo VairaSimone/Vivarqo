@@ -209,6 +209,13 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     const ownEvent = await prisma.reproductiveEvent.create({
       data: { cycleId: cycle.id, eventType: "laying", occurredAt: new Date(now.getTime() + 2 * 60 * 60 * 1000), details: "Calendar test" },
     });
+    // 23:30 UTC is already the following calendar day in Europe/Rome.
+    const midnightEvent = await prisma.reproductiveEvent.create({
+      data: { cycleId: cycle.id, eventType: "laying", occurredAt: new Date(`${today}T23:30:00.000Z`), details: "Timezone de-duplication test" },
+    });
+    const midnightClutch = await prisma.clutch.create({
+      data: { cycleId: cycle.id, laidOn: new Date(`${tomorrow}T00:00:00.000Z`), eggCount: 1, status: "active" },
+    });
     const otherCycle = await prisma.reproductionCycle.create({
       data: {
         userId: other.userId,
@@ -231,6 +238,8 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
       .get(`/api/v1/calendar?from=${today}&to=${tomorrow}&view=week`)
       .expect(200);
     expect(calendar.body.items.some((item: { id: string }) => item.id === ownEvent.id)).toBe(true);
+    expect(calendar.body.items.some((item: { id: string }) => item.id === midnightEvent.id)).toBe(true);
+    expect(calendar.body.items.some((item: { id: string }) => item.id === midnightClutch.id)).toBe(false);
     expect(calendar.body.items.some((item: { id: string }) => item.title === "Should not appear")).toBe(false);
     expect(calendar.body.items.some((item: { id: string }) => item.id === dueToday.body.task.id)).toBe(true);
   });
