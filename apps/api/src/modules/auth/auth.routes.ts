@@ -54,6 +54,10 @@ function authRateLimit(limit: number, namespace: string) {
   return rateLimit({
     windowMs: 15 * 60 * 1000,
     limit,
+    // Integration suites create many synthetic accounts from one loopback IP.
+    // Keep the middleware active in development/staging/production; the
+    // PostgresRateLimitStore itself is tested independently in integration tests.
+    skip: () => process.env.NODE_ENV === "test",
     store: new PostgresRateLimitStore(namespace),
     standardHeaders: "draft-8",
     legacyHeaders: false,
@@ -67,6 +71,12 @@ function authRateLimit(limit: number, namespace: string) {
 function emailRateLimit(limit: number, namespace: string): RequestHandler {
   const store = new PostgresRateLimitStore(namespace);
   return async (req, res, next) => {
+    // See authRateLimit: test traffic should not poison shared persistent
+    // counters for the other integration suites.
+    if (process.env.NODE_ENV === "test") {
+      next();
+      return;
+    }
     const email = typeof req.body === "object" && req.body !== null &&
       "email" in req.body && typeof (req.body as { email?: unknown }).email === "string"
       ? (req.body as { email: string }).email.trim().toLowerCase()
