@@ -5,10 +5,12 @@ import { ensureDatabaseSchema } from "./db/schema-integrity.js";
 import { createApp } from "./app.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
 import { startNotificationWorker } from "./modules/domain/notification-worker.js";
+import { startRetentionWorker } from "./modules/domain/retention-worker.js";
 import type { Server } from "node:http";
 
 let server: Server | undefined;
 let stopNotificationWorker: () => void = () => undefined;
+let stopRetentionWorker: () => void = () => undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
@@ -20,6 +22,7 @@ async function startServer(): Promise<void> {
 
   const app = createApp();
   stopNotificationWorker = startNotificationWorker();
+  stopRetentionWorker = startRetentionWorker();
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
   });
@@ -30,6 +33,7 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   logger.info({ signal }, "Graceful shutdown started");
   stopNotificationWorker();
+  stopRetentionWorker();
 
   const forcedExit = setTimeout(() => {
     logger.error({ signal }, "Graceful shutdown timed out");
@@ -78,9 +82,10 @@ function shutdown(signal: string): void {
 
 void startServer().catch(async (error: unknown) => {
   if (shuttingDown) return;
+  // Startup exceptions can embed connection URLs or provider diagnostics. Keep
+  // raw messages out of logs; the error class and failed start are enough to triage.
   logger.fatal({
     errorName: error instanceof Error ? error.name : "UnknownError",
-    message: error instanceof Error ? error.message : "Unknown startup error",
   }, "Vivarqo API startup failed; no HTTP listener was started");
   try {
     await prisma.$disconnect();

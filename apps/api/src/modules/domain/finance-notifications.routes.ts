@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { getVapidPublicKey, sendPushToUser } from "./web-push.js";
+import { getVapidPublicKey, isSupportedPushEndpoint, sendPushToUser } from "./web-push.js";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -265,8 +265,9 @@ export function createNotificationRouter() {
       keys: z.object({ p256dh: z.string().min(16).max(512), auth: z.string().min(8).max(256) }).strict(),
       userAgent: z.string().max(1000).nullable().optional(),
     }).strict(), req.body);
-    const endpoint = new URL(input.endpoint);
-    if (endpoint.protocol !== "https:") throw new AppError(400, "INVALID_PUSH_ENDPOINT", "Push endpoint must use HTTPS");
+    if (!isSupportedPushEndpoint(input.endpoint)) {
+      throw new AppError(400, "INVALID_PUSH_ENDPOINT", "Push endpoint must use a supported HTTPS push provider");
+    }
     // Create first so two accounts racing to register the same endpoint cannot
     // reassign ownership through an upsert's unconditional update branch.
     let subscription;

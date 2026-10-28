@@ -46,6 +46,10 @@ function dateOnly(value: string): Date {
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new AppError(400, "VALIDATION_ERROR", "Invalid date");
   return date;
 }
+const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}, "Use a valid YYYY-MM-DD date");
 function optionalText(value: string | undefined): string | null {
   return value?.trim() || null;
 }
@@ -79,7 +83,7 @@ function readReport(value: unknown): Report {
 
 const schemas = {
   finance: z.object({
-    entryType: z.enum(["income", "expense"]), occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    entryType: z.enum(["income", "expense"]), occurredOn: calendarDateSchema,
     amountCents: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
     category: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(240),
     animalId: z.string().uuid().nullable().optional(), documentId: z.string().uuid().nullable().optional(),
@@ -91,8 +95,8 @@ const schemas = {
     notes: z.string().max(10_000).nullable().optional(), isActive: z.boolean().default(true),
   }).strict().transform((v) => v as Record<string, unknown>),
   reproductionCycles: z.object({
-    name: z.string().trim().max(160).nullable().optional(), startedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    name: z.string().trim().max(160).nullable().optional(), startedOn: calendarDateSchema,
+    endedOn: calendarDateSchema.nullable().optional(),
     status: z.enum(["planned", "active", "completed", "cancelled"]).default("planned"),
     parentAAnimalId: z.string().uuid().nullable().optional(), parentBAnimalId: z.string().uuid().nullable().optional(),
     notes: z.string().max(20_000).nullable().optional(),
@@ -104,7 +108,7 @@ const schemas = {
     humidityPct: z.number().min(0).max(100).nullable().optional(),
   }).strict().transform((v) => v as Record<string, unknown>),
   clutches: z.object({
-    cycleId: z.string().uuid(), laidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), eggCount: z.number().int().min(0).max(10_000),
+    cycleId: z.string().uuid(), laidOn: calendarDateSchema, eggCount: z.number().int().min(0).max(10_000),
     status: z.string().trim().min(1).max(20).default("active"), incubatorLabel: z.string().max(120).nullable().optional(),
     incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(), notes: z.string().max(20_000).nullable().optional(),
   }).strict().transform((v) => v as Record<string, unknown>),
@@ -114,7 +118,7 @@ const schemas = {
     humidityPct: z.number().min(0).max(100).nullable().optional(), eventType: z.string().trim().min(1).max(24), notes: z.string().max(10_000).nullable().optional(),
   }).strict().transform((v) => v as Record<string, unknown>),
   offspringBatches: z.object({
-    cycleId: z.string().uuid(), clutchId: z.string().uuid().nullable().optional(), bornOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    cycleId: z.string().uuid(), clutchId: z.string().uuid().nullable().optional(), bornOn: calendarDateSchema,
     count: z.number().int().min(0).max(10_000), notes: z.string().max(20_000).nullable().optional(),
   }).strict().transform((v) => v as Record<string, unknown>),
 } satisfies Record<Entity, z.ZodTypeAny>;
@@ -213,27 +217,18 @@ export function createDomainImportRouter() {
     }
     const [animals, animalsByIdentifier, cycles, clutches, documents] = await Promise.all([
       animalKeys.size ? prisma.animal.findMany({ where: { userId: auth.userId, id: { in: [...animalKeys] } }, select: { id: true } }) : Promise.resolve([]),
-      // Restrict relation lookups to IDs actually referenced by the import.
-      // Fetching every animal/cycle/clutch made small imports progressively slower
-      // as an account accumulated historical data.
-      animalIdentifiers.size ? prisma.animal.findMany({
-        where: { userId: auth.userId, identifier: { in: [...animalIdentifiers], mode: "insensitive" } },
-        select: { id: true, identifier: true },
-      }) : Promise.resolve([]),
-      cycleIds.size ? prisma.reproductionCycle.findMany({
-        where: { userId: auth.userId, id: { in: [...cycleIds] } },
-        select: { id: true },
-      }) : Promise.resolve([]),
-      clutchIds.size ? prisma.clutch.findMany({
-        where: { cycle: { is: { userId: auth.userId } }, id: { in: [...clutchIds] } },
-        select: { id: true },
-      }) : Promise.resolve([]),
+      animalIdentifiers.size ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: [...animalIdentifiers], mode: "insensitive" } }, select: { id: true, identifier: true } }) : Promise.resolve([]),
+      cycleIds.size
+        ? prisma.reproductionCycle.findMany({ where: { userId: auth.userId, id: { in: [...cycleIds] } }, select: { id: true } }) : Promise.resolve([]),
+      clutchIds.size
+        ? prisma.clutch.findMany({ where: { id: { in: [...clutchIds] }, cycle: { is: { userId: auth.userId } } }, select: { id: true, cycleId: true } }) : Promise.resolve([]),
       documentIds.size ? prisma.document.findMany({ where: { id: { in: [...documentIds] }, userId: auth.userId, deletedAt: null }, select: { id: true } }) : Promise.resolve([]),
     ]);
     const ownedAnimalIds = new Set(animals.map((item) => item.id));
     const ownedAnimalByIdentifier = new Map(animalsByIdentifier.map((item) => [item.identifier?.toLocaleLowerCase("it-IT") ?? "", item.id]));
     const ownedCycleIds = new Set(cycles.map((item) => item.id));
     const ownedClutchIds = new Set(clutches.map((item) => item.id));
+    const ownedClutchCycleById = new Map(clutches.map((item) => [item.id, item.cycleId]));
     const ownedDocumentIds = new Set(documents.map((item) => item.id));
     const errors: Report["errors"] = [];
     const validRows: Row[] = [];
@@ -265,7 +260,12 @@ export function createDomainImportRouter() {
       }
       if (["eggs", "incubationLogs"].includes(entity as string)
         || (entity === "offspringBatches" && record.clutchId !== null && record.clutchId !== undefined && record.clutchId !== "")) {
-        if (!ownedClutchIds.has(String(record.clutchId))) relationError = { column: "clutchId", message: "Clutch not found in this account" };
+        const clutchId = String(record.clutchId);
+        if (!ownedClutchIds.has(clutchId)) {
+          relationError = { column: "clutchId", message: "Clutch not found in this account" };
+        } else if (entity === "offspringBatches" && ownedClutchCycleById.get(clutchId) !== record.cycleId) {
+          relationError = { column: "clutchId", message: "Clutch and offspring batch must belong to the same cycle" };
+        }
       }
       if (entity === "finance" && record.documentId) {
         if (!ownedDocumentIds.has(String(record.documentId))) relationError = { column: "documentId", message: "Document not found in this account" };

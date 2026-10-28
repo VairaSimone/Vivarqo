@@ -1,8 +1,9 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { PostgresRateLimitStore } from "../../middleware/postgres-rate-limit-store.js";
 import { prisma } from "../../db/prisma.js";
 import { issueSession, revokeCurrentSession, requireSession, type AuthContext } from "./session.js";
 import { setCsrfCookie } from "./csrf.js";
@@ -40,27 +41,62 @@ function parseBody<TSchema extends z.ZodType>(schema: TSchema, body: unknown): z
   return result.data;
 }
 
-function authRateLimit(limit: number) {
-  return rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-    handler: (_req: Request, res: Response, _next: NextFunction) => {
-      res.status(429).json({
-        code: "RATE_LIMITED",
-        message: "Too many requests",
-        details: null,
-        requestId: requestId(res),
-      });
-    },
+function rateLimitedResponse(res: Response): void {
+  res.status(429).json({
+    code: "RATE_LIMITED",
+    message: "Too many requests",
+    details: null,
+    requestId: requestId(res),
   });
 }
 
-const registerLimiter = authRateLimit(10);
-const loginLimiter = authRateLimit(10);
-const tokenRequestLimiter = authRateLimit(5);
-const passwordResetLimiter = authRateLimit(5);
+function authRateLimit(limit: number, namespace: string) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit,
+    store: new PostgresRateLimitStore(namespace),
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (_req: Request, res: Response, _next: NextFunction) => rateLimitedResponse(res),
+  });
+}
+
+// An IP-only limit is bypassable by a distributed credential-stuffing or
+// mail-bombing source. A second shared counter is keyed by a normalized email;
+// the store HMACs the key before it reaches PostgreSQL.
+function emailRateLimit(limit: number, namespace: string): RequestHandler {
+  const store = new PostgresRateLimitStore(namespace);
+  return async (req, res, next) => {
+    const email = typeof req.body === "object" && req.body !== null &&
+      "email" in req.body && typeof (req.body as { email?: unknown }).email === "string"
+      ? (req.body as { email: string }).email.trim().toLowerCase()
+      : "";
+    if (!email) {
+      next();
+      return;
+    }
+
+    try {
+      const counter = await store.increment(email);
+      if (counter.totalHits > limit) {
+        rateLimitedResponse(res);
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+const registerLimiter = authRateLimit(10, "auth-register");
+const registerEmailLimiter = emailRateLimit(5, "auth-register-email");
+const loginLimiter = authRateLimit(10, "auth-login");
+const loginEmailLimiter = emailRateLimit(10, "auth-login-email");
+const tokenRequestLimiter = authRateLimit(5, "auth-token-request");
+const resendVerificationEmailLimiter = emailRateLimit(5, "auth-resend-verification-email");
+const forgotPasswordEmailLimiter = emailRateLimit(5, "auth-forgot-password-email");
+const passwordResetLimiter = authRateLimit(5, "auth-password-reset");
 
 const genericEmailResponse = {
   message: "If the address is eligible, an email with further instructions will be sent.",
@@ -75,7 +111,7 @@ export function createAuthRouter(sender?: EmailSender) {
     res.status(200).json({ csrfToken });
   });
 
-  router.post("/register", registerLimiter, async (req, res) => {
+  router.post("/register", registerLimiter, registerEmailLimiter, async (req, res) => {
     const input = parseBody(registerSchema, req.body);
     await registerAccount(input, emailSender, requestId(res));
     res.status(202).json(genericEmailResponse);
@@ -87,13 +123,13 @@ export function createAuthRouter(sender?: EmailSender) {
     res.status(200).json({ message: "Email verified. You can now sign in." });
   });
 
-  router.post("/resend-verification", tokenRequestLimiter, async (req, res) => {
+  router.post("/resend-verification", tokenRequestLimiter, resendVerificationEmailLimiter, async (req, res) => {
     const input = parseBody(emailRequestSchema, req.body);
     await resendVerification(input.email, emailSender, requestId(res));
     res.status(202).json(genericEmailResponse);
   });
 
-  router.post("/login", loginLimiter, async (req, res) => {
+  router.post("/login", loginLimiter, loginEmailLimiter, async (req, res) => {
     const input = parseBody(loginSchema, req.body);
     const user = await authenticate(input);
     await issueSession(user.id, req, res);
@@ -112,7 +148,7 @@ export function createAuthRouter(sender?: EmailSender) {
     res.status(200).json({ message: "All sessions have been revoked" });
   });
 
-  router.post("/forgot-password", tokenRequestLimiter, async (req, res) => {
+  router.post("/forgot-password", tokenRequestLimiter, forgotPasswordEmailLimiter, async (req, res) => {
     const input = parseBody(emailRequestSchema, req.body);
     await requestPasswordReset(input.email, emailSender, requestId(res));
     res.status(202).json(genericEmailResponse);

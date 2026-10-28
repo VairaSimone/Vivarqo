@@ -39,6 +39,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   const checkDatabase = dependencies.checkDatabase ?? checkDatabaseConnection;
 
   app.disable("x-powered-by");
+  // Express must only trust a proxy chain explicitly configured by the operator.
+  // Default 0 avoids trusting attacker-controlled X-Forwarded-* headers.
+  app.set("trust proxy", env.TRUST_PROXY_HOPS);
   app.use(requestContext);
   app.use(
     helmet({
@@ -53,12 +56,19 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       crossOriginResourcePolicy: { policy: "same-site" },
     }),
   );
+  // API responses can contain account, animal, financial and document metadata.
+  // Do not permit shared/browser caches to retain private API responses.
+  app.use("/api/v1", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   app.use(
     cors({
       origin: env.APP_ORIGIN,
       credentials: true,
       methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id", "X-Document-Name", "X-Document-Category", "X-Animal-Id", "X-Cycle-Id"],
+      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id", "X-Document-Name", "X-Document-Category", "X-Document-Note", "X-Animal-Id", "X-Cycle-Id"],
       maxAge: 600,
     }),
   );
