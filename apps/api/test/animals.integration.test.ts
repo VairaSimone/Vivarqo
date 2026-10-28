@@ -288,6 +288,16 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("X-CSRF-Token", owner.csrf)
       .send({})
       .expect(200);
+
+    const tooManyColumns = makeXlsx([Array.from({ length: 257 }, (_, index) => index === 0 ? "name" : `col${index}`), Array(257).fill("value")]);
+    const rejected = await owner.agent
+      .post("/api/v1/imports?entity=animals")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .send(tooManyColumns)
+      .expect(413);
+    expect(rejected.body.code).toBe("IMPORT_TOO_MANY_COLUMNS");
   });
 
   it("commits bulk feedings in one transaction and forbids cross-account animals", async () => {
