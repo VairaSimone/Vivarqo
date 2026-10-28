@@ -8,11 +8,28 @@ dotenv.config({
   override: false,
 });
 
+const originSchema = z.string().url().refine((value) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.origin === value.replace(/\\/$/, "") &&
+      parsed.pathname === "/" &&
+      parsed.search === "" &&
+      parsed.hash === "" &&
+      parsed.username === "" &&
+      parsed.password === "";
+  } catch {
+    return false;
+  }
+}, "must be an origin only, without a path, query, credentials or fragment").transform((value) => new URL(value).origin);
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
-  APP_ORIGIN: z.string().url().default("http://localhost:5173"),
-  API_ORIGIN: z.string().url().default("http://localhost:3000"),
+  // Only set TRUST_PROXY_HOPS when the deployment topology has a known number
+  // of trusted reverse proxies; never blindly trust all X-Forwarded-* headers.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
+  APP_ORIGIN: originSchema.default("http://localhost:5173"),
+  API_ORIGIN: originSchema.default("http://localhost:3000"),
   DATABASE_URL: z.string().url().refine(
     (value) => value.startsWith("postgresql://") || value.startsWith("postgres://"),
     { message: "must be a PostgreSQL connection URL" },
@@ -46,8 +63,8 @@ if (!parsedEnvironment.success) {
 const runtimeEnvironment = parsedEnvironment.data;
 if (runtimeEnvironment.NODE_ENV === "production") {
   const productionProblems: string[] = [];
-  if (!runtimeEnvironment.APP_ORIGIN.startsWith("https://")) productionProblems.push("APP_ORIGIN must use HTTPS in production");
-  if (!runtimeEnvironment.API_ORIGIN.startsWith("https://")) productionProblems.push("API_ORIGIN must use HTTPS in production");
+  if (new URL(runtimeEnvironment.APP_ORIGIN).protocol !== "https:") productionProblems.push("APP_ORIGIN must use HTTPS in production");
+  if (new URL(runtimeEnvironment.API_ORIGIN).protocol !== "https:") productionProblems.push("API_ORIGIN must use HTTPS in production");
   if (runtimeEnvironment.CSRF_SECRET.toLowerCase().includes("replace-with") || runtimeEnvironment.CSRF_SECRET.length < 32) {
     productionProblems.push("CSRF_SECRET must be a unique random secret with at least 32 characters");
   }
@@ -63,7 +80,7 @@ if (runtimeEnvironment.NODE_ENV === "production") {
   if (!runtimeEnvironment.S3_BUCKET || !runtimeEnvironment.S3_ACCESS_KEY_ID || !runtimeEnvironment.S3_SECRET_ACCESS_KEY || !runtimeEnvironment.S3_REGION) {
     productionProblems.push("S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required in production");
   }
-  if (runtimeEnvironment.S3_ENDPOINT && !runtimeEnvironment.S3_ENDPOINT.startsWith("https://")) {
+  if (runtimeEnvironment.S3_ENDPOINT && new URL(runtimeEnvironment.S3_ENDPOINT).protocol !== "https:") {
     productionProblems.push("S3_ENDPOINT must use HTTPS in production");
   }
   if (productionProblems.length) throw new Error(`Invalid production environment: ${productionProblems.join("; ")}`);
