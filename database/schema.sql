@@ -339,7 +339,7 @@ CREATE TABLE stock_movements (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     item_id             UUID NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
     movement_type       VARCHAR(16) NOT NULL CHECK (movement_type IN ('in', 'out', 'adjustment')),
-    quantity            NUMERIC(12,3) NOT NULL CHECK (quantity > 0),
+    quantity            NUMERIC(12,3) NOT NULL CHECK (quantity >= 0 AND (movement_type = 'adjustment' OR quantity > 0)),
     unit_cost_cents     INTEGER CHECK (unit_cost_cents IS NULL OR unit_cost_cents >= 0),
     occurred_at         TIMESTAMPTZ NOT NULL,
     reference           VARCHAR(160),
