@@ -19,7 +19,7 @@ function crc32(buffer: Buffer): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 function archiveName(name: string): string {
-  return name.replace(/^\\/+/, "").replace(/\\.\\.(\\/|\\\\)/g, "");
+  return name.replace(/^\/+/, "").replace(/\.\.(\/|\\)/g, "");
 }
 function assertZipSizeWithinLimit(files: ExportFile[]): void {
   // This ZIP writer stores entries uncompressed. Preflight the exact ZIP32
@@ -40,7 +40,7 @@ function zipFiles(files: ExportFile[]): Buffer {
   const centralParts: Buffer[] = [];
   let offset = 0;
   for (const file of files) {
-    const filename = Buffer.from(file.name.replace(/^\/+/, "").replace(/\.\.(\/|\\)/g, ""), "utf8");
+    const filename = Buffer.from(archiveName(file.name), "utf8");
     const data = file.content;
     const checksum = crc32(data);
     const local = Buffer.alloc(30);
