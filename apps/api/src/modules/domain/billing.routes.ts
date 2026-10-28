@@ -43,6 +43,7 @@ async function stripeRequest(path: string, form: URLSearchParams, idempotencyKey
       },
       body: form,
       signal: AbortSignal.timeout(15_000),
+      redirect: "error",
     });
   } catch {
     // Do not leak provider/network details, and do not leave a client request
