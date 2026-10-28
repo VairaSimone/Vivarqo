@@ -12,9 +12,10 @@ const fileBody = raw({
   limit: "5mb",
 });
 
-function parseUuid(value: string): string {
-  if (!z.string().uuid().safeParse(value).success) throw new AppError(400, "INVALID_ID", "Invalid import id");
-  return value;
+function parseUuid(value: string | string[] | undefined): string {
+  const id = Array.isArray(value) ? value[0] : value;
+  if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid import id");
+  return id;
 }
 
 function normalizeHeader(value: string): string {
@@ -391,7 +392,3 @@ export function createImportRouter() {
   return router;
 }
 
-function parseUuid(value: string): string {
-  if (!z.string().uuid().safeParse(value).success) throw new AppError(400, "INVALID_ID", "Invalid import id");
-  return value;
-}

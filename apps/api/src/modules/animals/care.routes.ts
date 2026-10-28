@@ -29,9 +29,10 @@ function parseBody<TSchema extends z.ZodType>(schema: TSchema, body: unknown): z
   return result.data;
 }
 
-function parseUuid(value: string, label = "id"): string {
-  if (!z.string().uuid().safeParse(value).success) throw new AppError(400, "INVALID_ID", `Invalid ${label}`);
-  return value;
+function parseUuid(value: string | string[] | undefined, label = "id"): string {
+  const id = Array.isArray(value) ? value[0] : value;
+  if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", `Invalid ${label}`);
+  return id;
 }
 
 async function getOwnedAnimal(userId: string, animalId: string, writable = false) {
