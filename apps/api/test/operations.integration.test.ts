@@ -76,7 +76,7 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     return { userId: user.id, agent, csrf };
   }
 
-  async function task(
+  function task(
     context: Awaited<ReturnType<typeof account>>,
     payload: Record<string, unknown> = {},
   ) {
@@ -150,7 +150,7 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     const pet = await animal(owner, "Recurring snake");
     const dueAt = new Date(Date.now() - 10 * 60 * 1000);
     const created = await owner.agent
-      .post("/api/v1/reminder-rules")
+      .post("/api/v1/tasks/reminder-rules")
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .send({
@@ -240,7 +240,7 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     const foreignAnimal = await animal(other, "Foreign task animal");
 
     const invalid = await owner.agent
-      .post("/api/v1/reminder-rules")
+      .post("/api/v1/tasks/reminder-rules")
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .send({
