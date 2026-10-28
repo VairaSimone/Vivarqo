@@ -6,7 +6,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { deletePrivateObject, readPrivateObject, storePrivateObjectFromFile } from "./private-storage.js";
+import { deletePrivateObject, openPrivateObjectStream, storePrivateObjectFromFile } from "./private-storage.js";
 import { singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
 
 const EXPORT_PAGE_SIZE = 250;
@@ -258,8 +258,8 @@ async function* exportEntries(
   }));
   for await (const document of documents) {
     const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
-    const bytes = await readPrivateObject(String(document.storageKey));
-    yield { name: `documents/${document.id}_${fileName}`, chunks: singleBufferChunk(bytes) };
+    const stored = await openPrivateObjectStream(String(document.storageKey), 10 * 1024 * 1024);
+    yield { name: `documents/${document.id}_${fileName}`, chunks: stored.stream };
   }
 }
 
@@ -318,7 +318,7 @@ export function createExportRouter() {
     res.status(200).json({ export: job, ready: job.status === "completed" && job.expiresAt > new Date() });
   });
 
-  router.get("/:id/download", requireSession, async (req, res) => {
+  router.get("/:id/download", requireSession, async (req, res, next) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id);
     const job = await prisma.exportJob.findFirst({ where: { id, userId: auth.userId } });
@@ -326,12 +326,22 @@ export function createExportRouter() {
     if (job.status !== "completed" || !job.storageKey || job.expiresAt <= new Date()) {
       throw new AppError(410, "EXPORT_EXPIRED", "The export is not available or has expired");
     }
-    const data = await readPrivateObject(job.storageKey);
+
+    const stored = await openPrivateObjectStream(job.storageKey, MAX_EXPORT_BYTES);
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Length", data.length);
+    if (stored.sizeBytes !== null) res.setHeader("Content-Length", stored.sizeBytes);
     res.setHeader("Content-Disposition", `attachment; filename="vivarqo-export-${job.id}.zip"`);
     res.setHeader("Cache-Control", "private, no-store");
-    res.status(200).send(data);
+    res.status(200);
+
+    stored.stream.on("error", (error: Error) => {
+      if (res.headersSent) res.destroy(error);
+      else next(error);
+    });
+    res.on("close", () => {
+      if (!res.writableEnded) stored.stream.destroy();
+    });
+    stored.stream.pipe(res);
   });
 
   return router;
