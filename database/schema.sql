@@ -405,6 +405,15 @@ CREATE TABLE export_jobs (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE api_rate_limit_buckets (
+    namespace       VARCHAR(80) NOT NULL,
+    key_hash        CHAR(64) NOT NULL,
+    hits            INTEGER NOT NULL DEFAULT 1 CHECK (hits >= 0),
+    reset_at        TIMESTAMPTZ NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT api_rate_limit_buckets_pkey PRIMARY KEY (namespace, key_hash)
+);
+
 -- ---------------------------------------------------------------------------
 -- 7. Annotazioni genetiche e registro economico
 -- ---------------------------------------------------------------------------
@@ -521,6 +530,7 @@ CREATE INDEX import_jobs_user_created_idx ON import_jobs (user_id, created_at DE
 CREATE INDEX import_jobs_expiry_idx ON import_jobs (expires_at);
 CREATE INDEX export_jobs_user_created_idx ON export_jobs (user_id, created_at DESC);
 CREATE INDEX export_jobs_expiry_idx ON export_jobs (expires_at);
+CREATE INDEX api_rate_limit_buckets_reset_idx ON api_rate_limit_buckets (reset_at);
 CREATE INDEX animal_genetic_traits_animal_idx ON animal_genetic_traits (animal_id);
 CREATE INDEX animal_genetic_traits_source_animal_idx ON animal_genetic_traits (source_animal_id);
 CREATE INDEX finance_entries_user_date_idx ON finance_entries (user_id, occurred_on DESC);
