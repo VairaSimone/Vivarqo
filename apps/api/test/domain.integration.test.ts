@@ -238,9 +238,13 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ includeDocuments: false })
       .expect(201);
     expect(exported.body.export.status).toBe("completed");
-    const download = await owner.agent.get(exported.body.downloadPath).expect(200);
+    const download = await owner.agent.get(exported.body.downloadPath).buffer(true).parse((response, callback) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+      response.on("end", () => callback(null, Buffer.concat(chunks)));
+    }).expect(200);
     expect(download.headers["content-type"]).toContain("application/zip");
-    expect(Buffer.from(download.body).subarray(0, 2).toString("hex")).toBe("504b");
+    expect(Buffer.from(download.body as Buffer).subarray(0, 2).toString("hex")).toBe("504b");
 
     const billing = await owner.agent.get("/api/v1/billing/subscription").expect(200);
     expect(billing.body.subscription).toBeNull();
