@@ -85,10 +85,10 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | `pnpm typecheck` | Type-check TypeScript |
 | `pnpm build` | Compila l'API |
 
-## Stato dell'incremento
-Implementato: fondamenta API, account e impostazioni, registrazione, verifica email, login/logout, revoca sessioni, recupero/reset password, sessioni server-side con cookie HttpOnly, CSRF, rate limit dedicato ai flussi auth, integrazione email Resend configurabile e test unitari/integration.
+## Stato del repository
+Il repository contiene un backend API per account e impostazioni, autenticazione, animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti/condivisioni pubbliche, import/export, finanze, billing Stripe e notifiche. La presenza di un endpoint non sostituisce la verifica del suo stato operativo, della configurazione dei provider e dei processi di produzione.
 
-Non ancora implementato: animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti e condivisioni pubbliche, import/export, finanze, billing Stripe, notifiche/job, OpenAPI completa e frontend React/PWA. La presenza delle tabelle non implica che tali funzionalità siano disponibili.
+Non incluso in questo repository: frontend React/PWA e relative schermate, pagine legali pubblicabili, sistema completo self-service di cancellazione account, pannello di gestione del consenso per eventuali tracker del frontend e flusso completo di segnalazione/moderazione dei contenuti pubblici. Prima del lancio, verificare i punti in [docs/security-and-compliance-readiness.md](docs/security-and-compliance-readiness.md).
 
 Le discrepanze note sono annotate in [docs/architecture-decisions.md](docs/architecture-decisions.md). La specifica ricevuta è conservata in [docs/specification.md](docs/specification.md).
 
@@ -258,7 +258,7 @@ Il mittente Web Push usa VAPID ES256 e cifratura RFC 8291 (ECDH P-256, HKDF-SHA2
 
 L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono supportati `entity=animals`, `entity=weights`, `entity=sheds`, `entity=notes` ed `entity=feedings`. Per i registri di cura il file deve includere `animalId` oppure `animalIdentifier`, oltre ai campi del registro. Le righe vengono validate con numero di riga/colonna e importate in una transazione; per le alimentazioni si raggruppano le voci con lo stesso istante in un’unica sessione.
 
-`POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili, chiavi di relazione, morph genetici dichiarati, condivisioni e preferenze notifiche. Ogni CSV ha intestazioni anche quando non contiene righe. Il file `documents.csv` indicizza i documenti e i relativi percorsi; `includeDocuments: true` aggiunge anche i file privati, mentre il valore predefinito non include gli allegati. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato. Gli export scadono dopo 24 ore; il limite dell’archivio è 50 MB.
+`POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili, dati essenziali dell'account e dell'abbonamento, chiavi di relazione, dati di dominio, condivisioni e preferenze notifiche; non include password hash o token di autenticazione. Ogni CSV ha intestazioni anche quando non contiene righe. Il file `documents.csv` indicizza i documenti e i relativi percorsi; `includeDocuments: true` aggiunge anche i file privati, mentre il valore predefinito non include gli allegati. L'export legge le tabelle in pagine da 250 righe, genera ZIP e CSV in streaming e applica il limite di 50 MiB durante la scrittura. Gli export scadono dopo 24 ore e il worker di retention elimina i file e i metadati scaduti. La generazione è limitata a 2 export simultanei per processo API. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato in streaming.
 
 ### Abbonamenti e Stripe
 
@@ -283,6 +283,18 @@ curl -X POST 'http://localhost:3000/api/v1/imports?entity=weights' \
 
 Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il sistema risolve l’identificativo all’interno del solo account autenticato. Confermare con `POST /api/v1/imports/:importId/confirm`, dopo aver controllato l’anteprima e gli eventuali errori.
 
+
+## Sicurezza e privacy: configurazione di produzione
+
+- I limiti di registrazione/login/reset/verifica sono persistenti su PostgreSQL e condivisi tra repliche. Il rate limit generale API è ancora per-processo: se si scala a più repliche, configurare un rate limit distribuito al gateway/ingress.
+- `TRUST_PROXY_HOPS=0` è il default sicuro. Impostarlo a un valore superiore solo se l'API è raggiungibile esclusivamente attraverso una catena nota di proxy fidati; non esporre direttamente l'API mantenendo una fiducia indiscriminata negli header forwarded.
+- Le risposte API e le schede pubbliche non sono memorizzate nelle cache HTTP (`Cache-Control: no-store`). Gli access log registrano il template della rotta e non il percorso grezzo, per evitare di registrare slug di condivisione e identificativi presenti nella URL.
+- Il worker di retention cancella token scaduti/consumati, sessioni scadute, anteprime di import scadute, contatori di rate limit scaduti ed export scaduti. Questo non sostituisce una policy documentata per log, backup, documenti cancellati e dati amministrativi.
+- Prima del lancio pubblico, consultare [la checklist sicurezza e conformità](docs/security-and-compliance-readiness.md). Non dichiarare conformità legale sulla sola base dei controlli tecnici.
+
+## Lingua del backend
+
+Le risposte API e le email transazionali supportano italiano e inglese. La lingua salvata nelle impostazioni dell'account prevale sulla lingua del browser; per le richieste non autenticate viene usato `Accept-Language`, con italiano come fallback. Per il comportamento completo e il contratto dei messaggi, vedere [la documentazione di localizzazione](docs/backend-localization.md).
 
 ## Preparazione alla produzione, backup e ripristino
 

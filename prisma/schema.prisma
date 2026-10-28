@@ -496,6 +496,17 @@ model ExportJob {
   @@map("export_jobs")
 }
 
+model ApiRateLimitBucket {
+  namespace String   @db.VarChar(80)
+  keyHash   String   @map("key_hash") @db.Char(64)
+  hits      Int      @default(1)
+  resetAt   DateTime @map("reset_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  @@id([namespace, keyHash], map: "api_rate_limit_buckets_pkey")
+  @@index([resetAt], map: "api_rate_limit_buckets_reset_idx")
+  @@map("api_rate_limit_buckets")
+}
+
 model AnimalGeneticTrait {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   animalId       String   @map("animal_id") @db.Uuid

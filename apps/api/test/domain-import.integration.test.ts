@@ -109,6 +109,34 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect(entry.amountCents).toBe(1999n);
   });
 
+  it("rejects impossible calendar dates during preview", async () => {
+    const owner = await account();
+    const preview = await owner.agent.post("/api/v1/imports?entity=reproductionCycles")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(Buffer.from("startedOn,name\n2026-02-31,Invalid date\n", "utf8"))
+      .expect(201);
+
+    expect(preview.body.validRows).toBe(0);
+    expect(preview.body.invalidRows).toBe(1);
+    expect(preview.body.errors[0].reason).toContain("data valida nel formato AAAA-MM-GG");
+  });
+
+  it("rejects an offspring batch linked to a clutch from another cycle", async () => {
+    const owner = await account();
+    const firstCycleId = await importCsv(owner, "reproductionCycles", "name,startedOn\nFirst cycle,2026-01-01\n");
+    const secondCycleId = await importCsv(owner, "reproductionCycles", "name,startedOn\nSecond cycle,2026-02-01\n");
+    const clutchId = await importCsv(owner, "clutches", "cycleId,laidOn,eggCount\n" + firstCycleId + ",2026-10-01,2\n");
+    const csv = "cycleId,bornOn,count,clutchId\n" + secondCycleId + ",2026-10-20,2," + clutchId + "\n";
+    const preview = await owner.agent.post("/api/v1/imports?entity=offspringBatches")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+
+    expect(preview.body.validRows).toBe(0);
+    expect(preview.body.invalidRows).toBe(1);
+    expect(preview.body.errors[0].reason).toContain("stesso ciclo");
+  });
+
   it("rejects imports that reference another account's reproduction cycle", async () => {
     const owner = await account();
     const other = await account();
@@ -121,6 +149,6 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
       .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
     expect(preview.body.validRows).toBe(0);
     expect(preview.body.invalidRows).toBe(1);
-    expect(preview.body.errors[0].reason).toContain("Cycle not found");
+    expect(preview.body.errors[0].reason).toContain("Ciclo non trovato in questo account");
   });
 });

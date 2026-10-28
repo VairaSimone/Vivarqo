@@ -14,7 +14,9 @@ export const requestContext: RequestHandler = (req, res, next) => {
     const entry = {
       requestId,
       method: req.method,
-      path: req.path,
+      // Do not log raw paths: public-share slugs are bearer links and may appear
+      // in paths along with other identifiers that should not enter log retention.
+      route: typeof req.route?.path === "string" ? req.route.path : "unmatched",
       statusCode: res.statusCode,
       durationMs: Math.round(durationMs * 100) / 100,
     };

@@ -32,15 +32,21 @@ function configuredStripe(options: BillingRouterOptions): string {
 async function stripeRequest(path: string, form: URLSearchParams, idempotencyKey: string, options: BillingRouterOptions): Promise<Record<string, unknown>> {
   const key = configuredStripe(options);
   const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl(`https://api.stripe.com/v1/${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: form,
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(`https://api.stripe.com/v1/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new AppError(503, "BILLING_PROVIDER_UNAVAILABLE", "The payment provider is temporarily unavailable");
+  }
   const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
     const stripeError = typeof payload.error === "object" && payload.error !== null ? (payload.error as Record<string, unknown>).type : undefined;

@@ -6,8 +6,10 @@ export const logger = pino({
   redact: {
     paths: [
       "password", "passwordHash", "token", "tokenHash", "authorization", "cookie", "set-cookie",
-      "SESSION_SECRET", "CSRF_SECRET", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
-      "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY",
+      "SESSION_SECRET", "CSRF_SECRET", "csrfSecret", "DATABASE_URL", "databaseUrl",
+      "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "stripeSecretKey", "stripeWebhookSecret",
+      "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "secretAccessKey", "privateKey",
+      "authSecret", "p256dh", "pushEndpoint",
     ],
     censor: "[REDACTED]",
   },

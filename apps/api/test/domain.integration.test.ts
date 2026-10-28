@@ -222,11 +222,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await other.agent.patch(`/api/v1/notifications/${notification.id}/read`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({}).expect(404);
 
-    const endpoint = `https://push.example.test/${randomUUID()}`;
+    const endpoint = `https://fcm.googleapis.com/wp/${randomUUID()}`;
     await owner.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ endpoint, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
       .expect(201);
+
     await other.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", other.csrf)
       .send({ endpoint, keys: { p256dh: "zyxwvutsrqponmlk9876543210", auth: "zyxwvutsrqponmlk" }, userAgent: "other-account" })
@@ -234,6 +235,16 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const retainedSubscription = await prisma.pushSubscription.findUniqueOrThrow({ where: { endpoint } });
     expect(retainedSubscription.userId).toBe(owner.userId);
     expect(retainedSubscription.userAgent).toBe("integration-test");
+
+    const unsupported = await owner.agent.post("/api/v1/push-subscriptions")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        endpoint: "https://attacker.example.test/push",
+        keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) },
+      })
+      .expect(400);
+    expect(unsupported.body.code).toBe("INVALID_PUSH_ENDPOINT");
+
     const prefs = await owner.agent.patch("/api/v1/notification-preferences")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ pushEnabled: true, inAppEnabled: true, quietHoursStart: "22:00", quietHoursEnd: "07:00", categories: { billing: true } })
@@ -242,10 +253,33 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
+  it("matches care-import animal identifiers without regard to letter case", async () => {
+    const owner = await account();
+    const animal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Case-insensitive import", identifier: "ROCCO-123", species: "Python regius" },
+    });
+    const csv = "animalIdentifier,measuredAt,weightG\nrocco-123,2026-10-20T12:00:00Z,420\n";
+    const preview = await owner.agent.post("/api/v1/imports?entity=weights")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+
+    expect(preview.body.validRows).toBe(1);
+    expect(preview.body.invalidRows).toBe(0);
+
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    const measurement = await prisma.weightMeasurement.findFirstOrThrow({
+      where: { animalId: animal.id, weightG: 420 },
+    });
+    expect(measurement.animalId).toBe(animal.id);
+  });
+
   it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
-    await prisma.animal.create({ data: { userId: owner.userId, name: "  =HYPERLINK(\"https://evil.example\")", species: "Python regius" } });
+    await prisma.animal.create({
+      data: { userId: owner.userId, name: "  =HYPERLINK(\"https://evil.example\")", species: "Python regius" },
+    });
     const uploaded = await owner.agent.post("/api/v1/documents")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "application/pdf").set("X-Document-Name", "records.pdf")

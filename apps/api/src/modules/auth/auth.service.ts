@@ -11,9 +11,50 @@ import type {
 } from "./auth.schemas.js";
 import type { EmailSender } from "./email-sender.js";
 import { createOpaqueToken, hashOpaqueToken } from "./token-utils.js";
+import type { Locale } from "../../i18n/localization.js";
 
 const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000;
+
 const RESET_PASSWORD_TTL_MS = 60 * 60 * 1000;
+
+function verificationEmail(locale: string, link: string): { subject: string; html: string } {
+  if (locale === "en") {
+    return {
+      subject: "Verify your email address — Vivarqo",
+      html: "<p>To verify your email address, open this link:</p><p><a href=\"" + link + "\">Verify email</a></p><p>The link expires in 24 hours. If you did not request a Vivarqo account, ignore this email.</p>",
+    };
+  }
+  return {
+    subject: "Verifica il tuo indirizzo email — Vivarqo",
+    html: "<p>Per verificare il tuo indirizzo email, apri questo link:</p><p><a href=\"" + link + "\">Verifica email</a></p><p>Il link scade tra 24 ore. Se non hai richiesto un account Vivarqo, ignora questa email.</p>",
+  };
+}
+
+function passwordResetEmail(locale: string, link: string): { subject: string; html: string } {
+  if (locale === "en") {
+    return {
+      subject: "Reset your password — Vivarqo",
+      html: "<p>To set a new password, open this link:</p><p><a href=\"" + link + "\">Reset password</a></p><p>The link expires in 60 minutes. If you did not request a reset, ignore this email.</p>",
+    };
+  }
+  return {
+    subject: "Reimposta la password — Vivarqo",
+    html: "<p>Per impostare una nuova password, apri questo link:</p><p><a href=\"" + link + "\">Reimposta password</a></p><p>Il link scade tra 60 minuti. Se non hai richiesto il reset, ignora questa email.</p>",
+  };
+}
+
+function changedEmailVerification(locale: string, link: string): { subject: string; html: string } {
+  if (locale === "en") {
+    return {
+      subject: "Confirm your new email address — Vivarqo",
+      html: "<p>To confirm your new email address, open this link:</p><p><a href=\"" + link + "\">Verify email</a></p><p>The link expires in 24 hours.</p>",
+    };
+  }
+  return {
+    subject: "Conferma il nuovo indirizzo email — Vivarqo",
+    html: "<p>Per confermare il nuovo indirizzo email, apri questo link:</p><p><a href=\"" + link + "\">Verifica email</a></p><p>Il link scade tra 24 ore.</p>",
+  };
+}
 
 function makeLink(path: string, token: string): string {
   const url = new URL(path, env.APP_ORIGIN);
@@ -68,7 +109,7 @@ export async function registerAccount(
           email: input.email,
           displayName: input.displayName,
           passwordHash,
-          locale: "it",
+          locale: input.locale ?? "it",
           timezone: "Europe/Rome",
         },
       });
@@ -90,14 +131,13 @@ export async function registerAccount(
 
   await sendWithoutLeakingDetails(sender, {
     to: input.email,
-    subject: "Verifica il tuo indirizzo email — Vivarqo",
-    html: `<p>Per verificare il tuo indirizzo email, apri questo link:</p><p><a href="${makeLink("/verify-email", rawToken)}">Verifica email</a></p><p>Il link scade tra 24 ore. Se non hai richiesto un account Vivarqo, ignora questa email.</p>`,
+    ...verificationEmail(input.locale ?? "it", makeLink("/verify-email", rawToken)),
   }, requestId);
 
   logger.info({ requestId, userId }, "Account registration created");
 }
 
-export async function verifyEmail(rawToken: string): Promise<void> {
+export async function verifyEmail(rawToken: string): Promise<Locale> {
   const tokenHash = hashOpaqueToken(rawToken);
   const now = new Date();
   const token = await prisma.authToken.findUnique({
@@ -140,6 +180,7 @@ export async function verifyEmail(rawToken: string): Promise<void> {
       data: { consumedAt: now },
     });
   });
+  return token.user.locale === "en" ? "en" : "it";
 }
 
 export async function resendVerification(
@@ -149,7 +190,7 @@ export async function resendVerification(
 ): Promise<void> {
   const user = await prisma.user.findFirst({
     where: { email, emailVerifiedAt: null, deletedAt: null, accountStatus: "active" },
-    select: { id: true, email: true },
+    select: { id: true, email: true, locale: true },
   });
 
   if (!user) return;
@@ -173,12 +214,11 @@ export async function resendVerification(
 
   await sendWithoutLeakingDetails(sender, {
     to: user.email,
-    subject: "Verifica il tuo indirizzo email — Vivarqo",
-    html: `<p>Per verificare il tuo indirizzo email, apri questo link:</p><p><a href="${makeLink("/verify-email", rawToken)}">Verifica email</a></p><p>Il link scade tra 24 ore.</p>`,
+    ...verificationEmail(user.locale, makeLink("/verify-email", rawToken)),
   }, requestId);
 }
 
-export async function authenticate(input: LoginInput): Promise<{ id: string }> {
+export async function authenticate(input: LoginInput): Promise<{ id: string; locale: Locale }> {
   const user = await prisma.user.findFirst({
     where: { email: input.email, deletedAt: null },
     select: {
@@ -187,6 +227,7 @@ export async function authenticate(input: LoginInput): Promise<{ id: string }> {
       emailVerifiedAt: true,
       deletedAt: true,
       accountStatus: true,
+      locale: true,
     },
   });
 
@@ -206,7 +247,7 @@ export async function authenticate(input: LoginInput): Promise<{ id: string }> {
     throw new AppError(403, "EMAIL_NOT_VERIFIED", "Verify your email before signing in");
   }
 
-  return { id: user.id };
+  return { id: user.id, locale: user.locale === "en" ? "en" : "it" };
 }
 
 export async function requestPasswordReset(
@@ -221,7 +262,7 @@ export async function requestPasswordReset(
       deletedAt: null,
       accountStatus: "active",
     },
-    select: { id: true, email: true },
+    select: { id: true, email: true, locale: true },
   });
   if (!user) return;
 
@@ -244,12 +285,11 @@ export async function requestPasswordReset(
 
   await sendWithoutLeakingDetails(sender, {
     to: user.email,
-    subject: "Reimposta la password — Vivarqo",
-    html: `<p>Per impostare una nuova password, apri questo link:</p><p><a href="${makeLink("/reset-password", rawToken)}">Reimposta password</a></p><p>Il link scade tra 60 minuti. Se non hai richiesto il reset, ignora questa email.</p>`,
+    ...passwordResetEmail(user.locale, makeLink("/reset-password", rawToken)),
   }, requestId);
 }
 
-export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+export async function resetPassword(input: ResetPasswordInput): Promise<Locale> {
   const now = new Date();
   const token = await prisma.authToken.findUnique({
     where: { tokenHash: hashOpaqueToken(input.token) },
@@ -297,6 +337,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
       data: { consumedAt: now },
     });
   });
+  return token.user.locale === "en" ? "en" : "it";
 }
 
 export async function patchAccount(
@@ -392,8 +433,7 @@ export async function patchAccount(
   if (emailChanged && rawVerificationToken) {
     await sendWithoutLeakingDetails(sender, {
       to: updatedUser.email,
-      subject: "Conferma il nuovo indirizzo email — Vivarqo",
-      html: `<p>Per confermare il nuovo indirizzo email, apri questo link:</p><p><a href="${makeLink("/verify-email", rawVerificationToken)}">Verifica email</a></p><p>Il link scade tra 24 ore.</p>`,
+      ...changedEmailVerification(updatedUser.locale, makeLink("/verify-email", rawVerificationToken)),
     }, requestId);
   }
 
