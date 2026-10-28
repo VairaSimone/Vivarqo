@@ -197,7 +197,11 @@ export function createExportRouter() {
         "documents.csv": ["id", "animalId", "cycleId", "originalFilename", "mimeType", "sizeBytes", "category", "note", "createdAt", "archivePath"],
       };
       const files: ExportFile[] = tableRows.map((table) => {
-        const derivedHeaders = [...new Set(table.rows.flatMap((row) => Object.keys(row)))];
+        // Every row in a table comes from the same Prisma model (or the same
+        // explicit document projection), so its first row already defines the
+        // complete header set. Avoid allocating an intermediate array of keys
+        // for every exported row.
+        const derivedHeaders = Object.keys(table.rows[0] ?? {});
         const headers = table.headers ?? (derivedHeaders.length > 0 ? derivedHeaders : (emptyHeaders[table.name] ?? []));
         return { name: table.name, content: csv(headers, table.rows) };
       });
