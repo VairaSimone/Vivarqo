@@ -15,7 +15,9 @@ const MAX_EXPORT_BYTES = 50 * 1024 * 1024;
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   let rendered: string;
-  if (typeof value === "string") rendered = value;
+  // Spreadsheet apps may ignore leading whitespace/control characters
+  // before formula prefixes, so protect those cells as well.
+  if (/^[\u0000-\u0020]*[=+@\-]/.test(rendered) || /^[\t\r]/.test(rendered)) rendered = \`'\${rendered}\`;
   else if (typeof value === "bigint") rendered = value.toString();
   else if (value instanceof Date) rendered = value.toISOString();
   else if (typeof value === "object" && value !== null && "toString" in value && value.constructor?.name === "Decimal") rendered = String(value);
