@@ -187,6 +187,33 @@ export function createReproductionRouter() {
     res.status(200).json({ cycle });
   });
 
+  router.get("/reproduction-cycles/:id/clutches", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const cycleId = routeUuid(req.params.id, "cycle id");
+    await ownedCycle(auth.userId, cycleId);
+    const query = parseBody(pageSchema, req.query);
+    const where = { cycleId, cycle: { is: { userId: auth.userId } } };
+    const [total, clutches] = await Promise.all([
+      prisma.clutch.count({ where }),
+      prisma.clutch.findMany({
+        where,
+        orderBy: [{ laidOn: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { _count: { select: { eggs: true, incubationLogs: true } } },
+      }),
+    ]);
+    res.status(200).json({
+      clutches,
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize),
+      },
+    });
+  });
+
   router.patch("/reproduction-cycles/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const cycleId = routeUuid(req.params.id, "cycle id");
