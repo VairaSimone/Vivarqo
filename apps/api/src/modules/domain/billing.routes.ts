@@ -43,6 +43,7 @@ async function stripeRequest(path: string, form: URLSearchParams, idempotencyKey
       },
       body: form,
       signal: AbortSignal.timeout(15_000),
+      redirect: "error",
     });
   } catch {
     throw new AppError(503, "BILLING_PROVIDER_UNAVAILABLE", "The payment provider is temporarily unavailable");
