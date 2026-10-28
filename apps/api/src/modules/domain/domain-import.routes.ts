@@ -213,11 +213,18 @@ export function createDomainImportRouter() {
     }
     const [animals, animalsByIdentifier, cycles, clutches, documents] = await Promise.all([
       animalKeys.size ? prisma.animal.findMany({ where: { userId: auth.userId, id: { in: [...animalKeys] } }, select: { id: true } }) : Promise.resolve([]),
-      animalIdentifiers.size ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { not: null } }, select: { id: true, identifier: true } }) : Promise.resolve([]),
-      cycleIds.size || ["clutches", "reproductiveEvents", "offspringBatches"].includes(entity as Entity)
-        ? prisma.reproductionCycle.findMany({ where: { userId: auth.userId }, select: { id: true } }) : Promise.resolve([]),
-      clutchIds.size || ["eggs", "incubationLogs"].includes(entity as Entity)
-        ? prisma.clutch.findMany({ where: { cycle: { is: { userId: auth.userId } } }, select: { id: true } }) : Promise.resolve([]),
+      animalIdentifiers.size ? prisma.animal.findMany({
+        where: { userId: auth.userId, identifier: { in: [...animalIdentifiers], mode: "insensitive" } },
+        select: { id: true, identifier: true },
+      }) : Promise.resolve([]),
+      cycleIds.size ? prisma.reproductionCycle.findMany({
+        where: { userId: auth.userId, id: { in: [...cycleIds] } },
+        select: { id: true },
+      }) : Promise.resolve([]),
+      clutchIds.size ? prisma.clutch.findMany({
+        where: { id: { in: [...clutchIds] }, cycle: { is: { userId: auth.userId } } },
+        select: { id: true },
+      }) : Promise.resolve([]),
       documentIds.size ? prisma.document.findMany({ where: { id: { in: [...documentIds] }, userId: auth.userId, deletedAt: null }, select: { id: true } }) : Promise.resolve([]),
     ]);
     const ownedAnimalIds = new Set(animals.map((item) => item.id));
