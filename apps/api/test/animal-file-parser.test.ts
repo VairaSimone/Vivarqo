@@ -15,12 +15,13 @@ describe("Animal file parser resource limits", () => {
   it("rejects CSVs that exceed the supported column count", () => {
     const headers = Array.from({ length: 257 }, (_, index) => `column${index}`).join(",");
     const values = Array.from({ length: 257 }, () => "value").join(",");
-    expect(() => parseAnimalFile(Buffer.from(`${headers}\n${values}\n`, "utf8"), "text/csv"))
-      .toThrowError(AppError);
+    let thrown: unknown;
     try {
       parseAnimalFile(Buffer.from(`${headers}\n${values}\n`, "utf8"), "text/csv");
     } catch (error) {
-      expect(error).toMatchObject({ code: "IMPORT_TOO_MANY_COLUMNS", statusCode: 413 });
+      thrown = error;
     }
+    expect(thrown).toBeInstanceOf(AppError);
+    expect(thrown).toMatchObject({ code: "IMPORT_TOO_MANY_COLUMNS", statusCode: 413 });
   });
 });
