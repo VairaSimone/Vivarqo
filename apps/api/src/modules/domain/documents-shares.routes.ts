@@ -146,8 +146,11 @@ export function createDocumentShareRouter() {
     const documentId = id(req.params.id, "document id");
     const document = await prisma.document.findFirst({ where: { id: documentId, userId: auth.userId, deletedAt: null } });
     if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-    await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+    // Remove the private bytes before marking the row deleted. If storage is
+    // temporarily unavailable, leave the document active so the user can retry;
+    // deleting the row first would make a failed object deletion unrecoverable.
     await deletePrivateObject(document.storageKey);
+    await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
     res.status(204).send();
   });
 
