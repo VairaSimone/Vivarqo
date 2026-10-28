@@ -9,6 +9,7 @@ export interface RetentionCleanupSummary {
   expiredTokens: number;
   expiredImports: number;
   expiredExports: number;
+  expiredRateLimitBuckets: number;
   failedExportDeletes: number;
 }
 
@@ -23,6 +24,7 @@ export async function cleanupExpiredPrivateData(now = new Date()): Promise<Reten
     expiredTokens: 0,
     expiredImports: 0,
     expiredExports: 0,
+    expiredRateLimitBuckets: 0,
     failedExportDeletes: 0,
   };
 
@@ -51,6 +53,11 @@ export async function cleanupExpiredPrivateData(now = new Date()): Promise<Reten
     where: { expiresAt: { lte: now } },
   });
   summary.expiredImports = imports.count;
+
+  const rateLimitBuckets = await prisma.apiRateLimitBucket.deleteMany({
+    where: { resetAt: { lte: now } },
+  });
+  summary.expiredRateLimitBuckets = rateLimitBuckets.count;
 
   const expiredExports = await prisma.exportJob.findMany({
     where: { expiresAt: { lte: now }, storageKey: { not: null } },
