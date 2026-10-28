@@ -75,7 +75,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     }),
   );
   app.use("/api/v1/webhooks/stripe", express.raw({ type: "application/json", limit: "1mb" }));
-  app.use(express.json({ limit: "1mb", strict: true }));
+
 
   app.use(
     "/api/v1",
