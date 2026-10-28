@@ -3,6 +3,7 @@ import { AppError } from "../../errors/app-error.js";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_ROWS = 5_000;
+const MAX_COLUMNS = 256;
 
 export interface ParsedAnimalFile {
   fileType: "csv" | "xlsx";
@@ -43,11 +44,12 @@ function findZipEntries(buffer: Buffer): Map<string, Buffer> {
   const directoryOffset = buffer.readUInt32LE(eocd + 16);
   if (entryCount > 2_000) throw new AppError(400, "IMPORT_FILE_INVALID", "XLSX contains too many ZIP entries");
 
+  if (directoryOffset > buffer.length - 22) throw new AppError(400, "IMPORT_FILE_INVALID", "Invalid XLSX directory offset");
   const entries = new Map<string, Buffer>();
   let totalUncompressed = 0;
   let offset = directoryOffset;
   for (let index = 0; index < entryCount; index += 1) {
-    if (buffer.readUInt32LE(offset) !== 0x02014b50) {
+    if (offset < 0 || offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== 0x02014b50) {
       throw new AppError(400, "IMPORT_FILE_INVALID", "Invalid XLSX directory entry");
     }
     const flags = buffer.readUInt16LE(offset + 8);
@@ -58,19 +60,30 @@ function findZipEntries(buffer: Buffer): Map<string, Buffer> {
     const extraLength = buffer.readUInt16LE(offset + 30);
     const commentLength = buffer.readUInt16LE(offset + 32);
     const localOffset = buffer.readUInt32LE(offset + 42);
+    const entryEnd = offset + 46 + nameLength + extraLength + commentLength;
+    if (entryEnd > buffer.length || entryEnd > directoryOffset + buffer.readUInt32LE(eocd + 12)) {
+      throw new AppError(400, "IMPORT_FILE_INVALID", "XLSX directory entry exceeds its bounds");
+    }
     const name = buffer.toString("utf8", offset + 46, offset + 46 + nameLength);
-    offset += 46 + nameLength + extraLength + commentLength;
+    offset = entryEnd;
 
+    if (!name || entries.has(name)) throw new AppError(400, "IMPORT_FILE_INVALID", "XLSX contains an invalid or duplicate ZIP entry");
+    if (uncompressedSize === 0xffffffff || compressedSize === 0xffffffff || localOffset === 0xffffffff) {
+      throw new AppError(400, "IMPORT_FILE_INVALID", "ZIP64 XLSX files are not supported");
+    }
     if ((flags & 1) !== 0) throw new AppError(400, "IMPORT_FILE_INVALID", "Encrypted XLSX files are not supported");
     if (uncompressedSize > 20 * 1024 * 1024) throw new AppError(413, "IMPORT_FILE_TOO_LARGE", "An XLSX entry is too large");
     totalUncompressed += uncompressedSize;
     if (totalUncompressed > 30 * 1024 * 1024) throw new AppError(413, "IMPORT_FILE_TOO_LARGE", "Uncompressed XLSX contents cannot exceed 30 MB");
-    if (buffer.readUInt32LE(localOffset) !== 0x04034b50) {
+    if (localOffset > buffer.length - 30 || localOffset + 30 > directoryOffset || buffer.readUInt32LE(localOffset) !== 0x04034b50) {
       throw new AppError(400, "IMPORT_FILE_INVALID", "Invalid XLSX local entry");
     }
     const localNameLength = buffer.readUInt16LE(localOffset + 26);
     const localExtraLength = buffer.readUInt16LE(localOffset + 28);
     const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+    if (dataOffset > directoryOffset || compressedSize > directoryOffset - dataOffset) {
+      throw new AppError(400, "IMPORT_FILE_INVALID", "XLSX compressed entry exceeds its bounds");
+    }
     const compressed = buffer.subarray(dataOffset, dataOffset + compressedSize);
 
     let value: Buffer;
@@ -133,6 +146,9 @@ function readXlsx(buffer: Buffer, requestedSheet?: string): ParsedAnimalFile {
       const reference = attrs.match(/\br="([^"]+)"/)?.[1] ?? "A1";
       const type = attrs.match(/\bt="([^"]+)"/)?.[1] ?? "";
       const column = cellColumn(reference);
+      if (column < 0 || column >= MAX_COLUMNS) {
+        throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `XLSX may contain at most ${MAX_COLUMNS} columns`);
+      }
       const body = cellMatch[2] ?? "";
       const raw = body.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? "";
       let value = raw;
