@@ -263,21 +263,32 @@ async function* exportEntries(
   }
 }
 
+const MAX_CONCURRENT_EXPORTS_PER_PROCESS = 2;
+
 export function createExportRouter() {
   const router = Router();
+  let activeExports = 0;
 
   router.post("/", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = z.object({ includeDocuments: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
     if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
+    if (activeExports >= MAX_CONCURRENT_EXPORTS_PER_PROCESS) {
+      throw new AppError(503, "EXPORT_CAPACITY_EXCEEDED", "The server is already generating the maximum number of exports", {
+        maxConcurrentExportsPerProcess: MAX_CONCURRENT_EXPORTS_PER_PROCESS,
+      });
+    }
 
+    activeExports += 1;
     const createdAt = new Date();
-    const job = await prisma.exportJob.create({
-      data: { userId: auth.userId, status: "pending", expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000) },
-    });
     let tempDirectory: string | undefined;
     let storageKey: string | undefined;
+    let jobId: string | undefined;
     try {
+      const job = await prisma.exportJob.create({
+        data: { userId: auth.userId, status: "pending", expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000) },
+      });
+      jobId = job.id;
       tempDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
       const archivePath = join(tempDirectory, "export.zip");
       await writeStreamingZip(archivePath, exportEntries(auth.userId, input.data.includeDocuments, createdAt), MAX_EXPORT_BYTES);
@@ -297,12 +308,15 @@ export function createExportRouter() {
       });
     } catch (error) {
       if (storageKey) await deletePrivateObject(storageKey).catch(() => undefined);
-      await prisma.exportJob.updateMany({
-        where: { id: job.id, userId: auth.userId },
-        data: { status: "failed" },
-      }).catch(() => undefined);
+      if (jobId) {
+        await prisma.exportJob.updateMany({
+          where: { id: jobId, userId: auth.userId },
+          data: { status: "failed", storageKey: null },
+        }).catch(() => undefined);
+      }
       throw error;
     } finally {
+      activeExports -= 1;
       if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true }).catch(() => undefined);
     }
   });
