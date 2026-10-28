@@ -210,6 +210,7 @@ export async function sendWebPush(
     },
     body: encrypted.body,
     signal: AbortSignal.timeout(8_000),
+    redirect: "error",
   });
 }
 
@@ -249,10 +250,12 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   for (const subscription of subscriptions) {
     try {
       const response = await sendWebPush(subscription, payload, credentials);
-      if (response.status === 404 || response.status === 410) {
+      const status = response.status;
+      await response.body?.cancel().catch(() => undefined);
+      if (status === 404 || status === 410) {
         await prisma.pushSubscription.deleteMany({ where: { id: subscription.id, userId } });
         result.removed += 1;
-      } else if (response.status >= 200 && response.status < 300) {
+      } else if (status >= 200 && status < 300) {
         await prisma.pushSubscription.updateMany({ where: { id: subscription.id, userId }, data: { lastSuccessAt: new Date() } });
         result.sent += 1;
       } else {
