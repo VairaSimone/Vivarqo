@@ -78,9 +78,10 @@ function shutdown(signal: string): void {
 
 void startServer().catch(async (error: unknown) => {
   if (shuttingDown) return;
+  // Startup exceptions can embed connection URLs or provider diagnostics. Keep
+  // raw messages out of logs; the error class and failed start are enough to triage.
   logger.fatal({
     errorName: error instanceof Error ? error.name : "UnknownError",
-    message: error instanceof Error ? error.message : "Unknown startup error",
   }, "Vivarqo API startup failed; no HTTP listener was started");
   try {
     await prisma.$disconnect();
