@@ -37,6 +37,9 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+# Runtime schema metadata is required because the API runs Prisma migrations before listening.
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 RUN mkdir -p /app/var/private && chown -R node:node /app/var/private
 USER node
 EXPOSE 3000

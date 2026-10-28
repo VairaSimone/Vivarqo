@@ -18,8 +18,8 @@
     "db:restore": "bash scripts/restore-postgres.sh",
     "vapid:generate": "node scripts/generate-vapid-keys.mjs"
   },
-  "devDependencies": {
-    "prisma": "^7.0.0",
-    "dotenv": "^17.2.3"
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "prisma": "^7.0.0"
   }
 }

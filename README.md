@@ -17,7 +17,6 @@ cp .env.example .env
 docker compose -f infra/docker/compose.yaml up -d postgres
 pnpm install
 pnpm db:generate
-pnpm db:migrate:deploy
 pnpm dev:api
 ```
 
@@ -27,9 +26,13 @@ Questa modalità avvia l'API sul computer e PostgreSQL in Docker. Dopo aver appl
 docker compose -f infra/docker/compose.yaml up -d --build api
 ```
 
-La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Non applica automaticamente le migrazioni.
+La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione; l'API, prima di aprire la porta HTTP, applica automaticamente le migrazioni e verifica la completezza dello schema.
 
-La migrazione iniziale riproduce senza modifiche lo SQL consegnato ed è destinata a un database **VUOTO**. Non applicarla a un database con dati o tabelle preesistenti. `migrate deploy` applica solo le migrazioni versionate; non usare `prisma db push` per inizializzare o aggiornare questo schema.
+Lo schema SQL di riferimento è versionato anche in [`database/schema.sql`](database/schema.sql); la migrazione eseguibile è in `prisma/migrations/20261028000000_initial/migration.sql` e il modello ORM in `prisma/schema.prisma`. Per ogni modifica futura aggiungere una nuova migrazione versionata: non modificare una migrazione già applicata e non usare `prisma db push` in produzione.
+
+All'avvio l'API aspetta PostgreSQL, esegue `prisma migrate deploy` e controlla tabelle, colonne, indici, vincoli nominati, trigger, funzioni ed estensione `citext`. Se lo schema SQL completo è già stato applicato manualmente ma manca la cronologia Prisma, l'app lo registra come baseline solo dopo la verifica integrale. Se trova uno schema parziale non tracciato o una migrazione già applicata ma con oggetti mancanti, interrompe l'avvio senza cancellare o sovrascrivere dati: in quel caso va fatto un backup e va corretta la deriva con una migrazione revisionata.
+
+**Il database PostgreSQL indicato in `DATABASE_URL` deve già esistere** (Compose lo crea; nei servizi gestiti va creato nel provider). L'avvio automatico crea/aggiorna lo schema dentro quel database, non crea un server PostgreSQL né un database mancante sul provider. Il comando manuale `pnpm db:migrate:deploy` resta disponibile ed è idempotente.
 
 ## Controlli
 ```bash
