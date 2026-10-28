@@ -97,6 +97,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     }),
   );
 
+  // Rate-limit before parsing JSON so abusive requests do not consume parser CPU and memory first.
+  app.use(express.json({ limit: "1mb", strict: true }));
+
   // Validate browser intent before touching a server-side session.
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
