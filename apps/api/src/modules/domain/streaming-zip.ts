@@ -28,7 +28,7 @@ function validateEntryName(name: string): Buffer {
   if (
     !normalized ||
     normalized.startsWith("/") ||
-    normalized.includes("\\0") ||
+    normalized.includes("\0") ||
     parts.some((part) => part === "" || part === "." || part === "..")
   ) {
     throw new AppError(500, "EXPORT_ENTRY_NAME_INVALID", "Export contains an invalid archive entry name");
