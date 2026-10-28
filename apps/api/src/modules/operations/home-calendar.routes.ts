@@ -152,6 +152,21 @@ export function createHomeCalendarRouter() {
       }),
     ]);
 
+    // Compare clutches against a precomputed set instead of scanning all
+    // reproductive events for every clutch (O(clutches × events)).
+    const layingEventKeys = new Set(
+      reproductiveEvents
+        .filter((event) => event.eventType === "laying")
+        .map((event) => JSON.stringify([
+          event.cycleId,
+          event.occurredAt.toISOString().slice(0, 10),
+        ])),
+    );
+    const unmatchedClutches = clutches.filter((clutch) => !layingEventKeys.has(JSON.stringify([
+      clutch.cycleId,
+      new Date(clutch.laidOn).toISOString().slice(0, 10),
+    ])));
+
     const items = [
       ...tasks.map((task) => ({
         id: task.id,
@@ -177,9 +192,7 @@ export function createHomeCalendarRouter() {
         animal: event.animal,
         record: event,
       })),
-      ...clutches.filter((clutch) => !reproductiveEvents.some((event) =>
-        event.cycleId === clutch.cycleId && event.eventType === "laying" && event.occurredAt.toISOString().slice(0, 10) === new Date(clutch.laidOn).toISOString().slice(0, 10),
-      )).map((clutch) => ({
+      ...unmatchedClutches.map((clutch) => ({
         id: clutch.id,
         type: "clutch" as const,
         title: "Clutch laid",
