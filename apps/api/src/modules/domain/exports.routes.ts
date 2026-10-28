@@ -105,7 +105,7 @@ export function createExportRouter() {
       const [
         animals, feedingSessions, feedingEntries, weights, sheds, notes, cycles, reproductiveEvents,
         clutches, eggs, incubationLogs, offspringBatches, inventoryItems, stockMovements, financeEntries,
-        tasks, reminderRules, notifications, documents,
+        tasks, reminderRules, notifications, geneticTraits, publicShares, notificationPreferences, documents,
       ] = await Promise.all([
         prisma.animal.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
         prisma.feedingSession.findMany({ where: { userId: auth.userId }, orderBy: { performedAt: "asc" } }),
@@ -125,7 +125,10 @@ export function createExportRouter() {
         prisma.task.findMany({ where: { userId: auth.userId }, orderBy: { dueAt: "asc" } }),
         prisma.reminderRule.findMany({ where: { userId: auth.userId }, orderBy: { nextDueAt: "asc" } }),
         prisma.notification.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
-        input.data.includeDocuments ? prisma.document.findMany({ where: { userId: auth.userId, deletedAt: null }, orderBy: { createdAt: "asc" } }) : Promise.resolve([]),
+        prisma.animalGeneticTrait.findMany({ where: { animal: { is: { userId: auth.userId } } }, orderBy: { createdAt: "asc" } }),
+        prisma.publicShare.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
+        prisma.notificationPreferences.findMany({ where: { userId: auth.userId } }),
+        prisma.document.findMany({ where: { userId: auth.userId, deletedAt: null }, orderBy: { createdAt: "asc" } }),
       ]);
 
       const tableRows: Array<{ name: string; rows: Array<Record<string, unknown>>; headers?: string[] }> = [
@@ -147,22 +150,70 @@ export function createExportRouter() {
         { name: "tasks.csv", rows: recordRows(tasks) },
         { name: "reminder_rules.csv", rows: recordRows(reminderRules) },
         { name: "notifications.csv", rows: recordRows(notifications) },
+        { name: "animal_genetic_traits.csv", rows: recordRows(geneticTraits) },
+        { name: "public_shares.csv", rows: recordRows(publicShares) },
+        { name: "notification_preferences.csv", rows: recordRows(notificationPreferences) },
+        {
+          name: "documents.csv",
+          rows: recordRows(documents).map((document) => {
+            const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+            return {
+              id: document.id,
+              animalId: document.animalId,
+              cycleId: document.cycleId,
+              originalFilename: document.originalFilename,
+              mimeType: document.mimeType,
+              sizeBytes: document.sizeBytes,
+              category: document.category,
+              note: document.note,
+              createdAt: document.createdAt,
+              archivePath: input.data.includeDocuments ? `documents/${document.id}_${fileName}` : null,
+            };
+          }),
+        },
       ];
+      const emptyHeaders: Record<string, string[]> = {
+        "animals.csv": ["id", "userId", "name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes", "photoKey", "originClutchId", "originOffspringBatchId", "archivedAt", "createdAt", "updatedAt"],
+        "feeding_sessions.csv": ["id", "userId", "performedAt", "notes", "createdAt", "updatedAt"],
+        "feeding_entries.csv": ["id", "sessionId", "animalId", "outcome", "foodType", "foodSize", "foodWeightG", "notes", "createdAt", "updatedAt"],
+        "weights.csv": ["id", "animalId", "measuredAt", "weightG", "notes", "createdAt", "updatedAt"],
+        "sheds.csv": ["id", "animalId", "occurredAt", "outcome", "notes", "createdAt", "updatedAt"],
+        "animal_notes.csv": ["id", "animalId", "occurredAt", "title", "category", "body", "createdAt", "updatedAt", "archivedAt"],
+        "reproduction_cycles.csv": ["id", "userId", "parentAAnimalId", "parentBAnimalId", "name", "startedOn", "endedOn", "status", "notes", "createdAt", "updatedAt"],
+        "reproductive_events.csv": ["id", "cycleId", "eventType", "occurredAt", "animalId", "details", "temperatureC", "humidityPct", "createdAt", "updatedAt"],
+        "clutches.csv": ["id", "cycleId", "laidOn", "eggCount", "status", "incubatorLabel", "incubationStartedAt", "notes", "createdAt", "updatedAt"],
+        "eggs.csv": ["id", "clutchId", "code", "status", "notes", "createdAt", "updatedAt"],
+        "incubation_logs.csv": ["id", "clutchId", "recordedAt", "temperatureC", "humidityPct", "eventType", "notes", "createdAt", "updatedAt"],
+        "offspring_batches.csv": ["id", "cycleId", "clutchId", "bornOn", "count", "notes", "createdAt", "updatedAt"],
+        "inventory_items.csv": ["id", "userId", "name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive", "createdAt", "updatedAt"],
+        "stock_movements.csv": ["id", "itemId", "movementType", "quantity", "unitCostCents", "occurredAt", "reference", "notes", "createdAt"],
+        "finance_entries.csv": ["id", "userId", "animalId", "documentId", "entryType", "occurredOn", "amountCents", "currency", "category", "description", "createdAt", "updatedAt"],
+        "tasks.csv": ["id", "userId", "animalId", "title", "description", "category", "dueAt", "status", "completedAt", "reminderRuleId", "createdAt", "updatedAt"],
+        "reminder_rules.csv": ["id", "userId", "animalId", "title", "category", "intervalDays", "nextDueAt", "isEnabled", "createdAt", "updatedAt"],
+        "notifications.csv": ["id", "userId", "category", "title", "body", "targetPath", "readAt", "createdAt"],
+        "animal_genetic_traits.csv": ["id", "animalId", "traitName", "traitValue", "sourceAnimalId", "confidenceNote", "createdAt", "updatedAt"],
+        "public_shares.csv": ["id", "userId", "animalId", "slug", "visibleFields", "publicDescription", "isEnabled", "revokedAt", "createdAt", "updatedAt"],
+        "notification_preferences.csv": ["id", "userId", "inAppEnabled", "pushEnabled", "categories", "quietHoursStart", "quietHoursEnd", "createdAt", "updatedAt"],
+        "documents.csv": ["id", "animalId", "cycleId", "originalFilename", "mimeType", "sizeBytes", "category", "note", "createdAt", "archivePath"],
+      };
       const files: ExportFile[] = tableRows.map((table) => {
-        const headers = table.headers ?? [...new Set(table.rows.flatMap((row) => Object.keys(row)))];
+        const derivedHeaders = [...new Set(table.rows.flatMap((row) => Object.keys(row)))];
+        const headers = table.headers ?? (derivedHeaders.length > 0 ? derivedHeaders : (emptyHeaders[table.name] ?? []));
         return { name: table.name, content: csv(headers, table.rows) };
       });
-      files.unshift({
+            files.unshift({
         name: "README.txt",
         content: Buffer.from(
           `Vivarqo export\nCreated: ${new Date().toISOString()}\nAccount ID: ${auth.userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\n`,
           "utf8",
         ),
       });
-      for (const document of documents) {
-        const bytes = await readPrivateObject(document.storageKey);
-        const fileName = basename(document.originalFilename).replace(/[^\p{L}\p{N} ._()-]/gu, "_").slice(0, 160) || "document";
-        files.push({ name: `documents/${document.id}_${fileName}`, content: bytes });
+      if (input.data.includeDocuments) {
+        for (const document of documents) {
+          const bytes = await readPrivateObject(document.storageKey);
+          const fileName = basename(document.originalFilename).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+          files.push({ name: `documents/${document.id}_${fileName}`, content: bytes });
+        }
       }
       const zip = zipFiles(files);
       if (zip.length > 50 * 1024 * 1024) throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");

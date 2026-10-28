@@ -253,7 +253,7 @@ Le sottoscrizioni browser sono persistite, ma l’invio push tramite VAPID non �
 
 L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono supportati `entity=animals`, `entity=weights`, `entity=sheds`, `entity=notes` ed `entity=feedings`. Per i registri di cura il file deve includere `animalId` oppure `animalIdentifier`, oltre ai campi del registro. Le righe vengono validate con numero di riga/colonna e importate in una transazione; per le alimentazioni si raggruppano le voci con lo stesso istante in un’unica sessione.
 
-`POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili e chiavi di relazione; `includeDocuments: true` include anche i file privati associati. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato. Gli export scadono dopo 24 ore; il limite dell’archivio è 50 MB.
+`POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili, chiavi di relazione, morph genetici dichiarati, condivisioni e preferenze notifiche. Ogni CSV ha intestazioni anche quando non contiene righe. Il file `documents.csv` indicizza i documenti e i relativi percorsi; `includeDocuments: true` aggiunge anche i file privati, mentre il valore predefinito non include gli allegati. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato. Gli export scadono dopo 24 ore; il limite dell’archivio è 50 MB.
 
 ### Abbonamenti e Stripe
 

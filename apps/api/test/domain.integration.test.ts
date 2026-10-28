@@ -234,21 +234,34 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
-  it("exports private data as a downloadable ZIP and reports unconfigured billing without simulating a payment", async () => {
+  it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
-    await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
-    const exported = await owner.agent.post("/api/v1/exports")
+    const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
+    const uploaded = await owner.agent.post("/api/v1/documents")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ includeDocuments: false })
-      .expect(201);
-    expect(exported.body.export.status).toBe("completed");
-    const download = await owner.agent.get(exported.body.downloadPath).buffer(true).parse((response, callback) => {
+      .set("Content-Type", "application/pdf").set("X-Document-Name", "records.pdf")
+      .set("X-Document-Category", "records").set("X-Animal-Id", animal.id)
+      .send(pdf).expect(201);
+    const documentPath = `documents/${uploaded.body.document.id}_records.pdf`;
+    const getZip = async (path: string) => owner.agent.get(path).buffer(true).parse((response, callback) => {
       const chunks: Buffer[] = [];
       response.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
       response.on("end", () => callback(null, Buffer.concat(chunks)));
     }).expect(200);
-    expect(download.headers["content-type"]).toContain("application/zip");
-    expect(Buffer.from(download.body as Buffer).subarray(0, 2).toString("hex")).toBe("504b");
+
+    const noDocumentFiles = await owner.agent.post("/api/v1/exports")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(201);
+    expect(noDocumentFiles.body.export.status).toBe("completed");
+    const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
+    expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
+    expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
+
+    const withDocumentFiles = await owner.agent.post("/api/v1/exports")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: true }).expect(201);
+    const withDocZip = Buffer.from((await getZip(withDocumentFiles.body.downloadPath)).body as Buffer);
+    expect(withDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
+    expect(withDocZip.includes(Buffer.from(documentPath))).toBe(true);
 
     const billing = await owner.agent.get("/api/v1/billing/subscription").expect(200);
     expect(billing.body.subscription).toBeNull();

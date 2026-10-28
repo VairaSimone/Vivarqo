@@ -11,7 +11,7 @@ type PrivateExtension = "pdf" | "jpg" | "png" | "webp" | "zip";
 type S3Config = { endpoint: string | undefined; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
 
 function s3Config(): S3Config | null {
-  const supplied = [env.S3_ENDPOINT, env.S3_REGION, env.S3_BUCKET, env.S3_ACCESS_KEY_ID, env.S3_SECRET_ACCESS_KEY].filter((value) => Boolean(value));
+  const supplied = [env.S3_ENDPOINT, env.S3_BUCKET, env.S3_ACCESS_KEY_ID, env.S3_SECRET_ACCESS_KEY].filter((value) => Boolean(value));
   if (supplied.length === 0) {
     if (env.NODE_ENV === "production") {
       throw new AppError(503, "PRIVATE_STORAGE_NOT_CONFIGURED", "Private object storage must be configured before storing files in production");
