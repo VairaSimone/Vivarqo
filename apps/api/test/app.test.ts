@@ -35,11 +35,20 @@ describe("API infrastructure", () => {
     expect(response.status).toBe(503);
     expect(response.body).toMatchObject({
       code: "SERVICE_UNAVAILABLE",
-      message: "Service temporarily unavailable",
+      message: "Servizio temporaneamente non disponibile",
       details: null,
     });
     expect(JSON.stringify(response.body)).not.toContain("private connection details");
     expect(response.body.requestId).toEqual(expect.any(String));
+  });
+
+  it("honors Accept-Language for unauthenticated requests", async () => {
+    const response = await request(createApp({ checkDatabase: async () => undefined }))
+      .get("/api/v1/not-implemented")
+      .set("Accept-Language", "en-GB,en;q=0.9");
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe("Route not found");
   });
 
   it("returns a standardized 404 response for unimplemented routes", async () => {
@@ -49,7 +58,7 @@ describe("API infrastructure", () => {
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       code: "NOT_FOUND",
-      message: "Route not found",
+      message: "Percorso non trovato",
       details: null,
     });
     expect(response.body.requestId).toEqual(expect.any(String));
@@ -81,7 +90,7 @@ describe("API infrastructure", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       code: "INVALID_JSON",
-      message: "Malformed JSON request body",
+      message: "Il corpo della richiesta JSON non è valido",
       details: null,
     });
   });
@@ -95,7 +104,7 @@ describe("API infrastructure", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       code: "CSRF_INVALID",
-      message: "CSRF validation failed",
+      message: "La verifica CSRF non è riuscita",
     });
   });
 
