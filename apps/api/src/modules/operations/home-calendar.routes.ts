@@ -25,6 +25,10 @@ export function createHomeCalendarRouter() {
       recentSheds,
       recentNotes,
       recentReproductionEvents,
+      dueTodayCount,
+      overdueCount,
+      completedTodayCount,
+      imminentReminderCount,
     ] = await Promise.all([
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } },
@@ -53,35 +57,39 @@ export function createHomeCalendarRouter() {
       prisma.feedingSession.findMany({
         where: { userId: auth.userId, performedAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
         orderBy: { performedAt: "desc" },
-        take: 10,
+        take: 15,
         include: {
           entries: { where: { animal: { is: { userId: auth.userId } } }, include: { animal: { select: { id: true, name: true } } } },
         },
       }),
       prisma.weightMeasurement.findMany({
-        where: { animal: { is: { userId: auth.userId } }, createdAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
+        where: { animal: { is: { userId: auth.userId } }, measuredAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { measuredAt: "desc" },
+        take: 15,
         include: { animal: { select: { id: true, name: true } } },
       }),
       prisma.shedRecord.findMany({
-        where: { animal: { is: { userId: auth.userId } }, createdAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
+        where: { animal: { is: { userId: auth.userId } }, occurredAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { occurredAt: "desc" },
+        take: 15,
         include: { animal: { select: { id: true, name: true } } },
       }),
       prisma.animalNote.findMany({
-        where: { archivedAt: null, animal: { is: { userId: auth.userId } }, createdAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
+        where: { archivedAt: null, animal: { is: { userId: auth.userId } }, occurredAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { occurredAt: "desc" },
+        take: 15,
         include: { animal: { select: { id: true, name: true } } },
       }),
       prisma.reproductiveEvent.findMany({
         where: { cycle: { is: { userId: auth.userId } }, occurredAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
         orderBy: { occurredAt: "desc" },
-        take: 10,
+        take: 15,
         include: { cycle: { select: { id: true, name: true } }, animal: { select: { id: true, name: true } } },
       }),
+      prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } } }),
+      prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { lt: now } } }),
+      prisma.task.count({ where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } } }),
+      prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: reminderLimit } } }),
     ]);
 
     const recentEvents = [
@@ -97,10 +105,16 @@ export function createHomeCalendarRouter() {
       timezone: auth.timezone,
       tasks: { dueToday, overdue, completedToday },
       counts: {
-        dueToday: dueToday.length,
-        overdue: overdue.length,
-        completedToday: completedToday.length,
-        imminentReminders: reminders.length,
+        dueToday: dueTodayCount,
+        overdue: overdueCount,
+        completedToday: completedTodayCount,
+        imminentReminders: imminentReminderCount,
+      },
+      truncated: {
+        dueToday: dueTodayCount > dueToday.length,
+        overdue: overdueCount > overdue.length,
+        completedToday: completedTodayCount > completedToday.length,
+        imminentReminders: imminentReminderCount > reminders.length,
       },
       imminentReminders: reminders,
       quickActions: [{ key: "bulk-feeding", label: "Register multiple feedings", targetPath: "/feeding/bulk" }],
@@ -159,7 +173,7 @@ export function createHomeCalendarRouter() {
         .filter((event) => event.eventType === "laying")
         .map((event) => JSON.stringify([
           event.cycleId,
-          event.occurredAt.toISOString().slice(0, 10),
+          localDateFor(event.occurredAt, auth.timezone),
         ])),
     );
     const unmatchedClutches = clutches.filter((clutch) => !layingEventKeys.has(JSON.stringify([
