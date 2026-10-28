@@ -15,6 +15,10 @@ function routeUuid(value: string | string[] | undefined, label: string): string 
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", `Invalid ${label}`);
   return id;
 }
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002";
+}
 function validDate(value: string): Date {
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new AppError(400, "VALIDATION_ERROR", "Invalid date");
@@ -268,12 +272,32 @@ export function createNotificationRouter() {
     const endpoint = new URL(input.endpoint);
     if (endpoint.protocol !== "https:") throw new AppError(400, "INVALID_PUSH_ENDPOINT", "Push endpoint must use HTTPS");
     const existing = await prisma.pushSubscription.findUnique({ where: { endpoint: input.endpoint } });
-    if (existing && existing.userId !== auth.userId) throw new AppError(409, "PUSH_ENDPOINT_ALREADY_REGISTERED", "This browser endpoint is already associated with another account");
-    const subscription = await prisma.pushSubscription.upsert({
-      where: { endpoint: input.endpoint },
-      create: { userId: auth.userId, endpoint: input.endpoint, p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
-      update: { userId: auth.userId, p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
-    });
+    if (existing) {
+      if (existing.userId !== auth.userId) {
+        throw new AppError(409, "PUSH_ENDPOINT_ALREADY_REGISTERED", "This browser endpoint is already associated with another account");
+      }
+    }
+    const subscription = existing
+      ? await prisma.pushSubscription.update({
+          where: { endpoint: input.endpoint },
+          data: { p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
+        })
+      : await prisma.pushSubscription.create({
+          data: { userId: auth.userId, endpoint: input.endpoint, p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
+        }).catch(async (error: unknown) => {
+          if (!isUniqueViolation(error)) throw error;
+          // Another request may have claimed the same unique endpoint between
+          // our first lookup and create. Never transfer or overwrite another
+          // account's subscription in that race.
+          const raced = await prisma.pushSubscription.findUnique({ where: { endpoint: input.endpoint } });
+          if (!raced || raced.userId !== auth.userId) {
+            throw new AppError(409, "PUSH_ENDPOINT_ALREADY_REGISTERED", "This browser endpoint is already associated with another account");
+          }
+          return prisma.pushSubscription.update({
+            where: { endpoint: input.endpoint },
+            data: { p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
+          });
+        });
     res.status(201).json({ subscription: { id: subscription.id, endpoint: subscription.endpoint, createdAt: subscription.createdAt } });
   });
 
