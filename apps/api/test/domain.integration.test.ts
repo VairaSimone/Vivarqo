@@ -154,6 +154,17 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ movementType: "adjustment", quantity: 4.5, occurredAt: "2026-10-28T11:00:00.000Z", notes: "Physical count" })
       .expect(201);
     expect(Number(adjustment.body.item.quantityOnHand)).toBe(4.5);
+
+    const cleared = await owner.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ movementType: "adjustment", quantity: 0, occurredAt: "2026-10-28T12:00:00.000Z", notes: "Physical count: empty" })
+      .expect(201);
+    expect(Number(cleared.body.item.quantityOnHand)).toBe(0);
+
+    await owner.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ movementType: "in", quantity: 0, occurredAt: "2026-10-28T12:30:00.000Z" })
+      .expect(400);
   });
 
   it("stores private documents, exposes only allowlisted share fields, and revocation hides the public page", async () => {
