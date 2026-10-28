@@ -39,6 +39,7 @@ export function createResendEmailSender(): EmailSender {
             html: message.html,
           }),
           signal: AbortSignal.timeout(10_000),
+          redirect: "error",
         });
       } catch {
         throw new EmailDeliveryError();
