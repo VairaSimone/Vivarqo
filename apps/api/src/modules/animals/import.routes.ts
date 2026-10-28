@@ -337,30 +337,31 @@ export function createImportRouter() {
         return true;
       });
 
-      const createdIds: string[] = [];
-      for (const row of animalsToCreate) {
-        const input = row.animal;
-        const animal = await tx.animal.create({
-          data: {
-            userId,
-            name: input.name,
-            identifier: input.identifier ?? null,
-            species: input.species,
-            sex: input.sex,
-            morph: input.morph ?? null,
-            geneticsNotes: input.geneticsNotes ?? null,
-            birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
-            birthDateEstimated: input.birthDateEstimated,
-            acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
-            originDescription: input.originDescription ?? null,
-            previousBreeder: input.previousBreeder ?? null,
-            locationLabel: input.locationLabel ?? null,
-            status: input.status,
-            notes: input.notes ?? null,
-          },
-        });
-        createdIds.push(animal.id);
-      }
+      // One batched INSERT instead of up to 5,000 sequential INSERTs inside
+      // the transaction. The report only needs the created IDs, not row ordering.
+      const createdAnimals = animalsToCreate.length
+        ? await tx.animal.createManyAndReturn({
+            data: animalsToCreate.map(({ animal: input }) => ({
+              userId,
+              name: input.name,
+              identifier: input.identifier ?? null,
+              species: input.species,
+              sex: input.sex,
+              morph: input.morph ?? null,
+              geneticsNotes: input.geneticsNotes ?? null,
+              birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
+              birthDateEstimated: input.birthDateEstimated,
+              acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
+              originDescription: input.originDescription ?? null,
+              previousBreeder: input.previousBreeder ?? null,
+              locationLabel: input.locationLabel ?? null,
+              status: input.status,
+              notes: input.notes ?? null,
+            })),
+            select: { id: true },
+          })
+        : [];
+      const createdIds = createdAnimals.map((animal) => animal.id);
 
       await tx.auditEvent.create({
         data: {
