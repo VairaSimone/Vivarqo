@@ -138,9 +138,10 @@ export function createCareImportRouter() {
     if (missing.length) throw new AppError(400, "IMPORT_REQUIRED_COLUMNS", "Required columns are missing", { missingFields: missing });
 
     const identifiers = file.rows.map((row) => row.values[mapped.animalIdentifier ?? ""]?.trim()).filter((value): value is string => Boolean(value));
+    const normalizedIdentifiers = [...new Set(identifiers.map((value) => value.toLocaleLowerCase("it-IT")))];
     const ids = file.rows.map((row) => row.values[mapped.animalId ?? ""]?.trim()).filter((value): value is string => Boolean(value) && z.string().uuid().safeParse(value).success);
     const [animalsByIdentifier, animalsById] = await Promise.all([
-      identifiers.length ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: [...new Set(identifiers)] } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
+      normalizedIdentifiers.length ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: normalizedIdentifiers, mode: "insensitive" } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
       ids.length ? prisma.animal.findMany({ where: { userId: auth.userId, id: { in: [...new Set(ids)] } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
     ]);
     const identifierMap = new Map(animalsByIdentifier.map((animal) => [animal.identifier?.toLocaleLowerCase("it-IT") ?? "", animal]));
