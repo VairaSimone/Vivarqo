@@ -27,13 +27,13 @@ export function createHomeCalendarRouter() {
       recentReproductionEvents,
     ] = await Promise.all([
       prisma.task.findMany({
-        where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.start, lt: bounds.end } },
+        where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } },
         orderBy: { dueAt: "asc" },
         take: 100,
         include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
       prisma.task.findMany({
-        where: { userId: auth.userId, status: "open", dueAt: { lt: bounds.start } },
+        where: { userId: auth.userId, status: "open", dueAt: { lt: now } },
         orderBy: { dueAt: "asc" },
         take: 100,
         include: { animal: { select: { id: true, name: true, identifier: true } } },
