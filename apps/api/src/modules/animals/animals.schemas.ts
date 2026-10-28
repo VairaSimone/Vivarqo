@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable().optional();
-const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+function isValidCalendarDate(value: string): boolean {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refine(isValidCalendarDate, "Invalid calendar date");
 
 export const animalStatusSchema = z.enum(["active", "sold", "transferred", "deceased", "archived"]);
 export const animalSexSchema = z.enum(["male", "female", "unknown"]);
@@ -26,12 +30,6 @@ export const animalFields = {
 };
 
 export const createAnimalSchema = z.object(animalFields).strict().superRefine((value, ctx) => {
-  for (const field of ["birthDate", "acquiredDate"] as const) {
-    const date = value[field];
-    if (date && (Number.isNaN(Date.parse(`${date}T00:00:00.000Z`)) || new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) !== date)) {
-      ctx.addIssue({ code: "custom", path: [field], message: "Invalid calendar date" });
-    }
-  }
   if (value.status === "archived") {
     ctx.addIssue({ code: "custom", path: ["status"], message: "Use the archive action to archive an animal" });
   }
@@ -54,12 +52,6 @@ export const patchAnimalSchema = z.object({
   notes: animalFields.notes,
 }).strict().superRefine((value, ctx) => {
   if (Object.keys(value).length === 0) ctx.addIssue({ code: "custom", message: "At least one field is required" });
-  for (const field of ["birthDate", "acquiredDate"] as const) {
-    const date = value[field];
-    if (date && Number.isNaN(Date.parse(`${date}T00:00:00.000Z`))) {
-      ctx.addIssue({ code: "custom", path: [field], message: "Invalid calendar date" });
-    }
-  }
 });
 
 export const bulkAnimalsSchema = z.object({
