@@ -140,10 +140,11 @@ export function createAnimalRouter() {
     }
     try {
       const created = await prisma.$transaction(async (tx) => {
-        const animals = [];
-        for (const animalInput of input.animals) {
-          animals.push(await tx.animal.create({ data: { ...toAnimalData(animalInput), userId: auth.userId } }));
-        }
+        // PostgreSQL can insert and return the batch in one round-trip rather
+        // than issuing one INSERT per animal inside the transaction.
+        const animals = await tx.animal.createManyAndReturn({
+          data: input.animals.map((animalInput) => ({ ...toAnimalData(animalInput), userId: auth.userId })),
+        });
         await tx.auditEvent.create({
           data: {
             userId: auth.userId,
