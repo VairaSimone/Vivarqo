@@ -209,7 +209,20 @@ export function createDocumentShareRouter() {
     if (!slug || !/^[A-Za-z0-9_-]{32}$/.test(slug)) throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
     const share = await prisma.publicShare.findFirst({
       where: { slug, isEnabled: true, revokedAt: null, animal: { is: { archivedAt: null } } },
-      include: { animal: true },
+      select: {
+        visibleFields: true,
+        publicDescription: true,
+        updatedAt: true,
+        animal: {
+          select: {
+            name: true,
+            species: true,
+            morph: true,
+            sex: true,
+            birthDate: true,
+          },
+        },
+      },
     });
     if (!share) throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
     const allowlist = Array.isArray(share.visibleFields) ? share.visibleFields.filter((field): field is string => typeof field === "string" && (shareFields as readonly string[]).includes(field)) : [];
