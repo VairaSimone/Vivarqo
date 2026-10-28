@@ -30,6 +30,7 @@ export function createAccountRouter(sender?: EmailSender) {
   router.patch("/", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const result = await patchAccount(auth.userId, parsePatch(req.body), emailSender, requestId(res));
+    res.locals.responseLocale = result.user.locale;
 
     if (result.emailChanged || result.passwordChanged) {
       clearSessionCookie(res);
