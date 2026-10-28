@@ -40,6 +40,7 @@ const messagePairs: Array<[string, string]> = [
   ["Invalid token format", "Formato del token non valido"],
   ["Invalid IANA timezone", "Fuso orario IANA non valido"],
   ["Use YYYY-MM-DD", "Usa il formato AAAA-MM-GG"],
+  ["Use a valid YYYY-MM-DD date", "Inserisci una data valida nel formato AAAA-MM-GG"],
   ["Invalid calendar date", "Data di calendario non valida"],
   ["Invalid date", "Data non valida"],
   ["Invalid status filter", "Filtro dello stato non valido"],
