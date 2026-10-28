@@ -87,6 +87,9 @@ function signedHeaders(config: S3Config, method: "PUT" | "GET" | "DELETE", key: 
     },
   };
 }
+const S3_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_STORED_READ_BYTES = 50 * 1024 * 1024;
+
 async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key: string, body: Uint8Array = Buffer.alloc(0)): Promise<Buffer> {
   const signed = signedHeaders(config, method, key, Buffer.from(body));
   let response: Response;
@@ -95,19 +98,53 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
       method,
       headers: signed.headers,
       ...(method === "PUT" ? { body: new Uint8Array(body) } : {}),
+      signal: AbortSignal.timeout(S3_REQUEST_TIMEOUT_MS),
     });
   } catch {
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
   }
-  if (response.status === 404 && method === "GET") throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  if (response.status === 404 && method === "GET") {
+    await response.body?.cancel().catch(() => undefined);
+    throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  }
   if (!response.ok) {
-    if (method === "DELETE" && response.status === 404) return Buffer.alloc(0);
+    await response.body?.cancel().catch(() => undefined);
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the request", { providerStatus: response.status });
   }
-  if (method !== "GET") return Buffer.alloc(0);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > 50 * 1024 * 1024) throw new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size");
-  return bytes;
+  if (method !== "GET") {
+    await response.body?.cancel().catch(() => undefined);
+    return Buffer.alloc(0);
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_STORED_READ_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size");
+  }
+  if (!response.body) return Buffer.alloc(0);
+
+  // Stream into bounded chunks. arrayBuffer() would allocate an arbitrarily
+  // large response before checking its size, defeating the read limit.
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_STORED_READ_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size");
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    if (error instanceof AppError) throw error;
+    throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the download");
+  }
+  return Buffer.concat(chunks, totalBytes);
 }
 
 export function validatePrivateFile(buffer: Buffer, declaredMime: string): { mimeType: string; extension: string } {
