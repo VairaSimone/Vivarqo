@@ -71,7 +71,7 @@ function signedHeaders(
 ): { url: URL; headers: Record<string, string> } {
   const url = keyUrl(config, key);
   const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\\.\\d{3}/g, "");
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
   const payloadHash = payloadHashOverride ?? sha256(payload);
   const canonicalHeaders = `host:${url.host.toLowerCase()}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
