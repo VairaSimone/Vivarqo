@@ -11,7 +11,7 @@ dotenv.config({
 const originSchema = z.string().url().refine((value) => {
   try {
     const parsed = new URL(value);
-    return parsed.origin === value.replace(/\\/$/, "") &&
+    return parsed.origin === value.replace(/\/$/, "") &&
       parsed.pathname === "/" &&
       parsed.search === "" &&
       parsed.hash === "" &&
