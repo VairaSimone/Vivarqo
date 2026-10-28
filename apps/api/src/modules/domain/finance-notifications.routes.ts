@@ -268,13 +268,34 @@ export function createNotificationRouter() {
     if (!isSupportedPushEndpoint(input.endpoint)) {
       throw new AppError(400, "INVALID_PUSH_ENDPOINT", "Push endpoint must use a supported HTTPS push provider");
     }
-    const existing = await prisma.pushSubscription.findUnique({ where: { endpoint: input.endpoint } });
-    if (existing && existing.userId !== auth.userId) throw new AppError(409, "PUSH_ENDPOINT_ALREADY_REGISTERED", "This browser endpoint is already associated with another account");
-    const subscription = await prisma.pushSubscription.upsert({
-      where: { endpoint: input.endpoint },
-      create: { userId: auth.userId, endpoint: input.endpoint, p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
-      update: { userId: auth.userId, p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
-    });
+    // Create first so two accounts racing to register the same endpoint cannot
+    // reassign ownership through an upsert's unconditional update branch.
+    let subscription;
+    try {
+      subscription = await prisma.pushSubscription.create({
+        data: {
+          userId: auth.userId,
+          endpoint: input.endpoint,
+          p256dh: input.keys.p256dh,
+          authSecret: input.keys.auth,
+          userAgent: input.userAgent ?? null,
+        },
+      });
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+      if (code !== "P2002") throw error;
+
+      const existing = await prisma.pushSubscription.findUnique({ where: { endpoint: input.endpoint } });
+      if (!existing || existing.userId !== auth.userId) {
+        throw new AppError(409, "PUSH_ENDPOINT_ALREADY_REGISTERED", "This browser endpoint is already associated with another account");
+      }
+      subscription = await prisma.pushSubscription.update({
+        where: { id: existing.id, userId: auth.userId },
+        data: { p256dh: input.keys.p256dh, authSecret: input.keys.auth, userAgent: input.userAgent ?? null },
+      });
+    }
     res.status(201).json({ subscription: { id: subscription.id, endpoint: subscription.endpoint, createdAt: subscription.createdAt } });
   });
 
