@@ -39,11 +39,15 @@ export function createResendEmailSender(): EmailSender {
             html: message.html,
           }),
           signal: AbortSignal.timeout(10_000),
+          redirect: "error",
         });
       } catch {
         throw new EmailDeliveryError();
       }
 
+      // The provider body is not used, so release it in both success and
+      // failure cases instead of retaining a connection while handling auth.
+      await response.body?.cancel().catch(() => undefined);
       if (!response.ok) {
         // Provider response bodies are deliberately not logged or returned.
         throw new EmailDeliveryError();

@@ -8,6 +8,10 @@ const statuses = ["planned", "active", "completed", "cancelled"] as const;
 const eventTypes = ["pairing", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "loss", "other"] as const;
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nullableUuid = z.string().uuid().nullable().optional();
+const pageSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(100),
+});
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -171,13 +175,43 @@ export function createReproductionRouter() {
       include: {
         parentA: { select: { id: true, name: true, identifier: true, species: true } },
         parentB: { select: { id: true, name: true, identifier: true, species: true } },
-        events: { orderBy: { occurredAt: "desc" }, include: { animal: { select: { id: true, name: true } } } },
-        clutches: { orderBy: { laidOn: "desc" }, include: { _count: { select: { eggs: true, incubationLogs: true } } } },
-        offspringBatches: { orderBy: { bornOn: "desc" } },
+        // Details are deliberately bounded. Full history is available through
+        // the paginated child endpoints below.
+        events: { orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 100, include: { animal: { select: { id: true, name: true } } } },
+        clutches: { orderBy: [{ laidOn: "desc" }, { id: "desc" }], take: 100, include: { _count: { select: { eggs: true, incubationLogs: true } } } },
+        offspringBatches: { orderBy: [{ bornOn: "desc" }, { id: "desc" }], take: 100 },
+        _count: { select: { events: true, clutches: true, offspringBatches: true } },
       },
     });
     if (!cycle) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
     res.status(200).json({ cycle });
+  });
+
+  router.get("/reproduction-cycles/:id/clutches", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const cycleId = routeUuid(req.params.id, "cycle id");
+    await ownedCycle(auth.userId, cycleId);
+    const query = parseBody(pageSchema, req.query);
+    const where = { cycleId, cycle: { is: { userId: auth.userId } } };
+    const [total, clutches] = await Promise.all([
+      prisma.clutch.count({ where }),
+      prisma.clutch.findMany({
+        where,
+        orderBy: [{ laidOn: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { _count: { select: { eggs: true, incubationLogs: true } } },
+      }),
+    ]);
+    res.status(200).json({
+      clutches,
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize),
+      },
+    });
   });
 
   router.patch("/reproduction-cycles/:id", requireSession, async (req, res) => {
@@ -205,12 +239,19 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const cycleId = routeUuid(req.params.id, "cycle id");
     await ownedCycle(auth.userId, cycleId);
-    const events = await prisma.reproductiveEvent.findMany({
-      where: { cycleId, cycle: { is: { userId: auth.userId } } },
-      orderBy: { occurredAt: "desc" },
-      include: { animal: { select: { id: true, name: true } } },
-    });
-    res.status(200).json({ events });
+    const query = parseBody(pageSchema, req.query);
+    const where = { cycleId, cycle: { is: { userId: auth.userId } } };
+    const [total, events] = await Promise.all([
+      prisma.reproductiveEvent.count({ where }),
+      prisma.reproductiveEvent.findMany({
+        where,
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { animal: { select: { id: true, name: true } } },
+      }),
+    ]);
+    res.status(200).json({ events, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/reproduction-cycles/:id/events", requireSession, async (req, res) => {
@@ -256,8 +297,9 @@ export function createReproductionRouter() {
       where: { id: clutchId, cycle: { is: { userId: auth.userId } } },
       include: {
         cycle: { select: { id: true, name: true, status: true } },
-        eggs: { orderBy: { createdAt: "asc" } },
-        incubationLogs: { orderBy: { recordedAt: "desc" } },
+        eggs: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100 },
+        incubationLogs: { orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: 100 },
+        _count: { select: { eggs: true, incubationLogs: true } },
       },
     });
     if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found");
@@ -280,8 +322,18 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const clutchId = routeUuid(req.params.id, "clutch id");
     await ownedClutch(auth.userId, clutchId);
-    const eggs = await prisma.egg.findMany({ where: { clutchId }, orderBy: { createdAt: "asc" } });
-    res.status(200).json({ eggs });
+    const query = parseBody(pageSchema, req.query);
+    const where = { clutchId };
+    const [total, eggs] = await Promise.all([
+      prisma.egg.count({ where }),
+      prisma.egg.findMany({
+        where,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ]);
+    res.status(200).json({ eggs, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/clutches/:id/eggs", requireSession, async (req, res) => {
@@ -313,8 +365,18 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const clutchId = routeUuid(req.params.id, "clutch id");
     await ownedClutch(auth.userId, clutchId);
-    const logs = await prisma.incubationLog.findMany({ where: { clutchId }, orderBy: { recordedAt: "desc" } });
-    res.status(200).json({ logs });
+    const query = parseBody(pageSchema, req.query);
+    const where = { clutchId };
+    const [total, logs] = await Promise.all([
+      prisma.incubationLog.count({ where }),
+      prisma.incubationLog.findMany({
+        where,
+        orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ]);
+    res.status(200).json({ logs, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/clutches/:id/incubation-logs", requireSession, async (req, res) => {
@@ -333,12 +395,19 @@ export function createReproductionRouter() {
 
   router.get("/offspring-batches", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const batches = await prisma.offspringBatch.findMany({
-      where: { cycle: { is: { userId: auth.userId } } },
-      orderBy: { bornOn: "desc" },
-      include: { cycle: { select: { id: true, name: true } }, clutch: { select: { id: true, laidOn: true, eggCount: true } }, _count: { select: { originAnimals: true } } },
-    });
-    res.status(200).json({ offspringBatches: batches });
+    const query = parseBody(pageSchema, req.query);
+    const where = { cycle: { is: { userId: auth.userId } } };
+    const [total, batches] = await Promise.all([
+      prisma.offspringBatch.count({ where }),
+      prisma.offspringBatch.findMany({
+        where,
+        orderBy: [{ bornOn: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { cycle: { select: { id: true, name: true } }, clutch: { select: { id: true, laidOn: true, eggCount: true } }, _count: { select: { originAnimals: true } } },
+      }),
+    ]);
+    res.status(200).json({ offspringBatches: batches, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/offspring-batches", requireSession, async (req, res) => {

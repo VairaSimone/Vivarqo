@@ -192,7 +192,7 @@ export function createImportRouter() {
       .filter((value): value is string => typeof value === "string" && value.length > 0);
     if (identifiers.length) {
       const existingIdentifiers = await prisma.animal.findMany({
-        where: { userId, identifier: { in: identifiers } },
+        where: { userId, identifier: { in: identifiers, mode: "insensitive" } },
         select: { identifier: true },
       });
       const existing = new Set(existingIdentifiers.map((item) => item.identifier?.toLocaleLowerCase("it-IT")));
@@ -210,16 +210,31 @@ export function createImportRouter() {
       }
     }
 
-    const uniqueNames = new Set(preview.validRows.map((row) => `${row.animal.name.toLocaleLowerCase("it-IT")}\u0000${row.animal.species.toLocaleLowerCase("it-IT")}`));
-    if (uniqueNames.size) {
-      const candidates = preview.validRows.slice(0, 500).map((row) => ({
-        name: { equals: row.animal.name, mode: "insensitive" as const },
-        species: { equals: row.animal.species, mode: "insensitive" as const },
-      }));
-      const matches = await prisma.animal.findMany({
-        where: { userId, OR: candidates },
-        select: { id: true, name: true, species: true, identifier: true },
-      });
+    const nameSpeciesPairs = new Map<string, { name: string; species: string }>();
+    for (const row of preview.validRows) {
+      const key = JSON.stringify([
+        row.animal.name.toLocaleLowerCase("it-IT"),
+        row.animal.species.toLocaleLowerCase("it-IT"),
+      ]);
+      if (!nameSpeciesPairs.has(key)) {
+        nameSpeciesPairs.set(key, { name: row.animal.name, species: row.animal.species });
+      }
+    }
+    if (nameSpeciesPairs.size) {
+      const pairs = [...nameSpeciesPairs.values()];
+      const matches: Array<{ id: string; name: string; species: string; identifier: string | null }> = [];
+      // Bound OR-query size but inspect every unique pair, not only the first
+      // 500 rows in a large import file.
+      for (let offset = 0; offset < pairs.length; offset += 250) {
+        const candidates = pairs.slice(offset, offset + 250).map((pair) => ({
+          name: { equals: pair.name, mode: "insensitive" as const },
+          species: { equals: pair.species, mode: "insensitive" as const },
+        }));
+        matches.push(...await prisma.animal.findMany({
+          where: { userId, OR: candidates },
+          select: { id: true, name: true, species: true, identifier: true },
+        }));
+      }
       // Index existing candidates once: filtering the full result set for every
       // imported row becomes quadratic for large files.
       const candidatesByNameAndSpecies = new Map<string, typeof matches>();
@@ -324,13 +339,13 @@ export function createImportRouter() {
       const report = readReport(job.report);
       const identifiers = report.validRows.map((row) => row.animal.identifier).filter((value): value is string => Boolean(value));
       const existing = identifiers.length
-        ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers } }, select: { identifier: true } })
+        ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers, mode: "insensitive" } }, select: { identifier: true } })
         : [];
-      const existingSet = new Set(existing.map((animal) => animal.identifier));
+      const existingSet = new Set(existing.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")));
       const finalErrors = [...report.errors];
       const animalsToCreate = report.validRows.filter((row) => {
         const identifier = row.animal.identifier;
-        if (identifier && existingSet.has(identifier)) {
+        if (identifier && existingSet.has(identifier.toLocaleLowerCase("it-IT"))) {
           finalErrors.push({ row: row.rowNumber, column: "identifier", reason: "This identifier already exists in your account at confirmation time" });
           return false;
         }

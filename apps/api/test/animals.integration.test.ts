@@ -199,6 +199,20 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(archived.body.animals.some((item: { id: string }) => item.id === animal.id)).toBe(true);
   });
 
+  it("enforces case-insensitive animal identifier uniqueness in PostgreSQL", async () => {
+    const owner = await account();
+    await createAnimal(owner, "Case original", "Nala-01");
+
+    const duplicate = await owner.agent
+      .post("/api/v1/animals")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Case duplicate", species: "Python regius", identifier: "nALA-01", sex: "female" })
+      .expect(409);
+
+    expect(duplicate.body.code).toBe("ANIMAL_IDENTIFIER_CONFLICT");
+  });
+
   it("creates multiple animals atomically and rejects invalid or duplicated data", async () => {
     const owner = await account();
     const bulk = await owner.agent

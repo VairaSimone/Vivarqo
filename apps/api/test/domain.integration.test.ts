@@ -111,6 +111,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const foreign = await other.agent.get(`/api/v1/reproduction-cycles/${cycleId}`).expect(404);
     expect(foreign.body.code).toBe("REPRODUCTION_CYCLE_NOT_FOUND");
 
+    const clutchList = await owner.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches?page=1&pageSize=10`).expect(200);
+    expect(clutchList.body.clutches.map((item: { id: string }) => item.id)).toContain(clutch.body.clutch.id);
+    expect(clutchList.body.pagination.total).toBe(1);
+    const foreignClutches = await other.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches`).expect(404);
+    expect(foreignClutches.body.code).toBe("REPRODUCTION_CYCLE_NOT_FOUND");
+
     const eggs = await owner.agent.post(`/api/v1/clutches/${clutch.body.clutch.id}/eggs`)
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ eggs: [{ code: "E1" }, { code: "E2" }] })
@@ -154,6 +160,22 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ movementType: "adjustment", quantity: 4.5, occurredAt: "2026-10-28T11:00:00.000Z", notes: "Physical count" })
       .expect(201);
     expect(Number(adjustment.body.item.quantityOnHand)).toBe(4.5);
+
+    const cleared = await owner.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ movementType: "adjustment", quantity: 0, occurredAt: "2026-10-28T12:00:00.000Z", notes: "Physical count: empty" })
+      .expect(201);
+    expect(Number(cleared.body.item.quantityOnHand)).toBe(0);
+
+    await owner.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ movementType: "in", quantity: 0, occurredAt: "2026-10-28T12:30:00.000Z" })
+      .expect(400);
+
+    const history = await owner.agent.get(`/api/v1/inventory/items/${itemId}/movements?page=1&pageSize=2`).expect(200);
+    expect(history.body.movements).toHaveLength(2);
+    expect(history.body.pagination.total).toBe(4);
+    expect(history.body.pagination.totalPages).toBe(2);
   });
 
   it("stores private documents, exposes only allowlisted share fields, and revocation hides the public page", async () => {

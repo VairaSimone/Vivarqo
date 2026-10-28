@@ -62,7 +62,7 @@ CREATE TABLE animals (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id                     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name                        VARCHAR(120) NOT NULL,
-    identifier                  VARCHAR(120),
+    identifier                  CITEXT,
     species                     VARCHAR(160) NOT NULL,
     sex                         VARCHAR(12) NOT NULL DEFAULT 'unknown'
                                 CHECK (sex IN ('male', 'female', 'unknown')),
@@ -83,7 +83,8 @@ CREATE TABLE animals (
     archived_at                 TIMESTAMPTZ,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT animals_id_user_id_unique UNIQUE (id, user_id)
+    CONSTRAINT animals_id_user_id_unique UNIQUE (id, user_id),
+    CONSTRAINT animals_identifier_length_check CHECK (identifier IS NULL OR char_length(identifier::text) <= 120)
 );
 
 CREATE UNIQUE INDEX animals_user_identifier_unique
@@ -339,7 +340,7 @@ CREATE TABLE stock_movements (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     item_id             UUID NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
     movement_type       VARCHAR(16) NOT NULL CHECK (movement_type IN ('in', 'out', 'adjustment')),
-    quantity            NUMERIC(12,3) NOT NULL CHECK (quantity > 0),
+    quantity            NUMERIC(12,3) NOT NULL CHECK (quantity >= 0 AND (movement_type = 'adjustment' OR quantity > 0)),
     unit_cost_cents     INTEGER CHECK (unit_cost_cents IS NULL OR unit_cost_cents >= 0),
     occurred_at         TIMESTAMPTZ NOT NULL,
     reference           VARCHAR(160),
@@ -489,7 +490,9 @@ CREATE TABLE audit_events (
 -- 9. Indici per filtri, cronologie e chiavi esterne
 -- ---------------------------------------------------------------------------
 CREATE INDEX user_sessions_user_expires_idx ON user_sessions (user_id, expires_at);
+CREATE INDEX user_sessions_expires_idx ON user_sessions (expires_at);
 CREATE INDEX auth_tokens_user_type_expires_idx ON auth_tokens (user_id, token_type, expires_at);
+CREATE INDEX auth_tokens_expires_idx ON auth_tokens (expires_at);
 CREATE INDEX animals_user_status_idx ON animals (user_id, status);
 CREATE INDEX animals_user_name_idx ON animals (user_id, name);
 CREATE INDEX animals_user_species_idx ON animals (user_id, species);

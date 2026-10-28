@@ -82,7 +82,20 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
     const tokenHash = hashOpaqueToken(rawToken);
     const session = await prisma.userSession.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            locale: true,
+            timezone: true,
+            emailVerifiedAt: true,
+            deletedAt: true,
+            accountStatus: true,
+          },
+        },
+      },
     });
 
     if (!session) {

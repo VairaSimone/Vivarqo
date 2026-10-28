@@ -7,6 +7,10 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 const categories = ["food", "substrate", "material", "equipment", "other"] as const;
 const movementTypes = ["in", "out", "adjustment"] as const;
 const scale = 1000;
+const movementListQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed", { issues: parsed.error.issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message })) });
@@ -36,12 +40,20 @@ const patchItemSchema = z.object({
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 const movementSchema = z.object({
   movementType: z.enum(movementTypes),
-  quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places"),
+  quantity: z.coerce.number().finite().min(0).max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places"),
   occurredAt: z.string().datetime({ offset: true }),
   unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
   reference: z.string().trim().max(160).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.movementType !== "adjustment" && value.quantity <= 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["quantity"],
+      message: "Inbound and outbound movement quantities must be greater than zero",
+    });
+  }
+});
 
 function asMilli(value: string | number): number {
   const parsed = Math.round(Number(value) * scale);
@@ -216,8 +228,21 @@ export function createInventoryRouter() {
     const id = routeUuid(req.params.id);
     const owned = await prisma.inventoryItem.findFirst({ where: { id, userId: auth.userId }, select: { id: true } });
     if (!owned) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Inventory item not found");
-    const movements = await prisma.stockMovement.findMany({ where: { itemId: id }, orderBy: { occurredAt: "desc" }, take: 500 });
-    res.status(200).json({ movements });
+    const query = parseBody(movementListQuery, req.query);
+    const where = { itemId: id };
+    const [total, movements] = await Promise.all([
+      prisma.stockMovement.count({ where }),
+      prisma.stockMovement.findMany({
+        where,
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ]);
+    res.status(200).json({
+      movements,
+      pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) },
+    });
   });
 
   router.post("/inventory/items/:id/archive", requireSession, async (req, res) => {

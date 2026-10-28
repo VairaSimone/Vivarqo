@@ -137,6 +137,29 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect(preview.body.errors[0].reason).toContain("stesso ciclo");
   });
 
+  it("rejects offspring batch imports that mix a cycle with another cycle's clutch", async () => {
+    const owner = await account();
+    const firstCycle = await prisma.reproductionCycle.create({
+      data: { userId: owner.userId, name: "First cycle", startedOn: new Date("2026-01-01T00:00:00.000Z") },
+    });
+    const secondCycle = await prisma.reproductionCycle.create({
+      data: { userId: owner.userId, name: "Second cycle", startedOn: new Date("2026-02-01T00:00:00.000Z") },
+    });
+    const clutch = await prisma.clutch.create({
+      data: { cycleId: secondCycle.id, laidOn: new Date("2026-06-01T00:00:00.000Z"), eggCount: 2 },
+    });
+
+    const csv = "cycleId,clutchId,bornOn,count\n" +
+      `${firstCycle.id},${clutch.id},2026-08-01,2\n`;
+    const preview = await owner.agent.post("/api/v1/imports?entity=offspringBatches")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+
+    expect(preview.body.validRows).toBe(0);
+    expect(preview.body.invalidRows).toBe(1);
+    expect(preview.body.errors[0].reason).toContain("stesso ciclo");
+  });
+
   it("rejects imports that reference another account's reproduction cycle", async () => {
     const owner = await account();
     const other = await account();
