@@ -224,27 +224,24 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
 
     await owner.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ endpoint: `https://push.example.test/${randomUUID()}`, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
+      .send({ endpoint: `https://fcm.googleapis.com/wp/${randomUUID()}`, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
       .expect(201);
-    const prefs = await owner.agent.patch("/api/v1/notification-preferences")
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ pushEnabled: true, inAppEnabled: true, quietHoursStart: "22:00", quietHoursEnd: "07:00", categories: { billing: true } })
-      .expect(200);
-    expect(prefs.body.preferences.pushEnabled).toBe(true);
-    expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
-  });
 
-  it("rejects unsupported push endpoints during subscription registration", async () => {
-    const owner = await account();
-    const response = await owner.agent.post("/api/v1/push-subscriptions")
+    const unsupported = await owner.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({
         endpoint: "https://attacker.example.test/push",
         keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) },
       })
       .expect(400);
+    expect(unsupported.body.code).toBe("INVALID_PUSH_ENDPOINT");
 
-    expect(response.body.code).toBe("INVALID_PUSH_ENDPOINT");
+    const prefs = await owner.agent.patch("/api/v1/notification-preferences")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ pushEnabled: true, inAppEnabled: true, quietHoursStart: "22:00", quietHoursEnd: "07:00", categories: { billing: true } })
+      .expect(200);
+    expect(prefs.body.preferences.pushEnabled).toBe(true);
+    expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
   it("matches care-import animal identifiers without regard to letter case", async () => {
