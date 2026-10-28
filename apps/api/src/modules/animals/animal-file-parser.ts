@@ -3,6 +3,7 @@ import { AppError } from "../../errors/app-error.js";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_ROWS = 5_000;
+const MAX_COLUMNS = 256;
 
 export interface ParsedAnimalFile {
   fileType: "csv" | "xlsx";
@@ -22,10 +23,16 @@ function decodeXml(value: string): string {
 }
 
 function cellColumn(reference: string): number {
-  const letters = reference.match(/^[A-Z]+/i)?.[0]?.toUpperCase() ?? "A";
+  const match = /^([A-Z]{1,3})([1-9]\d*)$/i.exec(reference);
+  if (!match) throw new AppError(400, "IMPORT_FILE_INVALID", "XLSX contains an invalid cell reference");
+
   let column = 0;
-  for (const letter of letters) column = column * 26 + letter.charCodeAt(0) - 64;
-  return column - 1;
+  for (const letter of match[1]!.toUpperCase()) column = column * 26 + letter.charCodeAt(0) - 64;
+  const zeroBased = column - 1;
+  if (zeroBased < 0 || zeroBased >= MAX_COLUMNS) {
+    throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", \`XLSX may contain at most \${MAX_COLUMNS} columns\`);
+  }
+  return zeroBased;
 }
 
 function findZipEntries(buffer: Buffer): Map<string, Buffer> {
@@ -168,10 +175,12 @@ function parseCsv(text: string): string[][] {
       else field += char;
     } else if (char === '"' && field.length === 0) quoted = true;
     else if (char === ",") {
+      if (row.length >= MAX_COLUMNS - 1) throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `CSV may contain at most ${MAX_COLUMNS} columns`);
       row.push(field);
       field = "";
     } else if (char === "\n" || char === "\r") {
       if (char === "\r" && source[index + 1] === "\n") index += 1;
+      if (row.length >= MAX_COLUMNS) throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `CSV may contain at most ${MAX_COLUMNS} columns`);
       row.push(field);
       if (row.some((cell) => cell.trim() !== "")) rows.push(row);
       row = [];
@@ -182,6 +191,7 @@ function parseCsv(text: string): string[][] {
   }
   if (quoted) throw new AppError(400, "IMPORT_FILE_INVALID", "CSV has an unterminated quoted field");
   if (field.length > 0 || row.length > 0) {
+    if (row.length >= MAX_COLUMNS) throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `CSV may contain at most ${MAX_COLUMNS} columns`);
     row.push(field);
     if (row.some((cell) => cell.trim() !== "")) rows.push(row);
   }
