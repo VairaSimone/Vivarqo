@@ -222,10 +222,18 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await other.agent.patch(`/api/v1/notifications/${notification.id}/read`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({}).expect(404);
 
+    const endpoint = `https://push.example.test/${randomUUID()}`;
     await owner.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ endpoint: `https://push.example.test/${randomUUID()}`, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
+      .send({ endpoint, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
       .expect(201);
+    await other.agent.post("/api/v1/push-subscriptions")
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ endpoint, keys: { p256dh: "zyxwvutsrqponmlk9876543210", auth: "zyxwvutsrqponmlk" }, userAgent: "other-account" })
+      .expect(409);
+    const retainedSubscription = await prisma.pushSubscription.findUniqueOrThrow({ where: { endpoint } });
+    expect(retainedSubscription.userId).toBe(owner.userId);
+    expect(retainedSubscription.userAgent).toBe("integration-test");
     const prefs = await owner.agent.patch("/api/v1/notification-preferences")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ pushEnabled: true, inAppEnabled: true, quietHoursStart: "22:00", quietHoursEnd: "07:00", categories: { billing: true } })
