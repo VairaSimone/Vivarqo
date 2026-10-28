@@ -21,15 +21,20 @@ function crc32(buffer: Buffer): number {
 function archiveName(name: string): string {
   return name.replace(/^\/+/, "").replace(/\.\.(\/|\\)/g, "");
 }
-function assertZipSizeWithinLimit(files: ExportFile[]): void {
+type PlannedZipEntry = { name: string; size: number };
+function assertZipSizeWithinLimit(files: ExportFile[], plannedEntries: PlannedZipEntry[] = []): void {
   // This ZIP writer stores entries uncompressed. Preflight the exact ZIP32
   // envelope (local header, central header, duplicate filename, end record)
-  // before allocating the final multi-buffer archive.
+  // including document sizes known from metadata before reading object bytes.
   let size = 22;
-  for (const file of files) {
-    const filenameBytes = Buffer.byteLength(archiveName(file.name), "utf8");
-    size += 30 + 46 + filenameBytes * 2 + file.content.length;
-    if (size > MAX_EXPORT_BYTES) {
+  const entries = [
+    ...files.map((file) => ({ name: file.name, size: file.content.length })),
+    ...plannedEntries,
+  ];
+  for (const entry of entries) {
+    const filenameBytes = Buffer.byteLength(archiveName(entry.name), "utf8");
+    size += 30 + 46 + filenameBytes * 2 + entry.size;
+    if (!Number.isSafeInteger(entry.size) || entry.size < 0 || size > MAX_EXPORT_BYTES) {
       throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");
     }
   }
@@ -235,16 +240,25 @@ export function createExportRouter() {
           "utf8",
         ),
       });
-      // Fail before loading document objects or allocating the final ZIP when
-      // the CSV portion already exceeds the response/archive budget.
-      assertZipSizeWithinLimit(files);
-      if (input.data.includeDocuments) {
-        for (const document of documents) {
-          const fileName = basename(document.originalFilename).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
-          const bytes = await readPrivateObject(document.storageKey);
-          files.push({ name: `documents/${document.id}_${fileName}`, content: bytes });
-          assertZipSizeWithinLimit(files);
+      const plannedDocuments = input.data.includeDocuments ? documents.map((document) => {
+        const fileName = basename(document.originalFilename).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+        return {
+          document,
+          name: `documents/${document.id}_${fileName}`,
+          size: Number(document.sizeBytes),
+        };
+      }) : [];
+      // Reject an oversized export before reading any document bytes from S3
+      // or disk. Each uploaded document already has an authoritative byte size.
+      assertZipSizeWithinLimit(files, plannedDocuments);
+      for (let index = 0; index < plannedDocuments.length; index += 1) {
+        const planned = plannedDocuments[index]!;
+        const bytes = await readPrivateObject(planned.document.storageKey);
+        if (bytes.length !== planned.size) {
+          throw new AppError(500, "EXPORT_DOCUMENT_SIZE_MISMATCH", "A stored document size does not match its metadata");
         }
+        files.push({ name: planned.name, content: bytes });
+        assertZipSizeWithinLimit(files, plannedDocuments.slice(index + 1));
       }
       const zip = zipFiles(files);
       const storageKey = await storePrivateObject("exports", "zip", zip);
