@@ -99,7 +99,8 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
         metadata: { user_id: owner.userId },
       } },
     };
-    const completion = await sendEvent(owner.agent, checkoutEvent);\n    expect(completion.status, `Webhook returned ${completion.status}: ${completion.text}`).toBe(200);
+    const completion = await sendEvent(owner.agent, checkoutEvent);
+    expect(completion.status, `Webhook returned ${completion.status}: ${completion.text}`).toBe(200);
     expect(completion.body.received).toBe(true);
     const subscription = await prisma.subscription.findUnique({ where: { userId: owner.userId } });
     expect(subscription).toMatchObject({ stripeCustomerId: "cus_test_vivarqo", stripeSubscriptionId: "sub_test_vivarqo", status: "active" });
