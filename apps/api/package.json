@@ -17,24 +17,24 @@
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
+    "dotenv": "^18.0.9",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "pg": "^8.16.3",
-    "pino": "^9.7.0",
+    "pino": "^10.4.0",
     "zod": "^4.1.12",
-    "argon2": "^0.44.0"
+    "argon2": "^0.45.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/node": "^24.10.1",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.15.5",
-    "@types/supertest": "^6.0.3",
+    "@types/supertest": "^7.2.1",
     "supertest": "^7.1.4",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
