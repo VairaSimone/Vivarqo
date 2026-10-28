@@ -11,6 +11,7 @@ export const registerSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   email: emailSchema,
   password: passwordSchema,
+  locale: z.enum(["it", "en"]).optional(),
 });
 
 export const verifyEmailSchema = z.object({ token: tokenSchema });
