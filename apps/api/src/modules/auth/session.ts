@@ -114,7 +114,7 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
     // Avoid a write on every authenticated request. Session activity is
     // useful for operational visibility, but persisting it more than once
     // every few minutes adds needless database load under concurrent traffic.
-    const shouldUpdateLastSeen = now.getTime() - session.lastSeenAt.getTime() >= LAST_SEEN_UPDATE_INTERVAL_MS;
+    const shouldUpdateLastSeen = now.getTime() - (session.lastSeenAt?.getTime() ?? 0) >= LAST_SEEN_UPDATE_INTERVAL_MS;
     if (shouldRenew || shouldUpdateLastSeen) {
       await prisma.userSession.update({
         where: { id: session.id },
