@@ -481,7 +481,9 @@ CREATE TABLE audit_events (
 -- 9. Indici per filtri, cronologie e chiavi esterne
 -- ---------------------------------------------------------------------------
 CREATE INDEX user_sessions_user_expires_idx ON user_sessions (user_id, expires_at);
+CREATE INDEX user_sessions_expires_idx ON user_sessions (expires_at);
 CREATE INDEX auth_tokens_user_type_expires_idx ON auth_tokens (user_id, token_type, expires_at);
+CREATE INDEX auth_tokens_expires_idx ON auth_tokens (expires_at);
 CREATE INDEX animals_user_status_idx ON animals (user_id, status);
 CREATE INDEX animals_user_name_idx ON animals (user_id, name);
 CREATE INDEX animals_user_species_idx ON animals (user_id, species);
