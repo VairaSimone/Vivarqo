@@ -9,6 +9,7 @@ import { hashOpaqueToken } from "./token-utils.js";
 const IDLE_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const ABSOLUTE_SESSION_MS = 90 * 24 * 60 * 60 * 1000;
 const RENEW_WHEN_REMAINING_MS = 7 * 24 * 60 * 60 * 1000;
+const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 export const SESSION_COOKIE_NAME =
   env.NODE_ENV === "production" ? "__Host-vivarqo_session" : "vivarqo_session";
@@ -110,10 +111,19 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
       expiresAt = new Date(Math.min(now.getTime() + IDLE_SESSION_MS, absoluteExpiry.getTime()));
     }
 
-    await prisma.userSession.update({
-      where: { id: session.id },
-      data: { lastSeenAt: now, ...(shouldRenew ? { expiresAt } : {}) },
-    });
+    // Avoid a write on every authenticated request. Session activity is
+    // useful for operational visibility, but persisting it more than once
+    // every few minutes adds needless database load under concurrent traffic.
+    const shouldUpdateLastSeen = now.getTime() - session.lastSeenAt.getTime() >= LAST_SEEN_UPDATE_INTERVAL_MS;
+    if (shouldRenew || shouldUpdateLastSeen) {
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: {
+          ...(shouldUpdateLastSeen ? { lastSeenAt: now } : {}),
+          ...(shouldRenew ? { expiresAt } : {}),
+        },
+      });
+    }
 
     if (shouldRenew) {
       res.cookie(SESSION_COOKIE_NAME, rawToken, {
