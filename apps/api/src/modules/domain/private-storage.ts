@@ -175,8 +175,15 @@ export async function storePrivateObjectFromFile(
   const key = `${folder}/${randomUUID()}.${extension}`;
   const config = s3Config();
   if (config) {
-    await s3UploadFile(config, key, sourcePath, fileInfo.size);
-    return key;
+    try {
+      await s3UploadFile(config, key, sourcePath, fileInfo.size);
+      return key;
+    } catch (error) {
+      // A network failure can happen after the provider has received the full PUT.
+      // Best-effort cleanup avoids leaving an object without a database reference.
+      await s3Request(config, "DELETE", key).catch(() => undefined);
+      throw error;
+    }
   }
 
   const destination = absolutePath(key);
