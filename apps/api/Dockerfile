@@ -8,10 +8,10 @@ WORKDIR /app
 # the required inputs. This URL is build-only and is not copied into runtime.
 FROM base AS dependencies
 ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
-COPY package.json pnpm-workspace.yaml .npmrc prisma.config.ts ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc prisma.config.ts ./
 COPY prisma ./prisma
 COPY apps/api/package.json apps/api/package.json
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
 COPY . .
@@ -25,7 +25,7 @@ ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema
 COPY package.json pnpm-workspace.yaml .npmrc prisma.config.ts ./
 COPY prisma ./prisma
 COPY apps/api/package.json apps/api/package.json
-RUN pnpm install --prod --no-frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS runtime
 ENV NODE_ENV=production
