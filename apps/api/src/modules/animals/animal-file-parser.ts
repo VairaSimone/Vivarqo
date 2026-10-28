@@ -175,7 +175,7 @@ function parseCsv(text: string): string[][] {
       else field += char;
     } else if (char === '"' && field.length === 0) quoted = true;
     else if (char === ",") {
-      if (row.length >= MAX_COLUMNS - 1) throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `CSV may contain at most ${MAX_COLUMNS} columns`);
+      if (row.length >= MAX_COLUMNS) throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `CSV may contain at most ${MAX_COLUMNS} columns`);
       row.push(field);
       field = "";
     } else if (char === "\n" || char === "\r") {
