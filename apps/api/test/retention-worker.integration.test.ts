@@ -13,6 +13,9 @@ function hash(value: string): string {
 
 describe.skipIf(!enabled)("Privacy retention and shared authentication rate limits", () => {
   afterAll(async () => {
+    await prisma.apiRateLimitBucket.deleteMany({
+      where: { namespace: { in: ["test-retention", "test-shared-auth"] } },
+    });
     if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
