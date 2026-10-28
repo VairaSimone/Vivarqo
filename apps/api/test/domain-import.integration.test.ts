@@ -119,7 +119,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
 
     expect(preview.body.validRows).toBe(0);
     expect(preview.body.invalidRows).toBe(1);
-    expect(preview.body.errors[0].reason).toContain("valid YYYY-MM-DD");
+    expect(preview.body.errors[0].reason).toContain("data valida nel formato AAAA-MM-GG");
   });
 
   it("rejects an offspring batch linked to a clutch from another cycle", async () => {
@@ -134,7 +134,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
 
     expect(preview.body.validRows).toBe(0);
     expect(preview.body.invalidRows).toBe(1);
-    expect(preview.body.errors[0].reason).toContain("same cycle");
+    expect(preview.body.errors[0].reason).toContain("stesso ciclo");
   });
 
   it("rejects imports that reference another account's reproduction cycle", async () => {
@@ -149,6 +149,6 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
       .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
     expect(preview.body.validRows).toBe(0);
     expect(preview.body.invalidRows).toBe(1);
-    expect(preview.body.errors[0].reason).toContain("Cycle not found");
+    expect(preview.body.errors[0].reason).toContain("Ciclo non trovato in questo account");
   });
 });
