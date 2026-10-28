@@ -245,6 +245,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
   it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
+    await prisma.animal.create({ data: { userId: owner.userId, name: "  =HYPERLINK(\"https://evil.example\")", species: "Python regius" } });
     const uploaded = await owner.agent.post("/api/v1/documents")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "application/pdf").set("X-Document-Name", "records.pdf")
@@ -263,6 +264,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
     expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
     expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("'  =HYPERLINK(\"https://evil.example\")"))).toBe(true);
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
     const withDocumentFiles = await owner.agent.post("/api/v1/exports")
