@@ -247,6 +247,40 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(response.body.code).toBe("INVALID_PUSH_ENDPOINT");
   });
 
+  it("matches care-import animal identifiers without regard to letter case", async () => {
+    const owner = await account();
+    const animal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Case-insensitive import", identifier: "ROCCO-123", species: "Python regius" },
+    });
+    const csv = "animalIdentifier,measuredAt,weightG\\nrocco-123,2026-10-20T12:00:00Z,420\\n";
+    const preview = await owner.agent.post("/api/v1/imports?entity=weights")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+
+    expect(preview.body.validRows).toBe(1);
+    expect(preview.body.invalidRows).toBe(0);
+
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    const measurement = await prisma.weightMeasurement.findFirstOrThrow({
+      where: { animalId: animal.id, weightG: 420 },
+    });
+    expect(measurement.animalId).toBe(animal.id);
+  });
+
+  it("rejects unsupported push endpoints during subscription registration", async () => {
+    const owner = await account();
+    const response = await owner.agent.post("/api/v1/push-subscriptions")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        endpoint: "https://attacker.example.test/push",
+        keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) },
+      })
+      .expect(400);
+
+    expect(response.body.code).toBe("INVALID_PUSH_ENDPOINT");
+  });
+
   it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
