@@ -85,7 +85,7 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | `pnpm db:migrate:dev` | Crea/applica una migrazione in sviluppo; solo su DB di sviluppo |
 | `pnpm test` | Esegue i test API |
 | `pnpm typecheck` | Type-check TypeScript |
-| `pnpm build` | Compila l'API |
+| `pnpm build:api` | Compila solo l'API |
 
 ## Stato del repository
 Il repository contiene un backend API per account e impostazioni, autenticazione, animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti/condivisioni pubbliche, import/export, finanze, billing Stripe e notifiche. La presenza di un endpoint non sostituisce la verifica del suo stato operativo, della configurazione dei provider e dei processi di produzione.
