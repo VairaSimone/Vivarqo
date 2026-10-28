@@ -26,8 +26,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Check lockfile bootstrap state
+        id: lockfile_state
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Publish bootstrap lockfile
+        if: steps.lockfile_state.outputs.present == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-pnpm-lockfile
+          path: pnpm-lock.yaml
+          if-no-files-found: error
+          retention-days: 1
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Type-check
