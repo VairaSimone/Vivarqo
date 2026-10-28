@@ -1,70 +1,17 @@
+import { basename, join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { Router } from "express";
-import { basename } from "node:path";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { deletePrivateObject, readPrivateObject, storePrivateObject } from "./private-storage.js";
+import { deletePrivateObject, readPrivateObject, storePrivateObjectFromFile } from "./private-storage.js";
+import { singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
 
-type ExportFile = { name: string; content: Buffer };
-function crc32(buffer: Buffer): number {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-function zipFiles(files: ExportFile[]): Buffer {
-  const localParts: Buffer[] = [];
-  const centralParts: Buffer[] = [];
-  let offset = 0;
-  for (const file of files) {
-    const filename = Buffer.from(file.name.replace(/^\/+/, "").replace(/\.\.(\/|\\)/g, ""), "utf8");
-    const data = file.content;
-    const checksum = crc32(data);
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0, 6);
-    local.writeUInt16LE(0, 8);
-    local.writeUInt32LE(checksum, 14);
-    local.writeUInt32LE(data.length, 18);
-    local.writeUInt32LE(data.length, 22);
-    local.writeUInt16LE(filename.length, 26);
-    localParts.push(local, filename, data);
+const EXPORT_PAGE_SIZE = 250;
+const MAX_EXPORT_BYTES = 50 * 1024 * 1024;
 
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(0, 8);
-    central.writeUInt16LE(0, 10);
-    central.writeUInt32LE(checksum, 16);
-    central.writeUInt32LE(data.length, 20);
-    central.writeUInt32LE(data.length, 24);
-    central.writeUInt16LE(filename.length, 28);
-    central.writeUInt16LE(0, 30);
-    central.writeUInt16LE(0, 32);
-    central.writeUInt16LE(0, 34);
-    central.writeUInt16LE(0, 36);
-    central.writeUInt32LE(0, 38);
-    central.writeUInt32LE(offset, 42);
-    centralParts.push(central, filename);
-    offset += local.length + filename.length + data.length;
-  }
-  const central = Buffer.concat(centralParts);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(0, 4);
-  end.writeUInt16LE(0, 6);
-  end.writeUInt16LE(files.length, 8);
-  end.writeUInt16LE(files.length, 10);
-  end.writeUInt32LE(central.length, 12);
-  end.writeUInt32LE(offset, 16);
-  end.writeUInt16LE(0, 20);
-  return Buffer.concat([...localParts, central, end]);
-}
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   let rendered: string;
@@ -77,102 +24,71 @@ function csvCell(value: unknown): string {
   if (/^[=+@\-\t\r]/.test(rendered)) rendered = `'${rendered}`;
   return `"${rendered.replace(/"/g, '""')}"`;
 }
-function csv(headers: string[], rows: Array<Record<string, unknown>>): Buffer {
-  const lines = [headers.map(csvCell).join(",")];
-  for (const row of rows) lines.push(headers.map((key) => csvCell(row[key])).join(","));
-  return Buffer.from(`\uFEFF${lines.join("\r\n")}\r\n`, "utf8");
-}
-function recordRows(value: unknown): Array<Record<string, unknown>> {
-  if (!Array.isArray(value)) return [];
-  return value.map((entry) => entry as Record<string, unknown>);
-}
+
 function routeId(value: string | string[] | undefined): string {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid export id");
   return id;
 }
 
-export function createExportRouter() {
-  const router = Router();
+type PageLoader = (cursor: string | undefined, take: number) => Promise<unknown[]>;
+type ExportTable = {
+  name: string;
+  emptyHeaders: string[];
+  rows: () => AsyncIterable<Record<string, unknown>>;
+};
 
-  router.post("/", requireSession, async (req, res) => {
-    const auth = res.locals.auth as AuthContext;
-    const input = z.object({ includeDocuments: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
-    if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const job = await prisma.exportJob.create({ data: { userId: auth.userId, status: "pending", expiresAt } });
-    try {
-      const [
-        animals, feedingSessions, feedingEntries, weights, sheds, notes, cycles, reproductiveEvents,
-        clutches, eggs, incubationLogs, offspringBatches, inventoryItems, stockMovements, financeEntries,
-        tasks, reminderRules, notifications, geneticTraits, publicShares, notificationPreferences, documents,
-      ] = await Promise.all([
-        prisma.animal.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
-        prisma.feedingSession.findMany({ where: { userId: auth.userId }, orderBy: { performedAt: "asc" } }),
-        prisma.feedingEntry.findMany({ where: { session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } }, orderBy: { createdAt: "asc" } }),
-        prisma.weightMeasurement.findMany({ where: { animal: { is: { userId: auth.userId } } }, orderBy: { measuredAt: "asc" } }),
-        prisma.shedRecord.findMany({ where: { animal: { is: { userId: auth.userId } } }, orderBy: { occurredAt: "asc" } }),
-        prisma.animalNote.findMany({ where: { animal: { is: { userId: auth.userId } } }, orderBy: { occurredAt: "asc" } }),
-        prisma.reproductionCycle.findMany({ where: { userId: auth.userId }, orderBy: { startedOn: "asc" } }),
-        prisma.reproductiveEvent.findMany({ where: { cycle: { is: { userId: auth.userId } } }, orderBy: { occurredAt: "asc" } }),
-        prisma.clutch.findMany({ where: { cycle: { is: { userId: auth.userId } } }, orderBy: { laidOn: "asc" } }),
-        prisma.egg.findMany({ where: { clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, orderBy: { createdAt: "asc" } }),
-        prisma.incubationLog.findMany({ where: { clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, orderBy: { recordedAt: "asc" } }),
-        prisma.offspringBatch.findMany({ where: { cycle: { is: { userId: auth.userId } } }, orderBy: { bornOn: "asc" } }),
-        prisma.inventoryItem.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
-        prisma.stockMovement.findMany({ where: { item: { is: { userId: auth.userId } } }, orderBy: { occurredAt: "asc" } }),
-        prisma.financeEntry.findMany({ where: { userId: auth.userId }, orderBy: { occurredOn: "asc" } }),
-        prisma.task.findMany({ where: { userId: auth.userId }, orderBy: { dueAt: "asc" } }),
-        prisma.reminderRule.findMany({ where: { userId: auth.userId }, orderBy: { nextDueAt: "asc" } }),
-        prisma.notification.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
-        prisma.animalGeneticTrait.findMany({ where: { animal: { is: { userId: auth.userId } } }, orderBy: { createdAt: "asc" } }),
-        prisma.publicShare.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "asc" } }),
-        prisma.notificationPreferences.findMany({ where: { userId: auth.userId } }),
-        prisma.document.findMany({ where: { userId: auth.userId, deletedAt: null }, orderBy: { createdAt: "asc" } }),
-      ]);
+function paginateRows(loadPage: PageLoader): AsyncIterable<Record<string, unknown>> {
+  return (async function* () {
+    let cursor: string | undefined;
+    while (true) {
+      const page = await loadPage(cursor, EXPORT_PAGE_SIZE);
+      if (page.length === 0) return;
 
-      const tableRows: Array<{ name: string; rows: Array<Record<string, unknown>>; headers?: string[] }> = [
-        { name: "animals.csv", rows: recordRows(animals) },
-        { name: "feeding_sessions.csv", rows: recordRows(feedingSessions) },
-        { name: "feeding_entries.csv", rows: recordRows(feedingEntries) },
-        { name: "weights.csv", rows: recordRows(weights) },
-        { name: "sheds.csv", rows: recordRows(sheds) },
-        { name: "animal_notes.csv", rows: recordRows(notes) },
-        { name: "reproduction_cycles.csv", rows: recordRows(cycles) },
-        { name: "reproductive_events.csv", rows: recordRows(reproductiveEvents) },
-        { name: "clutches.csv", rows: recordRows(clutches) },
-        { name: "eggs.csv", rows: recordRows(eggs) },
-        { name: "incubation_logs.csv", rows: recordRows(incubationLogs) },
-        { name: "offspring_batches.csv", rows: recordRows(offspringBatches) },
-        { name: "inventory_items.csv", rows: recordRows(inventoryItems) },
-        { name: "stock_movements.csv", rows: recordRows(stockMovements) },
-        { name: "finance_entries.csv", rows: recordRows(financeEntries).map((entry) => ({ ...entry, amountCents: String(entry.amountCents) })) },
-        { name: "tasks.csv", rows: recordRows(tasks) },
-        { name: "reminder_rules.csv", rows: recordRows(reminderRules) },
-        { name: "notifications.csv", rows: recordRows(notifications) },
-        { name: "animal_genetic_traits.csv", rows: recordRows(geneticTraits) },
-        { name: "public_shares.csv", rows: recordRows(publicShares) },
-        { name: "notification_preferences.csv", rows: recordRows(notificationPreferences) },
-        {
-          name: "documents.csv",
-          rows: recordRows(documents).map((document) => {
-            const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
-            return {
-              id: document.id,
-              animalId: document.animalId,
-              cycleId: document.cycleId,
-              originalFilename: document.originalFilename,
-              mimeType: document.mimeType,
-              sizeBytes: document.sizeBytes,
-              category: document.category,
-              note: document.note,
-              createdAt: document.createdAt,
-              archivePath: input.data.includeDocuments ? `documents/${document.id}_${fileName}` : null,
-            };
-          }),
-        },
-      ];
-      const emptyHeaders: Record<string, string[]> = {
+      for (const row of page) {
+        if (typeof row !== "object" || row === null) throw new Error("Unexpected non-object row in export query");
+        yield row as Record<string, unknown>;
+      }
+
+      const lastId = (page[page.length - 1] as { id?: unknown }).id;
+      if (typeof lastId !== "string") throw new Error("Export pagination requires a stable string ID");
+      cursor = lastId;
+      if (page.length < EXPORT_PAGE_SIZE) return;
+    }
+  })();
+}
+
+async function* mapRows(
+  rows: AsyncIterable<Record<string, unknown>>,
+  transform: (row: Record<string, unknown>) => Record<string, unknown>,
+): AsyncGenerator<Record<string, unknown>> {
+  for await (const row of rows) yield transform(row);
+}
+
+async function* csvChunks(
+  rows: AsyncIterable<Record<string, unknown>>,
+  emptyHeaders: string[],
+): AsyncGenerator<Buffer> {
+  const iterator = rows[Symbol.asyncIterator]();
+  try {
+    const first = await iterator.next();
+    const headers = first.done ? emptyHeaders : Object.keys(first.value);
+    yield Buffer.from(`\uFEFF${headers.map(csvCell).join(",")}\r\n`, "utf8");
+
+    if (!first.done) {
+      yield Buffer.from(`${headers.map((key) => csvCell(first.value[key])).join(",")}\r\n`, "utf8");
+      while (true) {
+        const next = await iterator.next();
+        if (next.done) break;
+        yield Buffer.from(`${headers.map((key) => csvCell(next.value[key])).join(",")}\r\n`, "utf8");
+      }
+    }
+  } finally {
+    await iterator.return?.();
+  }
+}
+
+const EMPTY_HEADERS: Record<string, string[]> = {
         "animals.csv": ["id", "userId", "name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes", "photoKey", "originClutchId", "originOffspringBatchId", "archivedAt", "createdAt", "updatedAt"],
         "feeding_sessions.csv": ["id", "userId", "performedAt", "notes", "createdAt", "updatedAt"],
         "feeding_entries.csv": ["id", "sessionId", "animalId", "outcome", "foodType", "foodSize", "foodWeightG", "notes", "createdAt", "updatedAt"],
@@ -195,50 +111,209 @@ export function createExportRouter() {
         "public_shares.csv": ["id", "userId", "animalId", "slug", "visibleFields", "publicDescription", "isEnabled", "revokedAt", "createdAt", "updatedAt"],
         "notification_preferences.csv": ["id", "userId", "inAppEnabled", "pushEnabled", "categories", "quietHoursStart", "quietHoursEnd", "createdAt", "updatedAt"],
         "documents.csv": ["id", "animalId", "cycleId", "originalFilename", "mimeType", "sizeBytes", "category", "note", "createdAt", "archivePath"],
-      };
-      const files: ExportFile[] = tableRows.map((table) => {
-        // Every row in a table comes from the same Prisma model (or the same
-        // explicit document projection), so its first row already defines the
-        // complete header set. Avoid allocating an intermediate array of keys
-        // for every exported row.
-        const derivedHeaders = Object.keys(table.rows[0] ?? {});
-        const headers = table.headers ?? (derivedHeaders.length > 0 ? derivedHeaders : (emptyHeaders[table.name] ?? []));
-        return { name: table.name, content: csv(headers, table.rows) };
-      });
-            files.unshift({
-        name: "README.txt",
-        content: Buffer.from(
-          `Vivarqo export\nCreated: ${new Date().toISOString()}\nAccount ID: ${auth.userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\n`,
-          "utf8",
-        ),
-      });
-      if (input.data.includeDocuments) {
-        for (const document of documents) {
-          const bytes = await readPrivateObject(document.storageKey);
-          const fileName = basename(document.originalFilename).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
-          files.push({ name: `documents/${document.id}_${fileName}`, content: bytes });
-        }
-      }
-      const zip = zipFiles(files);
-      if (zip.length > 50 * 1024 * 1024) throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");
-      const storageKey = await storePrivateObject("exports", "zip", zip);
+};
+
+function exportTables(userId: string, includeDocuments: boolean): ExportTable[] {
+  const page = (cursor: string | undefined, take: number) => ({
+    take,
+    orderBy: { id: "asc" as const },
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
+
+  return [
+    {
+      name: "animals.csv", emptyHeaders: EMPTY_HEADERS["animals.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animal.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "feeding_sessions.csv", emptyHeaders: EMPTY_HEADERS["feeding_sessions.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.feedingSession.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "feeding_entries.csv", emptyHeaders: EMPTY_HEADERS["feeding_entries.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.feedingEntry.findMany({
+        where: { session: { is: { userId } }, animal: { is: { userId } } }, ...page(cursor, take),
+      })),
+    },
+    {
+      name: "weights.csv", emptyHeaders: EMPTY_HEADERS["weights.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.weightMeasurement.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "sheds.csv", emptyHeaders: EMPTY_HEADERS["sheds.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.shedRecord.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "animal_notes.csv", emptyHeaders: EMPTY_HEADERS["animal_notes.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalNote.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "reproduction_cycles.csv", emptyHeaders: EMPTY_HEADERS["reproduction_cycles.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.reproductionCycle.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "reproductive_events.csv", emptyHeaders: EMPTY_HEADERS["reproductive_events.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.reproductiveEvent.findMany({ where: { cycle: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "clutches.csv", emptyHeaders: EMPTY_HEADERS["clutches.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.clutch.findMany({ where: { cycle: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "eggs.csv", emptyHeaders: EMPTY_HEADERS["eggs.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.egg.findMany({ where: { clutch: { is: { cycle: { is: { userId } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "incubation_logs.csv", emptyHeaders: EMPTY_HEADERS["incubation_logs.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.incubationLog.findMany({ where: { clutch: { is: { cycle: { is: { userId } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "offspring_batches.csv", emptyHeaders: EMPTY_HEADERS["offspring_batches.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.offspringBatch.findMany({ where: { cycle: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "inventory_items.csv", emptyHeaders: EMPTY_HEADERS["inventory_items.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.inventoryItem.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "stock_movements.csv", emptyHeaders: EMPTY_HEADERS["stock_movements.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.stockMovement.findMany({ where: { item: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "finance_entries.csv", emptyHeaders: EMPTY_HEADERS["finance_entries.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.financeEntry.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "tasks.csv", emptyHeaders: EMPTY_HEADERS["tasks.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.task.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "reminder_rules.csv", emptyHeaders: EMPTY_HEADERS["reminder_rules.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.reminderRule.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "notifications.csv", emptyHeaders: EMPTY_HEADERS["notifications.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.notification.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "animal_genetic_traits.csv", emptyHeaders: EMPTY_HEADERS["animal_genetic_traits.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalGeneticTrait.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "public_shares.csv", emptyHeaders: EMPTY_HEADERS["public_shares.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.publicShare.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "notification_preferences.csv", emptyHeaders: EMPTY_HEADERS["notification_preferences.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.notificationPreferences.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "documents.csv", emptyHeaders: EMPTY_HEADERS["documents.csv"]!,
+      rows: () => mapRows(
+        paginateRows((cursor, take) => prisma.document.findMany({ where: { userId, deletedAt: null }, ...page(cursor, take) })),
+        (document) => {
+          const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+          return {
+            id: document.id,
+            animalId: document.animalId,
+            cycleId: document.cycleId,
+            originalFilename: document.originalFilename,
+            mimeType: document.mimeType,
+            sizeBytes: document.sizeBytes,
+            category: document.category,
+            note: document.note,
+            createdAt: document.createdAt,
+            archivePath: includeDocuments ? `documents/${document.id}_${fileName}` : null,
+          };
+        },
+      ),
+    },
+  ];
+}
+
+async function* exportEntries(
+  userId: string,
+  includeDocuments: boolean,
+  createdAt: Date,
+): AsyncGenerator<StreamingZipEntry> {
+  const readme = Buffer.from(
+    `Vivarqo export\nCreated: ${createdAt.toISOString()}\nAccount ID: ${userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\n`,
+    "utf8",
+  );
+  yield { name: "README.txt", chunks: singleBufferChunk(readme) };
+
+  for (const table of exportTables(userId, includeDocuments)) {
+    yield { name: table.name, chunks: csvChunks(table.rows(), table.emptyHeaders) };
+  }
+
+  if (!includeDocuments) return;
+  const documents = paginateRows((cursor, take) => prisma.document.findMany({
+    where: { userId, deletedAt: null },
+    select: { id: true, originalFilename: true, storageKey: true },
+    ...{
+      take,
+      orderBy: { id: "asc" as const },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    },
+  }));
+  for await (const document of documents) {
+    const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+    const bytes = await readPrivateObject(String(document.storageKey));
+    yield { name: `documents/${document.id}_${fileName}`, chunks: singleBufferChunk(bytes) };
+  }
+}
+
+export function createExportRouter() {
+  const router = Router();
+
+  router.post("/", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = z.object({ includeDocuments: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
+    if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
+
+    const createdAt = new Date();
+    const job = await prisma.exportJob.create({
+      data: { userId: auth.userId, status: "pending", expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000) },
+    });
+    let tempDirectory: string | undefined;
+    let storageKey: string | undefined;
+    try {
+      tempDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
+      const archivePath = join(tempDirectory, "export.zip");
+      await writeStreamingZip(archivePath, exportEntries(auth.userId, input.data.includeDocuments, createdAt), MAX_EXPORT_BYTES);
+      storageKey = await storePrivateObjectFromFile("exports", "zip", archivePath);
       const completed = await prisma.exportJob.update({
         where: { id: job.id },
         data: { status: "completed", storageKey },
         select: { id: true, status: true, expiresAt: true, createdAt: true },
       });
-      await prisma.auditEvent.create({ data: { userId: auth.userId, action: "account.export_created", entityType: "export_job", entityId: job.id } });
-      res.status(201).json({ export: completed, downloadPath: `/api/v1/exports/${job.id}/download`, includeDocuments: input.data.includeDocuments });
+      await prisma.auditEvent.create({
+        data: { userId: auth.userId, action: "account.export_created", entityType: "export_job", entityId: job.id },
+      });
+      res.status(201).json({
+        export: completed,
+        downloadPath: `/api/v1/exports/${job.id}/download`,
+        includeDocuments: input.data.includeDocuments,
+      });
     } catch (error) {
-      await prisma.exportJob.updateMany({ where: { id: job.id, userId: auth.userId }, data: { status: "failed" } }).catch(() => undefined);
+      if (storageKey) await deletePrivateObject(storageKey).catch(() => undefined);
+      await prisma.exportJob.updateMany({
+        where: { id: job.id, userId: auth.userId },
+        data: { status: "failed" },
+      }).catch(() => undefined);
       throw error;
+    } finally {
+      if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true }).catch(() => undefined);
     }
   });
 
   router.get("/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id);
-    const job = await prisma.exportJob.findFirst({ where: { id, userId: auth.userId }, select: { id: true, status: true, expiresAt: true, createdAt: true } });
+    const job = await prisma.exportJob.findFirst({
+      where: { id, userId: auth.userId },
+      select: { id: true, status: true, expiresAt: true, createdAt: true },
+    });
     if (!job) throw new AppError(404, "EXPORT_NOT_FOUND", "Export not found");
     res.status(200).json({ export: job, ready: job.status === "completed" && job.expiresAt > new Date() });
   });
@@ -248,7 +323,9 @@ export function createExportRouter() {
     const id = routeId(req.params.id);
     const job = await prisma.exportJob.findFirst({ where: { id, userId: auth.userId } });
     if (!job) throw new AppError(404, "EXPORT_NOT_FOUND", "Export not found");
-    if (job.status !== "completed" || !job.storageKey || job.expiresAt <= new Date()) throw new AppError(410, "EXPORT_EXPIRED", "The export is not available or has expired");
+    if (job.status !== "completed" || !job.storageKey || job.expiresAt <= new Date()) {
+      throw new AppError(410, "EXPORT_EXPIRED", "The export is not available or has expired");
+    }
     const data = await readPrivateObject(job.storageKey);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Length", data.length);
