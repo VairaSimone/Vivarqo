@@ -37,6 +37,16 @@ describe("backend localization", () => {
     });
   });
 
+  it("localizes generated errors in import previews without changing row metadata", () => {
+    expect(localizeResponseBody({
+      importId: "import-test",
+      errors: [{ row: 4, column: "animalId", reason: "Animal not found in this account" }],
+    }, "it")).toEqual({
+      importId: "import-test",
+      errors: [{ row: 4, column: "animalId", reason: "Animale non trovato in questo account" }],
+    });
+  });
+
   it("localizes validation details while preserving field paths", () => {
     expect(localizeResponseBody({
       code: "VALIDATION_ERROR",
