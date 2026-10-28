@@ -1,0 +1,578 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../apps/api/src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions", "partialIndexes"]
+}
+datasource db {
+  provider   = "postgresql"
+  extensions = [citext]
+}
+
+model User {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                   String                    @unique @db.Citext
+  passwordHash            String                    @map("password_hash")
+  displayName             String                    @map("display_name") @db.VarChar(120)
+  locale                  String                    @default("it") @db.VarChar(10)
+  timezone                String                    @default("Europe/Rome") @db.VarChar(64)
+  emailVerifiedAt         DateTime?                 @map("email_verified_at") @db.Timestamptz(6)
+  accountStatus           String                    @default("active") @map("account_status") @db.VarChar(20)
+  createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt               DateTime?                 @map("deleted_at") @db.Timestamptz(6)
+  sessions                UserSession[]
+  authTokens              AuthToken[]
+  animals                 Animal[]
+  feedingSessions         FeedingSession[]
+  reminderRules           ReminderRule[]
+  tasks                   Task[]
+  notificationPreferences NotificationPreferences?
+  pushSubscriptions       PushSubscription[]
+  notifications           Notification[]
+  reproductionCycles      ReproductionCycle[]
+  inventoryItems          InventoryItem[]
+  documents               Document[]
+  publicShares            PublicShare[]
+  importJobs              ImportJob[]
+  exportJobs              ExportJob[]
+  financeEntries          FinanceEntry[]
+  subscription            Subscription?
+  auditEvents             AuditEvent[]
+  @@map("users")
+}
+
+model UserSession {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  userAgent  String?  @map("user_agent")
+  ipHash     String?  @map("ip_hash")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt], map: "user_sessions_user_expires_idx")
+  @@map("user_sessions")
+}
+
+model AuthToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  tokenType  String    @map("token_type") @db.VarChar(24)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, tokenType, expiresAt], map: "auth_tokens_user_type_expires_idx")
+  @@map("auth_tokens")
+}
+
+model Animal {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                 String                @map("user_id") @db.Uuid
+  name                   String                @db.VarChar(120)
+  identifier             String?               @db.VarChar(120)
+  species                String                @db.VarChar(160)
+  sex                    String                @default("unknown") @db.VarChar(12)
+  morph                  String?               @db.VarChar(200)
+  geneticsNotes          String?               @map("genetics_notes")
+  birthDate              DateTime?             @map("birth_date") @db.Date
+  birthDateEstimated     Boolean               @default(false) @map("birth_date_estimated")
+  acquiredDate           DateTime?             @map("acquired_date") @db.Date
+  originDescription      String?               @map("origin_description")
+  previousBreeder        String?               @map("previous_breeder") @db.VarChar(160)
+  locationLabel          String?               @map("location_label") @db.VarChar(160)
+  status                 String                @default("active") @db.VarChar(20)
+  notes                  String?
+  photoKey               String?               @map("photo_key")
+  originClutchId         String?               @map("origin_clutch_id") @db.Uuid
+  originOffspringBatchId String?               @map("origin_offspring_batch_id") @db.Uuid
+  archivedAt             DateTime?             @map("archived_at") @db.Timestamptz(6)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedingEntries         FeedingEntry[]
+  weightMeasurements     WeightMeasurement[]
+  shedRecords            ShedRecord[]
+  notesHistory           AnimalNote[]
+  reminderRules          ReminderRule[]
+  tasks                  Task[]
+  parentCyclesA          ReproductionCycle[]   @relation("CycleParentA")
+  parentCyclesB          ReproductionCycle[]   @relation("CycleParentB")
+  reproductiveEvents     ReproductiveEvent[]
+  originClutch           Clutch?               @relation("AnimalOriginClutch", fields: [originClutchId], references: [id], onDelete: Restrict)
+  originOffspringBatch   OffspringBatch?       @relation("AnimalOriginBatch", fields: [originOffspringBatchId], references: [id], onDelete: Restrict)
+  documents              Document[]
+  publicShare            PublicShare?
+  financeEntries         FinanceEntry[]
+  geneticTraits          AnimalGeneticTrait[]  @relation("GeneticTraitAnimal")
+  traitsAsSource         AnimalGeneticTrait[]  @relation("GeneticTraitSourceAnimal")
+  @@unique([id, userId], map: "animals_id_user_id_unique")
+  @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
+  @@index([userId, status], map: "animals_user_status_idx")
+  @@index([userId, name], map: "animals_user_name_idx")
+  @@index([userId, species], map: "animals_user_species_idx")
+  @@index([userId, locationLabel], map: "animals_user_location_idx")
+  @@index([originClutchId], map: "animals_origin_clutch_idx")
+  @@index([originOffspringBatchId], map: "animals_origin_batch_idx")
+  @@map("animals")
+}
+
+model FeedingSession {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  performedAt DateTime       @map("performed_at") @db.Timestamptz(6)
+  notes       String?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries     FeedingEntry[]
+  @@unique([id, userId], map: "feeding_sessions_id_user_id_unique")
+  @@index([userId, performedAt(sort: Desc)], map: "feeding_sessions_user_performed_idx")
+  @@map("feeding_sessions")
+}
+
+model FeedingEntry {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId   String         @map("session_id") @db.Uuid
+  animalId    String         @map("animal_id") @db.Uuid
+  outcome     String         @db.VarChar(20)
+  foodType    String?        @map("food_type") @db.VarChar(120)
+  foodSize    String?        @map("food_size") @db.VarChar(120)
+  foodWeightG Decimal?       @map("food_weight_g") @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  session     FeedingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  animal      Animal         @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([animalId, sessionId], map: "feeding_entries_animal_session_idx")
+  @@index([sessionId], map: "feeding_entries_session_idx")
+  @@map("feeding_entries")
+}
+
+model WeightMeasurement {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId   String   @map("animal_id") @db.Uuid
+  measuredAt DateTime @map("measured_at") @db.Timestamptz(6)
+  weightG    Decimal  @map("weight_g") @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([animalId, measuredAt(sort: Desc)], map: "weight_measurements_animal_measured_idx")
+  @@map("weight_measurements")
+}
+
+model ShedRecord {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId   String   @map("animal_id") @db.Uuid
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  outcome    String   @db.VarChar(16)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([animalId, occurredAt(sort: Desc)], map: "shed_records_animal_occurred_idx")
+  @@map("shed_records")
+}
+
+model AnimalNote {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId   String   @map("animal_id") @db.Uuid
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  title      String?  @db.VarChar(160)
+  category   String   @db.VarChar(40)
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([animalId, occurredAt(sort: Desc)], map: "animal_notes_animal_occurred_idx")
+  @@map("animal_notes")
+}
+
+model ReminderRule {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  animalId     String?   @map("animal_id") @db.Uuid
+  title        String    @db.VarChar(160)
+  category     String    @db.VarChar(30)
+  intervalDays Int       @map("interval_days")
+  nextDueAt    DateTime  @map("next_due_at") @db.Timestamptz(6)
+  isEnabled    Boolean   @default(true) @map("is_enabled")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal       Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  tasks        Task[]
+  @@unique([id, userId], map: "reminder_rules_id_user_id_unique")
+  @@index([userId, nextDueAt], where: { isEnabled: true }, map: "reminder_rules_user_next_due_idx")
+  @@index([animalId], map: "reminder_rules_animal_idx")
+  @@map("reminder_rules")
+}
+
+model Task {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  animalId       String?       @map("animal_id") @db.Uuid
+  title          String        @db.VarChar(160)
+  description    String?
+  category       String        @db.VarChar(30)
+  dueAt          DateTime      @map("due_at") @db.Timestamptz(6)
+  status         String        @default("open") @db.VarChar(16)
+  completedAt    DateTime?     @map("completed_at") @db.Timestamptz(6)
+  reminderRuleId String?       @map("reminder_rule_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal         Animal?       @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  reminderRule   ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+  @@index([userId, status, dueAt], map: "tasks_user_status_due_idx")
+  @@index([animalId], map: "tasks_animal_idx")
+  @@index([reminderRuleId], map: "tasks_reminder_rule_idx")
+  @@map("tasks")
+}
+
+model NotificationPreferences {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  inAppEnabled    Boolean  @default(true) @map("in_app_enabled")
+  pushEnabled     Boolean  @default(false) @map("push_enabled")
+  categories      Json     @default("{}") @db.JsonB
+  quietHoursStart DateTime? @map("quiet_hours_start") @db.Time(6)
+  quietHoursEnd   DateTime? @map("quiet_hours_end") @db.Time(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("notification_preferences")
+}
+
+model PushSubscription {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  endpoint      String    @unique
+  p256dh        String
+  authSecret    String    @map("auth_secret")
+  userAgent     String?   @map("user_agent")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSuccessAt DateTime? @map("last_success_at") @db.Timestamptz(6)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId], map: "push_subscriptions_user_idx")
+  @@map("push_subscriptions")
+}
+
+model Notification {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  category   String    @db.VarChar(30)
+  title      String    @db.VarChar(160)
+  body       String
+  targetPath String?   @map("target_path")
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt(sort: Desc)], map: "notifications_user_created_idx")
+  @@index([userId, createdAt(sort: Desc)], where: { readAt: null }, map: "notifications_user_unread_idx")
+  @@map("notifications")
+}
+
+model ReproductionCycle {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String             @map("user_id") @db.Uuid
+  parentAAnimalId   String?            @map("parent_a_animal_id") @db.Uuid
+  parentBAnimalId   String?            @map("parent_b_animal_id") @db.Uuid
+  name              String?            @db.VarChar(160)
+  startedOn         DateTime           @map("started_on") @db.Date
+  endedOn           DateTime?          @map("ended_on") @db.Date
+  status            String             @default("planned") @db.VarChar(16)
+  notes             String?
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentA           Animal?            @relation("CycleParentA", fields: [parentAAnimalId], references: [id], onDelete: Restrict)
+  parentB           Animal?            @relation("CycleParentB", fields: [parentBAnimalId], references: [id], onDelete: Restrict)
+  events            ReproductiveEvent[]
+  clutches          Clutch[]
+  offspringBatches  OffspringBatch[]
+  documents         Document[]
+  @@unique([id, userId], map: "reproduction_cycles_id_user_id_unique")
+  @@index([userId, status, startedOn(sort: Desc)], map: "reproduction_cycles_user_status_started_idx")
+  @@index([parentAAnimalId], map: "reproduction_cycles_parent_a_idx")
+  @@index([parentBAnimalId], map: "reproduction_cycles_parent_b_idx")
+  @@map("reproduction_cycles")
+}
+
+model ReproductiveEvent {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId      String            @map("cycle_id") @db.Uuid
+  eventType    String            @map("event_type") @db.VarChar(24)
+  occurredAt   DateTime          @map("occurred_at") @db.Timestamptz(6)
+  animalId     String?           @map("animal_id") @db.Uuid
+  details      String?
+  temperatureC Decimal?          @map("temperature_c") @db.Decimal(5, 2)
+  humidityPct  Decimal?          @map("humidity_pct") @db.Decimal(5, 2)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cycle        ReproductionCycle  @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  animal       Animal?            @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([cycleId, occurredAt], map: "reproductive_events_cycle_occurred_idx")
+  @@index([animalId], map: "reproductive_events_animal_idx")
+  @@map("reproductive_events")
+}
+
+model Clutch {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId             String             @map("cycle_id") @db.Uuid
+  laidOn              DateTime           @map("laid_on") @db.Date
+  eggCount            Int                @map("egg_count")
+  status              String             @default("active") @db.VarChar(20)
+  incubatorLabel      String?            @map("incubator_label") @db.VarChar(120)
+  incubationStartedAt DateTime?          @map("incubation_started_at") @db.Timestamptz(6)
+  notes               String?
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cycle               ReproductionCycle  @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  eggs                Egg[]
+  incubationLogs      IncubationLog[]
+  offspringBatches    OffspringBatch[]
+  originAnimals       Animal[]            @relation("AnimalOriginClutch")
+  @@unique([id, cycleId], map: "clutches_id_cycle_id_unique")
+  @@index([cycleId, laidOn], map: "clutches_cycle_laid_idx")
+  @@map("clutches")
+}
+
+model Egg {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clutchId  String    @map("clutch_id") @db.Uuid
+  code      String?   @db.VarChar(80)
+  status    String    @default("unknown") @db.VarChar(20)
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  clutch    Clutch    @relation(fields: [clutchId], references: [id], onDelete: Restrict)
+  @@unique([clutchId, code], where: raw("\"code\" IS NOT NULL"), map: "eggs_clutch_code_unique")
+  @@index([clutchId], map: "eggs_clutch_idx")
+  @@map("eggs")
+}
+
+model IncubationLog {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clutchId     String    @map("clutch_id") @db.Uuid
+  recordedAt   DateTime  @map("recorded_at") @db.Timestamptz(6)
+  temperatureC Decimal?  @map("temperature_c") @db.Decimal(5, 2)
+  humidityPct  Decimal?  @map("humidity_pct") @db.Decimal(5, 2)
+  eventType    String    @map("event_type") @db.VarChar(24)
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  clutch       Clutch    @relation(fields: [clutchId], references: [id], onDelete: Restrict)
+  @@index([clutchId, recordedAt], map: "incubation_logs_clutch_recorded_idx")
+  @@map("incubation_logs")
+}
+
+model OffspringBatch {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId     String             @map("cycle_id") @db.Uuid
+  clutchId    String?            @map("clutch_id") @db.Uuid
+  bornOn      DateTime           @map("born_on") @db.Date
+  count       Int
+  notes       String?
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  cycle       ReproductionCycle  @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  clutch      Clutch?            @relation(fields: [clutchId], references: [id], onDelete: Restrict)
+  originAnimals Animal[]         @relation("AnimalOriginBatch")
+  @@unique([id, cycleId], map: "offspring_batches_id_cycle_id_unique")
+  @@index([cycleId], map: "offspring_batches_cycle_idx")
+  @@index([clutchId], map: "offspring_batches_clutch_idx")
+  @@map("offspring_batches")
+}
+
+model InventoryItem {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  name            String          @db.VarChar(160)
+  category        String          @db.VarChar(32)
+  unit            String          @db.VarChar(24)
+  quantityOnHand  Decimal         @default(0) @map("quantity_on_hand") @db.Decimal(12, 3)
+  minimumQuantity Decimal?        @map("minimum_quantity") @db.Decimal(12, 3)
+  notes           String?
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movements       StockMovement[]
+  @@unique([id, userId], map: "inventory_items_id_user_id_unique")
+  @@index([userId, isActive], map: "inventory_items_user_active_idx")
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemId        String        @map("item_id") @db.Uuid
+  movementType  String        @map("movement_type") @db.VarChar(16)
+  quantity      Decimal       @db.Decimal(12, 3)
+  unitCostCents Int?          @map("unit_cost_cents")
+  occurredAt    DateTime      @map("occurred_at") @db.Timestamptz(6)
+  reference     String?       @db.VarChar(160)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  @@index([itemId, occurredAt(sort: Desc)], map: "stock_movements_item_occurred_idx")
+  @@map("stock_movements")
+}
+
+model Document {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String             @map("user_id") @db.Uuid
+  animalId         String?            @map("animal_id") @db.Uuid
+  cycleId          String?            @map("cycle_id") @db.Uuid
+  originalFilename String             @map("original_filename") @db.VarChar(255)
+  storageKey       String             @unique @map("storage_key")
+  mimeType         String             @map("mime_type") @db.VarChar(120)
+  sizeBytes        BigInt             @map("size_bytes")
+  category         String             @db.VarChar(40)
+  note             String?
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal           Animal?            @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  cycle            ReproductionCycle? @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  financeEntries   FinanceEntry[]
+  @@index([userId, createdAt(sort: Desc)], map: "documents_user_created_idx")
+  @@index([animalId], map: "documents_animal_idx")
+  @@index([cycleId], map: "documents_cycle_idx")
+  @@map("documents")
+}
+
+model PublicShare {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  animalId          String    @unique @map("animal_id") @db.Uuid
+  slug              String    @unique @db.VarChar(100)
+  isEnabled         Boolean   @default(false) @map("is_enabled")
+  visibleFields     Json      @default("[]") @map("visible_fields") @db.JsonB
+  publicDescription String?   @map("public_description")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal            Animal    @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([userId, isEnabled], map: "public_shares_user_enabled_idx")
+  @@map("public_shares")
+}
+
+model ImportJob {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  entityType   String    @map("entity_type") @db.VarChar(40)
+  storageKey   String    @map("storage_key")
+  status       String    @default("uploaded") @db.VarChar(20)
+  totalRows    Int       @default(0) @map("total_rows")
+  createdCount Int       @default(0) @map("created_count")
+  skippedCount Int       @default(0) @map("skipped_count")
+  errorCount   Int       @default(0) @map("error_count")
+  report       Json?     @db.JsonB
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt(sort: Desc)], map: "import_jobs_user_created_idx")
+  @@index([expiresAt], map: "import_jobs_expiry_idx")
+  @@map("import_jobs")
+}
+
+model ExportJob {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  status     String    @default("pending") @db.VarChar(20)
+  storageKey String?   @map("storage_key")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt(sort: Desc)], map: "export_jobs_user_created_idx")
+  @@index([expiresAt], map: "export_jobs_expiry_idx")
+  @@map("export_jobs")
+}
+
+model AnimalGeneticTrait {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId       String   @map("animal_id") @db.Uuid
+  traitName      String   @map("trait_name") @db.VarChar(160)
+  traitValue     String   @map("trait_value") @db.VarChar(240)
+  sourceAnimalId String?  @map("source_animal_id") @db.Uuid
+  confidenceNote String?  @map("confidence_note")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal         Animal   @relation("GeneticTraitAnimal", fields: [animalId], references: [id], onDelete: Restrict)
+  sourceAnimal   Animal?  @relation("GeneticTraitSourceAnimal", fields: [sourceAnimalId], references: [id], onDelete: Restrict)
+  @@index([animalId], map: "animal_genetic_traits_animal_idx")
+  @@index([sourceAnimalId], map: "animal_genetic_traits_source_animal_idx")
+  @@map("animal_genetic_traits")
+}
+
+model FinanceEntry {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  animalId    String?   @map("animal_id") @db.Uuid
+  entryType   String    @map("entry_type") @db.VarChar(12)
+  occurredOn  DateTime  @map("occurred_on") @db.Date
+  amountCents BigInt    @map("amount_cents")
+  currency    String    @default("EUR") @db.Char(3)
+  category    String    @db.VarChar(80)
+  description String    @db.VarChar(240)
+  documentId  String?   @map("document_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal      Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  @@index([userId, occurredOn(sort: Desc)], map: "finance_entries_user_date_idx")
+  @@index([userId, category, occurredOn(sort: Desc)], map: "finance_entries_user_category_date_idx")
+  @@index([animalId], map: "finance_entries_animal_idx")
+  @@index([documentId], map: "finance_entries_document_idx")
+  @@map("finance_entries")
+}
+
+model Subscription {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  stripeCustomerId     String?   @unique @map("stripe_customer_id") @db.VarChar(128)
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id") @db.VarChar(128)
+  stripePriceId        String?   @map("stripe_price_id") @db.VarChar(128)
+  status               String    @db.VarChar(32)
+  currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("subscriptions")
+}
+
+model StripeWebhookEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stripeEventId String    @unique @map("stripe_event_id") @db.VarChar(128)
+  eventType     String    @map("event_type") @db.VarChar(120)
+  processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
+  result        String    @default("pending") @db.VarChar(20)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@map("stripe_webhook_events")
+}
+
+model AuditEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String?  @map("entity_type") @db.VarChar(80)
+  entityId   String?  @map("entity_id") @db.Uuid
+  requestId  String?  @map("request_id") @db.VarChar(80)
+  metadata   Json?    @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt(sort: Desc)], map: "audit_events_user_created_idx")
+  @@index([entityType, entityId], map: "audit_events_entity_idx")
+  @@index([requestId], where: raw("\"request_id\" IS NOT NULL"), map: "audit_events_request_idx")
+  @@map("audit_events")
+}
