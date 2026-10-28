@@ -4,7 +4,12 @@ import { logger } from "../logger.js";
 
 type ParserError = Error & { type?: string };
 
-export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next): void => {
+export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, next): void => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
   const requestId =
     typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
   const candidate = error instanceof Error ? (error as ParserError) : undefined;
