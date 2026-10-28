@@ -148,7 +148,8 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
   it("creates recurring rules, materializes occurrences, and preserves completed history", async () => {
     const owner = await account();
     const pet = await animal(owner, "Recurring snake");
-    const dueAt = new Date(Date.now() - 10 * 60 * 1000);
+    // A decades-old due date must advance without iterating once per missed occurrence.
+    const dueAt = new Date("2000-01-01T10:00:00.000Z");
     const created = await owner.agent
       .post("/api/v1/tasks/reminder-rules")
       .set("Origin", origin)
