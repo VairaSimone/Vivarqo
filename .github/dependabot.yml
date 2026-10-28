@@ -13,6 +13,19 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: npm
+    directory: "/apps/api"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:15"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 5
+    groups:
+      api-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
