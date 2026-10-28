@@ -374,6 +374,12 @@ export async function patchAccount(
           },
         });
       }
+      if (passwordChanged) {
+        await tx.authToken.updateMany({
+          where: { userId, tokenType: "reset_password", consumedAt: null },
+          data: { consumedAt: now },
+        });
+      }
       return updated;
     });
   } catch (error) {

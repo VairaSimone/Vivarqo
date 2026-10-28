@@ -8,6 +8,18 @@
 - Check constraint e funzioni/trigger PostgreSQL restano nella migrazione SQL: Prisma Schema Language non esprime tutti questi costrutti. Non usare `prisma db push`.
 - La migrazione non è stata eseguita contro un DB reale in questo ambiente.
 
+## Incremento 2 — Account e autenticazione
+
+- Le password vengono memorizzate con Argon2id (memoryCost=19456, timeCost=2, parallelism=1); password e token non sono mai registrati nei log.
+- I token di verifica e reset sono casuali, ne viene persistito soltanto SHA-256, sono monouso e hanno scadenza rispettivamente di 24 ore e 60 minuti.
+- Gli account devono verificare l'email prima del login. Le risposte di register/resend/forgot sono generiche per non consentire l'enumerazione degli indirizzi.
+- Le sessioni usano token casuali opachi da 256 bit; solo l'hash è scritto in user_sessions. Cookie HttpOnly, SameSite=Lax e Secure in produzione. Sessione con scadenza idle di 30 giorni, rinnovo quando resta meno di 7 giorni e limite assoluto di 90 giorni.
+- Le operazioni mutative sotto /api/v1 richiedono un token CSRF HMAC-firmato con nonce e timestamp, inviato sia nel cookie leggibile CSRF sia nell'header X-CSRF-Token. Le richieste con Origin devono corrispondere a APP_ORIGIN. Il futuro webhook Stripe è escluso dal CSRF perché dovrà usare la verifica della firma Stripe.
+- POST /api/v1/auth/sessions/revoke-all è una rotta aggiuntiva per il requisito di revoca di tutte le sessioni; il catalogo iniziale della specifica non indicava un endpoint esplicito per questa azione.
+- Resend è l'adapter email predefinito; i test iniettano un sender fittizio. Se Resend non è configurato o fallisce, il sistema non espone il token o la risposta del provider e registra solo un messaggio di log senza dati personali.
+- Il cambio email richiede la password corrente, azzera email_verified_at, revoca le sessioni e richiede la verifica del nuovo indirizzo. Il cambio password richiede la password corrente e revoca tutte le sessioni.
+- CSRF_SECRET è obbligatorio e deve avere almeno 32 caratteri. SESSION_SECRET non è necessario perché i token sessione sono casuali e non firmati: il database conserva il loro hash.
+
 ## Discrepanze o decisioni necessarie
 1. **Preferenze account non completamente persistite.** La sezione 6.3 afferma che l'account conserva unità di misura e preferenze di visualizzazione. La tabella `users` contiene lingua e fuso orario e `notification_preferences` contiene preferenze di notifica, ma non vedo colonne/tabelle per unità e preferenze di visualizzazione. Non aggiungo campi senza una revisione esplicita dello schema.
 2. **Nome personalizzato della condivisione pubblica.** La sezione 14.2 cita un “nome scelto per la condivisione”, ma `public_shares` ha `visible_fields` e `public_description`, non un campo dedicato. Non deduco se riutilizzare `animals.name` oppure aggiungere una colonna.

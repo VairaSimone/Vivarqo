@@ -171,4 +171,78 @@ describe.skipIf(!integrationEnabled)("Authentication and account integration", (
       .send({ email: account.email, password: newPassword });
     expect(newPasswordResponse.status).toBe(200);
   });
+  it("requires the current password to change email/password and re-verifies a new email", async () => {
+    const agent = request.agent(app);
+    const account = await newAccount(agent);
+    const newEmail = `auth-changed-${randomUUID()}@example.com`;
+    const newPassword = "New-Strong-Passphrase-45!";
+    testEmails.add(newEmail);
+
+    const loginResponse = await agent
+      .post("/api/v1/auth/login")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: account.email, password: account.password });
+    expect(loginResponse.status).toBe(200);
+
+    const changeWithoutPassword = await agent
+      .patch("/api/v1/account")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: newEmail });
+    expect(changeWithoutPassword.status).toBe(400);
+
+    const emailChangeResponse = await agent
+      .patch("/api/v1/account")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: newEmail, currentPassword: account.password });
+    expect(emailChangeResponse.status).toBe(202);
+    expect((await agent.get("/api/v1/auth/me")).status).toBe(401);
+
+    const verificationEmail = [...emails].reverse().find((message) =>
+      message.to === newEmail && message.subject.includes("Conferma"),
+    );
+    expect(verificationEmail).toBeDefined();
+    const href = verificationEmail?.html.match(/href="([^"]+)"/)?.[1];
+    const verificationToken = new URL(href!).searchParams.get("token");
+    expect(verificationToken).toBeTruthy();
+
+    const verifyResponse = await agent
+      .post("/api/v1/auth/verify-email")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ token: verificationToken });
+    expect(verifyResponse.status).toBe(200);
+
+    const loginAfterEmailChange = await agent
+      .post("/api/v1/auth/login")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: newEmail, password: account.password });
+    expect(loginAfterEmailChange.status).toBe(200);
+
+    const passwordChangeResponse = await agent
+      .patch("/api/v1/account")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ currentPassword: account.password, newPassword });
+    expect(passwordChangeResponse.status).toBe(200);
+    expect((await agent.get("/api/v1/auth/me")).status).toBe(401);
+
+    const oldPasswordResponse = await agent
+      .post("/api/v1/auth/login")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: newEmail, password: account.password });
+    expect(oldPasswordResponse.status).toBe(401);
+
+    const newPasswordResponse = await agent
+      .post("/api/v1/auth/login")
+      .set("Origin", account.origin)
+      .set("X-CSRF-Token", account.csrfToken)
+      .send({ email: newEmail, password: newPassword });
+    expect(newPasswordResponse.status).toBe(200);
+  });
+
 });
