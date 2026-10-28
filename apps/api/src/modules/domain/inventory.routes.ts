@@ -36,12 +36,20 @@ const patchItemSchema = z.object({
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 const movementSchema = z.object({
   movementType: z.enum(movementTypes),
-  quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places"),
+  quantity: z.coerce.number().finite().min(0).max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places"),
   occurredAt: z.string().datetime({ offset: true }),
   unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
   reference: z.string().trim().max(160).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.movementType !== "adjustment" && value.quantity <= 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["quantity"],
+      message: "Inbound and outbound movement quantities must be greater than zero",
+    });
+  }
+});
 
 function asMilli(value: string | number): number {
   const parsed = Math.round(Number(value) * scale);
