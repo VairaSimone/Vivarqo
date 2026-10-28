@@ -140,7 +140,7 @@ export function createCareImportRouter() {
     const identifiers = file.rows.map((row) => row.values[mapped.animalIdentifier ?? ""]?.trim()).filter((value): value is string => Boolean(value));
     const ids = file.rows.map((row) => row.values[mapped.animalId ?? ""]?.trim()).filter((value): value is string => Boolean(value) && z.string().uuid().safeParse(value).success);
     const [animalsByIdentifier, animalsById] = await Promise.all([
-      identifiers.length ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: [...new Set(identifiers)] } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
+      identifiers.length ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: [...new Set(identifiers)], mode: "insensitive" } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
       ids.length ? prisma.animal.findMany({ where: { userId: auth.userId, id: { in: [...new Set(ids)] } }, select: { id: true, identifier: true, name: true } }) : Promise.resolve([]),
     ]);
     const identifierMap = new Map(animalsByIdentifier.map((animal) => [animal.identifier?.toLocaleLowerCase("it-IT") ?? "", animal]));
