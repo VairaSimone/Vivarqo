@@ -70,7 +70,7 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     return { userId: user.id, agent, csrf };
   }
 
-  async function sendEvent(agent: ReturnType<typeof request.agent>, event: Record<string, unknown>) {
+  function sendEvent(agent: ReturnType<typeof request.agent>, event: Record<string, unknown>) {
     const eventId = String(event.id);
     generatedEventIds.push(eventId);
     const body = Buffer.from(JSON.stringify(event), "utf8");
