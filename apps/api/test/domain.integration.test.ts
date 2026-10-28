@@ -111,6 +111,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const foreign = await other.agent.get(`/api/v1/reproduction-cycles/${cycleId}`).expect(404);
     expect(foreign.body.code).toBe("REPRODUCTION_CYCLE_NOT_FOUND");
 
+    const clutchList = await owner.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches?page=1&pageSize=10`).expect(200);
+    expect(clutchList.body.clutches.map((item: { id: string }) => item.id)).toContain(clutch.body.clutch.id);
+    expect(clutchList.body.pagination.total).toBe(1);
+    const foreignClutches = await other.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches`).expect(404);
+    expect(foreignClutches.body.code).toBe("REPRODUCTION_CYCLE_NOT_FOUND");
+
     const eggs = await owner.agent.post(`/api/v1/clutches/${clutch.body.clutch.id}/eggs`)
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ eggs: [{ code: "E1" }, { code: "E2" }] })
