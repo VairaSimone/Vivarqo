@@ -223,7 +223,7 @@ export function createDomainImportRouter() {
       }) : Promise.resolve([]),
       clutchIds.size ? prisma.clutch.findMany({
         where: { id: { in: [...clutchIds] }, cycle: { is: { userId: auth.userId } } },
-        select: { id: true },
+        select: { id: true, cycleId: true },
       }) : Promise.resolve([]),
       documentIds.size ? prisma.document.findMany({ where: { id: { in: [...documentIds] }, userId: auth.userId, deletedAt: null }, select: { id: true } }) : Promise.resolve([]),
     ]);
@@ -231,6 +231,7 @@ export function createDomainImportRouter() {
     const ownedAnimalByIdentifier = new Map(animalsByIdentifier.map((item) => [item.identifier?.toLocaleLowerCase("it-IT") ?? "", item.id]));
     const ownedCycleIds = new Set(cycles.map((item) => item.id));
     const ownedClutchIds = new Set(clutches.map((item) => item.id));
+    const ownedClutchCycleById = new Map(clutches.map((item) => [item.id, item.cycleId]));
     const ownedDocumentIds = new Set(documents.map((item) => item.id));
     const errors: Report["errors"] = [];
     const validRows: Row[] = [];
@@ -260,9 +261,15 @@ export function createDomainImportRouter() {
       if (["reproductiveEvents", "clutches", "offspringBatches"].includes(entity as string)) {
         if (!ownedCycleIds.has(String(record.cycleId))) relationError = { column: "cycleId", message: "Cycle not found in this account" };
       }
-      if (["eggs", "incubationLogs"].includes(entity as string)
-        || (entity === "offspringBatches" && record.clutchId !== null && record.clutchId !== undefined && record.clutchId !== "")) {
+      if (["eggs", "incubationLogs"].includes(entity as string)) {
         if (!ownedClutchIds.has(String(record.clutchId))) relationError = { column: "clutchId", message: "Clutch not found in this account" };
+      }
+      if (entity === "offspringBatches" && record.clutchId !== null && record.clutchId !== undefined && record.clutchId !== "") {
+        if (!ownedClutchIds.has(String(record.clutchId))) {
+          relationError = { column: "clutchId", message: "Clutch not found in this account" };
+        } else if (ownedClutchCycleById.get(String(record.clutchId)) !== String(record.cycleId)) {
+          relationError = { column: "clutchId", message: "Clutch must belong to the selected reproduction cycle" };
+        }
       }
       if (entity === "finance" && record.documentId) {
         if (!ownedDocumentIds.has(String(record.documentId))) relationError = { column: "documentId", message: "Document not found in this account" };
