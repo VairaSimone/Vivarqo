@@ -224,7 +224,7 @@ export function createDocumentShareRouter() {
         case "birthDate": if (animal.birthDate !== null) publicAnimal.birthDate = animal.birthDate.toISOString().slice(0, 10); break;
       }
     }
-    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=30");
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Robots-Tag", "noindex");
     res.status(200).json({ animal: publicAnimal, description: share.publicDescription, updatedAt: share.updatedAt });
   });
