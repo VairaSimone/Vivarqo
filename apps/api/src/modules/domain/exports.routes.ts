@@ -89,6 +89,8 @@ async function* csvChunks(
 }
 
 const EMPTY_HEADERS: Record<string, string[]> = {
+        "account.csv": ["id", "email", "displayName", "locale", "timezone", "emailVerifiedAt", "createdAt"],
+        "subscriptions.csv": ["id", "userId", "stripeCustomerId", "stripeSubscriptionId", "stripePriceId", "status", "currentPeriodStart", "currentPeriodEnd", "cancelAtPeriodEnd", "createdAt", "updatedAt"],
         "animals.csv": ["id", "userId", "name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes", "photoKey", "originClutchId", "originOffspringBatchId", "archivedAt", "createdAt", "updatedAt"],
         "feeding_sessions.csv": ["id", "userId", "performedAt", "notes", "createdAt", "updatedAt"],
         "feeding_entries.csv": ["id", "sessionId", "animalId", "outcome", "foodType", "foodSize", "foodWeightG", "notes", "createdAt", "updatedAt"],
@@ -121,6 +123,22 @@ function exportTables(userId: string, includeDocuments: boolean): ExportTable[] 
   });
 
   return [
+    {
+      name: "account.csv", emptyHeaders: EMPTY_HEADERS["account.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.user.findMany({
+        where: { id: userId },
+        select: { id: true, email: true, displayName: true, locale: true, timezone: true, emailVerifiedAt: true, createdAt: true },
+        ...page(cursor, take),
+      })),
+    },
+    {
+      name: "subscriptions.csv", emptyHeaders: EMPTY_HEADERS["subscriptions.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.subscription.findMany({
+        where: { userId },
+        select: { id: true, userId: true, stripeCustomerId: true, stripeSubscriptionId: true, stripePriceId: true, status: true, currentPeriodStart: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, createdAt: true, updatedAt: true },
+        ...page(cursor, take),
+      })),
+    },
     {
       name: "animals.csv", emptyHeaders: EMPTY_HEADERS["animals.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.animal.findMany({ where: { userId }, ...page(cursor, take) })),
