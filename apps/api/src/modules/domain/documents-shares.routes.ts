@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { basename, extname } from "node:path";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { logger } from "../../logger.js";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
@@ -123,7 +124,11 @@ export function createDocumentShareRouter() {
       });
       res.status(201).json({ document: { ...document, sizeBytes: document.sizeBytes.toString() } });
     } catch (error) {
-      await deletePrivateObject(storageKey);
+      try {
+        await deletePrivateObject(storageKey);
+      } catch {
+        logger.error({ storageKey }, "Failed to clean up an uploaded document after database failure");
+      }
       throw error;
     }
   });
@@ -237,7 +242,20 @@ export function createDocumentShareRouter() {
     if (!slug || !/^[A-Za-z0-9_-]{32}$/.test(slug)) throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
     const share = await prisma.publicShare.findFirst({
       where: { slug, isEnabled: true, revokedAt: null, animal: { is: { archivedAt: null } } },
-      include: { animal: true },
+      select: {
+        visibleFields: true,
+        publicDescription: true,
+        updatedAt: true,
+        animal: {
+          select: {
+            name: true,
+            species: true,
+            morph: true,
+            sex: true,
+            birthDate: true,
+          },
+        },
+      },
     });
     if (!share) throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
     const allowlist = Array.isArray(share.visibleFields) ? share.visibleFields.filter((field): field is string => typeof field === "string" && (shareFields as readonly string[]).includes(field)) : [];
