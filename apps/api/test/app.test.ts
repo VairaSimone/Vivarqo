@@ -89,7 +89,7 @@ describe("API infrastructure", () => {
       .set("Access-Control-Request-Headers", "content-type,x-csrf-token,x-document-note");
 
     expect(response.status).toBe(204);
-    expect(response.headers["access-control-allow-headers"].toLowerCase()).toContain("x-document-note");
+    expect(String(response.headers["access-control-allow-headers"] ?? "").toLowerCase()).toContain("x-document-note");
   });
 
   it("sets security headers and does not expose Express", async () => {
