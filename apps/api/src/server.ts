@@ -5,10 +5,12 @@ import { ensureDatabaseSchema } from "./db/schema-integrity.js";
 import { createApp } from "./app.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
 import { startNotificationWorker } from "./modules/domain/notification-worker.js";
+import { startRetentionWorker } from "./modules/domain/retention-worker.js";
 import type { Server } from "node:http";
 
 let server: Server | undefined;
 let stopNotificationWorker: () => void = () => undefined;
+let stopRetentionWorker: () => void = () => undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
@@ -20,6 +22,7 @@ async function startServer(): Promise<void> {
 
   const app = createApp();
   stopNotificationWorker = startNotificationWorker();
+  stopRetentionWorker = startRetentionWorker();
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
   });
@@ -30,6 +33,7 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   logger.info({ signal }, "Graceful shutdown started");
   stopNotificationWorker();
+  stopRetentionWorker();
 
   const forcedExit = setTimeout(() => {
     logger.error({ signal }, "Graceful shutdown timed out");
