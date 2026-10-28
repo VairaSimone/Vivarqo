@@ -94,7 +94,9 @@ function csvCell(value: unknown): string {
   else if (typeof value === "object" && value !== null && "toString" in value && value.constructor?.name === "Decimal") rendered = String(value);
   else if (typeof value === "object") rendered = JSON.stringify(value);
   else rendered = String(value);
-  if (/^[=+@\-\t\r]/.test(rendered)) rendered = `'${rendered}`;
+  // Prefix spreadsheet formula markers even when preceded by whitespace or
+  // control characters that some CSV consumers may ignore.
+  if (/^[\s\u0000-\u001f]*[=+@\-]/u.test(rendered)) rendered = `'${rendered}`;
   return `"${rendered.replace(/"/g, '""')}"`;
 }
 function csv(headers: string[], rows: Array<Record<string, unknown>>): Buffer {
