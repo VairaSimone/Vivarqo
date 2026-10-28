@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { getVapidPublicKey, sendPushToUser } from "./web-push.js";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -177,6 +178,11 @@ export function createFinanceRouter() {
 export function createNotificationRouter() {
   const router = Router();
 
+  router.get("/push/public-key", (_req, res) => {
+    res.status(200).json({ publicKey: getVapidPublicKey() });
+  });
+
+
   router.get("/notifications", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const query = parseBody(z.object({
@@ -277,6 +283,35 @@ export function createNotificationRouter() {
     const deleted = await prisma.pushSubscription.deleteMany({ where: { id, userId: auth.userId } });
     if (deleted.count === 0) throw new AppError(404, "PUSH_SUBSCRIPTION_NOT_FOUND", "Push subscription not found");
     res.status(204).send();
+  });
+
+  router.post("/notifications/test-push", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    // Validate configuration before persisting a test notification.
+    getVapidPublicKey();
+    const [preferences, subscriptionCount] = await Promise.all([
+      prisma.notificationPreferences.findUnique({ where: { userId: auth.userId } }),
+      prisma.pushSubscription.count({ where: { userId: auth.userId } }),
+    ]);
+    if (!preferences?.pushEnabled) throw new AppError(409, "PUSH_NOT_ENABLED", "Enable push notifications before sending a test");
+    if (subscriptionCount === 0) throw new AppError(409, "PUSH_SUBSCRIPTION_REQUIRED", "Register a browser push subscription before sending a test");
+
+    const notification = await prisma.notification.create({
+      data: {
+        userId: auth.userId,
+        category: "system",
+        title: "Test notifiche Vivarqo",
+        body: "Le notifiche push sono configurate correttamente.",
+        targetPath: "/settings/notifications",
+      },
+    });
+    const delivery = await sendPushToUser(auth.userId, {
+      title: notification.title,
+      body: notification.body,
+      url: notification.targetPath ?? "/settings/notifications",
+      category: notification.category,
+    });
+    res.status(200).json({ notificationId: notification.id, delivery });
   });
 
   return router;

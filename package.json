@@ -13,7 +13,10 @@
     "db:migrate:dev": "prisma migrate dev --config prisma.config.ts",
     "test": "pnpm --filter @vivarqo/api test",
     "typecheck": "pnpm --filter @vivarqo/api typecheck",
-    "build": "pnpm --filter @vivarqo/api build"
+    "build": "pnpm --filter @vivarqo/api build",
+    "db:backup": "bash scripts/backup-postgres.sh",
+    "db:restore": "bash scripts/restore-postgres.sh",
+    "vapid:generate": "node scripts/generate-vapid-keys.mjs"
   },
   "devDependencies": {
     "prisma": "^7.0.0",

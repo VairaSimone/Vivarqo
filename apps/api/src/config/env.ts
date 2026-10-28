@@ -23,7 +23,10 @@ const environmentSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_ID: z.string().optional(),
-  S3_ENDPOINT: z.string().optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
+  S3_ENDPOINT: z.preprocess((value) => typeof value === "string" && !value.trim() ? undefined : value, z.string().url().optional()),
   S3_REGION: z.string().optional(),
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
@@ -40,5 +43,39 @@ if (!parsedEnvironment.success) {
   throw new Error(`Invalid environment configuration: ${issues}`);
 }
 
-export const env = parsedEnvironment.data;
+const runtimeEnvironment = parsedEnvironment.data;
+if (runtimeEnvironment.NODE_ENV === "production") {
+  const productionProblems: string[] = [];
+  if (!runtimeEnvironment.APP_ORIGIN.startsWith("https://")) productionProblems.push("APP_ORIGIN must use HTTPS in production");
+  if (!runtimeEnvironment.API_ORIGIN.startsWith("https://")) productionProblems.push("API_ORIGIN must use HTTPS in production");
+  if (runtimeEnvironment.CSRF_SECRET.toLowerCase().includes("replace-with") || runtimeEnvironment.CSRF_SECRET.length < 32) {
+    productionProblems.push("CSRF_SECRET must be a unique random secret with at least 32 characters");
+  }
+  if (!runtimeEnvironment.RESEND_API_KEY || !runtimeEnvironment.EMAIL_FROM) {
+    productionProblems.push("RESEND_API_KEY and EMAIL_FROM are required in production");
+  }
+  if (!runtimeEnvironment.STRIPE_SECRET_KEY || !runtimeEnvironment.STRIPE_WEBHOOK_SECRET || !runtimeEnvironment.STRIPE_PRICE_ID) {
+    productionProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID are required in production");
+  }
+  if (!runtimeEnvironment.VAPID_PUBLIC_KEY || !runtimeEnvironment.VAPID_PRIVATE_KEY || !runtimeEnvironment.VAPID_SUBJECT) {
+    productionProblems.push("VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are required in production");
+  }
+  if (!runtimeEnvironment.S3_BUCKET || !runtimeEnvironment.S3_ACCESS_KEY_ID || !runtimeEnvironment.S3_SECRET_ACCESS_KEY || !runtimeEnvironment.S3_REGION) {
+    productionProblems.push("S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required in production");
+  }
+  if (runtimeEnvironment.S3_ENDPOINT && !runtimeEnvironment.S3_ENDPOINT.startsWith("https://")) {
+    productionProblems.push("S3_ENDPOINT must use HTTPS in production");
+  }
+  if (productionProblems.length) throw new Error(`Invalid production environment: ${productionProblems.join("; ")}`);
+}
+const vapidValues = [
+  runtimeEnvironment.VAPID_PUBLIC_KEY,
+  runtimeEnvironment.VAPID_PRIVATE_KEY,
+  runtimeEnvironment.VAPID_SUBJECT,
+];
+if (vapidValues.some(Boolean) && !vapidValues.every(Boolean)) {
+  throw new Error("Invalid environment configuration: configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together");
+}
+
+export const env = runtimeEnvironment;
 export type Environment = z.infer<typeof environmentSchema>;
