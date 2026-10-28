@@ -13,6 +13,9 @@ import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { loadOptionalSession } from "./modules/auth/session.js";
 import { createAccountRouter } from "./modules/account/account.routes.js";
 import type { EmailSender } from "./modules/auth/email-sender.js";
+import { createAnimalRouter } from "./modules/animals/animals.routes.js";
+import { createCareRouter } from "./modules/animals/care.routes.js";
+import { createImportRouter } from "./modules/animals/import.routes.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -74,6 +77,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", loadOptionalSession);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
+  app.use("/api/v1/animals", createAnimalRouter());
+  app.use("/api/v1", createCareRouter());
+  app.use("/api/v1/imports", createImportRouter());
 
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", requestId: res.locals.requestId });

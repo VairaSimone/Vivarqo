@@ -88,3 +88,72 @@ Implementato: fondamenta API, account e impostazioni, registrazione, verifica em
 Non ancora implementato: animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti e condivisioni pubbliche, import/export, finanze, billing Stripe, notifiche/job, OpenAPI completa e frontend React/PWA. La presenza delle tabelle non implica che tali funzionalità siano disponibili.
 
 Le discrepanze note sono annotate in [docs/architecture-decisions.md](docs/architecture-decisions.md). La specifica ricevuta è conservata in [docs/specification.md](docs/specification.md).
+
+## Anagrafiche animali e registri di cura
+
+Le API di questo incremento sono private: richiedono una sessione valida e, per le richieste mutative da browser, il token CSRF ottenuto da `GET /api/v1/auth/csrf`. Tutte le query di dominio filtrano per proprietario; una risorsa di un altro account risponde come non trovata.
+
+### Animali
+
+| Metodo | Endpoint | Funzione |
+|---|---|---|
+| GET | `/api/v1/animals` | Lista paginata, ricerca per nome/codice, filtri e ordinamento |
+| POST | `/api/v1/animals` | Crea un animale |
+| POST | `/api/v1/animals/bulk` | Crea fino a 500 animali in un'unica transazione |
+| GET | `/api/v1/animals/:id` | Dettaglio |
+| PATCH | `/api/v1/animals/:id` | Modifica i campi anagrafici |
+| POST | `/api/v1/animals/:id/archive` | Archivia senza cancellare lo storico |
+| POST | `/api/v1/animals/:id/restore` | Ripristina un animale archiviato |
+| DELETE | `/api/v1/animals/:id` | Elimina solo se non ha registri o relazioni collegate |
+
+Parametri di lista: `page`, `pageSize` (massimo 100), `q`, `species`, `sex`, `morph`, `location`, `status` (`active`, `sold`, `transferred`, `deceased`, `archived`, `all`) e `sort` (`name`, `createdAt`, `updatedAt`). Senza `status`, la lista operativa mostra gli animali attivi. Gli identificativi devono essere univoci all'interno dell'account.
+
+### Alimentazioni, pesi, mute e note
+
+| Metodo | Endpoint | Funzione |
+|---|---|---|
+| GET / POST | `/api/v1/feeding-sessions` | Elenco paginato e creazione di alimentazioni singole o multiple |
+| GET | `/api/v1/feeding-sessions/:id` | Dettaglio della sessione con voci |
+| PATCH / DELETE | `/api/v1/feeding-entries/:id` | Corregge o rimuove una singola voce |
+| GET / POST | `/api/v1/animals/:animalId/weights` | Cronologia e nuove pesate |
+| PATCH / DELETE | `/api/v1/weights/:id` | Correzione o rimozione di una pesata |
+| GET / POST | `/api/v1/animals/:animalId/sheds` | Cronologia e registrazione mute |
+| PATCH / DELETE | `/api/v1/sheds/:id` | Correzione o rimozione di una muta |
+| GET / POST | `/api/v1/animals/:animalId/notes` | Cronologia e creazione note |
+| PATCH / DELETE | `/api/v1/animal-notes/:id` | Modifica o archivia una nota |
+| GET | `/api/v1/animals/:animalId/history` | Cronologia unificata, ordinata per data |
+
+Una sessione di alimentazione contiene da 1 a 500 animali e viene salvata insieme a tutte le voci nella stessa transazione PostgreSQL. Se anche un solo animale non appartiene all'account o non è attivo, l'intera operazione viene annullata. Esiti ammessi: `ate`, `refused`, `not_offered`, `unknown`; peso positivo in grammi per le pesate.
+
+### Importazione CSV/XLSX degli animali
+
+L'importazione segue due passaggi: caricamento e anteprima privata, poi conferma esplicita. Il file è conservato come report di anteprima nel database e scade dopo un'ora; non viene scritto in un bucket pubblico. I file sono limitati a 5 MB e 5.000 righe. Sono supportati CSV UTF-8 e XLSX, con scelta del foglio mediante il parametro `sheet`. Le intestazioni possono essere in italiano o in inglese; le colonne riconosciute vengono mappate automaticamente, le altre vengono riportate come non mappate.
+
+Caricare i byte del file nel body della richiesta:
+
+```bash
+curl -X POST 'http://localhost:3000/api/v1/imports?entity=animals' \
+  -H 'Origin: http://localhost:5173' \
+  -H 'X-CSRF-Token: <token-csrf>' \
+  -H 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' \
+  --data-binary '@animali.xlsx' \
+  -b cookies.txt
+```
+
+La risposta fornisce `importId`, righe valide, errori con riga/colonna e possibili omonimie per nome e specie. Dopo aver controllato l'anteprima:
+
+```bash
+curl -X POST 'http://localhost:3000/api/v1/imports/<importId>/confirm' \
+  -H 'Origin: http://localhost:5173' \
+  -H 'X-CSRF-Token: <token-csrf>' \
+  -H 'Content-Type: application/json' \
+  -b cookies.txt \
+  -d '{}'
+```
+
+Se sono presenti possibili duplicati per nome e specie, la conferma richiede `{"allowPossibleDuplicates":true}`. La conferma usa una transazione: le righe non valide sono escluse e riportate nel report finale. `GET /api/v1/imports/:id` mostra stato e report dell'importazione.
+
+## Test d'integrazione PostgreSQL
+
+La CI avvia PostgreSQL 18, applica la migrazione versionata e abilita `RUN_DB_INTEGRATION=true`. I test coprono CRUD, filtri/archiviazione, creazione multipla, import CSV/XLSX con conferma, alimentazione multipla atomica, registri di cura, input non validi e isolamento tra account.
+
