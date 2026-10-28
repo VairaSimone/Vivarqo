@@ -36,3 +36,5 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+      - name: Docker build
+        run: docker build -f apps/api/Dockerfile -t vivarqo-api:ci .

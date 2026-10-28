@@ -21,6 +21,14 @@ pnpm db:migrate:deploy
 pnpm dev:api
 ```
 
+Questa modalità avvia l'API sul computer e PostgreSQL in Docker. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+
+```bash
+docker compose -f infra/docker/compose.yaml up -d --build api
+```
+
+La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Non applica automaticamente le migrazioni.
+
 La migrazione iniziale riproduce senza modifiche lo SQL consegnato ed è destinata a un database **VUOTO**. Non applicarla a un database con dati o tabelle preesistenti. `migrate deploy` applica solo le migrazioni versionate; non usare `prisma db push` per inizializzare o aggiornare questo schema.
 
 ## Controlli

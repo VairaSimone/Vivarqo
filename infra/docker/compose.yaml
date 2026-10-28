@@ -16,5 +16,24 @@ services:
       timeout: 3s
       retries: 20
 
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      APP_ORIGIN: http://localhost:5173
+      API_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   vivarqo-postgres-data:

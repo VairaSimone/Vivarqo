@@ -4,8 +4,12 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /app
 
+# Include schema/config in the dependency stage so Prisma's postinstall has
+# the required inputs. This URL is build-only and is not copied into runtime.
 FROM base AS dependencies
-COPY package.json pnpm-workspace.yaml .npmrc ./
+ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
+COPY package.json pnpm-workspace.yaml .npmrc prisma.config.ts ./
+COPY prisma ./prisma
 COPY apps/api/package.json apps/api/package.json
 RUN pnpm install --no-frozen-lockfile
 
@@ -14,15 +18,22 @@ COPY . .
 RUN pnpm db:generate
 RUN pnpm --filter @vivarqo/api build
 
+# Runtime dependencies are installed separately to keep the image free of
+# TypeScript, Vitest, Prisma CLI and other development-only packages.
+FROM base AS production-dependencies
+ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
+COPY package.json pnpm-workspace.yaml .npmrc prisma.config.ts ./
+COPY prisma ./prisma
+COPY apps/api/package.json apps/api/package.json
+RUN pnpm install --prod --no-frozen-lockfile
+
 FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=production-dependencies /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
-COPY --from=build /app/apps/api/src/generated/prisma ./apps/api/src/generated/prisma
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+USER node
 EXPOSE 3000
 CMD ["node", "apps/api/dist/server.js"]
