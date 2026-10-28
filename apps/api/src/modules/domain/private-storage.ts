@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { env } from "../../config/env.js";
@@ -61,12 +62,18 @@ function keyUrl(config: S3Config, key: string): URL {
   url.pathname = `/${awsEncode(config.bucket)}/${encodedKey}`;
   return url;
 }
-function signedHeaders(config: S3Config, method: "PUT" | "GET" | "DELETE", key: string, payload: Buffer): { url: URL; headers: Record<string, string> } {
+function signedHeaders(
+  config: S3Config,
+  method: "PUT" | "GET" | "DELETE",
+  key: string,
+  payload: Buffer,
+  payloadHashOverride?: string,
+): { url: URL; headers: Record<string, string> } {
   const url = keyUrl(config, key);
   const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const amzDate = now.toISOString().replace(/[:-]|\\.\\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = sha256(payload);
+  const payloadHash = payloadHashOverride ?? sha256(payload);
   const canonicalHeaders = `host:${url.host.toLowerCase()}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
   const signed = "host;x-amz-content-sha256;x-amz-date";
   const canonicalRequest = [method, url.pathname, "", canonicalHeaders, signed, payloadHash].join("\n");
@@ -124,6 +131,63 @@ export function validatePrivateFile(buffer: Buffer, declaredMime: string): { mim
     throw new AppError(400, "MIME_MISMATCH", "Declared content type does not match the file content");
   }
   return { mimeType, extension };
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  return hash.digest("hex");
+}
+
+async function s3UploadFile(config: S3Config, key: string, sourcePath: string, sizeBytes: number): Promise<void> {
+  const payloadHash = await sha256File(sourcePath);
+  const signed = signedHeaders(config, "PUT", key, Buffer.alloc(0), payloadHash);
+  const body = createReadStream(sourcePath);
+  let response: Response;
+  try {
+    response = await fetch(signed.url, {
+      method: "PUT",
+      headers: { ...signed.headers, "content-length": String(sizeBytes) },
+      body: body as unknown as BodyInit,
+      duplex: "half",
+    } as RequestInit);
+  } catch {
+    body.destroy();
+    throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
+  }
+  if (!response.ok) {
+    throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the request", { providerStatus: response.status });
+  }
+}
+
+export async function storePrivateObjectFromFile(
+  folder: PrivateFolder,
+  extension: PrivateExtension,
+  sourcePath: string,
+): Promise<string> {
+  const maximum = folder === "exports" ? 50 * 1024 * 1024 : MAX_FILE_BYTES;
+  const fileInfo = await stat(sourcePath);
+  if (!fileInfo.isFile() || fileInfo.size === 0 || fileInfo.size > maximum) {
+    throw new AppError(413, "FILE_TOO_LARGE", "File exceeds the storage limit");
+  }
+
+  const key = `${folder}/${randomUUID()}.${extension}`;
+  const config = s3Config();
+  if (config) {
+    await s3UploadFile(config, key, sourcePath, fileInfo.size);
+    return key;
+  }
+
+  const destination = absolutePath(key);
+  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+  try {
+    await copyFile(sourcePath, destination);
+    await chmod(destination, 0o600);
+  } catch (error) {
+    await rm(destination, { force: true }).catch(() => undefined);
+    throw error;
+  }
+  return key;
 }
 
 export async function storePrivateObject(folder: PrivateFolder, extension: PrivateExtension, bytes: Buffer): Promise<string> {
