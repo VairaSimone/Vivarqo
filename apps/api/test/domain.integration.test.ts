@@ -171,6 +171,11 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ movementType: "in", quantity: 0, occurredAt: "2026-10-28T12:30:00.000Z" })
       .expect(400);
+
+    const history = await owner.agent.get(`/api/v1/inventory/items/${itemId}/movements?page=1&pageSize=2`).expect(200);
+    expect(history.body.movements).toHaveLength(2);
+    expect(history.body.pagination.total).toBe(4);
+    expect(history.body.pagination.totalPages).toBe(2);
   });
 
   it("stores private documents, exposes only allowlisted share fields, and revocation hides the public page", async () => {
