@@ -52,6 +52,7 @@ model UserSession {
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, expiresAt], map: "user_sessions_user_expires_idx")
+  @@index([expiresAt], map: "user_sessions_expires_idx")
   @@map("user_sessions")
 }
 
@@ -65,6 +66,7 @@ model AuthToken {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, tokenType, expiresAt], map: "auth_tokens_user_type_expires_idx")
+  @@index([expiresAt], map: "auth_tokens_expires_idx")
   @@map("auth_tokens")
 }
 
