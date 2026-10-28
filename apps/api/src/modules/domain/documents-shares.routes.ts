@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { basename, extname } from "node:path";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { logger } from "../../logger.js";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
@@ -123,7 +124,13 @@ export function createDocumentShareRouter() {
       });
       res.status(201).json({ document: { ...document, sizeBytes: document.sizeBytes.toString() } });
     } catch (error) {
-      await deletePrivateObject(storageKey);
+      try {
+        await deletePrivateObject(storageKey);
+      } catch {
+        // Preserve the original database/audit error while making cleanup
+        // failures observable so the orphaned object can be investigated.
+        logger.error({ storageKey }, "Failed to clean up an uploaded document after database failure");
+      }
       throw error;
     }
   });
