@@ -220,23 +220,26 @@ export function createCareImportRouter() {
       const report = reportFrom(job.report);
       let createdCount = 0;
       if (report.entityType === "weights") {
-        for (const row of report.validRows) {
-          const record = row.record as { animalId: string; measuredAt: string; weightG: number; notes?: string | null };
-          await tx.weightMeasurement.create({ data: { animalId: record.animalId, measuredAt: new Date(record.measuredAt), weightG: record.weightG, notes: record.notes ?? null } });
-          createdCount += 1;
-        }
+        const records = report.validRows.map(({ record: value }) => {
+          const record = value as { animalId: string; measuredAt: string; weightG: number; notes?: string | null };
+          return { animalId: record.animalId, measuredAt: new Date(record.measuredAt), weightG: record.weightG, notes: record.notes ?? null };
+        });
+        if (records.length) await tx.weightMeasurement.createMany({ data: records });
+        createdCount = records.length;
       } else if (report.entityType === "sheds") {
-        for (const row of report.validRows) {
-          const record = row.record as { animalId: string; occurredAt: string; outcome: "complete" | "partial" | "unknown"; notes?: string | null };
-          await tx.shedRecord.create({ data: { animalId: record.animalId, occurredAt: new Date(record.occurredAt), outcome: record.outcome, notes: record.notes ?? null } });
-          createdCount += 1;
-        }
+        const records = report.validRows.map(({ record: value }) => {
+          const record = value as { animalId: string; occurredAt: string; outcome: "complete" | "partial" | "unknown"; notes?: string | null };
+          return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), outcome: record.outcome, notes: record.notes ?? null };
+        });
+        if (records.length) await tx.shedRecord.createMany({ data: records });
+        createdCount = records.length;
       } else if (report.entityType === "notes") {
-        for (const row of report.validRows) {
-          const record = row.record as { animalId: string; occurredAt: string; title?: string | null; category: string; body: string };
-          await tx.animalNote.create({ data: { animalId: record.animalId, occurredAt: new Date(record.occurredAt), title: record.title ?? null, category: record.category, body: record.body } });
-          createdCount += 1;
-        }
+        const records = report.validRows.map(({ record: value }) => {
+          const record = value as { animalId: string; occurredAt: string; title?: string | null; category: string; body: string };
+          return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), title: record.title ?? null, category: record.category, body: record.body };
+        });
+        if (records.length) await tx.animalNote.createMany({ data: records });
+        createdCount = records.length;
       } else {
         const byTimestamp = new Map<string, Array<{ rowNumber: number; record: Record<string, unknown> }>>();
         for (const row of report.validRows) {
@@ -247,17 +250,16 @@ export function createCareImportRouter() {
         }
         for (const [timestamp, rows] of byTimestamp) {
           const session = await tx.feedingSession.create({ data: { userId: auth.userId, performedAt: new Date(timestamp) } });
-          for (const row of rows) {
-            const record = row.record as { animalId: string; outcome: "ate" | "refused" | "not_offered" | "unknown"; foodType?: string | null; foodSize?: string | null; foodWeightG?: number | null; notes?: string | null };
-            await tx.feedingEntry.create({
-              data: {
-                sessionId: session.id, animalId: record.animalId, outcome: record.outcome,
-                foodType: record.foodType ?? null, foodSize: record.foodSize ?? null,
-                foodWeightG: record.foodWeightG ?? null, notes: record.notes ?? null,
-              },
-            });
-            createdCount += 1;
-          }
+          const entries = rows.map(({ record: value }) => {
+            const record = value as { animalId: string; outcome: "ate" | "refused" | "not_offered" | "unknown"; foodType?: string | null; foodSize?: string | null; foodWeightG?: number | null; notes?: string | null };
+            return {
+              sessionId: session.id, animalId: record.animalId, outcome: record.outcome,
+              foodType: record.foodType ?? null, foodSize: record.foodSize ?? null,
+              foodWeightG: record.foodWeightG ?? null, notes: record.notes ?? null,
+            };
+          });
+          if (entries.length) await tx.feedingEntry.createMany({ data: entries });
+          createdCount += entries.length;
         }
       }
       const finalReport = { ...report, createdCount, skippedCount: report.errors.length, errors: report.errors };

@@ -222,10 +222,18 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await other.agent.patch(`/api/v1/notifications/${notification.id}/read`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({}).expect(404);
 
+    const endpoint = `https://push.example.test/${randomUUID()}`;
     await owner.agent.post("/api/v1/push-subscriptions")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ endpoint: `https://push.example.test/${randomUUID()}`, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
+      .send({ endpoint, keys: { p256dh: "abcdefghijklmnop0123456789", auth: "abcdefghijklmnop" }, userAgent: "integration-test" })
       .expect(201);
+    await other.agent.post("/api/v1/push-subscriptions")
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ endpoint, keys: { p256dh: "zyxwvutsrqponmlk9876543210", auth: "zyxwvutsrqponmlk" }, userAgent: "other-account" })
+      .expect(409);
+    const retainedSubscription = await prisma.pushSubscription.findUniqueOrThrow({ where: { endpoint } });
+    expect(retainedSubscription.userId).toBe(owner.userId);
+    expect(retainedSubscription.userAgent).toBe("integration-test");
     const prefs = await owner.agent.patch("/api/v1/notification-preferences")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ pushEnabled: true, inAppEnabled: true, quietHoursStart: "22:00", quietHoursEnd: "07:00", categories: { billing: true } })
@@ -237,6 +245,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
   it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
+    await prisma.animal.create({ data: { userId: owner.userId, name: "  =HYPERLINK(\"https://evil.example\")", species: "Python regius" } });
     const uploaded = await owner.agent.post("/api/v1/documents")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "application/pdf").set("X-Document-Name", "records.pdf")
@@ -255,6 +264,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
     expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
     expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("'  =HYPERLINK("))).toBe(true);
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
     const withDocumentFiles = await owner.agent.post("/api/v1/exports")

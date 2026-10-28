@@ -74,7 +74,9 @@ function csvCell(value: unknown): string {
   else if (typeof value === "object" && value !== null && "toString" in value && value.constructor?.name === "Decimal") rendered = String(value);
   else if (typeof value === "object") rendered = JSON.stringify(value);
   else rendered = String(value);
-  if (/^[=+@\-\t\r]/.test(rendered)) rendered = `'${rendered}`;
+  // Spreadsheet apps may ignore leading whitespace/control characters
+  // before formula prefixes, so protect those cells as well.
+  if (/^[\u0000-\u0020]*[=+@\-]/.test(rendered) || /^[\t\r]/.test(rendered)) rendered = `'${rendered}`;
   return `"${rendered.replace(/"/g, '""')}"`;
 }
 function csv(headers: string[], rows: Array<Record<string, unknown>>): Buffer {
