@@ -13,7 +13,7 @@ import {
   reminderListQuerySchema,
   taskListQuerySchema,
 } from "./operations.schemas.js";
-import { addDaysAtLocalTime, parseDateBound } from "./time.js";
+import { addDaysAtLocalTime, localDateFor, parseDateBound } from "./time.js";
 
 function requestId(res: Response): string {
   return typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
@@ -147,7 +147,22 @@ export function createTasksRouter() {
         });
         if (rule) {
           nextDueAt = addDaysAtLocalTime(existing.dueAt, rule.intervalDays, auth.timezone);
-          while (nextDueAt <= now) nextDueAt = addDaysAtLocalTime(nextDueAt, rule.intervalDays, auth.timezone);
+          if (nextDueAt <= now) {
+            // Jump over missed occurrences in one calculation instead of
+            // running Intl.DateTimeFormat once per interval for old tasks.
+            const nextLocalDate = localDateFor(nextDueAt, auth.timezone);
+            const nowLocalDate = localDateFor(now, auth.timezone);
+            const nextLocalMidnight = Date.parse(`${nextLocalDate}T00:00:00.000Z`);
+            const nowLocalMidnight = Date.parse(`${nowLocalDate}T00:00:00.000Z`);
+            const daysBehind = Math.max(0, Math.floor((nowLocalMidnight - nextLocalMidnight) / 86_400_000));
+            const missedIntervals = Math.floor(daysBehind / rule.intervalDays);
+            if (missedIntervals > 0) {
+              nextDueAt = addDaysAtLocalTime(nextDueAt, missedIntervals * rule.intervalDays, auth.timezone);
+            }
+            if (nextDueAt <= now) {
+              nextDueAt = addDaysAtLocalTime(nextDueAt, rule.intervalDays, auth.timezone);
+            }
+          }
           await tx.reminderRule.update({
             where: { id: rule.id },
             data: { nextDueAt },
