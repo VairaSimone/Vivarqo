@@ -292,6 +292,10 @@ Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il si
 - Il worker di retention cancella token scaduti/consumati, sessioni scadute, anteprime di import scadute, contatori di rate limit scaduti ed export scaduti. Questo non sostituisce una policy documentata per log, backup, documenti cancellati e dati amministrativi.
 - Prima del lancio pubblico, consultare [la checklist sicurezza e conformità](docs/security-and-compliance-readiness.md). Non dichiarare conformità legale sulla sola base dei controlli tecnici.
 
+## Lingua del backend
+
+Le risposte API e le email transazionali supportano italiano e inglese. La lingua salvata nelle impostazioni dell'account prevale sulla lingua del browser; per le richieste non autenticate viene usato `Accept-Language`, con italiano come fallback. Per il comportamento completo e il contratto dei messaggi, vedere [la documentazione di localizzazione](docs/backend-localization.md).
+
 ## Preparazione alla produzione, backup e ripristino
 
 Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HTTPS, un CSRF_SECRET non predefinito, credenziali email, configurazione Stripe, chiavi VAPID o storage S3. Le credenziali devono essere fornite tramite secret manager o variabili dell'ambiente e non devono essere inserite nel repository. Verificare /healthz per liveness e /readyz per la connessione PostgreSQL.
