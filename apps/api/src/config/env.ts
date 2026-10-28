@@ -17,7 +17,6 @@ const environmentSchema = z.object({
     (value) => value.startsWith("postgresql://") || value.startsWith("postgres://"),
     { message: "must be a PostgreSQL connection URL" },
   ),
-  SESSION_SECRET: z.string().min(32).optional(),
   CSRF_SECRET: z.string().min(32),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),

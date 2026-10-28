@@ -1,7 +1,10 @@
 FROM node:24-bookworm-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable \
+    && apt-get update \
+    && apt-get install --no-install-recommends -y openssl \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Include schema/config in the dependency stage so Prisma's postinstall has
