@@ -50,7 +50,14 @@ function decodeKey(value: string, name: string, minBytes: number, maxBytes: numb
   }
   return decoded;
 }
+let cachedVapidCredentials: VapidCredentials | undefined;
+
 export function getVapidCredentials(): VapidCredentials {
+  // Configuration is immutable for the lifetime of this process. Validate the
+  // P-256 keypair once instead of repeating elliptic-curve work for every
+  // notification or public-key request.
+  if (cachedVapidCredentials) return cachedVapidCredentials;
+
   const publicKey = env.VAPID_PUBLIC_KEY;
   const privateKey = env.VAPID_PRIVATE_KEY;
   const subject = env.VAPID_SUBJECT;
@@ -75,6 +82,7 @@ export function getVapidCredentials(): VapidCredentials {
   if (derived.length !== publicPoint.length || !timingSafeEqual(derived, publicPoint)) {
     throw new AppError(503, "WEB_PUSH_NOT_CONFIGURED", "VAPID public and private keys do not match");
   }
+  cachedVapidCredentials = credentials;
   return credentials;
 }
 export function getVapidPublicKey(): string {
