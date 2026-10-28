@@ -29,6 +29,11 @@ const traitPatch = z.object({
   confidenceNote: z.string().trim().max(10_000).nullable().optional(),
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 
+const traitListQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(100),
+});
+
 async function ownedAnimal(userId: string, animalId: string) {
   const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true } });
   if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
@@ -46,12 +51,19 @@ export function createGeneticTraitsRouter() {
     const auth = res.locals.auth as AuthContext;
     const animalId = uuid(req.params.animalId, "animal id");
     await ownedAnimal(auth.userId, animalId);
-    const traits = await prisma.animalGeneticTrait.findMany({
-      where: { animalId },
-      orderBy: [{ traitName: "asc" }, { createdAt: "asc" }],
-      include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
-    });
-    res.status(200).json({ traits });
+    const query = parseBody(traitListQuery, req.query);
+    const where = { animalId };
+    const [total, traits] = await Promise.all([
+      prisma.animalGeneticTrait.count({ where }),
+      prisma.animalGeneticTrait.findMany({
+        where,
+        orderBy: [{ traitName: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
+      }),
+    ]);
+    res.status(200).json({ traits, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/animals/:animalId/genetic-traits", requireSession, async (req, res) => {
