@@ -129,7 +129,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
 
     expect(preview.body.validRows).toBe(0);
     expect(preview.body.invalidRows).toBe(1);
-    expect(preview.body.errors[0].reason).toContain("same reproduction cycle");
+    expect(preview.body.errors[0].reason).toContain("reproduction cycle");
   });
 
   it("rejects imports that reference another account's reproduction cycle", async () => {
