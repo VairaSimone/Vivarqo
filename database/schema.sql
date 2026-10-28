@@ -62,7 +62,7 @@ CREATE TABLE animals (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id                     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name                        VARCHAR(120) NOT NULL,
-    identifier                  VARCHAR(120),
+    identifier                  CITEXT,
     species                     VARCHAR(160) NOT NULL,
     sex                         VARCHAR(12) NOT NULL DEFAULT 'unknown'
                                 CHECK (sex IN ('male', 'female', 'unknown')),
@@ -83,7 +83,8 @@ CREATE TABLE animals (
     archived_at                 TIMESTAMPTZ,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT animals_id_user_id_unique UNIQUE (id, user_id)
+    CONSTRAINT animals_id_user_id_unique UNIQUE (id, user_id),
+    CONSTRAINT animals_identifier_length_check CHECK (identifier IS NULL OR char_length(identifier::text) <= 120)
 );
 
 CREATE UNIQUE INDEX animals_user_identifier_unique
