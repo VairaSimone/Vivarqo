@@ -87,7 +87,7 @@ function signedHeaders(config: S3Config, method: "PUT" | "GET" | "DELETE", key: 
     },
   };
 }
-const S3_REQUEST_TIMEOUT_MS = 30_000;
+const S3_REQUEST_TIMEOUT_MS = 60_000;
 const MAX_STORED_READ_BYTES = 50 * 1024 * 1024;
 
 async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key: string, body: Uint8Array = Buffer.alloc(0)): Promise<Buffer> {
@@ -106,6 +106,10 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
   if (response.status === 404 && method === "GET") {
     await response.body?.cancel().catch(() => undefined);
     throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  }
+  if (response.status === 404 && method === "DELETE") {
+    await response.body?.cancel().catch(() => undefined);
+    return Buffer.alloc(0);
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
