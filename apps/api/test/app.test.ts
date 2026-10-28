@@ -81,6 +81,17 @@ describe("API infrastructure", () => {
     });
   });
 
+  it("allows the document note header through browser CORS preflight", async () => {
+    const response = await request(createApp({ checkDatabase: async () => undefined }))
+      .options("/api/v1/documents")
+      .set("Origin", "http://localhost:5173")
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "content-type,x-csrf-token,x-document-note");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-headers"].toLowerCase()).toContain("x-document-note");
+  });
+
   it("sets security headers and does not expose Express", async () => {
     const response = await request(createApp({ checkDatabase: async () => undefined }))
       .get("/healthz");
