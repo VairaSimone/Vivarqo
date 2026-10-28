@@ -7,15 +7,35 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 import { deletePrivateObject, readPrivateObject, storePrivateObject } from "./private-storage.js";
 
 type ExportFile = { name: string; content: Buffer };
+const MAX_EXPORT_BYTES = 50 * 1024 * 1024;
+const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  return crc >>> 0;
+});
 function crc32(buffer: Buffer): number {
   let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
-  }
+  for (const byte of buffer) crc = CRC32_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
+function archiveName(name: string): string {
+  return name.replace(/^\\/+/, "").replace(/\\.\\.(\\/|\\\\)/g, "");
+}
+function assertZipSizeWithinLimit(files: ExportFile[]): void {
+  // This ZIP writer stores entries uncompressed. Preflight the exact ZIP32
+  // envelope (local header, central header, duplicate filename, end record)
+  // before allocating the final multi-buffer archive.
+  let size = 22;
+  for (const file of files) {
+    const filenameBytes = Buffer.byteLength(archiveName(file.name), "utf8");
+    size += 30 + 46 + filenameBytes * 2 + file.content.length;
+    if (size > MAX_EXPORT_BYTES) {
+      throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");
+    }
+  }
+}
 function zipFiles(files: ExportFile[]): Buffer {
+  assertZipSizeWithinLimit(files);
   const localParts: Buffer[] = [];
   const centralParts: Buffer[] = [];
   let offset = 0;
@@ -205,22 +225,25 @@ export function createExportRouter() {
         const headers = table.headers ?? (derivedHeaders.length > 0 ? derivedHeaders : (emptyHeaders[table.name] ?? []));
         return { name: table.name, content: csv(headers, table.rows) };
       });
-            files.unshift({
+      files.unshift({
         name: "README.txt",
         content: Buffer.from(
           `Vivarqo export\nCreated: ${new Date().toISOString()}\nAccount ID: ${auth.userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\n`,
           "utf8",
         ),
       });
+      // Fail before loading document objects or allocating the final ZIP when
+      // the CSV portion already exceeds the response/archive budget.
+      assertZipSizeWithinLimit(files);
       if (input.data.includeDocuments) {
         for (const document of documents) {
-          const bytes = await readPrivateObject(document.storageKey);
           const fileName = basename(document.originalFilename).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
+          const bytes = await readPrivateObject(document.storageKey);
           files.push({ name: `documents/${document.id}_${fileName}`, content: bytes });
+          assertZipSizeWithinLimit(files);
         }
       }
       const zip = zipFiles(files);
-      if (zip.length > 50 * 1024 * 1024) throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");
       const storageKey = await storePrivateObject("exports", "zip", zip);
       const completed = await prisma.exportJob.update({
         where: { id: job.id },
