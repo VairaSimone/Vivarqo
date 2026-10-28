@@ -24,6 +24,8 @@ import { createDocumentShareRouter } from "./modules/domain/documents-shares.rou
 import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
 import { createBillingRouter } from "./modules/domain/billing.routes.js";
 import { createExportRouter } from "./modules/domain/exports.routes.js";
+import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
+import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -89,11 +91,13 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/animals", createAnimalRouter());
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1/imports", createImportRouter());
+  app.use("/api/v1/imports", createCareImportRouter());
   app.use("/api/v1/tasks", createTasksRouter());
   app.use("/api/v1", createHomeCalendarRouter());
   app.use("/api/v1", createReproductionRouter());
   app.use("/api/v1", createInventoryRouter());
   app.use("/api/v1", createDocumentShareRouter());
+  app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
   app.use("/api/v1", createBillingRouter());

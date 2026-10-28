@@ -251,7 +251,7 @@ Le sottoscrizioni browser sono persistite, ma l’invio push tramite VAPID non �
 
 ### Importazione ed esportazione
 
-L’importazione CSV/XLSX con anteprima e conferma implementata in precedenza supporta attualmente le anagrafiche animali. I formati d’importazione di alimentazioni, pesi, mute, note e altri registri non sono ancora stati aggiunti.
+L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono supportati `entity=animals`, `entity=weights`, `entity=sheds`, `entity=notes` ed `entity=feedings`. Per i registri di cura il file deve includere `animalId` oppure `animalIdentifier`, oltre ai campi del registro. Le righe vengono validate con numero di riga/colonna e importate in una transazione; per le alimentazioni si raggruppano le voci con lo stesso istante in un’unica sessione.
 
 `POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili e chiavi di relazione; `includeDocuments: true` include anche i file privati associati. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato. Gli export scadono dopo 24 ore; il limite dell’archivio è 50 MB.
 
@@ -264,3 +264,16 @@ L’importazione CSV/XLSX con anteprima e conferma implementata in precedenza su
 
 Prima di attivare gli acquisti, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` e `STRIPE_WEBHOOK_SECRET`, quindi registra l’URL webhook nella dashboard Stripe. La CI non usa credenziali Stripe e non esegue pagamenti reali; l’integrazione va verificata con Stripe Test Mode nell’ambiente di staging. Gli stati locali sono aggiornati da eventi firmati, non dal redirect del browser.
 
+
+Esempio di importazione dei pesi:
+
+```bash
+curl -X POST 'http://localhost:3000/api/v1/imports?entity=weights' \
+  -H 'Origin: http://localhost:5173' \
+  -H 'X-CSRF-Token: <token-csrf>' \
+  -H 'Content-Type: text/csv' \
+  --data-binary '@pesi.csv' \
+  -b cookies.txt
+```
+
+Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il sistema risolve l’identificativo all’interno del solo account autenticato. Confermare con `POST /api/v1/imports/:importId/confirm`, dopo aver controllato l’anteprima e gli eventuali errori.

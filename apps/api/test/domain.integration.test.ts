@@ -61,6 +61,8 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.exportJob.deleteMany({ where: { userId: ids } });
     await prisma.subscription.deleteMany({ where: { userId: ids } });
     await prisma.auditEvent.deleteMany({ where: { userId: ids } });
+    await prisma.animalGeneticTrait.deleteMany({ where: { animalId: { in: animalIds } } });
+    await prisma.animalGeneticTrait.deleteMany({ where: { sourceAnimalId: { in: animalIds } } });
     await prisma.animal.deleteMany({ where: { userId: ids } });
     await prisma.user.deleteMany({ where: { id: ids } });
     await prisma.$disconnect();
@@ -144,6 +146,8 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ movementType: "out", quantity: 1.25, occurredAt: "2026-10-28T10:00:00.000Z" })
       .expect(201);
     expect(Number(movement.body.item.quantityOnHand)).toBe(0.75);
+    const lowStock = await owner.agent.get("/api/v1/inventory/items?lowStock=true").expect(200);
+    expect(lowStock.body.items.some((entry: { id: string }) => entry.id === itemId)).toBe(true);
 
     const adjustment = await owner.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)

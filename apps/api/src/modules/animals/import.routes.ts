@@ -1,4 +1,5 @@
 import { Router, raw } from "express";
+import type { NextFunction } from "express";
 import type { Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
@@ -176,14 +177,10 @@ function authId(res: Response): string {
 export function createImportRouter() {
   const router = Router();
 
-  router.post("/", requireSession, fileBody, async (req, res) => {
-    const userId = authId(res);
+  router.post("/", requireSession, fileBody, async (req, res, next: NextFunction) => {
     const entity = typeof req.query.entity === "string" ? req.query.entity : "animals";
-    if (entity !== "animals") {
-      throw new AppError(400, "IMPORT_ENTITY_NOT_SUPPORTED", "This import endpoint currently supports animal registries only", {
-        supportedEntities: ["animals"],
-      });
-    }
+    if (entity !== "animals") { next(); return; }
+    const userId = authId(res);
     if (!Buffer.isBuffer(req.body)) throw new AppError(400, "IMPORT_FILE_REQUIRED", "Upload a CSV or XLSX file as the request body");
     const mime = (req.get("content-type") ?? "").split(";")[0]!.trim().toLocaleLowerCase("en-US");
     const selectedSheet = typeof req.query.sheet === "string" ? req.query.sheet : undefined;
@@ -284,14 +281,15 @@ export function createImportRouter() {
     });
   });
 
-  router.post("/:id/confirm", requireSession, async (req, res) => {
+  router.post("/:id/confirm", requireSession, async (req, res, next: NextFunction) => {
     const userId = authId(res);
     const id = parseUuid(req.params.id!);
     const confirmSchema = z.object({ allowPossibleDuplicates: z.boolean().optional().default(false) }).strict();
     const body = confirmSchema.safeParse(req.body ?? {});
     if (!body.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
-    const current = await prisma.importJob.findFirst({ where: { id, userId, entityType: "animals" } });
+    const current = await prisma.importJob.findFirst({ where: { id, userId } });
     if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
+    if (current.entityType !== "animals") { next(); return; }
     if (current.status !== "preview" || current.expiresAt <= new Date()) {
       throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
     }

@@ -62,6 +62,49 @@ export function createInventoryRouter() {
       q: z.string().trim().max(160).optional(),
       lowStock: z.enum(["true", "false"]).optional(),
     }), req.query);
+    if (query.lowStock === "true") {
+      const category = query.category ?? "";
+      const q = query.q ?? "";
+      const activeAll = query.active === "all";
+      const active = query.active === "true";
+      const [countRows, idRows] = await Promise.all([
+        prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM inventory_items
+          WHERE user_id = ${auth.userId}::uuid
+            AND (${activeAll} OR is_active = ${active})
+            AND (${query.category === undefined} OR category::text = ${category})
+            AND (${query.q === undefined} OR name ILIKE '%' || ${q} || '%')
+            AND minimum_quantity IS NOT NULL
+            AND quantity_on_hand <= minimum_quantity
+        `,
+        prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id::text AS id
+          FROM inventory_items
+          WHERE user_id = ${auth.userId}::uuid
+            AND (${activeAll} OR is_active = ${active})
+            AND (${query.category === undefined} OR category::text = ${category})
+            AND (${query.q === undefined} OR name ILIKE '%' || ${q} || '%')
+            AND minimum_quantity IS NOT NULL
+            AND quantity_on_hand <= minimum_quantity
+          ORDER BY is_active DESC, name ASC
+          LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}
+        `,
+      ]);
+      const total = Number(countRows[0]?.count ?? 0n);
+      const ids = idRows.map((row) => row.id);
+      const items = ids.length === 0 ? [] : await prisma.inventoryItem.findMany({
+        where: { userId: auth.userId, id: { in: ids } },
+        orderBy: [{ isActive: "desc" }, { name: "asc" }],
+      });
+      const byId = new Map(items.map((item) => [item.id, item]));
+      res.status(200).json({
+        items: ids.map((id) => byId.get(id)).filter((item) => item !== undefined),
+        pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) },
+      });
+      return;
+    }
+
     const where: Record<string, unknown> = { userId: auth.userId };
     if (query.active !== "all") where.isActive = query.active === "true";
     if (query.category) where.category = query.category;
@@ -75,12 +118,9 @@ export function createInventoryRouter() {
         take: query.pageSize,
       }),
     ]);
-    const filteredItems = query.lowStock === "true"
-      ? items.filter((item) => item.minimumQuantity !== null && Number(item.quantityOnHand) <= Number(item.minimumQuantity))
-      : items;
     res.status(200).json({
-      items: filteredItems,
-      pagination: { page: query.page, pageSize: query.pageSize, total: query.lowStock === "true" ? filteredItems.length : total, totalPages: Math.ceil((query.lowStock === "true" ? filteredItems.length : total) / query.pageSize) },
+      items,
+      pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) },
     });
   });
 
