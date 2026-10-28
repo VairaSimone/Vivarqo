@@ -220,11 +220,24 @@ export function createImportRouter() {
         where: { userId, OR: candidates },
         select: { id: true, name: true, species: true, identifier: true },
       });
+      // Index existing candidates once: filtering the full result set for every
+      // imported row becomes quadratic for large files.
+      const candidatesByNameAndSpecies = new Map<string, typeof matches>();
+      for (const candidate of matches) {
+        const key = JSON.stringify([
+          candidate.name.toLocaleLowerCase("it-IT"),
+          candidate.species.toLocaleLowerCase("it-IT"),
+        ]);
+        const bucket = candidatesByNameAndSpecies.get(key);
+        if (bucket) bucket.push(candidate);
+        else candidatesByNameAndSpecies.set(key, [candidate]);
+      }
       preview.potentialDuplicates = preview.validRows.flatMap((row) => {
-        const found = matches.filter((candidate) =>
-          candidate.name.toLocaleLowerCase("it-IT") === row.animal.name.toLocaleLowerCase("it-IT") &&
-          candidate.species.toLocaleLowerCase("it-IT") === row.animal.species.toLocaleLowerCase("it-IT"),
-        );
+        const key = JSON.stringify([
+          row.animal.name.toLocaleLowerCase("it-IT"),
+          row.animal.species.toLocaleLowerCase("it-IT"),
+        ]);
+        const found = candidatesByNameAndSpecies.get(key) ?? [];
         return found.length ? [{ row: row.rowNumber, name: row.animal.name, species: row.animal.species, matches: found }] : [];
       });
     }
