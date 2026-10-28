@@ -58,7 +58,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       origin: env.APP_ORIGIN,
       credentials: true,
       methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id", "X-Document-Name", "X-Document-Category", "X-Animal-Id", "X-Cycle-Id"],
+      allowedHeaders: ["Content-Type", "X-CSRF-Token", "X-Request-Id", "X-Document-Name", "X-Document-Category", "X-Document-Note", "X-Animal-Id", "X-Cycle-Id"],
       maxAge: 600,
     }),
   );
