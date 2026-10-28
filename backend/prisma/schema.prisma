@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client"
-  output          = "../apps/api/src/generated/prisma"
+  output          = "../api/src/generated/prisma"
   previewFeatures = ["postgresqlExtensions", "partialIndexes"]
 }
 datasource db {
