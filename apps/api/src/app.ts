@@ -8,9 +8,15 @@ import { AppError } from "./errors/app-error.js";
 import { checkDatabaseConnection } from "./db/prisma.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { requestContext } from "./middleware/request-context.js";
+import { csrfProtection } from "./modules/auth/csrf.js";
+import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import { loadOptionalSession } from "./modules/auth/session.js";
+import { createAccountRouter } from "./modules/account/account.routes.js";
+import type { EmailSender } from "./modules/auth/email-sender.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
+  emailSender?: EmailSender;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -62,6 +68,12 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       },
     }),
   );
+
+  // Validate browser intent before touching a server-side session.
+  app.use("/api/v1", csrfProtection);
+  app.use("/api/v1", loadOptionalSession);
+  app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
+  app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
 
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", requestId: res.locals.requestId });

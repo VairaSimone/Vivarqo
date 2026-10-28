@@ -68,6 +68,19 @@ describe("API infrastructure", () => {
     });
   });
 
+  it("rejects mutating API requests without a valid CSRF token", async () => {
+    const response = await request(createApp({ checkDatabase: async () => undefined }))
+      .post("/api/v1/auth/logout")
+      .set("Origin", "http://localhost:5173")
+      .send({});
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      code: "CSRF_INVALID",
+      message: "CSRF validation failed",
+    });
+  });
+
   it("sets security headers and does not expose Express", async () => {
     const response = await request(createApp({ checkDatabase: async () => undefined }))
       .get("/healthz");
