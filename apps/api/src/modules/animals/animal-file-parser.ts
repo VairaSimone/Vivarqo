@@ -30,7 +30,7 @@ function cellColumn(reference: string): number {
   for (const letter of match[1]!.toUpperCase()) column = column * 26 + letter.charCodeAt(0) - 64;
   const zeroBased = column - 1;
   if (zeroBased < 0 || zeroBased >= MAX_COLUMNS) {
-    throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", \`XLSX may contain at most \${MAX_COLUMNS} columns\`);
+    throw new AppError(413, "IMPORT_TOO_MANY_COLUMNS", `XLSX may contain at most ${MAX_COLUMNS} columns`);
   }
   return zeroBased;
 }
