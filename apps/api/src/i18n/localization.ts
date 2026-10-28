@@ -54,6 +54,11 @@ const messagePairs: Array<[string, string]> = [
   ["The request contains repeated animal identifiers", "La richiesta contiene identificativi di animali ripetuti"],
   ["Animal not found", "Animale non trovato"],
   ["One or more animals were not found", "Uno o più animali non sono stati trovati"],
+  ["Animal not found in this account", "Animale non trovato in questo account"],
+  ["Parent animal not found in this account", "Animale genitore non trovato in questo account"],
+  ["Cycle not found in this account", "Ciclo non trovato in questo account"],
+  ["Clutch not found in this account", "Covata non trovata in questo account"],
+  ["Document not found in this account", "Documento non trovato in questo account"],
   ["Use the restore action before changing an archived animal status", "Ripristina l'animale prima di modificarne lo stato"],
   ["Only archived animals can be restored", "È possibile ripristinare solo animali archiviati"],
   ["This animal has linked history or records. Archive it instead of deleting it.", "Questo animale ha uno storico o dei registri collegati. Archivialo invece di eliminarlo."],
@@ -272,6 +277,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function localizeImportErrorRows(value: Record<string, unknown>, locale: Locale): Record<string, unknown> {
+  const output: Record<string, unknown> = { ...value };
+  if (Array.isArray(value.errors)) {
+    output.errors = value.errors.map((entry) => {
+      if (!isRecord(entry) || typeof entry.reason !== "string") return entry;
+      return { ...entry, reason: localizeValidationMessage(entry.reason, locale) };
+    });
+  }
+  if (isRecord(value.report)) {
+    output.report = localizeImportErrorRows(value.report, locale);
+  }
+  return output;
+}
+
 export function localizeResponseBody(body: unknown, locale: Locale): unknown {
   if (!isRecord(body)) return body;
   const output: Record<string, unknown> = { ...body };
@@ -289,6 +308,12 @@ export function localizeResponseBody(body: unknown, locale: Locale): unknown {
         return { ...entry, message: localizeValidationMessage(entry.message, locale) };
       }),
     };
+  }
+
+  // CSV/XLSX preview failures are server-generated validation text too. Only
+  // translate the known error-row "reason" fields; never traverse user records.
+  if (Array.isArray(body.errors) || isRecord(body.report)) {
+    Object.assign(output, localizeImportErrorRows(output, locale));
   }
   return output;
 }
