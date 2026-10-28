@@ -234,6 +234,19 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
+  it("rejects unsupported push endpoints during subscription registration", async () => {
+    const owner = await account();
+    const response = await owner.agent.post("/api/v1/push-subscriptions")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        endpoint: "https://attacker.example.test/push",
+        keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) },
+      })
+      .expect(400);
+
+    expect(response.body.code).toBe("INVALID_PUSH_ENDPOINT");
+  });
+
   it("exports private data as a downloadable ZIP, controls document attachments, and reports unconfigured billing", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Export animal", species: "Python regius" } });
