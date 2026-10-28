@@ -6,7 +6,7 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { deletePrivateObject, readPrivateObject, storePrivateObject, validatePrivateFile } from "./private-storage.js";
+import { deletePrivateObject, openPrivateObjectStream, storePrivateObject, validatePrivateFile } from "./private-storage.js";
 
 const uploadBody = raw({
   type: ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/octet-stream"],
@@ -128,26 +128,54 @@ export function createDocumentShareRouter() {
     }
   });
 
-  router.get("/documents/:id/download", requireSession, async (req, res) => {
+  router.get("/documents/:id/download", requireSession, async (req, res, next) => {
     const auth = res.locals.auth as AuthContext;
     const documentId = id(req.params.id, "document id");
-    const document = await prisma.document.findFirst({ where: { id: documentId, userId: auth.userId, deletedAt: null } });
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, userId: auth.userId, deletedAt: null },
+    });
     if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-    const bytes = await readPrivateObject(document.storageKey);
+
+    const stored = await openPrivateObjectStream(document.storageKey, 10 * 1024 * 1024);
     res.setHeader("Content-Type", document.mimeType);
-    res.setHeader("Content-Length", bytes.length);
+    if (stored.sizeBytes !== null) res.setHeader("Content-Length", stored.sizeBytes);
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(document.originalFilename)}`);
     res.setHeader("Cache-Control", "private, no-store");
-    res.status(200).send(bytes);
+    res.status(200);
+
+    stored.stream.on("error", (error: Error) => {
+      if (res.headersSent) res.destroy(error);
+      else next(error);
+    });
+    res.on("close", () => {
+      if (!res.writableEnded) stored.stream.destroy();
+    });
+    stored.stream.pipe(res);
   });
 
   router.delete("/documents/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const documentId = id(req.params.id, "document id");
-    const document = await prisma.document.findFirst({ where: { id: documentId, userId: auth.userId, deletedAt: null } });
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, userId: auth.userId, deletedAt: null },
+    });
     if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-    await prisma.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+
+    // Keep the database record visible/retryable if object storage is unavailable.
+    // Deleting an already-removed object is idempotent for both supported stores.
     await deletePrivateObject(document.storageKey);
+    await prisma.$transaction(async (tx) => {
+      await tx.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
+      await tx.auditEvent.create({
+        data: {
+          userId: auth.userId,
+          action: "document.deleted",
+          entityType: "document",
+          entityId: documentId,
+          requestId: requestId(res),
+        },
+      });
+    });
     res.status(204).send();
   });
 
