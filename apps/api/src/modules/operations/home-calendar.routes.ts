@@ -173,7 +173,7 @@ export function createHomeCalendarRouter() {
         .filter((event) => event.eventType === "laying")
         .map((event) => JSON.stringify([
           event.cycleId,
-          event.occurredAt.toISOString().slice(0, 10),
+          localDateFor(event.occurredAt, auth.timezone),
         ])),
     );
     const unmatchedClutches = clutches.filter((clutch) => !layingEventKeys.has(JSON.stringify([
