@@ -339,13 +339,13 @@ export function createImportRouter() {
       const report = readReport(job.report);
       const identifiers = report.validRows.map((row) => row.animal.identifier).filter((value): value is string => Boolean(value));
       const existing = identifiers.length
-        ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers } }, select: { identifier: true } })
+        ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers, mode: "insensitive" } }, select: { identifier: true } })
         : [];
-      const existingSet = new Set(existing.map((animal) => animal.identifier));
+      const existingSet = new Set(existing.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")));
       const finalErrors = [...report.errors];
       const animalsToCreate = report.validRows.filter((row) => {
         const identifier = row.animal.identifier;
-        if (identifier && existingSet.has(identifier)) {
+        if (identifier && existingSet.has(identifier.toLocaleLowerCase("it-IT"))) {
           finalErrors.push({ row: row.rowNumber, column: "identifier", reason: "This identifier already exists in your account at confirmation time" });
           return false;
         }
