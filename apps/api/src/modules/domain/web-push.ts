@@ -43,10 +43,10 @@ function decodeKey(value: string, name: string, minBytes: number, maxBytes: numb
   try {
     decoded = Buffer.from(value, "base64url");
   } catch {
-    throw new AppError(503, "WEB_PUSH_NOT_CONFIGURED", \`\${name} is invalid\`);
+    throw new AppError(503, "WEB_PUSH_NOT_CONFIGURED", `${name} is invalid`);
   }
   if (decoded.length < minBytes || decoded.length > maxBytes) {
-    throw new AppError(503, "WEB_PUSH_NOT_CONFIGURED", \`\${name} is invalid\`);
+    throw new AppError(503, "WEB_PUSH_NOT_CONFIGURED", `${name} is invalid`);
   }
   return decoded;
 }
@@ -116,12 +116,12 @@ export function createVapidAuthorization(endpoint: string, credentials: VapidCre
     exp: nowSeconds + 12 * 60 * 60,
     sub: credentials.subject,
   })));
-  const message = \`\${header}.\${payload}\`;
+  const message = `${header}.${payload}`;
   const signature = sign("sha256", Buffer.from(message), {
     key: buildPrivateKey(publicPoint, privateScalar),
     dsaEncoding: "ieee-p1363",
   });
-  return \`vapid t=\${message}.\${b64url(signature)}, k=\${credentials.publicKey}\`;
+  return `vapid t=${message}.${b64url(signature)}, k=${credentials.publicKey}`;
 }
 
 export function encryptWebPushPayload(payload: Buffer, userPublicKey: Buffer, userAuthSecret: Buffer): { body: Buffer; serverPublicKey: Buffer } {
