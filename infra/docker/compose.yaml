@@ -29,11 +29,15 @@ services:
       APP_ORIGIN: http://localhost:5173
       API_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
+      PRIVATE_STORAGE_PATH: /app/var/private
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      - vivarqo-private-data:/app/var/private
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   vivarqo-postgres-data:
+  vivarqo-private-data:

@@ -18,6 +18,12 @@ import { createCareRouter } from "./modules/animals/care.routes.js";
 import { createImportRouter } from "./modules/animals/import.routes.js";
 import { createTasksRouter } from "./modules/operations/tasks.routes.js";
 import { createHomeCalendarRouter } from "./modules/operations/home-calendar.routes.js";
+import { createReproductionRouter } from "./modules/domain/reproduction.routes.js";
+import { createInventoryRouter } from "./modules/domain/inventory.routes.js";
+import { createDocumentShareRouter } from "./modules/domain/documents-shares.routes.js";
+import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
+import { createBillingRouter } from "./modules/domain/billing.routes.js";
+import { createExportRouter } from "./modules/domain/exports.routes.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -52,6 +58,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       maxAge: 600,
     }),
   );
+  app.use("/api/v1/webhooks/stripe", express.raw({ type: "application/json", limit: "1mb" }));
   app.use(express.json({ limit: "1mb", strict: true }));
 
   app.use(
@@ -84,6 +91,13 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/tasks", createTasksRouter());
   app.use("/api/v1", createHomeCalendarRouter());
+  app.use("/api/v1", createReproductionRouter());
+  app.use("/api/v1", createInventoryRouter());
+  app.use("/api/v1", createDocumentShareRouter());
+  app.use("/api/v1", createFinanceRouter());
+  app.use("/api/v1", createNotificationRouter());
+  app.use("/api/v1", createBillingRouter());
+  app.use("/api/v1/exports", createExportRouter());
 
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", requestId: res.locals.requestId });

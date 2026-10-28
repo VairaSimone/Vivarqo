@@ -37,6 +37,7 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+RUN mkdir -p /app/var/private && chown -R node:node /app/var/private
 USER node
 EXPOSE 3000
 CMD ["node", "apps/api/dist/server.js"]
