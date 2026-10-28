@@ -22,7 +22,7 @@ RUN pnpm --filter @vivarqo/api build
 # TypeScript, Vitest, Prisma CLI and other development-only packages.
 FROM base AS production-dependencies
 ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
-COPY package.json pnpm-workspace.yaml .npmrc prisma.config.ts ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc prisma.config.ts ./
 COPY prisma ./prisma
 COPY apps/api/package.json apps/api/package.json
 RUN pnpm install --prod --frozen-lockfile
