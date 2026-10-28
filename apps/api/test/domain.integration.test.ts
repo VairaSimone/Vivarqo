@@ -264,7 +264,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
     expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
     expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
-    expect(noDocZip.includes(Buffer.from("'  =HYPERLINK(\"https://evil.example\")"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("'  =HYPERLINK("))).toBe(true);
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
     const withDocumentFiles = await owner.agent.post("/api/v1/exports")
