@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { Readable, Transform } from "node:stream";
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { createHash, createHmac, randomUUID } from "node:crypto";
@@ -205,6 +206,77 @@ export async function storePrivateObject(folder: PrivateFolder, extension: Priva
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
   return key;
+}
+
+const MAX_OBJECT_STREAM_BYTES = 50 * 1024 * 1024;
+
+function enforceStreamLimit(source: Readable, maximumBytes: number): Readable {
+  let totalBytes = 0;
+  const limiter = new Transform({
+    transform(chunk, _encoding, callback) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += bytes.length;
+      if (totalBytes > maximumBytes) {
+        callback(new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size"));
+        return;
+      }
+      callback(null, bytes);
+    },
+  });
+  return source.pipe(limiter);
+}
+
+/**
+ * Opens a private object as a bounded stream. This keeps downloads and export
+ * attachments from allocating a Buffer equal to the entire object size.
+ */
+export async function openPrivateObjectStream(
+  key: string,
+  maximumBytes = MAX_OBJECT_STREAM_BYTES,
+): Promise<{ stream: Readable; sizeBytes: number | null }> {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1) {
+    throw new Error("maximumBytes must be a positive safe integer");
+  }
+
+  const config = s3Config();
+  if (config) {
+    const signed = signedHeaders(config, "GET", key, Buffer.alloc(0));
+    let response: Response;
+    try {
+      response = await fetch(signed.url, { method: "GET", headers: signed.headers });
+    } catch {
+      throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
+    }
+    if (response.status === 404) throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+    if (!response.ok || !response.body) {
+      throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the request", { providerStatus: response.status });
+    }
+
+    const rawLength = response.headers.get("content-length");
+    const sizeBytes = rawLength && /^\\d+$/.test(rawLength) && Number.isSafeInteger(Number(rawLength))
+      ? Number(rawLength)
+      : null;
+    if (sizeBytes !== null && sizeBytes > maximumBytes) {
+      await response.body.cancel().catch(() => undefined);
+      throw new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size");
+    }
+    const source = Readable.fromWeb(response.body as import("node:stream/web").ReadableStream);
+    return { stream: enforceStreamLimit(source, maximumBytes), sizeBytes };
+  }
+
+  const path = absolutePath(key);
+  let fileInfo;
+  try {
+    fileInfo = await stat(path);
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+    }
+    throw error;
+  }
+  if (!fileInfo.isFile()) throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  if (fileInfo.size > maximumBytes) throw new AppError(413, "FILE_TOO_LARGE", "Stored file exceeded the permitted download size");
+  return { stream: enforceStreamLimit(createReadStream(path), maximumBytes), sizeBytes: fileInfo.size };
 }
 
 export async function readPrivateObject(key: string): Promise<Buffer> {
