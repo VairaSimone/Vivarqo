@@ -267,15 +267,15 @@ export async function ensureDatabaseSchema(): Promise<SchemaIntegrityReport> {
   await waitForPostgres();
 
   const tables = await currentPublicTableNames();
-  const hasMigrationTable = tables.includes("prisma_migrations");
-  const applicationTables = tables.filter((name) => name !== "prisma_migrations");
+  const hasMigrationTable = tables.includes("_prisma_migrations");
+  const applicationTables = tables.filter((name) => name !== "_prisma_migrations");
   let initialApplied = false;
   let historyRowsExist = false;
 
   if (hasMigrationTable) {
     const rows = await prisma.$queryRawUnsafe<MigrationRow[]>(
       "SELECT migration_name AS \"migrationName\", finished_at AS \"finishedAt\", rolled_back_at AS \"rolledBackAt\" " +
-      "FROM public.prisma_migrations",
+      "FROM public._prisma_migrations",
     );
     historyRowsExist = rows.length > 0;
     initialApplied = rows.some((row) =>
