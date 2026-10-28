@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import type { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { PostgresRateLimitStore } from "../../middleware/postgres-rate-limit-store.js";
 import { prisma } from "../../db/prisma.js";
 import { issueSession, revokeCurrentSession, requireSession, type AuthContext } from "./session.js";
 import { setCsrfCookie } from "./csrf.js";
@@ -40,10 +41,11 @@ function parseBody<TSchema extends z.ZodType>(schema: TSchema, body: unknown): z
   return result.data;
 }
 
-function authRateLimit(limit: number) {
+function authRateLimit(limit: number, namespace: string) {
   return rateLimit({
     windowMs: 15 * 60 * 1000,
     limit,
+    store: new PostgresRateLimitStore(namespace),
     standardHeaders: "draft-8",
     legacyHeaders: false,
     handler: (_req: Request, res: Response, _next: NextFunction) => {
@@ -57,10 +59,10 @@ function authRateLimit(limit: number) {
   });
 }
 
-const registerLimiter = authRateLimit(10);
-const loginLimiter = authRateLimit(10);
-const tokenRequestLimiter = authRateLimit(5);
-const passwordResetLimiter = authRateLimit(5);
+const registerLimiter = authRateLimit(10, "auth-register");
+const loginLimiter = authRateLimit(10, "auth-login");
+const tokenRequestLimiter = authRateLimit(5, "auth-token-request");
+const passwordResetLimiter = authRateLimit(5, "auth-password-reset");
 
 const genericEmailResponse = {
   message: "If the address is eligible, an email with further instructions will be sent.",
