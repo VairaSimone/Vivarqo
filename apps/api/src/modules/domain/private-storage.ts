@@ -253,7 +253,7 @@ export async function openPrivateObjectStream(
     }
 
     const rawLength = response.headers.get("content-length");
-    const sizeBytes = rawLength && /^\\d+$/.test(rawLength) && Number.isSafeInteger(Number(rawLength))
+    const sizeBytes = rawLength && /^\d+$/.test(rawLength) && Number.isSafeInteger(Number(rawLength))
       ? Number(rawLength)
       : null;
     if (sizeBytes !== null && sizeBytes > maximumBytes) {
