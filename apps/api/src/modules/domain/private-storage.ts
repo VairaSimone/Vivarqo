@@ -172,7 +172,7 @@ async function s3UploadFile(config: S3Config, key: string, sourcePath: string, s
     response = await fetch(signed.url, {
       method: "PUT",
       headers: { ...signed.headers, "content-length": String(sizeBytes) },
-      body: body as unknown as BodyInit,
+      body: body as never,
       duplex: "half",
       signal: AbortSignal.timeout(5 * 60_000),
     } as RequestInit);
