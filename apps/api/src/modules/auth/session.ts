@@ -81,7 +81,20 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
     const tokenHash = hashOpaqueToken(rawToken);
     const session = await prisma.userSession.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            locale: true,
+            timezone: true,
+            emailVerifiedAt: true,
+            deletedAt: true,
+            accountStatus: true,
+          },
+        },
+      },
     });
 
     if (!session) {
@@ -110,10 +123,30 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
       expiresAt = new Date(Math.min(now.getTime() + IDLE_SESSION_MS, absoluteExpiry.getTime()));
     }
 
-    await prisma.userSession.update({
-      where: { id: session.id },
-      data: { lastSeenAt: now, ...(shouldRenew ? { expiresAt } : {}) },
-    });
+    // Authentication still checks the session on every request, but writing
+    // last_seen_at for every API call creates needless database churn. Refresh
+    // activity at most once every five minutes; renew the cookie/session expiry
+    // as soon as the sliding-expiry threshold is reached.
+    const lastSeenRefreshDue =
+      session.lastSeenAt === null ||
+      session.lastSeenAt.getTime() <= now.getTime() - 5 * 60_000;
+    if (shouldRenew) {
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: { lastSeenAt: now, expiresAt },
+      });
+    } else if (lastSeenRefreshDue) {
+      await prisma.userSession.updateMany({
+        where: {
+          id: session.id,
+          OR: [
+            { lastSeenAt: null },
+            { lastSeenAt: { lte: new Date(now.getTime() - 5 * 60_000) } },
+          ],
+        },
+        data: { lastSeenAt: now },
+      });
+    }
 
     if (shouldRenew) {
       res.cookie(SESSION_COOKIE_NAME, rawToken, {
