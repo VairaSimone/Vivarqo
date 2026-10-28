@@ -1,0 +1,21 @@
+{
+  "name": "vivarqo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0 <25"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @vivarqo/api dev",
+    "db:generate": "prisma generate --config prisma.config.ts",
+    "db:migrate:deploy": "prisma migrate deploy --config prisma.config.ts",
+    "db:migrate:dev": "prisma migrate dev --config prisma.config.ts",
+    "test": "pnpm --filter @vivarqo/api test",
+    "typecheck": "pnpm --filter @vivarqo/api typecheck",
+    "build": "pnpm --filter @vivarqo/api build"
+  },
+  "devDependencies": {
+    "prisma": "^7.0.0"
+  }
+}

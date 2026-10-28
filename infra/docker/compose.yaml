@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vivarqo
+      POSTGRES_USER: vivarqo
+      POSTGRES_PASSWORD: vivarqo_dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - vivarqo-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vivarqo -d vivarqo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  vivarqo-postgres-data:
