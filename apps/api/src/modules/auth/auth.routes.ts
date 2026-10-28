@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { getPreferredLocale } from "../../i18n/localization.js";
 import { PostgresRateLimitStore } from "../../middleware/postgres-rate-limit-store.js";
 import { prisma } from "../../db/prisma.js";
 import { issueSession, revokeCurrentSession, requireSession, type AuthContext } from "./session.js";
@@ -123,13 +124,15 @@ export function createAuthRouter(sender?: EmailSender) {
 
   router.post("/register", registerLimiter, registerEmailLimiter, async (req, res) => {
     const input = parseBody(registerSchema, req.body);
-    await registerAccount(input, emailSender, requestId(res));
+    const locale = input.locale ?? getPreferredLocale(req.get("accept-language"));
+    res.locals.responseLocale = locale;
+    await registerAccount({ ...input, locale }, emailSender, requestId(res));
     res.status(202).json(genericEmailResponse);
   });
 
   router.post("/verify-email", tokenRequestLimiter, async (req, res) => {
     const input = parseBody(verifyEmailSchema, req.body);
-    await verifyEmail(input.token);
+    res.locals.responseLocale = await verifyEmail(input.token);
     res.status(200).json({ message: "Email verified. You can now sign in." });
   });
 
@@ -142,6 +145,7 @@ export function createAuthRouter(sender?: EmailSender) {
   router.post("/login", loginLimiter, loginEmailLimiter, async (req, res) => {
     const input = parseBody(loginSchema, req.body);
     const user = await authenticate(input);
+    res.locals.responseLocale = user.locale;
     await issueSession(user.id, req, res);
     res.status(200).json({ message: "Signed in successfully" });
   });
@@ -166,7 +170,7 @@ export function createAuthRouter(sender?: EmailSender) {
 
   router.post("/reset-password", passwordResetLimiter, async (req, res) => {
     const input = parseBody(resetPasswordSchema, req.body);
-    await resetPassword(input);
+    res.locals.responseLocale = await resetPassword(input);
     await revokeCurrentSession(req, res);
     res.status(200).json({ message: "Password reset successfully. Sign in with your new password." });
   });
