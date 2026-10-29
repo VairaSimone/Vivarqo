@@ -1,5 +1,5 @@
 import React from "react";
-import { Icon } from "../ui/Icon.jsx";
+import { Icon } from "../ui/Icon.tsx";
 
 const value = (obj, keys, fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
 const date = value => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
