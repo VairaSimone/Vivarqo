@@ -4,6 +4,7 @@ import {
   createHmac,
   createPrivateKey,
   randomBytes,
+  randomUUID,
   sign,
   timingSafeEqual,
 } from "node:crypto";
@@ -231,7 +232,25 @@ function isWithinQuietHours(now: Date, timezone: string, start: Date | null, end
     : currentMinutes >= startMinutes || currentMinutes < endMinutes;
 }
 
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<PushSendResult> {
+const MAX_PUSH_ATTEMPTS = 9;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: string }).code === "P2002";
+}
+
+/**
+ * Attempts are persisted before the network call. Each queue retry gets its
+ * own idempotency key; successful endpoints are skipped if the same notification
+ * is replayed because another endpoint failed. No provider response body or
+ * subscription endpoint is retained in the delivery history.
+ */
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+  notificationId?: string,
+  attemptNumber = 1,
+): Promise<PushSendResult> {
   const credentials = getVapidCredentials();
   const [preferences, user, subscriptions] = await Promise.all([
     prisma.notificationPreferences.findUnique({ where: { userId } }),
@@ -246,24 +265,91 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   }
   if (subscriptions.length === 0) return { attempted: 0, sent: 0, removed: 0, failed: 0, skipped: "no_subscriptions" };
 
-  const result: PushSendResult = { attempted: subscriptions.length, sent: 0, removed: 0, failed: 0 };
+  const correlationId = notificationId ?? randomUUID();
+  const result: PushSendResult = { attempted: 0, sent: 0, removed: 0, failed: 0 };
   for (const subscription of subscriptions) {
+    if (notificationId) {
+      const alreadyDelivered = await prisma.pushDeliveryAttempt.findFirst({
+        where: {
+          notificationId,
+          pushSubscriptionId: subscription.id,
+          status: "sent",
+        },
+        select: { id: true },
+      });
+      if (alreadyDelivered) continue;
+    }
+
+    const idempotencyKey = `${correlationId}:${subscription.id}:${attemptNumber}`;
+    try {
+      await prisma.pushDeliveryAttempt.create({
+        data: {
+          userId,
+          notificationId: notificationId ?? null,
+          pushSubscriptionId: subscription.id,
+          idempotencyKey,
+          attemptNumber,
+          status: "queued",
+          attemptedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      // A duplicate queue delivery with the same attempt number must not send
+      // the same Web Push request twice. A later pg-boss retry has a new number.
+      if (isUniqueConstraintError(error)) continue;
+      throw error;
+    }
+
+    result.attempted += 1;
+    let responseStatus: number | null = null;
     try {
       const response = await sendWebPush(subscription, payload, credentials);
-      const status = response.status;
+      responseStatus = response.status;
       await response.body?.cancel().catch(() => undefined);
-      if (status === 404 || status === 410) {
-        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id, userId } });
-        result.removed += 1;
-      } else if (status >= 200 && status < 300) {
-        await prisma.pushSubscription.updateMany({ where: { id: subscription.id, userId }, data: { lastSuccessAt: new Date() } });
-        result.sent += 1;
-      } else {
-        result.failed += 1;
-      }
     } catch {
-      result.failed += 1;
+      responseStatus = null;
     }
+
+    const now = new Date();
+    if (responseStatus !== null && responseStatus >= 200 && responseStatus < 300) {
+      await prisma.$transaction([
+        prisma.pushDeliveryAttempt.update({
+          where: { idempotencyKey },
+          data: { status: "sent", responseStatus, errorCode: null, nextAttemptAt: null, deliveredAt: now },
+        }),
+        prisma.pushSubscription.updateMany({
+          where: { id: subscription.id, userId },
+          data: { lastSuccessAt: now },
+        }),
+      ]);
+      result.sent += 1;
+      continue;
+    }
+
+    if (responseStatus === 404 || responseStatus === 410) {
+      await prisma.pushDeliveryAttempt.update({
+        where: { idempotencyKey },
+        data: { status: "removed", responseStatus, errorCode: "SUBSCRIPTION_GONE", nextAttemptAt: null },
+      });
+      await prisma.pushSubscription.deleteMany({ where: { id: subscription.id, userId } });
+      result.removed += 1;
+      continue;
+    }
+
+    const exhausted = attemptNumber >= MAX_PUSH_ATTEMPTS;
+    const nextAttemptAt = exhausted
+      ? null
+      : new Date(now.getTime() + Math.min(60 * 60 * 1000, 15_000 * (2 ** Math.min(attemptNumber - 1, 8))));
+    await prisma.pushDeliveryAttempt.update({
+      where: { idempotencyKey },
+      data: {
+        status: exhausted ? "failed" : "retry",
+        responseStatus,
+        errorCode: responseStatus === null ? "NETWORK_OR_CRYPTO_ERROR" : `HTTP_${responseStatus}`,
+        nextAttemptAt,
+      },
+    });
+    result.failed += 1;
   }
   return result;
 }
