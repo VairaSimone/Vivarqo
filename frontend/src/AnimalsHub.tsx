@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { Icon } from "./ui/Icon.jsx";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { Icon } from "./ui/Icon.tsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 
 const arrayOf = value => Array.isArray(value) ? value : [];
 const sexOptions = [["unknown", "Non specificato"], ["female", "Femmina"], ["male", "Maschio"]];
