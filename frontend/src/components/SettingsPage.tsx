@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../api/api.js";
 import { useConfirmDialog } from "../ui/ConfirmDialog.jsx";
 
@@ -78,6 +79,23 @@ function displayDefaults(user: SettingsUser): SettingsForm {
 
 export function SettingsPage({ user, onNotice }: SettingsPageProps) {
   const confirmAction = useConfirmDialog();
+  const queryClient = useQueryClient();
+  const profileQuery = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => apiRequest("auth/me"),
+    staleTime: 30_000,
+    retry: 0,
+  });
+  const saveMutation = useMutation({
+    mutationFn: (body: Record<string, unknown>) => apiRequest("account", { method: "PATCH", body }),
+    onSuccess: async (result) => {
+      if (result.user) {
+        queryClient.setQueryData(["auth", "me"], { user: result.user });
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      }
+    },
+  });
   const [deletionRequested, setDeletionRequested] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const {
@@ -89,6 +107,11 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
   const deletionForm = useForm<DeleteForm>({
     defaultValues: { currentPassword: "", confirmation: "" },
   });
+
+  useEffect(() => {
+    const latestUser = profileQuery.data?.user;
+    if (latestUser) reset(displayDefaults(latestUser));
+  }, [profileQuery.data, reset]);
 
   const save = async (values: SettingsForm) => {
     const body: Record<string, unknown> = {
@@ -113,7 +136,7 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
     }
 
     try {
-      const result = await apiRequest("account", { method: "PATCH", body });
+      const result = await saveMutation.mutateAsync(body);
       onNotice(result.message || "Impostazioni aggiornate.");
       if (result.user) reset(displayDefaults(result.user));
       else reset({ ...values, currentPassword: "", newPassword: "" });
@@ -160,13 +183,13 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
     </section>;
   }
 
-  const emailChanged = user.email !== undefined && user.email !== undefined;
-
   return <div className="advanced-stack">
     <section className="panel settings-panel">
       <p className="eyebrow">PROFILO E PREFERENZE</p>
       <h2>Impostazioni account</h2>
       <p className="subheading">Lingua, fuso orario, unità e visualizzazione vengono salvati sul tuo account.</p>
+      {profileQuery.isFetching && <p className="muted" role="status">Aggiornamento delle preferenze salvate…</p>}
+      {profileQuery.isError && <p className="muted">Non è stato possibile aggiornare il profilo dal server; puoi comunque modificare i valori già caricati.</p>
       <form className="form-grid" onSubmit={handleSubmit(save)}>
         <Field label="Nome visualizzato" {...register("displayName", { required: "Inserisci un nome.", maxLength: { value: 120, message: "Massimo 120 caratteri." } })} />
         <Field label="Email" type="email" autoComplete="email" {...register("email", { required: "Inserisci un indirizzo email.", maxLength: 254 })} />
