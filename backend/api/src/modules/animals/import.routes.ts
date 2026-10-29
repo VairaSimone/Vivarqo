@@ -310,7 +310,7 @@ export function createImportRouter() {
     });
   });
 
-  router.post("/:id/confirm", requireSession, async (req, res, next: NextFunction) => {
+  router.post("/:id/confirm", requireSession, persistentRateLimit(30, "import-confirm"), async (req, res, next: NextFunction) => {
     const userId = authId(res);
     const id = parseUuid(req.params.id!);
     const confirmSchema = z.object({ allowPossibleDuplicates: z.boolean().optional().default(false) }).strict();
