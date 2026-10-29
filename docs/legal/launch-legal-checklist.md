@@ -10,6 +10,7 @@ Questa lista richiede prove e decisioni dell'operatore; non deve essere chiusa s
 - [ ] DPA/sub-responsabili, regioni e possibili trasferimenti controllati per database, hosting, storage, email, Stripe, Sentry e backup.
 - [ ] Sicurezza art. 32 documentata: gestione segreti, TLS, cifratura dati/backup, access control, patching, logging, incident response e restore drill.
 - [ ] Cookie/storage audit su una sessione pulita; banner/pannello, rifiuto, consenso e revoca testati dove necessari.
+- [ ] Verificare l'uso di tracking pixel/open tracking nelle email (anche tramite il provider); il Garante ha pubblicato linee guida specifiche il 17 aprile 2026, pubblicate in G.U. il 29 aprile 2026. Disabilitare il tracking non necessario, oppure fornire informativa e valutare/ottenere il consenso preventivo quando richiesto; registrare anche la modalità di revoca. [Provvedimento Garante n. 284/2026](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/10241943).
 - [ ] Termini di servizio e prezzi verificati rispetto ai piani realmente attivi, inclusi trial, rinnovo, recesso, cancellazione, rimborsi e fatturazione.
 - [ ] Applicabilità DSA e altri obblighi per contenuti pubblici e condivisioni valutata; segnalazione e presa in carico implementate quando richiesto.
 - [ ] Stripe Test Mode completato e prove conservate; passaggio a Live controllato separatamente.
