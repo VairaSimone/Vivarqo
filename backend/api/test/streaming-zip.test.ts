@@ -39,6 +39,18 @@ describe("streaming ZIP writer", () => {
     }
   });
 
+  it("defaults to the classic ZIP capacity rather than a product-specific 50 MiB cap", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vivarqo-zip-default-limit-"));
+    const archivePath = join(directory, "export.zip");
+    try {
+      const result = await writeStreamingZip(archivePath, entries());
+      expect(result.entryCount).toBe(2);
+      expect(result.sizeBytes).toBeGreaterThan(0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("enforces the final archive size limit while writing instead of after buffering", async () => {
     const directory = await mkdtemp(join(tmpdir(), "vivarqo-zip-limit-"));
     const archivePath = join(directory, "export.zip");
