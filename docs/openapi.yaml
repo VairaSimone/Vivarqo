@@ -237,7 +237,6 @@ paths:
           description: Modifica email in attesa di verifica.
         '400':
           $ref: '#/components/responses/Error'
-  /api/v1/account:
     delete:
       tags: [Account]
       summary: Richiede la cancellazione self-service dell'account
