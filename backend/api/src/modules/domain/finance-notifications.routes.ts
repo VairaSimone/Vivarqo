@@ -63,6 +63,7 @@ export function createFinanceRouter() {
       pageSize: z.coerce.number().int().min(1).max(100).default(25),
       entryType: entryType.optional(),
       category: z.string().trim().max(80).optional(),
+      q: z.string().trim().max(160).optional(),
       from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       animalId: z.string().uuid().optional(),
@@ -78,6 +79,10 @@ export function createFinanceRouter() {
       ...(query.category ? { category: query.category } : {}),
       ...(query.animalId ? { animalId: query.animalId } : {}),
       ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}),
+      ...(query.q ? { OR: [
+        { description: { contains: query.q, mode: "insensitive" as const } },
+        { category: { contains: query.q, mode: "insensitive" as const } },
+      ] } : {}),
     };
     const [total, entries] = await Promise.all([
       prisma.financeEntry.count({ where }),
