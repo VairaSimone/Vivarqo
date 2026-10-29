@@ -166,6 +166,19 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await page.goto("/reproduction");
   await expect(page.getByRole("heading", { name: "Cicli riproduttivi" })).toBeVisible();
   await page.getByRole("tab", { name: "Covate, uova e incubazione" }).click();
+  await page.getByRole("button", { name: /Nuova covata/ }).click();
+  await page.getByLabel("Data deposizione").fill("2026-05-10");
+  await page.getByLabel("Numero uova").fill("2");
+  await page.getByLabel("Incubatrice / posizione").fill("Incubatrice E2E");
+  await page.getByRole("button", { name: "Salva covata", exact: true }).click();
+  await expect.poll(() => page.e2eState.clutches.length).toBe(2);
+
+  const newClutchCard = page.locator(".clutch-card").filter({ hasText: "Incubatrice E2E" });
+  await newClutchCard.getByRole("button", { name: "Modifica", exact: true }).click();
+  await page.getByLabel("Incubatrice / posizione").fill("Incubatrice E2E modificata");
+  await page.getByRole("button", { name: "Salva covata", exact: true }).click();
+  await expect.poll(() => page.e2eState.clutches.find(item => item.incubatorLabel === "Incubatrice E2E modificata")?.incubatorLabel).toBe("Incubatrice E2E modificata");
+
   await page.getByLabel("Quante uova").fill("2");
   await page.getByLabel("Prefisso codice (facoltativo)").fill("E2E");
   await page.getByRole("button", { name: "Aggiungi uova", exact: true }).click();
@@ -175,7 +188,7 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   const firstEggRow = page.locator("tr").filter({ hasText: "E2E-01" });
   await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).fill("E2E-01-M");
   await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).press("Enter");
-  await expect.poll(() => page.e2eState.eggs.find(item => item.id === "egg-1")?.code).toBe("E2E-01-M");
+  await expect.poll(() => page.e2eState.eggs.some(item => item.code === "E2E-01-M")).toBe(true);
 
   const secondEggRow = page.locator("tr").filter({ hasText: "E2E-02" });
   await secondEggRow.getByRole("button", { name: "Elimina", exact: true }).click();

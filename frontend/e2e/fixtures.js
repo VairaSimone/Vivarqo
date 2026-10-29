@@ -31,7 +31,17 @@ export async function mockApi(context) {
     devices: [{ id: "device-1", userAgent: "Chromium E2E", createdAt: "2026-10-28T10:00:00.000Z" }],
     requests: [], nextId: 1
   };
-  const nextId = prefix => prefix + "-" + String(state.nextId++);
+  const nextId = prefix => {
+    const collections = {
+      animal: state.animals, cycle: state.cycles, clutch: state.clutches, egg: state.eggs,
+      log: state.incubationLogs, batch: state.batches, doc: state.documents,
+      device: state.devices, session: state.sessions
+    };
+    const existing = collections[prefix] || [];
+    let id;
+    do { id = prefix + "-" + String(state.nextId++); } while (existing.some(item => item.id === id));
+    return id;
+  };
   const itemsResponse = (key, items) => ({ [key]: items, pagination: pagination(items) });
 
   await context.route("**/api/v1/**", async route => {
