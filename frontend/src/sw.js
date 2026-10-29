@@ -1,6 +1,6 @@
 import { clientsClaim } from "workbox-core";
-import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
-import { createHandlerBoundToURL, NavigationRoute, registerRoute } from "workbox-routing";
+import { createHandlerBoundToURL, cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
+import { NavigationRoute, registerRoute } from "workbox-routing";
 
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
