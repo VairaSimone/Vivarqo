@@ -46,6 +46,8 @@ function downloadQr(value, name) {
 
 export function DocumentsHub({ onNotice = () => {}, owner }) {
   const [documents, setDocuments] = useState([]);
+  const [documentsPage, setDocumentsPage] = useState(1);
+  const [documentsPagination, setDocumentsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [animals, setAnimals] = useState([]);
   const [cycles, setCycles] = useState([]);
   const [selectedAnimal, setSelectedAnimal] = useState("");
@@ -62,16 +64,17 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
 
   const loadLists = useCallback(async () => {
     const [docs, animalResponse, cycleResponse] = await Promise.all([
-      apiRequest("documents?page=1&pageSize=100"),
+      apiRequest("documents?page=" + documentsPage + "&pageSize=50"),
       apiRequest("animals?page=1&pageSize=100"),
       apiRequest("reproduction-cycles?page=1&pageSize=100")
     ]);
     setDocuments(arrayOf(docs.documents ?? docs));
+    setDocumentsPagination(docs.pagination || { page: documentsPage, pageSize: 50, total: arrayOf(docs.documents ?? docs).length, totalPages: 1 });
     const nextAnimals = arrayOf(animalResponse.animals ?? animalResponse);
     setAnimals(nextAnimals);
     setCycles(arrayOf(cycleResponse.cycles ?? cycleResponse));
     if (!selectedAnimal && nextAnimals.length) setSelectedAnimal(nextAnimals[0].id);
-  }, [selectedAnimal]);
+  }, [selectedAnimal, documentsPage]);
 
   const loadShare = useCallback(async id => {
     if (!id) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); return; }
@@ -95,7 +98,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   }, [loadLists, loadShare, selectedAnimal]);
 
-  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, []);
+  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, [loadLists]);
   useEffect(() => { void loadShare(selectedAnimal); }, [selectedAnimal, loadShare]);
   useEffect(() => {
     const changed = () => { void loadLists().catch(() => {}); if (selectedAnimal) void loadShare(selectedAnimal); };
@@ -176,6 +179,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
       </form>
       {documents.length === 0 ? <div className="empty-state"><h3>Nessun documento</h3><p>I documenti caricati compariranno qui e resteranno privati finché non li colleghi a una condivisione esplicita.</p></div> :
         <div className="table-wrap"><table><thead><tr><th>Nome file</th><th>Categoria</th><th>Dimensione</th><th>Data</th><th>Collegamento</th><th>Azioni</th></tr></thead><tbody>{documents.map(doc => <tr key={doc.id}><td><strong>{doc.originalFilename}</strong>{doc.note && <small className="table-subtext">{doc.note}</small>}</td><td>{doc.category}</td><td>{bytes(doc.sizeBytes)}</td><td>{displayDate(doc.createdAt)}</td><td>{animals.find(a => a.id === doc.animalId)?.name || cycles.find(c => c.id === doc.cycleId)?.name || (doc.animalId ? "Animale" : doc.cycleId ? "Ciclo riproduttivo" : "—")}</td><td><div className="inline-actions"><Button onClick={() => downloadPrivateDocument(doc.id, doc.originalFilename).catch(e => onNotice(e.message, "error"))}>Scarica</Button><Button onClick={() => editDocument(doc)}>Modifica</Button><Button variant="danger" onClick={() => removeDocument(doc)}>Elimina</Button></div></td></tr>)}</tbody></table></div>}
+      {documentsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {documentsPagination.page || documentsPage} di {documentsPagination.totalPages} · {documentsPagination.total} documenti</span><div className="inline-actions"><Button disabled={documentsPage <= 1 || busy} onClick={() => setDocumentsPage(p => p - 1)}>← Precedente</Button><Button disabled={documentsPage >= documentsPagination.totalPages || busy} onClick={() => setDocumentsPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>
 
     <section className="panel">

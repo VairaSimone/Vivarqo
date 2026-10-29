@@ -395,8 +395,12 @@ export function createReproductionRouter() {
 
   router.get("/offspring-batches", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const query = parseBody(pageSchema, req.query);
-    const where = { cycle: { is: { userId: auth.userId } } };
+    const query = parseBody(pageSchema.extend({ cycleId: z.string().uuid().optional() }), req.query);
+    if (query.cycleId) await ownedCycle(auth.userId, query.cycleId);
+    const where = {
+      cycle: { is: { userId: auth.userId } },
+      ...(query.cycleId ? { cycleId: query.cycleId } : {}),
+    };
     const [total, batches] = await Promise.all([
       prisma.offspringBatch.count({ where }),
       prisma.offspringBatch.findMany({

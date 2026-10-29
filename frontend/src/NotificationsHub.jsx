@@ -20,6 +20,8 @@ function isSupported() {
 
 export function NotificationsHub({ onNotice = () => {}, owner }) {
   const [notifications, setNotifications] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [unreadCount, setUnreadCount] = useState(0);
   const [preferences, setPreferences] = useState({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
   const [devices, setDevices] = useState([]);
@@ -28,11 +30,12 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
 
   const load = useCallback(async () => {
     const [notices, pref, subs] = await Promise.all([
-      apiRequest("notifications?page=1&pageSize=100"),
+      apiRequest("notifications?page=" + page + "&pageSize=50"),
       apiRequest("notification-preferences"),
       apiRequest("push-subscriptions")
     ]);
     setNotifications(arrayOf(notices.notifications ?? notices));
+    setPagination(notices.pagination || { page, pageSize: 50, total: arrayOf(notices.notifications ?? notices).length, totalPages: 1 });
     setUnreadCount(Number(notices.unreadCount || 0));
     const p = pref.preferences || {};
     const merged = Object.fromEntries(categories.map(([key]) => [key, p.categories?.[key] !== false]));
@@ -42,7 +45,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
       quietHoursStart: p.quietHoursStart || "", quietHoursEnd: p.quietHoursEnd || ""
     });
     setDevices(arrayOf(subs.subscriptions ?? subs));
-  }, []);
+  }, [page]);
 
   useEffect(() => { void load().catch(e => setError(e.message)); }, [load]);
   useEffect(() => {
@@ -158,6 +161,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
       {error && <p className="form-message" role="alert">{error}</p>}
       {notifications.length === 0 ? <div className="empty-state"><h3>Nessuna notifica</h3><p>Gli avvisi generati dal server appariranno in questa sezione.</p></div> :
         <div className="notice-list">{notifications.map(item => <article className={"notification-row " + (item.readAt ? "is-read" : "is-unread")} key={item.id}><span className="notification-dot">{item.readAt ? "✓" : "•"}</span><div className="notification-copy"><strong>{item.title}</strong><p>{item.body}</p><small>{item.category} · {dateTime(item.createdAt)}</small></div><div className="notification-actions">{item.targetPath && <a href={item.targetPath} className="text-link">Apri</a>}{!item.readAt && <Button onClick={() => markRead(item)}>Segna letta</Button>}</div></article>)}</div>}
+      {pagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {pagination.page || page} di {pagination.totalPages} · {pagination.total} notifiche</span><div className="inline-actions"><Button disabled={page <= 1 || busy} onClick={() => setPage(p => p - 1)}>← Precedente</Button><Button disabled={page >= pagination.totalPages || busy} onClick={() => setPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">PREFERENZE AVANZATE</p><h2>Come e quando ricevere avvisi</h2></div></div>

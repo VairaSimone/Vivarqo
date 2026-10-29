@@ -36,16 +36,28 @@ const eggStatuses = [["unknown", "Da valutare"], ["incubating", "In incubazione"
 
 export function ReproductionHub({ onNotice = () => {}, owner }) {
   const [cycles, setCycles] = useState([]);
+  const [cyclesPage, setCyclesPage] = useState(1);
+  const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [animals, setAnimals] = useState([]);
   const [cycleId, setCycleId] = useState("");
   const [cycle, setCycle] = useState(null);
   const [clutches, setClutches] = useState([]);
   const [events, setEvents] = useState([]);
+  const [eventsPage, setEventsPage] = useState(1);
+  const [eventsPagination, setEventsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+  const [clutchesPage, setClutchesPage] = useState(1);
+  const [clutchesPagination, setClutchesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+  const [batchesPage, setBatchesPage] = useState(1);
+  const [batchesPagination, setBatchesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [batches, setBatches] = useState([]);
   const [clutchId, setClutchId] = useState("");
   const [clutch, setClutch] = useState(null);
   const [eggs, setEggs] = useState([]);
+  const [eggsPage, setEggsPage] = useState(1);
+  const [eggsPagination, setEggsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [logs, setLogs] = useState([]);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPagination, setLogsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [editCycle, setEditCycle] = useState(null);
   const [editClutch, setEditClutch] = useState(null);
   const [editEvent, setEditEvent] = useState(null);
@@ -62,46 +74,72 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     return result;
   }, [owner, onNotice]);
 
+  const selectCycle = id => {
+    setCycleId(id);
+    setEventsPage(1); setClutchesPage(1); setBatchesPage(1);
+    setClutchId(""); setEggsPage(1); setLogsPage(1);
+  };
+
   const loadLists = useCallback(async () => {
+    const batchQuery = new URLSearchParams({ page: String(batchesPage), pageSize: "50" });
+    if (cycleId) batchQuery.set("cycleId", cycleId);
     const [cycleResult, animalResult, batchResult] = await Promise.all([
-      apiRequest("reproduction-cycles?page=1&pageSize=100"),
+      apiRequest("reproduction-cycles?page=" + cyclesPage + "&pageSize=50"),
       apiRequest("animals?page=1&pageSize=100"),
-      apiRequest("offspring-batches?page=1&pageSize=100")
+      apiRequest("offspring-batches?" + batchQuery.toString())
     ]);
     const nextCycles = arrayOf(cycleResult.cycles ?? cycleResult);
+    const nextBatches = arrayOf(batchResult.offspringBatches ?? batchResult);
     setCycles(nextCycles);
+    setCyclesPagination(cycleResult.pagination || { page: cyclesPage, pageSize: 50, total: nextCycles.length, totalPages: 1 });
     setAnimals(arrayOf(animalResult.animals ?? animalResult));
-    setBatches(arrayOf(batchResult.offspringBatches ?? batchResult));
+    setBatches(nextBatches);
+    setBatchesPagination(batchResult.pagination || { page: batchesPage, pageSize: 50, total: nextBatches.length, totalPages: 1 });
     if (!cycleId && nextCycles.length) setCycleId(nextCycles[0].id);
-    if (cycleId && !nextCycles.some(item => item.id === cycleId)) setCycleId(nextCycles[0]?.id || "");
-  }, [cycleId]);
+  }, [cycleId, cyclesPage, batchesPage]);
 
   const loadCycle = useCallback(async (id = cycleId) => {
     if (!id) {
       setCycle(null); setClutches([]); setEvents([]); setClutchId(""); setBatches([]);
+      setEventsPagination({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+      setClutchesPagination({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
       return;
     }
-    const response = await apiRequest("reproduction-cycles/" + id);
-    const value = response.cycle;
+    const [detail, eventResponse, clutchResponse] = await Promise.all([
+      apiRequest("reproduction-cycles/" + id),
+      apiRequest("reproduction-cycles/" + id + "/events?page=" + eventsPage + "&pageSize=50"),
+      apiRequest("reproduction-cycles/" + id + "/clutches?page=" + clutchesPage + "&pageSize=50")
+    ]);
+    const value = detail.cycle;
+    const nextEvents = arrayOf(eventResponse.events ?? eventResponse);
+    const nextClutches = arrayOf(clutchResponse.clutches ?? clutchResponse);
     setCycle(value);
-    setClutches(arrayOf(value?.clutches));
-    setEvents(arrayOf(value?.events));
-    setBatches(arrayOf(value?.offspringBatches));
-    if (clutchId && !arrayOf(value?.clutches).some(item => item.id === clutchId)) setClutchId("");
-    else if (!clutchId && arrayOf(value?.clutches).length) setClutchId(arrayOf(value.clutches)[0].id);
-  }, [cycleId, clutchId]);
+    setClutches(nextClutches);
+    setEvents(nextEvents);
+    setEventsPagination(eventResponse.pagination || { page: eventsPage, pageSize: 50, total: nextEvents.length, totalPages: 1 });
+    setClutchesPagination(clutchResponse.pagination || { page: clutchesPage, pageSize: 50, total: nextClutches.length, totalPages: 1 });
+    if (!clutchId && nextClutches.length) setClutchId(nextClutches[0].id);
+  }, [cycleId, clutchId, eventsPage, clutchesPage]);
 
   const loadClutch = useCallback(async (id = clutchId) => {
-    if (!id) { setClutch(null); setEggs([]); setLogs([]); return; }
+    if (!id) {
+      setClutch(null); setEggs([]); setLogs([]);
+      setEggsPagination({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+      setLogsPagination({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+      return;
+    }
     const [detail, eggResult, logResult] = await Promise.all([
       apiRequest("clutches/" + id),
-      apiRequest("clutches/" + id + "/eggs?page=1&pageSize=100"),
-      apiRequest("clutches/" + id + "/incubation-logs?page=1&pageSize=100")
+      apiRequest("clutches/" + id + "/eggs?page=" + eggsPage + "&pageSize=50"),
+      apiRequest("clutches/" + id + "/incubation-logs?page=" + logsPage + "&pageSize=50")
     ]);
+    const nextEggs = arrayOf(eggResult.eggs ?? eggResult);
+    const nextLogs = arrayOf(logResult.logs ?? logResult);
     setClutch(detail.clutch);
-    setEggs(arrayOf(eggResult.eggs ?? eggResult));
-    setLogs(arrayOf(logResult.logs ?? logResult));
-  }, [clutchId]);
+    setEggs(nextEggs); setLogs(nextLogs);
+    setEggsPagination(eggResult.pagination || { page: eggsPage, pageSize: 50, total: nextEggs.length, totalPages: 1 });
+    setLogsPagination(logResult.pagination || { page: logsPage, pageSize: 50, total: nextLogs.length, totalPages: 1 });
+  }, [clutchId, eggsPage, logsPage]);
 
   const refresh = useCallback(async () => {
     setError(""); setBusy(true);
@@ -110,9 +148,9 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   }, [cycleId, loadLists, loadCycle]);
 
-  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, []);
-  useEffect(() => { void loadCycle(cycleId).catch(e => setError(e.message)); }, [cycleId]);
-  useEffect(() => { void loadClutch(clutchId).catch(e => setError(e.message)); }, [clutchId]);
+  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, [loadLists]);
+  useEffect(() => { void loadCycle(cycleId).catch(e => setError(e.message)); }, [loadCycle]);
+  useEffect(() => { void loadClutch(clutchId).catch(e => setError(e.message)); }, [loadClutch]);
   useEffect(() => {
     const changed = () => { void loadLists().then(() => loadCycle()).catch(() => {}); };
     window.addEventListener("vivarqo:offline-queue-changed", changed);
@@ -133,7 +171,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       setEditCycle(null);
       await loadLists();
       const created = response.cycle;
-      if (created?.id) setCycleId(created.id);
+      if (created?.id) { setCyclesPage(1); selectCycle(created.id); }
       await loadCycle(created?.id || cycleId);
     } catch (err) { onNotice(err.message, "error"); }
   };
@@ -142,7 +180,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
       if (result.queuedOffline) return;
-      if (cycleId === item.id) { setCycleId(""); setClutchId(""); }
+      if (cycleId === item.id) { setCycleId(""); setClutchId(""); setEventsPage(1); setClutchesPage(1); setBatchesPage(1); }
       await loadLists();
     } catch (err) { onNotice(err.message, "error"); }
   };
@@ -180,7 +218,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       }, "Covata");
       if (response.queuedOffline) { setEditClutch(null); return; }
       setEditClutch(null);
-      if (response.clutch?.id) setClutchId(response.clutch.id);
+      if (response.clutch?.id) { setClutchId(response.clutch.id); setEggsPage(1); setLogsPage(1); }
       await loadCycle();
     } catch (err) { onNotice(err.message, "error"); }
   };
@@ -291,9 +329,10 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       {busy && <p className="muted">Caricamento dati riproduttivi…</p>}
       {cycles.length === 0 ? <div className="empty-state"><h3>Nessun ciclo registrato</h3><p>Crea un ciclo per collegare genitori, eventi, covate e piccoli.</p></div> :
         <div className="cycle-grid">{cycles.map(item => <article className={"cycle-card " + (item.id === cycleId ? "selected" : "")} key={item.id}>
-          <button className="cycle-select" onClick={() => setCycleId(item.id)}><strong>{item.name || "Ciclo senza nome"}</strong><span>{prettyDate(item.startedOn)} · {val(item, "status")}</span><small>{item.parentA?.name || animals.find(a => a.id === item.parentAAnimalId)?.name || "Genitore A non assegnato"} × {item.parentB?.name || animals.find(a => a.id === item.parentBAnimalId)?.name || "Genitore B non assegnato"}</small><small>{item._count?.clutches ?? 0} covate · {item._count?.events ?? 0} eventi · {item._count?.offspringBatches ?? 0} registri piccoli</small></button>
+          <button className="cycle-select" onClick={() => selectCycle(item.id)}><strong>{item.name || "Ciclo senza nome"}</strong><span>{prettyDate(item.startedOn)} · {val(item, "status")}</span><small>{item.parentA?.name || animals.find(a => a.id === item.parentAAnimalId)?.name || "Genitore A non assegnato"} × {item.parentB?.name || animals.find(a => a.id === item.parentBAnimalId)?.name || "Genitore B non assegnato"}</small><small>{item._count?.clutches ?? 0} covate · {item._count?.events ?? 0} eventi · {item._count?.offspringBatches ?? 0} registri piccoli</small></button>
           <div className="inline-actions"><Action onClick={() => setEditCycle(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteCycle(item)}>Elimina</Action></div>
         </article>)}</div>}
+      {cyclesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {cyclesPagination.page || cyclesPage} di {cyclesPagination.totalPages} · {cyclesPagination.total} cicli</span><div className="inline-actions"><Action disabled={cyclesPage <= 1} onClick={() => setCyclesPage(p => p - 1)}>← Precedente</Action><Action disabled={cyclesPage >= cyclesPagination.totalPages} onClick={() => setCyclesPage(p => p + 1)}>Successiva →</Action></div></div>}
       {editCycle && <div className="embedded-form"><form className="form-grid" onSubmit={submitCycle}>
         <h3 className="form-full">{editCycle.id ? "Modifica ciclo" : "Nuovo ciclo"}</h3>
         <Input label="Nome del ciclo" name="name" defaultValue={cycleForForm.name} placeholder="Es. Riproduzione 2026"/>
@@ -324,6 +363,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <div className="form-actions form-full"><Action type="button" onClick={() => setEditEvent(null)}>Annulla</Action><Action variant="primary">Salva evento</Action></div>
         </form></div>}
         {events.length === 0 ? <p className="muted">Nessun evento registrato per questo ciclo.</p> : <div className="table-wrap"><table><thead><tr><th>Quando</th><th>Evento</th><th>Animale</th><th>Dettagli</th><th>Azioni</th></tr></thead><tbody>{events.map(item => <tr key={item.id}><td>{prettyDate(item.occurredAt)}</td><td>{eventTypes.find(o => o[0] === item.eventType)?.[1] || item.eventType}</td><td>{item.animal?.name || "—"}</td><td>{item.details || "—"}</td><td><div className="inline-actions"><Action onClick={() => setEditEvent(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteEvent(item)}>Elimina</Action></div></td></tr>)}</tbody></table></div>}
+      {eventsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eventsPagination.page || eventsPage} di {eventsPagination.totalPages} · {eventsPagination.total} eventi</span><div className="inline-actions"><Action disabled={eventsPage <= 1} onClick={() => setEventsPage(p => p - 1)}>← Precedente</Action><Action disabled={eventsPage >= eventsPagination.totalPages} onClick={() => setEventsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
 
       <section className="panel">
@@ -341,9 +381,10 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <div className="form-actions form-full"><Action type="button" onClick={() => setEditClutch(null)}>Annulla</Action><Action variant="primary">Salva covata</Action></div>
         </form></div>}
         {clutches.length === 0 ? <p className="muted">Nessuna covata collegata a questo ciclo.</p> : <div className="clutch-grid">{clutches.map(item => <article key={item.id} className={"clutch-card " + (item.id === clutchId ? "selected" : "")}>
-          <button className="cycle-select" onClick={() => setClutchId(item.id)}><strong>{prettyDate(item.laidOn)} · {item.eggCount} uova</strong><span>{item.status} · {item.incubatorLabel || "Incubatrice non indicata"}</span><small>{item._count?.eggs ?? 0} uova registrate · {item._count?.incubationLogs ?? 0} controlli</small></button>
+          <button className="cycle-select" onClick={() => { setClutchId(item.id); setEggsPage(1); setLogsPage(1); }}><strong>{prettyDate(item.laidOn)} · {item.eggCount} uova</strong><span>{item.status} · {item.incubatorLabel || "Incubatrice non indicata"}</span><small>{item._count?.eggs ?? 0} uova registrate · {item._count?.incubationLogs ?? 0} controlli</small></button>
           <div className="inline-actions"><Action onClick={() => setEditClutch(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteClutch(item)}>Elimina</Action></div>
         </article>)}</div>}
+      {clutchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {clutchesPagination.page || clutchesPage} di {clutchesPagination.totalPages} · {clutchesPagination.total} covate</span><div className="inline-actions"><Action disabled={clutchesPage <= 1} onClick={() => setClutchesPage(p => p - 1)}>← Precedente</Action><Action disabled={clutchesPage >= clutchesPagination.totalPages} onClick={() => setClutchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
 
       {clutch && <section className="panel">
@@ -360,6 +401,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         </form></div>
         {eggs.length === 0 ? <p className="muted">Nessun uovo tracciato singolarmente. Il conteggio della covata rimane separato dalle schede individuali.</p> : <div className="table-wrap"><table><thead><tr><th>Codice</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead><tbody>{eggs.map(egg => <tr key={egg.id}><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><input className="compact-input" name="code" defaultValue={egg.code || ""} placeholder="Codice"/></form></td><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><select name="status" defaultValue={egg.status}>{eggStatuses.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></form></td><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><input className="compact-input" name="notes" defaultValue={egg.notes || ""} placeholder="Note"/></form></td><td><div className="inline-actions"><Action onClick={e => { const row = e.currentTarget.closest("tr"); const forms = row.querySelectorAll("form"); const values = Object.fromEntries(Array.from(new FormData(forms[0]).entries())); const status = forms[1].querySelector("select").value; const notes = forms[2].querySelector("input").value; void api("eggs/" + egg.id, { method: "PATCH", body: { code: nullable(values.code), status, notes: nullable(notes) } }, "Modifica uovo").then(r => { if (!r.queuedOffline) loadClutch(); }).catch(err => onNotice(err.message, "error")); }}>Salva</Action><Action variant="danger" onClick={() => deleteEgg(egg)}>Elimina</Action></div></td></tr>)}</tbody></table></div>}
 
+        {eggsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eggsPagination.page || eggsPage} di {eggsPagination.totalPages} · {eggsPagination.total} uova</span><div className="inline-actions"><Action disabled={eggsPage <= 1} onClick={() => setEggsPage(p => p - 1)}>← Precedente</Action><Action disabled={eggsPage >= eggsPagination.totalPages} onClick={() => setEggsPage(p => p + 1)}>Successiva →</Action></div></div>}
         <SectionTitle eyebrow="CONTROLLI AMBIENTALI" title="Registro incubazione"/>
         <div className="embedded-form"><form className="form-grid" onSubmit={addIncubationLog}>
           <Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime()} required/>
@@ -370,6 +412,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <div className="form-actions form-full"><Action variant="primary">Registra controllo</Action></div>
         </form></div>
         {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{log.temperatureC ?? "—"} °C · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label="Temperatura °C" name="temperatureC" type="number" step="0.1" defaultValue={log.temperatureC}/><Input label="Umidità %" name="humidityPct" type="number" min="0" max="100" step="0.1" defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
+        {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>← Precedente</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>}
 
       <section className="panel">
@@ -383,6 +426,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <div className="form-actions form-full"><Action variant="primary">Registra lotto</Action></div>
         </form></div>
         {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {clutches.find(c => c.id === batch.clutchId) ? prettyDate(clutches.find(c => c.id === batch.clutchId).laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min="0" max="10000" defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>)}</div>}
+        {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>← Precedente</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
     </>}
   </div>;
