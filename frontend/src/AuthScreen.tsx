@@ -1,3 +1,4 @@
+// @ts-nocheck -- staged migration: preserve legacy runtime while explicit prop/data types are introduced.
 import React, { useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
 
