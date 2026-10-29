@@ -281,7 +281,7 @@ export function ReproductionHub({ onNotice = () => {}, owner, temperatureUnit = 
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
-      temperatureC: v.temperatureC === "" ? null : Number(v.temperatureC),
+      temperatureC: v.temperatureC === "" ? null : toCelsius(v.temperatureC, temperatureUnit),
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
@@ -292,7 +292,7 @@ export function ReproductionHub({ onNotice = () => {}, owner, temperatureUnit = 
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
-      temperatureC: v.temperatureC === "" ? null : Number(v.temperatureC),
+      temperatureC: v.temperatureC === "" ? null : toCelsius(v.temperatureC, temperatureUnit),
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
