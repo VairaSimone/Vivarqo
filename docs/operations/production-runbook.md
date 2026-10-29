@@ -77,11 +77,15 @@ La CI non usa credenziali Stripe reali e quindi non prova il checkout esterno. P
 5. confrontare dashboard Stripe test e DB locale per customer/subscription/price/status; controllare anche past_due, unpaid, paused e account senza subscription quando applicabili;
 6. conservare run ID, event ID non sensibili, timestamp, screenshot oscurati e risultati. Non inserire segreti o dati di carta nel report.
 
-## 6. Sentry
+## 6. Email transazionali e tracking pixel
+
+Verificare nella console del provider email e nelle impostazioni del dominio se vengono inseriti pixel per open/read tracking o link-tracking. Disabilitare il monitoraggio delle aperture nelle email transazionali se non è necessario. Se si vuole utilizzare pixel per misurazione o personalizzazione, rendere visibile la finalità e valutare la base legale/il consenso preventivo e la revoca, in linea con il provvedimento del Garante del 17 aprile 2026 (Doc. web 10241943, pubblicato in G.U. il 29 aprile 2026): https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/10241943. Registrare screenshot/configurazione del provider come evidenza.
+
+## 7. Sentry
 
 Configurare un progetto Sentry per ogni ambiente con SENTRY_DSN. Verificare un errore controllato su staging e accertarsi che il progetto riceva evento, environment e release corretti. Controllare che request bodies, cookie, Authorization, query string e altri dati identificanti non siano trasmessi; mantenere i filtri e limitare accesso, retention e export degli eventi.
 
-## 7. Incidenti e continuità
+## 8. Incidenti e continuità
 
 Prima del lancio assegnare ruoli e contatti per DB/provider, sicurezza, privacy e comunicazioni. Definire escalation, conservazione delle evidenze, procedura per credenziali compromesse, valutazione breach, comunicazione al titolare e, se applicabile, notifica agli interessati/autorità. Stabilire e testare un piano di indisponibilità DB/storage/email/Stripe, e una procedura di rollback per l'API e il frontend.
 
