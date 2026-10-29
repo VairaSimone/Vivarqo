@@ -54,7 +54,7 @@ export async function mockApi(context) {
     if (headers["content-type"]?.includes("application/json")) {
       try { body = request.postDataJSON() || {}; } catch { body = {}; }
     }
-    state.requests.push({ path, method, body });
+    state.requests.push({ path, method, body, query: url.searchParams.toString() });
     const respond = (payload = {}, status = 200) => route.fulfill({
       status, contentType: "application/json; charset=utf-8", body: JSON.stringify(payload)
     });
