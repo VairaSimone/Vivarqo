@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { Icon } from "./ui/Icon.jsx";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { Icon } from "./ui/Icon.tsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 
 const CATEGORIES = [["feeding", "Alimentazione"], ["weighing", "Peso"], ["shed_check", "Muta"], ["cleaning", "Pulizia"], ["reproduction", "Riproduzione"], ["document", "Documenti"], ["inventory", "Inventario"], ["custom", "Altro"]];
 const pad = value => String(value).padStart(2, "0");
