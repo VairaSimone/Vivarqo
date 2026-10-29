@@ -92,14 +92,22 @@ export async function processAccountDeletion(userId: string): Promise<void> {
         ],
       },
     });
-    await tx.egg.deleteMany({ where: { clutch: { is: { cycle: { is: { userId } } } } });
-    await tx.incubationLog.deleteMany({ where: { clutch: { is: { cycle: { is: { userId } } } } });
+    await tx.egg.deleteMany({
+      where: { clutch: { is: { cycle: { is: { userId } } } } },
+    });
+    await tx.incubationLog.deleteMany({
+      where: { clutch: { is: { cycle: { is: { userId } } } } },
+    });
     await tx.animal.updateMany({
       where: { userId },
       data: { originClutchId: null, originOffspringBatchId: null },
     });
-    await tx.offspringBatch.deleteMany({ where: { cycle: { is: { userId } } });
-    await tx.clutch.deleteMany({ where: { cycle: { is: { userId } } });
+    await tx.offspringBatch.deleteMany({
+      where: { cycle: { is: { userId } } },
+    });
+    await tx.clutch.deleteMany({
+      where: { cycle: { is: { userId } } },
+    });
     await tx.reproductionCycle.deleteMany({ where: { userId } });
     await tx.animalGeneticTrait.deleteMany({
       where: {
@@ -109,7 +117,9 @@ export async function processAccountDeletion(userId: string): Promise<void> {
         ],
       },
     });
-    await tx.stockMovement.deleteMany({ where: { item: { is: { userId } } });
+    await tx.stockMovement.deleteMany({
+      where: { item: { is: { userId } } },
+    });
     await tx.document.deleteMany({ where: { userId } });
     await tx.feedingSession.deleteMany({ where: { userId } });
     await tx.animal.deleteMany({ where: { userId } });
