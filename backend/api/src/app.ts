@@ -119,7 +119,10 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
   app.use("/api/v1", createBillingRouter(dependencies.billing));
-  app.use("/api/v1/exports", createExportRouter());
+  const exportRouter = createExportRouter();
+  app.use("/api/v1/exports", exportRouter);
+  // Compatibility route required by the product specification; both paths share capacity controls.
+  app.use("/api/v1/account/export", exportRouter);
 
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok", requestId: res.locals.requestId });
