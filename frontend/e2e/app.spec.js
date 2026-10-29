@@ -91,10 +91,10 @@ test("animali: i filtri avanzati e l'ordinamento raggiungono l'API", async ({ pa
   await page.goto("/animals");
   await page.getByText("Filtri avanzati e ordinamento", { exact: true }).click();
   await page.getByLabel("Specie", { exact: true }).fill("Python regius");
-  await page.getByLabel("Sesso", { exact: true }).selectOption("female");
+  await page.getByLabel("Filtra per sesso", { exact: true }).selectOption("female");
   await page.getByLabel("Morph", { exact: true }).fill("Pastel");
   await page.getByLabel("Posizione / stabulazione", { exact: true }).fill("Rack 2");
-  await page.getByLabel("Ordina per", { exact: true }).selectOption("name");
+  await page.getByLabel("Ordina elenco animali", { exact: true }).selectOption("name");
   await page.getByRole("button", { name: "Applica filtri", exact: true }).click();
 
   await expect.poll(() => page.e2eState.requests.some(request => {
