@@ -42,6 +42,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [cycleId, setCycleId] = useState("");
+  const [detailTab, setDetailTab] = useState("events");
   const [cycle, setCycle] = useState(null);
   const [clutches, setClutches] = useState([]);
   const [events, setEvents] = useState([]);
@@ -78,6 +79,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
 
   const selectCycle = id => {
     setCycleId(id);
+    setDetailTab("events");
     setEventsPage(1); setClutchesPage(1); setBatchesPage(1);
     setClutchId(""); setEggsPage(1); setLogsPage(1);
   };
@@ -359,7 +361,10 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     </section>
 
     {!cycle ? null : <>
-      <section className="panel">
+      <div className="reproduction-detail-tabs" role="tablist" aria-label="Sezioni del ciclo riproduttivo">
+        {[["events","Eventi e osservazioni"],["clutches","Covate, uova e incubazione"],["offspring","Piccoli e nascite"]].map(([id,label])=><button key={id} type="button" role="tab" aria-selected={detailTab===id} className={"tab-button "+(detailTab===id?"active":"")} onClick={()=>setDetailTab(id)}>{label}</button>)}
+      </div>
+      <section className={"panel reproduction-detail-section "+(detailTab==="events"?"":"is-hidden")}>
         <SectionTitle eyebrow="EVENTI DEL CICLO" title={cycle.name || "Dettaglio ciclo"}>
           <Action onClick={() => setEditEvent({})}>＋ Evento</Action>
         </SectionTitle>
@@ -378,7 +383,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       {eventsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eventsPagination.page || eventsPage} di {eventsPagination.totalPages} · {eventsPagination.total} eventi</span><div className="inline-actions"><Action disabled={eventsPage <= 1} onClick={() => setEventsPage(p => p - 1)}>← Precedente</Action><Action disabled={eventsPage >= eventsPagination.totalPages} onClick={() => setEventsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
 
-      <section className="panel">
+      <section className={"panel reproduction-detail-section "+(detailTab==="clutches"?"":"is-hidden")}>
         <SectionTitle eyebrow="DEPOSIZIONI" title="Covate">
           <Action onClick={() => setEditClutch({})}>＋ Nuova covata</Action>
         </SectionTitle>
@@ -427,7 +432,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>← Precedente</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>}
 
-      <section className="panel">
+      <section className={"panel reproduction-detail-section "+(detailTab==="offspring"?"":"is-hidden")}>
         <SectionTitle eyebrow="NASCITA E CRESCITA" title="Piccoli e lotti di nascita"/>
         <div className="embedded-form"><form className="form-grid" onSubmit={createBatch}>
           <h3 className="form-full">Registra un lotto di piccoli</h3>
