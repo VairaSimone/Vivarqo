@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { apiRequest } from "../api/api.js";
-import { Icon } from "../ui/Icon.jsx";
+import { Icon } from "../ui/Icon.tsx";
 
 const asArray = data => Array.isArray(data) ? data : Object.values(data ?? {}).find(Array.isArray) ?? [];
 const value = (obj, keys, fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
