@@ -369,3 +369,4 @@ input,select,textarea { min-height: 40px; }
 .record-filter-drawer>summary{cursor:pointer;color:var(--green-dark);font-size:12px;font-weight:700}
 .record-filter-drawer[open]>summary{margin-bottom:14px}
 .record-filter-drawer>form{padding:0 0 2px}
+.pwa-update-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.pwa-update-notice .button{flex:0 0 auto}
