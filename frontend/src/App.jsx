@@ -1,208 +1,97 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { apiRequest, apiUpload } from "./api/api.js";
 
-const navigation = [
-  { id: "Home", label: "Home", icon: "⌂" },
-  { id: "Animali", label: "Animali", icon: "♧" },
-  { id: "Alimentazioni", label: "Alimentazioni", icon: "◉" },
-  { id: "Riproduzioni", label: "Riproduzioni", icon: "✳" },
-  { id: "Inventario", label: "Inventario", icon: "▤" }
+const NAV = [
+  ["oggi","Oggi","⌂","Panoramica e attività in scadenza"],
+  ["animali","Animali","♧","Anagrafica e schede individuali"],
+  ["alimentazioni","Alimentazioni","◉","Sessioni e storico dei pasti"],
+  ["cure","Peso, mute e note","＋","Registri di cura e osservazioni"],
+  ["attivita","Attività e calendario","◷","Promemoria, attività e scadenze"],
+  ["riproduzioni","Riproduzioni","✳","Cicli, covate, uova e piccoli"],
+  ["inventario","Inventario","▤","Scorte, movimenti e soglie"],
+  ["documenti","Documenti e QR","▧","Documenti e condivisioni pubbliche"],
+  ["genetica","Morph e genetica","◈","Tratti genetici e storico"],
+  ["finanze","Registro economico","€","Entrate e uscite gestionali"],
+  ["notifiche","Notifiche","♧","Avvisi e preferenze push"],
+  ["dati","Importa ed esporta","⇄","Portabilità dei tuoi dati"],
+  ["abbonamento","Abbonamento","◇","Stato e gestione del piano"],
+  ["guide","Guide e tutorial","?","Guide dettagliate sito e PWA"],
+  ["impostazioni","Impostazioni","⚙","Profilo, lingua e sicurezza"]
 ];
+const API = {
+  oggi: "home/today", animali:"animals?page=1&pageSize=50", alimentazioni:"feeding-sessions?page=1&pageSize=50",
+  peso:"weights?page=1&pageSize=50", mute:"sheds?page=1&pageSize=50", note:"notes?page=1&pageSize=50",
+  attivita:"tasks?page=1&pageSize=50", riproduzioni:"reproduction/cycles?page=1&pageSize=50",
+  inventario:"inventory/items?page=1&pageSize=50", documenti:"documents?page=1&pageSize=50",
+  genetica:"genetic-traits", finanze:"finance/entries?page=1&pageSize=50", notifiche:"notifications?page=1&pageSize=50",
+  abbonamento:"billing/subscription"
+};
+const TITLES = Object.fromEntries(NAV.map(([id,label])=>[id,label]));
+const asArray = (data) => Array.isArray(data) ? data : Object.values(data ?? {}).find(Array.isArray) ?? [];
+const value = (obj, keys, fallback="—") => { for (const k of keys) if (obj?.[k] !== undefined && obj?.[k] !== null && obj?.[k] !== "") return obj[k]; return fallback; };
+const date = (v) => { if (!v || v==="—") return "—"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):new Intl.DateTimeFormat("it-IT",{dateStyle:"medium"}).format(d); };
+const money = (v) => { const n=Number(v); return Number.isFinite(n)?new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(n>10000?n/100:n):"—"; };
 
-const todayTasks = [
-  { time: "09:00", title: "Controllo temperature", detail: "Rack principali", tag: "Routine", tone: "sage" },
-  { time: "11:30", title: "Registrare le alimentazioni", detail: "3 animali in programma", tag: "Alimentazione", tone: "amber" },
-  { time: "16:00", title: "Verificare incubatrice", detail: "Covata VB-024", tag: "Riproduzione", tone: "lavender" }
-];
+function Brand(){return <a className="brand" href="#oggi" aria-label="Vivarqo, Oggi"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a>;}
+function Button({children,variant="",...props}){return <button className={"button "+variant} {...props}>{children}</button>;}
+function Field({label,...props}){return <label className="field"><span>{label}</span><input {...props}/></label>;}
+function SelectField({label,children,...props}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>;}
+function Notice({notice}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{notice.text}</div>:null;}
 
-function ApiStatus() {
-  const [status, setStatus] = useState("checking");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/readyz", { signal: controller.signal, credentials: "include" })
-      .then((response) => setStatus(response.ok ? "online" : "offline"))
-      .catch((error) => {
-        if (error.name !== "AbortError") setStatus("offline");
-      });
-    return () => controller.abort();
-  }, []);
-
-  const labels = {
-    checking: "Verifica API…",
-    online: "API collegata",
-    offline: "API non raggiungibile"
-  };
-
-  return (
-    <span className={`api-status api-status--${status}`} role="status">
-      <span className="status-dot" aria-hidden="true" />
-      {labels[status]}
-    </span>
-  );
+function AuthScreen({onLogin}) {
+ const [mode,setMode]=useState("login"),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const submit=async(e)=>{e.preventDefault();setBusy(true);setError("");const f=new FormData(e.currentTarget);const body=Object.fromEntries(f.entries());try{const path=mode==="login"?"auth/login":mode==="register"?"auth/register":mode==="forgot"?"auth/forgot-password":"auth/resend-verification";await apiRequest(path,{method:"POST",body});if(mode==="login")await onLogin();else setError(mode==="register"?"Account creato. Controlla la tua email per verificare l’indirizzo.":"Se l’indirizzo è registrato, riceverai le istruzioni via email.");}catch(err){setError(err.message||"Operazione non riuscita.");}finally{setBusy(false);}};
+ return <main className="auth-wrap"><div className="auth-art"><Brand/><p className="eyebrow">IL GESTIONALE PER ALLEVATORI</p><h1>Più cura.<br/><em>Meno fogli.</em></h1><p>Animali, alimentazioni, documenti e riproduzioni: tutto in un unico spazio, pensato anche per il telefono.</p><div className="auth-leaf">❧</div></div><section className="auth-card"><div className="auth-card-head"><p className="eyebrow">BENTORNATO</p><h2>{mode==="login"?"Accedi a Vivarqo":mode==="register"?"Crea il tuo account":"Recupera l’accesso"}</h2><p>I tuoi registri restano privati e collegati al tuo account.</p></div><form className="form-stack" onSubmit={submit}>{mode==="register"&&<Field label="Nome visualizzato" name="displayName" autoComplete="name" required maxLength="120"/>}{mode!=="forgot"&&<Field label="Email" name="email" type="email" autoComplete="email" required maxLength="254"/>}{(mode==="login"||mode==="register")&&<Field label="Password" name="password" type="password" autoComplete={mode==="login"?"current-password":"new-password"} required minLength={mode==="register"?12:1}/ >}{mode==="forgot"&&<p className="muted">Ti invieremo le istruzioni se l’indirizzo è associato a un account.</p>}<Button disabled={busy}>{busy?"Attendi…":mode==="login"?"Accedi":mode==="register"?"Crea account":"Invia istruzioni"}</Button></form>{error&&<p className="form-message">{error}</p>}<div className="auth-links">{mode!=="login"&&<button onClick={()=>{setMode("login");setError("");}}>Torna all’accesso</button>}{mode==="login"&&<><button onClick={()=>setMode("forgot")}>Password dimenticata?</button><button onClick={()=>setMode("register")}>Crea un account</button></>}</div><p className="tiny">Registrandoti dichiari di aver letto l’informativa privacy e le condizioni applicabili pubblicate dal gestore.</p></section></main>;
 }
 
-function StatCard({ label, value, caption, icon, accent }) {
-  return (
-    <article className={`stat-card stat-card--${accent}`}>
-      <div className="stat-card__top">
-        <span className="stat-card__label">{label}</span>
-        <span className="stat-card__icon" aria-hidden="true">{icon}</span>
-      </div>
-      <strong className="stat-card__value">{value}</strong>
-      <span className="stat-card__caption">{caption}</span>
-    </article>
-  );
+function LoginGuard({children,onLogout}){return <>{children}</>;}
+
+function Tutorial({pwa=false}){return <div className="tutorial-grid"><article className="tutorial-card"><span className="step">01</span><h3>{pwa?"Installa sul dispositivo":"Completa il profilo"}</h3><p>{pwa?"Apri Vivarqo con Chrome o Edge su Android/desktop oppure usa Condividi → Aggiungi alla schermata Home su iPhone. Su iOS la voce può chiamarsi “Aggiungi alla schermata Home”.":"Accedi, completa nome, lingua e fuso orario. La sessione è gestita dal server: non condividere il dispositivo se non hai effettuato la disconnessione."}</p></article><article className="tutorial-card"><span className="step">02</span><h3>{pwa?"Apri dalla nuova icona":"Registra gli animali"}</h3><p>{pwa?"Avvia Vivarqo dall’icona installata. L’app usa una visualizzazione dedicata; la prima apertura e le funzioni con dati richiedono la connessione.":"Crea una scheda per ogni esemplare con nome, specie e identificativo facoltativo. Usa la ricerca e i filtri per trovare rapidamente le schede."}</p></article><article className="tutorial-card"><span className="step">03</span><h3>{pwa?"Aggiorna con cautela":"Registra le attività"}</h3><p>{pwa?"Quando compare un aggiornamento, ricarica dopo aver terminato le modifiche. Non inserire dati offline: Vivarqo non accoda scritture da sincronizzare più tardi.":"Dopo un pasto registra l’esito e i dettagli; aggiungi peso, muta, note e promemoria con data reale per mantenere uno storico affidabile."}</p></article><article className="tutorial-card"><span className="step">04</span><h3>{pwa?"Consenti le notifiche solo se vuoi":"Esporta e proteggi i dati"}</h3><p>{pwa?"Apri Notifiche e premi Attiva solo se desideri le push. Il browser chiederà il consenso. La consegna dipende dal sistema operativo e dalla configurazione server.":"Usa Importa ed esporta per scaricare una copia o migrare dati. Gli archivi possono contenere informazioni personali: conservali in modo sicuro."}</p></article><article className="tutorial-card"><span className="step">05</span><h3>Quando non funziona</h3><p>Controlla la connessione, verifica che il server sia raggiungibile e riprova. Se il problema persiste, annota il messaggio e l’ora senza condividere password o token.</p></article><article className="tutorial-card"><span className="step">06</span><h3>Privacy e sicurezza</h3><p>La PWA memorizza solo risorse statiche; non mette in cache le risposte private dell’API. Non supporta ancora scritture offline o sincronizzazione automatica.</p></article></div>;}
+
+function App() {
+ const [user,setUser]=useState(null),[active,setActive]=useState("oggi"),[data,setData]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(null),[query,setQuery]=useState(""),[modal,setModal]=useState(null),[installEvent,setInstallEvent]=useState(null),[online,setOnline]=useState(navigator.onLine);
+ const showNotice=useCallback((text,kind="info")=>{setNotice({text,kind});window.clearTimeout(showNotice.timer);showNotice.timer=window.setTimeout(()=>setNotice(null),5000);},[]);
+ useEffect(()=>{const onInstall=e=>{e.preventDefault();setInstallEvent(e);};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
+ const loadMe=useCallback(async()=>{try{const r=await apiRequest("auth/me");setUser(r.user??r);return true;}catch(e){setUser(null);return false;}},[]);
+ useEffect(()=>{void loadMe();},[loadMe]);
+ const loadData=useCallback(async(section=active)=>{setData(null);if(section==="guide-sito"||section==="guide-pwa"){setData({});return;}const path=API[section];if(!path){setData({});return;}setBusy(true);try{const result=await apiRequest(path);setData(result);}catch(e){if(e.status===401){setUser(null);}setData({__error:e.message});}finally{setBusy(false);}},[active]);
+ useEffect(()=>{if(user)void loadData(active);},[user,active,loadData]);
+ const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);setActive("oggi");showNotice("Hai terminato la sessione.");};
+ const go=(id)=>{setActive(id);setQuery("");setModal(null);if(window.innerWidth<900)document.querySelector(".sidebar")?.classList.remove("sidebar--open");};
+ const rows=useMemo(()=>asArray(data),[data]);
+ const saveEntity=async(e)=>{e.preventDefault();const form=new FormData(e.currentTarget);const raw=Object.fromEntries(form.entries());const {endpoint,method="POST",transform}=modal;try{await apiRequest(endpoint,{method,body:transform?transform(raw):raw});setModal(null);showNotice("Modifiche salvate.");await loadData(active);}catch(err){showNotice(err.message,"error");}};
+ const addAnimal=()=>setModal({title:"Nuovo animale",endpoint:"animals",fields:[["name","Nome","text"],["identifier","Identificativo (facoltativo)","text"],["species","Specie","text"],["sex","Sesso","select"],["morph","Morph","text"],["birthDate","Data di nascita","date"],["locationLabel","Stabulazione / posizione","text"],["notes","Note","textarea"]],transform:v=>({...v,identifier:v.identifier||null,morph:v.morph||null,birthDate:v.birthDate||null,locationLabel:v.locationLabel||null,notes:v.notes||null})});
+ const addInventory=()=>setModal({title:"Nuovo articolo",endpoint:"inventory/items",fields:[["name","Nome","text"],["category","Categoria","select"],["unit","Unità","text"],["quantityOnHand","Quantità iniziale","number"],["minimumQuantity","Soglia minima","number"],["notes","Note","textarea"]],transform:v=>({...v,quantityOnHand:Number(v.quantityOnHand||0),minimumQuantity:v.minimumQuantity===""?null:Number(v.minimumQuantity),notes:v.notes||null})});
+ const addFinance=()=>setModal({title:"Nuova voce economica",endpoint:"finance/entries",fields:[["entryType","Tipo","select"],["occurredOn","Data","date"],["amount","Importo (€)","number"],["category","Categoria","text"],["description","Descrizione","text"]],transform:v=>({entryType:v.entryType,occurredOn:v.occurredOn,amountCents:Math.round(Number(v.amount)*100),currency:"EUR",category:v.category,description:v.description})});
+ const addTask=()=>setModal({title:"Nuova attività",endpoint:"tasks",fields:[["title","Titolo","text"],["dueAt","Scadenza","datetime-local"],["description","Descrizione","text"]],transform:v=>({...v,dueAt:new Date(v.dueAt).toISOString(),description:v.description||null})});
+ const actionButton = active==="animali"?["＋ Nuovo animale",addAnimal]:active==="inventario"?["＋ Nuovo articolo",addInventory]:active==="finanze"?["＋ Nuova voce",addFinance]:active==="attivita"?["＋ Nuova attività",addTask]:null;
+ const dataForDisplay = useMemo(()=>rows.filter(row=>JSON.stringify(row).toLowerCase().includes(query.toLowerCase())),[rows,query]);
+ const displayRecord = (r)=>active==="animali"?{Nome:value(r,["name"]),Identificativo:value(r,["identifier"]),Specie:value(r,["species"]),Sesso:value(r,["sex"]),Morph:value(r,["morph"]),Stabulazione:value(r,["locationLabel"]),Stato:value(r,["status"])}:active==="inventario"?{Articolo:value(r,["name"]),Categoria:value(r,["category"]),Disponibile:value(r,["quantityOnHand"]),Unità:value(r,["unit"]),Soglia:value(r,["minimumQuantity"])}:active==="finanze"?{Descrizione:value(r,["description"]),Tipo:value(r,["entryType"]),Data:date(value(r,["occurredOn"],"—")),Importo:money(value(r,["amountCents"],"—")),Categoria:value(r,["category"])}:active==="alimentazioni"?{Data:date(value(r,["performedAt","fedAt","createdAt"])),Animale:value(r,["animalName","animalId"]),Esito:value(r,["outcome"]),Cibo:value(r,["foodType"]),Dettagli:value(r,["notes"])}:active==="attivita"?{Attività:value(r,["title","name"]),Scadenza:date(value(r,["dueAt"])),Stato:value(r,["status"]),Animale:value(r,["animalName"])}:active==="notifiche"?{Titolo:value(r,["title"]),Messaggio:value(r,["body"]),Data:date(value(r,["createdAt"])),Stato:value(r,["readAt"],"Non letta")}:Object.fromEntries(Object.entries(r).filter(([k,v])=>!["userId","updatedAt","createdAt","id"].includes(k)&&["string","number","boolean"].includes(typeof v)).slice(0,6).map(([k,v])=>[k.replace(/([A-Z])/g," $1"),String(v)]));
+ const markTask=async(row,status)=>{try{await apiRequest("tasks/"+row.id+"/complete",{method:"POST",body:{}});showNotice("Attività aggiornata.");await loadData(active);}catch(e){showNotice(e.message,"error");}};
+ const createCare=async(type)=>{const animalId=window.prompt("ID dell’animale (UUID della scheda)");if(!animalId)return;const detail=window.prompt(type==="weights"?"Peso in grammi":type==="sheds"?"Esito della muta":"Osservazione");if(detail===null)return;let body={animalId};if(type==="weights")body={animalId,measuredAt:new Date().toISOString(),weightG:Number(detail)};if(type==="sheds")body={animalId,occurredAt:new Date().toISOString(),outcome:detail};if(type==="notes")body={animalId,occurredAt:new Date().toISOString(),category:"general",body:detail};try{await apiRequest("animals/"+animalId+"/"+(type==="weights"?"weights":type==="sheds"?"sheds":"notes"),{method:"POST",body});showNotice("Registro aggiornato.");await loadData(active);}catch(e){showNotice(e.message,"error");}};
+ const doInstall=async()=>{if(!installEvent){showNotice("Usa il menu Condividi del browser e scegli “Aggiungi alla schermata Home” o “Installa app”.");return;}await installEvent.prompt();await installEvent.userChoice;setInstallEvent(null);};
+ const headerTitle=active==="guide-sito"?"Tutorial per usare il sito":active==="guide-pwa"?"Tutorial per installare e usare la PWA":TITLES[active]||"Vivarqo";
+ if(!user)return <><AuthScreen onLogin={loadMe}/><Notice notice={notice}/></>;
+ return <div className="app-shell"><aside className="sidebar"><div className="sidebar-brand"><Brand/><button className="mobile-close" onClick={()=>document.querySelector(".sidebar")?.classList.remove("sidebar--open")}>×</button></div><p className="nav-caption">IL TUO ALLEVAMENTO</p><nav>{NAV.map(([id,label,icon])=><button key={id} className={"nav-item "+(active===id?"active":"")} onClick={()=>go(id)}><span className="nav-icon">{icon}</span><span>{label}</span></button>)}</nav><div className="sidebar-foot"><div className="sidebar-note"><strong>Piccoli gesti, dati preziosi.</strong><p>Registra le attività quando accadono: il tuo storico sarà più utile.</p></div><button className="user-card" onClick={()=>go("impostazioni")}><span className="avatar">{String(user.displayName||user.email||"V").slice(0,1).toUpperCase()}</span><span><strong>{user.displayName||"Il mio account"}</strong><small>{user.email}</small></span><span>···</span></button></div></aside><main className="main-content"><header className="topbar"><button className="menu-toggle" aria-label="Apri menu" onClick={()=>document.querySelector(".sidebar")?.classList.toggle("sidebar--open")}>☰</button><div><span className="breadcrumb">Vivarqo / </span><strong>{headerTitle}</strong></div><div className="topbar-right"><span className={"connection "+(online?"":"offline")}>{online?"● Online":"○ Offline"}</span><button className="install-button" onClick={doInstall}>＋ Installa PWA</button><button className="avatar avatar-button" onClick={logout} title="Esci">{String(user.displayName||user.email||"V").slice(0,1).toUpperCase()}</button></div></header><div className="page-wrap"><Notice notice={notice}/>{!online&&<div className="notice warning">Sei offline: puoi vedere la struttura dell’app, ma le operazioni e i dati richiedono la connessione. Nessuna modifica viene salvata in locale.</div>}
+ <section className="page-heading"><div><p className="eyebrow">GESTIONE ALLEVAMENTO · {new Intl.DateTimeFormat("it-IT",{weekday:"long",day:"numeric",month:"long"}).format(new Date())}</p><h1>{active==="oggi"?"Il tuo allevamento, sotto controllo.":headerTitle}</h1><p>{NAV.find(n=>n[0]===active)?.[3]||"Una guida pratica per gestire il tuo allevamento."}</p></div><div className="heading-actions">{actionButton&&<Button onClick={actionButton[1]}>{actionButton[0]}</Button>}{active==="guide-pwa"&&<Button onClick={doInstall}>Installa la PWA</Button>}</div></section>
+ {busy?<div className="loading"><span className="spinner"/>Caricamento dati dal server…</div>:data?.__error?<div className="error-panel"><h2>Non riesco a caricare questa sezione</h2><p>{data.__error}</p><Button variant="secondary" onClick={()=>loadData(active)}>Riprova</Button></div>:active==="guide-sito"?<><Tutorial/><div className="tutorial-callout"><h3>Flusso consigliato</h3><p>1. Crea le schede degli animali. 2. Registra pasti, pesi, mute e note. 3. Pianifica attività e promemoria. 4. Mantieni aggiornati inventario e documenti. 5. Esporta periodicamente una copia dei dati.</p></div></>:active==="guide-pwa"?<><Tutorial pwa/><div className="tutorial-callout"><h3>Cosa funziona offline?</h3><p>La PWA può conservare alcune risorse statiche già caricate. I dati personali, le ricerche, i salvataggi e le modifiche richiedono una connessione al server; non esiste una coda offline.</p><Button onClick={doInstall}>＋ Installa la PWA</Button></div></>:active==="oggi"?<Dashboard data={data} onGo={go} onRetry={()=>loadData("oggi")}/>:active==="animali"||active==="inventario"||active==="alimentazioni"||active==="attivita"||active==="finanze"||active==="notifiche"||active==="riproduzioni"||active==="documenti"||active==="genetica"||active==="peso"||active==="mute"||active==="note"||active==="abbonamento"?<Records active={active} data={data} rows={dataForDisplay} onSearch={setQuery} query={query} onCare={createCare} onReload={()=>loadData(active)} onTask={markTask} onGo={go}/>:active==="cure"?<CareHub onCare={createCare}/>:active==="dati"?<DataTools onNotice={showNotice}/>:active==="impostazioni"?<SettingsPage user={user} onNotice={showNotice}/>:<Records active={active} data={data} rows={dataForDisplay} onSearch={setQuery} query={query} onCare={createCare} onReload={()=>loadData(active)} onTask={markTask} onGo={go}/>}
+ <footer className="page-footer"><span>Vivarqo · Crescere con cura.</span><span>Sessione protetta · Dati caricati dal backend</span></footer></div></main>{modal&&<Modal modal={modal} onClose={()=>setModal(null)} onSubmit={saveEntity}/>}<nav className="mobile-nav" aria-label="Navigazione rapida">{[["oggi","⌂","Oggi"],["animali","♧","Animali"],["alimentazioni","◉","Pasti"],["attivita","◷","Attività"],["guide","?","Guide"]].map(([id,icon,label])=><button key={id} className={active===id?"active":""} onClick={()=>go(id)}><span>{icon}</span>{label}</button>)}</nav></div>;
 }
 
-export default function App() {
-  const [activeSection, setActiveSection] = useState("Home");
-  const dateLabel = new Intl.DateTimeFormat("it-IT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long"
-  }).format(new Date());
-
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href="#home" onClick={() => setActiveSection("Home")} aria-label="Vivarqo, vai alla Home">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
-          <span className="brand-word">vivarqo<span>.</span></span>
-        </a>
-
-        <div className="workspace-label">GESTIONE ALLEVAMENTO</div>
-        <nav className="primary-nav" aria-label="Navigazione principale">
-          {navigation.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={`nav-item ${activeSection === item.id ? "nav-item--active" : ""}`}
-              onClick={() => setActiveSection(item.id)}
-              aria-current={activeSection === item.id ? "page" : undefined}
-            >
-              <span className="nav-item__icon" aria-hidden="true">{item.icon}</span>
-              <span>{item.label}</span>
-              {item.id === "Animali" && <span className="nav-count">32</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-bottom">
-          <div className="support-card">
-            <span className="support-card__eyebrow">UN PICCOLO PROMEMORIA</span>
-            <p>La costanza di oggi crea uno storico utile domani.</p>
-            <span className="support-card__leaf" aria-hidden="true">✳</span>
-          </div>
-          <button className="profile-button" type="button" onClick={() => setActiveSection("Impostazioni")}>
-            <span className="avatar">VA</span>
-            <span className="profile-copy"><strong>Il mio allevamento</strong><small>Account demo</small></span>
-            <span className="profile-menu" aria-hidden="true">···</span>
-          </button>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <header className="topbar">
-          <div className="mobile-brand">
-            <span className="brand-mark" aria-hidden="true"><span /></span>
-            <span className="brand-word">vivarqo<span>.</span></span>
-          </div>
-          <div className="breadcrumbs"><span>Workspace</span><span className="breadcrumb-separator">/</span><strong>{activeSection}</strong></div>
-          <div className="topbar-actions">
-            <ApiStatus />
-            <button className="icon-button notification-button" aria-label="Notifiche" type="button">
-              <span aria-hidden="true">♧</span><i />
-            </button>
-          </div>
-        </header>
-
-        <div className="page-wrap">
-          <div className="demo-notice">
-            <span className="demo-notice__dot" />
-            Interfaccia iniziale · contenuti dimostrativi, non sono dati reali
-          </div>
-
-          {activeSection === "Home" ? (
-            <>
-              <section className="welcome-row">
-                <div>
-                  <p className="eyebrow">{dateLabel}</p>
-                  <h1>Il tuo allevamento,<br /><span>sotto controllo.</span></h1>
-                  <p className="welcome-copy">Tieni traccia delle attività e prenditi cura dei tuoi animali, un giorno alla volta.</p>
-                </div>
-                <div className="welcome-art" aria-hidden="true">
-                  <div className="art-sun" />
-                  <div className="art-leaf art-leaf--one" />
-                  <div className="art-leaf art-leaf--two" />
-                  <div className="art-pot"><span /></div>
-                </div>
-              </section>
-
-              <section className="stats-grid" aria-label="Panoramica allevamento">
-                <StatCard label="Animali registrati" value="32" caption="Nel tuo allevamento" icon="♧" accent="green" />
-                <StatCard label="Attività di oggi" value="04" caption="1 da completare subito" icon="◷" accent="orange" />
-                <StatCard label="Covate attive" value="03" caption="In monitoraggio" icon="✳" accent="purple" />
-                <StatCard label="Scorte da verificare" value="02" caption="Sotto la soglia minima" icon="▤" accent="blue" />
-              </section>
-
-              <div className="content-grid">
-                <section className="panel tasks-panel">
-                  <div className="panel-heading">
-                    <div><p className="eyebrow">LA TUA GIORNATA</p><h2>Da fare oggi</h2></div>
-                    <button className="text-button" type="button" onClick={() => setActiveSection("Alimentazioni")}>Vedi attività <span aria-hidden="true">↗</span></button>
-                  </div>
-                  <div className="task-list">
-                    {todayTasks.map((task) => (
-                      <article className="task-item" key={task.title}>
-                        <div className="task-time">{task.time}</div>
-                        <div className={`task-symbol task-symbol--${task.tone}`} aria-hidden="true">•</div>
-                        <div className="task-copy"><strong>{task.title}</strong><span>{task.detail}</span></div>
-                        <span className={`task-tag task-tag--${task.tone}`}>{task.tag}</span>
-                      </article>
-                    ))}
-                  </div>
-                  <button className="add-task-button" type="button" onClick={() => setActiveSection("Alimentazioni")}><span aria-hidden="true">＋</span> Registra un’attività</button>
-                </section>
-
-                <section className="panel quick-panel">
-                  <div className="panel-heading">
-                    <div><p className="eyebrow">ACCESSO RAPIDO</p><h2>Cosa vuoi fare?</h2></div>
-                  </div>
-                  <button className="quick-action" type="button" onClick={() => setActiveSection("Animali")}>
-                    <span className="quick-action__icon quick-action__icon--green" aria-hidden="true">＋</span>
-                    <span><strong>Aggiungi un animale</strong><small>Crea una nuova scheda</small></span>
-                    <span className="quick-arrow" aria-hidden="true">↗</span>
-                  </button>
-                  <button className="quick-action" type="button" onClick={() => setActiveSection("Alimentazioni")}>
-                    <span className="quick-action__icon quick-action__icon--orange" aria-hidden="true">◉</span>
-                    <span><strong>Registra alimentazione</strong><small>Aggiorna lo storico</small></span>
-                    <span className="quick-arrow" aria-hidden="true">↗</span>
-                  </button>
-                  <button className="quick-action" type="button" onClick={() => setActiveSection("Inventario")}>
-                    <span className="quick-action__icon quick-action__icon--blue" aria-hidden="true">▤</span>
-                    <span><strong>Controlla le scorte</strong><small>Alimenti e materiali</small></span>
-                    <span className="quick-arrow" aria-hidden="true">↗</span>
-                  </button>
-                  <div className="quick-tip"><span aria-hidden="true">✦</span><p><strong>Un consiglio:</strong> registra i dati subito dopo ogni attività per mantenere uno storico completo.</p></div>
-                </section>
-              </div>
-            </>
-          ) : (
-            <section className="section-placeholder">
-              <span className="placeholder-icon" aria-hidden="true">{navigation.find((item) => item.id === activeSection)?.icon ?? "⚙"}</span>
-              <p className="eyebrow">PROSSIMO MODULO</p>
-              <h1>{activeSection}</h1>
-              <p>La struttura di navigazione è pronta. Questa sezione verrà collegata alle API e ai dati reali nei prossimi passaggi.</p>
-              <button type="button" className="primary-button" onClick={() => setActiveSection("Home")}>Torna alla Home</button>
-            </section>
-          )}
-
-          <footer className="page-footer">
-            <span>Vivarqo <span className="footer-dot">·</span> Crescere con cura.</span>
-            <span>Prima versione dell’interfaccia</span>
-          </footer>
-        </div>
-      </main>
-    </div>
-  );
+function Dashboard({data,onGo,onRetry}) {
+ const due=asArray(data?.dueToday),overdue=asArray(data?.overdue),recent=asArray(data?.recentFeedings);
+ const stat=[["Animali registrati",value(data,["animalCount","totalAnimals"],"—"),"Schede nel tuo account"],["Da fare oggi",value(data,["dueTodayCount"],due.length),"Attività in scadenza"],["In ritardo",value(data,["overdueCount"],overdue.length),"Da verificare"],["Pasti recenti",recent.length,"Nel riepilogo odierno"]];
+ return <><div className="stats-grid">{stat.map(([label,val,caption],i)=><article className={"stat-card tone-"+i} key={label}><span>{label}</span><strong>{val}</strong><small>{caption}</small></article>)}</div><div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">IL TUO GIORNO</p><h2>Attività da seguire</h2></div><Button variant="quiet" onClick={()=>onGo("attivita")}>Apri attività ↗</Button></div>{due.length+overdue.length===0?<div className="empty-state"><span>✧</span><h3>Nessuna attività da mostrare</h3><p>Quando il backend restituisce scadenze o promemoria, li vedrai qui.</p><Button variant="secondary" onClick={()=>onGo("attivita")}>Vai al calendario</Button></div>:<div className="task-list">{[...overdue,...due].slice(0,12).map((task,i)=><article className="task-row" key={task.id||i}><span className="task-bullet">{i<overdue.length?"!":"•"}</span><div><strong>{value(task,["title","name"],"Attività")}</strong><small>{value(task,["animal","animalName","description"],"Promemoria")} · {date(value(task,["dueAt","scheduledAt"]))}</small></div><span className={"pill "+(i<overdue.length?"danger":"sage")}>{i<overdue.length?"In ritardo":"In programma"}</span></article>)}</div>}</section><section className="panel quick-panel"><p className="eyebrow">ACCESSO RAPIDO</p><h2>Registra un’attività</h2>{[["＋","Aggiungi un animale","animali"],["◉","Registra alimentazione","alimentazioni"],["＋","Registra peso, muta o nota","cure"],["▤","Controlla le scorte","inventario"],["⇄","Importa o esporta dati","dati"]].map(([icon,label,id])=><button className="quick-link" key={id} onClick={()=>onGo(id)}><span>{icon}</span><strong>{label}</strong><b>↗</b></button>)}<div className="privacy-note">I dati sono caricati dal tuo account; nessun animale o numero dimostrativo viene inserito automaticamente.</div></section></div></>;
 }
+function Records({active,data,rows,onSearch,query,onCare,onReload,onTask,onGo}) {
+ const [detail,setDetail]=useState(null);
+ const titles={animali:"Schede animali",inventario:"Scorte e materiali",alimentazioni:"Storico alimentazioni",attivita:"Attività e promemoria",finanze:"Entrate e uscite",notifiche:"Centro notifiche",riproduzioni:"Riproduzioni",documenti:"Documenti e condivisioni",genetica:"Morph e genetica",peso:"Storico pesi",mute:"Storico mute",note:"Osservazioni"};
+ const shown=rows.map((r)=>({raw:r,display:active==="animali"?{Nome:value(r,["name"]),Identificativo:value(r,["identifier"]),Specie:value(r,["species"]),Sesso:value(r,["sex"]),Morph:value(r,["morph"]),Stabulazione:value(r,["locationLabel"]),Stato:value(r,["status"])}:active==="inventario"?{Articolo:value(r,["name"]),Categoria:value(r,["category"]),Quantità:value(r,["quantityOnHand"]),Unità:value(r,["unit"]),Soglia:value(r,["minimumQuantity"])}:active==="alimentazioni"?{Data:date(value(r,["performedAt","fedAt","createdAt"])),Animale:value(r,["animalName","animalId"]),Esito:value(r,["outcome"]),Cibo:value(r,["foodType"]),Note:value(r,["notes"])}:active==="attivita"?{Attività:value(r,["title","name"]),Scadenza:date(value(r,["dueAt"])),Stato:value(r,["status"]),Descrizione:value(r,["description"])}:active==="finanze"?{Descrizione:value(r,["description"]),Tipo:value(r,["entryType"]),Data:date(value(r,["occurredOn"])),Importo:money(value(r,["amountCents"])),Categoria:value(r,["category"])}:active==="notifiche"?{Titolo:value(r,["title"]),Messaggio:value(r,["body"]),Data:date(value(r,["createdAt"])),Stato:r.readAt?"Letta":"Non letta"}:Object.fromEntries(Object.entries(r).filter(([k,v])=>!["userId","updatedAt","createdAt","id"].includes(k)&&["string","number","boolean"].includes(typeof v)).slice(0,6).map(([k,v])=>[k.replace(/([A-Z])/g," $1"),String(v)]))}));
+ const add=active==="animali"?()=>onGo("animali"):active==="inventario"?()=>onGo("inventario"):null;
+ return <section className="panel records-panel"><div className="panel-heading"><div><p className="eyebrow">DATI DEL TUO ACCOUNT</p><h2>{titles[active]||TITLES[active]||active}</h2><p className="subheading">Dati reali restituiti dall’API. I risultati rispettano l’account autenticato.</p></div><Button variant="secondary" onClick={onReload}>↻ Aggiorna</Button></div>{["animali","inventario","alimentazioni","attivita","finanze","riproduzioni","documenti","genetica","notifiche"].includes(active)&&<input className="search-input" type="search" placeholder="Cerca nei risultati…" value={query} onChange={e=>onSearch(e.target.value)} aria-label="Cerca nei risultati"/>}{active==="cure"&&<p>Seleziona il tipo di registro dal menu laterale.</p>}{active==="peso"||active==="mute"||active==="note"?<div className="inline-actions"><Button onClick={()=>onCare(active==="peso"?"weights":active==="mute"?"sheds":"notes")}>＋ Nuova registrazione</Button></div>:null}{shown.length===0?<div className="empty-state"><span>⌁</span><h3>Nessun dato trovato</h3><p>Se è il tuo primo accesso, inizia aggiungendo i tuoi dati. Se hai già registrazioni, aggiorna la sezione o controlla i filtri.</p>{active==="animali"&&<Button onClick={()=>onGo("animali")}>Ricarica animali</Button>}</div>:<div className="table-wrap"><table><thead><tr>{Object.keys(shown[0].display).map(k=><th key={k}>{k}</th>)}{active==="attivita"&&<th>Azioni</th>}</tr></thead><tbody>{shown.map(({raw,display},i)=><tr key={raw.id||i}>{Object.entries(display).map(([k,v])=><td key={k}>{String(v)}</td>)}{active==="attivita"&&<td><Button variant="quiet" onClick={()=>onTask(raw,"complete")}>Completa</Button></td>}</tr>)}</tbody></table></div>}{data?.pagination&&<p className="muted">Pagina 1 · {data.pagination.total??shown.length} risultati totali. La lista mostra al massimo 50 elementi.</p>}</section>;
+}
+function CareHub({onCare}){return <div className="care-grid">{[["weights","Peso","Registra il peso in grammi e confronta lo storico."],["sheds","Mute","Annota esito e data della muta."],["notes","Osservazioni","Aggiungi una nota alla scheda dell’animale."]].map(([type,title,desc])=><article className="panel care-card" key={type}><span className="care-symbol">＋</span><h2>{title}</h2><p>{desc}</p><Button onClick={()=>onCare(type)}>Nuova registrazione</Button></article>)}</div>;}
+function DataTools({onNotice}){const [file,setFile]=useState(null),[entity,setEntity]=useState("animals"),[preview,setPreview]=useState(null),[busy,setBusy]=useState(false),[includeDocs,setIncludeDocs]=useState(false);const entities=[["animals","Animali"],["weights","Pesate"],["sheds","Mute"],["notes","Note"],["feedings","Alimentazioni"],["finance","Finanze"],["inventory","Inventario"],["reproductionCycles","Cicli riproduttivi"],["clutches","Covate"],["eggs","Uova"]];const upload=async(e)=>{e.preventDefault();if(!file)return onNotice("Scegli prima un file CSV o XLSX.","error");setBusy(true);try{const p=await apiUpload("imports?entity="+encodeURIComponent(entity),file);setPreview(p);onNotice("Anteprima pronta: nessun dato importato ancora.");}catch(err){onNotice(err.message,"error");}finally{setBusy(false);}};const exportData=async()=>{setBusy(true);try{const r=await apiRequest("exports",{method:"POST",body:{includeDocuments:includeDocs}});if(r.downloadPath)window.location.assign(r.downloadPath);else if(r.export?.id)window.location.assign("/api/v1/exports/"+r.export.id+"/download");else onNotice("Esportazione richiesta. Controlla lo stato restituito dal server.");}catch(e){onNotice(e.message,"error");}finally{setBusy(false);}};const confirm=async()=>{try{await apiRequest("imports/"+(preview.importId||preview.id||preview.import?.id)+"/confirm",{method:"POST",body:{}});setPreview(null);onNotice("Importazione completata.");}catch(e){onNotice(e.message,"error");}};return <div className="transfer-grid"><section className="panel"><p className="eyebrow">IMPORT GUIDATO</p><h2>Importa dati esistenti</h2><p>Carica CSV o XLSX. Prima di confermare controlla l’anteprima e gli eventuali errori.</p><form className="form-stack" onSubmit={upload}><SelectField label="Tipo di dati" value={entity} onChange={e=>setEntity(e.target.value)}>{entities.map(([id,label])=><option key={id} value={id}>{label}</option>)}</SelectField><Field label="File CSV o XLSX" type="file" accept=".csv,.xlsx" onChange={e=>setFile(e.target.files?.[0]||null)} required/><Button disabled={busy}>{busy?"Elaborazione…":"Crea anteprima"}</Button></form>{preview&&<div className="import-result"><h3>Anteprima importazione</h3><p>Righe totali: {preview.totalRows??"—"} · valide: {preview.validRows??"—"} · errori: {preview.invalidRows??"—"}</p>{(preview.errors||[]).slice(0,20).map((err,i)=><p key={i} className="error-text">Riga {err.row}: {err.column} — {err.reason}</p>)}<Button onClick={confirm} disabled={!preview.validRows}>Conferma importazione</Button></div>}</section><section className="panel"><p className="eyebrow">PORTABILITÀ</p><h2>Esporta il tuo account</h2><p>Genera un archivio privato con identificativi e relazioni. Gli archivi possono contenere dati personali.</p><label className="check-row"><input type="checkbox" checked={includeDocs} onChange={e=>setIncludeDocs(e.target.checked)}/> Includi documenti e allegati</label><Button onClick={exportData} disabled={busy}>Genera e scarica archivio ZIP</Button><p className="muted">La disponibilità del download dipende dallo stato restituito dal backend.</p></section></div>;}
+function SettingsPage({user,onNotice}){const [displayName,setName]=useState(user.displayName||""),[locale,setLocale]=useState(user.locale||"it"),[timezone,setTimezone]=useState(user.timezone||"Europe/Rome"),[currentPassword,setCurrent]=useState(""),[newPassword,setNew]=useState(""),[email,setEmail]=useState(user.email||""),[busy,setBusy]=useState(false);const save=async(e)=>{e.preventDefault();setBusy(true);try{const body={displayName,locale,timezone};if(email!==user.email||newPassword){body.email=email;body.currentPassword=currentPassword;if(newPassword)body.newPassword=newPassword;}const r=await apiRequest("account",{method:"PATCH",body});onNotice(r.message||"Impostazioni aggiornate.");setCurrent("");setNew("");}catch(err){onNotice(err.message,"error");}finally{setBusy(false);}};return <section className="panel settings-panel"><p className="eyebrow">PROFILO E SICUREZZA</p><h2>Impostazioni account</h2><form className="form-grid" onSubmit={save}><Field label="Nome visualizzato" value={displayName} onChange={e=>setName(e.target.value)} required maxLength="120"/><Field label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/><SelectField label="Lingua" value={locale} onChange={e=>setLocale(e.target.value)}><option value="it">Italiano</option><option value="en">English</option></SelectField><Field label="Fuso orario IANA" value={timezone} onChange={e=>setTimezone(e.target.value)} required/><Field label="Password attuale (per modifiche sensibili)" type="password" value={currentPassword} onChange={e=>setCurrent(e.target.value)} autoComplete="current-password"/><Field label="Nuova password (facoltativa)" type="password" value={newPassword} onChange={e=>setNew(e.target.value)} autoComplete="new-password" minLength="12"/><div className="form-full"><Button disabled={busy}>{busy?"Salvataggio…":"Salva impostazioni"}</Button></div></form><div className="security-actions"><Button variant="secondary" onClick={async()=>{if(!window.confirm("Revocare tutte le sessioni? Potresti dover accedere di nuovo."))return;try{await apiRequest("auth/sessions/revoke-all",{method:"POST",body:{}});onNotice("Sessioni revocate. Esci e accedi di nuovo.");}catch(e){onNotice(e.message,"error");}}}>Revoca tutte le sessioni</Button></div></section>;}
+function Modal({modal,onClose,onSubmit}){return <div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="panel-heading"><h2 id="modal-title">{modal.title}</h2><button className="close-button" onClick={onClose} aria-label="Chiudi">×</button></div><form className="form-grid" onSubmit={onSubmit}>{modal.fields.map(([name,label,type])=><div className={type==="textarea"?"form-full":""} key={name}>{type==="select"?<SelectField label={label} name={name} required>{(name==="sex"?[["unknown","Non specificato"],["male","Maschio"],["female","Femmina"]]:name==="category"?[["food","Alimenti"],["substrate","Substrati"],["material","Materiali"],["equipment","Attrezzatura"],["other","Altro"]]:name==="entryType"?[["income","Entrata"],["expense","Uscita"]]:[]).map(([v,l])=><option key={v} value={v}>{l}</option>)}</SelectField>:type==="textarea"?<label className="field"><span>{label}</span><textarea name={name} rows="3"/></label>:<Field label={label} name={name} type={type} required={!label.includes("facoltativo")&&name!=="minimumQuantity"}/>}</div>)}<div className="form-actions form-full"><Button type="button" variant="secondary" onClick={onClose}>Annulla</Button><Button>Salva</Button></div></form></section></div>;}
+export default App;
