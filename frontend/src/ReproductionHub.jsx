@@ -447,7 +447,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <td><select className="compact-input" data-egg-field="status" aria-label={"Stato uovo " + (egg.code || egg.id)} defaultValue={egg.status} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}>{eggStatuses.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></td>
           <td><input className="compact-input" data-egg-field="notes" aria-label={"Note uovo " + (egg.code || egg.id)} defaultValue={egg.notes || ""} placeholder="Note" onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
           <td><div className="inline-actions"><Action type="button" onClick={event => void saveEggRow(egg, event.currentTarget.closest("tr"))}>Salva</Action><Action type="button" variant="danger" onClick={() => deleteEgg(egg)}>Elimina</Action></div></td>
-        </tr>)}}</tbody></table></div>}
+        </tr>)}</tbody></table></div>}
 
         {eggsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eggsPagination.page || eggsPage} di {eggsPagination.totalPages} · {eggsPagination.total} uova</span><div className="inline-actions"><Action disabled={eggsPage <= 1} onClick={() => setEggsPage(p => p - 1)}>← Precedente</Action><Action disabled={eggsPage >= eggsPagination.totalPages} onClick={() => setEggsPage(p => p + 1)}>Successiva →</Action></div></div>}
         <SectionTitle eyebrow="CONTROLLI AMBIENTALI" title="Registro incubazione"/>
