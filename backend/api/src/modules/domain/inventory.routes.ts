@@ -86,7 +86,7 @@ export function createInventoryRouter() {
           WHERE user_id = ${auth.userId}::uuid
             AND (${activeAll} OR is_active = ${active})
             AND (${query.category === undefined} OR category::text = ${category})
-            AND (${query.q === undefined} OR name ILIKE '%' || ${q} || '%')
+            AND (${query.q === undefined} OR (name ILIKE '%' || ${q} || '%' OR category::text ILIKE '%' || ${q} || '%' OR unit ILIKE '%' || ${q} || '%' OR COALESCE(notes, '') ILIKE '%' || ${q} || '%'))
             AND minimum_quantity IS NOT NULL
             AND quantity_on_hand <= minimum_quantity
         `,
@@ -96,7 +96,7 @@ export function createInventoryRouter() {
           WHERE user_id = ${auth.userId}::uuid
             AND (${activeAll} OR is_active = ${active})
             AND (${query.category === undefined} OR category::text = ${category})
-            AND (${query.q === undefined} OR name ILIKE '%' || ${q} || '%')
+            AND (${query.q === undefined} OR (name ILIKE '%' || ${q} || '%' OR category::text ILIKE '%' || ${q} || '%' OR unit ILIKE '%' || ${q} || '%' OR COALESCE(notes, '') ILIKE '%' || ${q} || '%'))
             AND minimum_quantity IS NOT NULL
             AND quantity_on_hand <= minimum_quantity
           ORDER BY is_active DESC, name ASC
@@ -120,7 +120,15 @@ export function createInventoryRouter() {
     const where: Record<string, unknown> = { userId: auth.userId };
     if (query.active !== "all") where.isActive = query.active === "true";
     if (query.category) where.category = query.category;
-    if (query.q) where.name = { contains: query.q, mode: "insensitive" };
+    if (query.q) {
+      const search = query.q;
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { category: { equals: categories.find((category) => category === search), mode: "insensitive" } },
+        { unit: { contains: search, mode: "insensitive" } },
+        { notes: { contains: search, mode: "insensitive" } },
+      ].filter((condition) => !("category" in condition) || Boolean(condition.category.equals));
+    }
     const [total, items] = await Promise.all([
       prisma.inventoryItem.count({ where: where as never }),
       prisma.inventoryItem.findMany({
