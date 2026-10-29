@@ -7,11 +7,13 @@ import { createApp } from "./app.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
 import { startNotificationWorker } from "./modules/domain/notification-worker.js";
 import { startRetentionWorker } from "./modules/domain/retention-worker.js";
+import { startBackgroundJobs } from "./modules/domain/background-jobs.js";
 import type { Server } from "node:http";
 
 let server: Server | undefined;
 let stopNotificationWorker: () => void = () => undefined;
 let stopRetentionWorker: () => void = () => undefined;
+let stopBackgroundJobs: () => Promise<void> = async () => undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
@@ -22,12 +24,37 @@ async function startServer(): Promise<void> {
   await ensureDatabaseSchema();
   if (shuttingDown) return;
 
+  stopBackgroundJobs = await startBackgroundJobs();
+  if (shuttingDown) {
+    await stopBackgroundJobs();
+    return;
+  }
+
   const app = createApp();
   stopNotificationWorker = startNotificationWorker();
   stopRetentionWorker = startRetentionWorker();
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
   });
+}
+
+async function finishShutdown(signal: string, serverError?: Error): Promise<void> {
+  try {
+    await stopBackgroundJobs();
+    await prisma.$disconnect();
+    if (serverError) {
+      logger.error({ signal, errorName: serverError.name }, "HTTP server close failed");
+      process.exitCode = 1;
+    } else {
+      logger.info({ signal }, "Graceful shutdown completed");
+    }
+  } catch (error) {
+    logger.error({
+      signal,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    }, "Shutdown cleanup failed");
+    process.exitCode = 1;
+  }
 }
 
 function shutdown(signal: string): void {
@@ -44,41 +71,12 @@ function shutdown(signal: string): void {
   forcedExit.unref();
 
   if (!server) {
-    void prisma.$disconnect()
-      .then(() => {
-        clearTimeout(forcedExit);
-        logger.info({ signal }, "Shutdown completed before the HTTP server started");
-      })
-      .catch((error: unknown) => {
-        clearTimeout(forcedExit);
-        logger.error({
-          signal,
-          errorName: error instanceof Error ? error.name : "UnknownError",
-        }, "Database disconnect failed during shutdown");
-        process.exitCode = 1;
-      });
+    void finishShutdown(signal).finally(() => clearTimeout(forcedExit));
     return;
   }
 
   server.close((error) => {
-    void prisma.$disconnect()
-      .then(() => {
-        clearTimeout(forcedExit);
-        if (error) {
-          logger.error({ signal, errorName: error.name }, "HTTP server close failed");
-          process.exitCode = 1;
-        } else {
-          logger.info({ signal }, "Graceful shutdown completed");
-        }
-      })
-      .catch((disconnectError: unknown) => {
-        clearTimeout(forcedExit);
-        logger.error({
-          signal,
-          errorName: disconnectError instanceof Error ? disconnectError.name : "UnknownError",
-        }, "Database disconnect failed during shutdown");
-        process.exitCode = 1;
-      });
+    void finishShutdown(signal, error).finally(() => clearTimeout(forcedExit));
   });
 }
 
