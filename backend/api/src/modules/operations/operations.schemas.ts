@@ -57,6 +57,7 @@ export const taskListQuerySchema = z.object({
   status: z.enum(taskStatuses).or(z.literal("all")).default("open"),
   category: z.enum(taskCategories).optional(),
   animalId: z.string().uuid().optional(),
+  q: z.string().trim().max(160).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
 });
