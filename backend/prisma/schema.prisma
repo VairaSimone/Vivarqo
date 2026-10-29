@@ -15,6 +15,9 @@ model User {
   displayName             String                    @map("display_name") @db.VarChar(120)
   locale                  String                    @default("it") @db.VarChar(10)
   timezone                String                    @default("Europe/Rome") @db.VarChar(64)
+  weightUnit              String                    @default("g") @map("weight_unit") @db.VarChar(8)
+  temperatureUnit         String                    @default("C") @map("temperature_unit") @db.VarChar(8)
+  displayPreferences      Json                      @default("{}") @map("display_preferences") @db.JsonB
   emailVerifiedAt         DateTime?                 @map("email_verified_at") @db.Timestamptz(6)
   accountStatus           String                    @default("active") @map("account_status") @db.VarChar(20)
   createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -28,6 +31,7 @@ model User {
   tasks                   Task[]
   notificationPreferences NotificationPreferences?
   pushSubscriptions       PushSubscription[]
+  pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
   reproductionCycles      ReproductionCycle[]
   inventoryItems          InventoryItem[]
@@ -260,6 +264,7 @@ model PushSubscription {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   lastSuccessAt DateTime? @map("last_success_at") @db.Timestamptz(6)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAttempts PushDeliveryAttempt[]
   @@index([userId], map: "push_subscriptions_user_idx")
   @@map("push_subscriptions")
 }
@@ -274,6 +279,7 @@ model Notification {
   readAt     DateTime? @map("read_at") @db.Timestamptz(6)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAttempts PushDeliveryAttempt[]
   @@index([userId, createdAt(sort: Desc)], map: "notifications_user_created_idx")
   @@index([userId, createdAt(sort: Desc)], where: { readAt: null }, map: "notifications_user_unread_idx")
   @@map("notifications")
@@ -588,4 +594,28 @@ model AuditEvent {
   @@index([entityType, entityId], map: "audit_events_entity_idx")
   @@index([requestId], where: raw("\"request_id\" IS NOT NULL"), map: "audit_events_request_idx")
   @@map("audit_events")
+}
+
+model PushDeliveryAttempt {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String           @map("user_id") @db.Uuid
+  notificationId     String?          @map("notification_id") @db.Uuid
+  pushSubscriptionId String?          @map("push_subscription_id") @db.Uuid
+  idempotencyKey     String           @unique @map("idempotency_key") @db.VarChar(220)
+  attemptNumber      Int              @map("attempt_number")
+  status             String           @db.VarChar(16)
+  responseStatus     Int?             @map("response_status")
+  errorCode          String?          @map("error_code") @db.VarChar(64)
+  attemptedAt        DateTime         @default(now()) @map("attempted_at") @db.Timestamptz(6)
+  nextAttemptAt      DateTime?        @map("next_attempt_at") @db.Timestamptz(6)
+  deliveredAt        DateTime?        @map("delivered_at") @db.Timestamptz(6)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification       Notification?    @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  pushSubscription   PushSubscription? @relation(fields: [pushSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, attemptedAt(sort: Desc)], map: "push_delivery_attempts_user_attempted_idx")
+  @@index([status, nextAttemptAt], map: "push_delivery_attempts_status_retry_idx")
+  @@index([notificationId], map: "push_delivery_attempts_notification_idx")
+  @@map("push_delivery_attempts")
 }
