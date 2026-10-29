@@ -373,3 +373,5 @@ input,select,textarea { min-height: 40px; }
 .pwa-update-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.pwa-update-notice .button{flex:0 0 auto}
 
 .danger-zone{border-color:#edd3c7}.danger-zone h2{color:#7e392b}.button.danger{background:#a24d38;border-color:#a24d38;color:#fff}.button.danger:hover{background:#843d2d}.settings-panel+.settings-panel{margin-top:18px}
+
+.animal-grid--compact .animal-card{padding:12px}.animal-grid--compact .animal-facts{gap:6px}.animal-grid--compact .animal-facts>div{padding:5px 7px}
