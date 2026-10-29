@@ -37,15 +37,16 @@ function historyDescription(item) {
   return "Registro";
 }
 
-export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initialAnimalId = null }) {
+export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initialAnimalId = null, displayPreferences = {} }) {
   const confirmAction = useConfirmDialog();
   const [animals, setAnimals] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("active");
+  const [status, setStatus] = useState(displayPreferences.showArchivedAnimals ? "all" : "active");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const emptyFilters = { species: "", sex: "", morph: "", location: "", sort: "updatedAt" };
+  const preferredSort = ["name", "createdAt", "updatedAt"].includes(displayPreferences.defaultAnimalSort) ? displayPreferences.defaultAnimalSort : "updatedAt";
+  const emptyFilters = { species: "", sex: "", morph: "", location: "", sort: preferredSort };
   const [filterDraft, setFilterDraft] = useState(emptyFilters);
   const [filters, setFilters] = useState(emptyFilters);
   const [busy, setBusy] = useState(false);
@@ -147,7 +148,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     setPage(1);
   };
   const resetFilters = () => {
-    const reset = { species: "", sex: "", morph: "", location: "", sort: "updatedAt" };
+    const reset = { species: "", sex: "", morph: "", location: "", sort: preferredSort };
     setFilterDraft(reset);
     setFilters(reset);
     setPage(1);
