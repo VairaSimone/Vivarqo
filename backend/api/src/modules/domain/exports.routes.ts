@@ -8,6 +8,8 @@ import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { deletePrivateObject, openPrivateObjectStream, storePrivateObjectFromFile } from "./private-storage.js";
 import { MAX_ZIP32_ARCHIVE_BYTES, singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
+import { env } from "../../config/env.js";
+import { enqueueExportJob } from "./background-jobs.js";
 
 const EXPORT_PAGE_SIZE = 250;
 
@@ -283,62 +285,103 @@ async function* exportEntries(
   }
 }
 
-const MAX_CONCURRENT_EXPORTS_PER_PROCESS = 2;
+/**
+ * Idempotent export processor. The queue message contains only identifiers;
+ * all ownership and current job state are re-read from PostgreSQL before work.
+ */
+export async function processExportJob(exportId: string, userId: string, includeDocuments: boolean): Promise<void> {
+  const job = await prisma.exportJob.findFirst({
+    where: { id: exportId, userId },
+    select: { id: true, userId: true, status: true, storageKey: true, expiresAt: true, createdAt: true },
+  });
+  if (!job) throw new Error("Export job no longer exists");
+  if (job.status === "completed" && job.storageKey) return;
+  if (job.expiresAt <= new Date()) throw new Error("Export job expired before processing");
+
+  await prisma.exportJob.updateMany({
+    where: { id: exportId, userId, status: { not: "completed" } },
+    data: { status: "processing", storageKey: null },
+  });
+
+  let tempDirectory: string | undefined;
+  let storageKey: string | undefined;
+  try {
+    tempDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
+    const archivePath = join(tempDirectory, "export.zip");
+    await writeStreamingZip(archivePath, exportEntries(userId, includeDocuments, job.createdAt));
+    storageKey = await storePrivateObjectFromFile("exports", "zip", archivePath, exportId);
+
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.exportJob.updateMany({
+        where: { id: exportId, userId, status: "processing" },
+        data: { status: "completed", storageKey },
+      });
+      if (updated.count !== 1) throw new Error("Export job changed while it was being finalized");
+      await tx.auditEvent.create({
+        data: { userId, action: "account.export_created", entityType: "export_job", entityId: exportId },
+      });
+    });
+  } catch (error) {
+    if (storageKey) await deletePrivateObject(storageKey).catch(() => undefined);
+    throw error;
+  } finally {
+    if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
 
 export function createExportRouter() {
   const router = Router();
-  let activeExports = 0;
 
   router.post("/", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = z.object({ includeDocuments: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
     if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
-    if (activeExports >= MAX_CONCURRENT_EXPORTS_PER_PROCESS) {
-      throw new AppError(503, "EXPORT_CAPACITY_EXCEEDED", "The server is already generating the maximum number of exports", {
-        maxConcurrentExportsPerProcess: MAX_CONCURRENT_EXPORTS_PER_PROCESS,
-      });
-    }
 
-    activeExports += 1;
     const createdAt = new Date();
-    let tempDirectory: string | undefined;
-    let storageKey: string | undefined;
-    let jobId: string | undefined;
-    try {
-      const job = await prisma.exportJob.create({
-        data: { userId: auth.userId, status: "pending", expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000) },
-      });
-      jobId = job.id;
-      tempDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
-      const archivePath = join(tempDirectory, "export.zip");
-      await writeStreamingZip(archivePath, exportEntries(auth.userId, input.data.includeDocuments, createdAt));
-      storageKey = await storePrivateObjectFromFile("exports", "zip", archivePath);
-      const completed = await prisma.exportJob.update({
-        where: { id: job.id },
-        data: { status: "completed", storageKey },
+    const job = await prisma.exportJob.create({
+      data: { userId: auth.userId, status: "pending", expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000) },
+      select: { id: true, status: true, expiresAt: true, createdAt: true },
+    });
+
+    // Integration tests exercise the same processor without starting a second
+    // long-lived worker process. All deployed environments go through pg-boss.
+    if (env.NODE_ENV === "test") {
+      await processExportJob(job.id, auth.userId, input.data.includeDocuments);
+      const completed = await prisma.exportJob.findFirst({
+        where: { id: job.id, userId: auth.userId },
         select: { id: true, status: true, expiresAt: true, createdAt: true },
-      });
-      await prisma.auditEvent.create({
-        data: { userId: auth.userId, action: "account.export_created", entityType: "export_job", entityId: job.id },
       });
       res.status(201).json({
         export: completed,
         downloadPath: `/api/v1/exports/${job.id}/download`,
         includeDocuments: input.data.includeDocuments,
       });
-    } catch (error) {
-      if (storageKey) await deletePrivateObject(storageKey).catch(() => undefined);
-      if (jobId) {
-        await prisma.exportJob.updateMany({
-          where: { id: jobId, userId: auth.userId },
-          data: { status: "failed", storageKey: null },
-        }).catch(() => undefined);
-      }
-      throw error;
-    } finally {
-      activeExports -= 1;
-      if (tempDirectory) await rm(tempDirectory, { recursive: true, force: true }).catch(() => undefined);
+      return;
     }
+
+    try {
+      await enqueueExportJob({
+        exportId: job.id,
+        userId: auth.userId,
+        includeDocuments: input.data.includeDocuments,
+      });
+    } catch (error) {
+      await prisma.exportJob.updateMany({
+        where: { id: job.id, userId: auth.userId, status: "pending" },
+        data: { status: "failed" },
+      }).catch(() => undefined);
+      throw new AppError(503, "EXPORT_QUEUE_UNAVAILABLE", "The export has been saved but could not be queued; retry the export request", {
+        exportId: job.id,
+      });
+    }
+
+    res.status(202).json({
+      export: job,
+      ready: false,
+      statusPath: `/api/v1/exports/${job.id}`,
+      downloadPath: `/api/v1/exports/${job.id}/download`,
+      includeDocuments: input.data.includeDocuments,
+    });
   });
 
   router.get("/:id", requireSession, async (req, res) => {
@@ -349,7 +392,8 @@ export function createExportRouter() {
       select: { id: true, status: true, expiresAt: true, createdAt: true },
     });
     if (!job) throw new AppError(404, "EXPORT_NOT_FOUND", "Export not found");
-    res.status(200).json({ export: job, ready: job.status === "completed" && job.expiresAt > new Date() });
+    const ready = job.status === "completed" && job.expiresAt > new Date();
+    res.status(200).json({ export: job, ready, downloadPath: ready ? `/api/v1/exports/${job.id}/download` : null });
   });
 
   router.get("/:id/download", requireSession, async (req, res, next) => {
