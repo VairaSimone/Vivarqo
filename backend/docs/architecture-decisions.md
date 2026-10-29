@@ -44,3 +44,12 @@
 - La coda frontend delle mutazioni offline è stata rimossa: le richieste mutative vengono rifiutate lato client quando il browser segnala di essere offline. La cache del service worker resta limitata agli asset statici.
 - L'export ZIP è generato incrementalmente su disco, senza il limite prodotto arbitrario di 50 MiB. Restano i limiti strutturali del formato ZIP classico (dimensione complessiva fino a circa 4 GiB, massimo 65.535 entry) e la generazione avviene ancora nella richiesta HTTP, non tramite un worker persistente.
 - Rimangono non conformità aperte: frontend JavaScript/JSX anziché TypeScript e librerie prescritte non installate; assenza del contratto OpenAPI completo e di `pg-boss`; campi/preferenze dell'account incompleti; cancellazione account self-service e verifiche operative/legali ancora da completare.
+
+
+### Follow-up — miglioramenti successivi
+
+- La scheda animale espone ora annotazioni genetiche, indicatore di data di nascita stimata, data di acquisizione, provenienza e allevatore precedente; la lista evidenzia le date stimate.
+- La lista animali offre filtri server-side per specie, sesso, morph e posizione, oltre all'ordinamento per nome, creazione e ultima attività.
+- Il service worker attende l'accettazione esplicita prima di attivare un aggiornamento disponibile; la UI può mostrare l'avviso e ricaricare la pagina dopo il cambio di controller.
+- La prima bozza OpenAPI è disponibile in `docs/openapi.yaml`. Diverse request/response restano documentate con uno schema generico: il contratto va completato e validato in CI prima di considerarlo conforme alla sezione 20.
+- Test E2E aggiunti per il blocco delle mutazioni offline, i campi anagrafici estesi e la trasmissione all'API dei filtri/ordinamenti.
