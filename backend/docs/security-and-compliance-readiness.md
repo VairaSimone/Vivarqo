@@ -1,7 +1,7 @@
 # Sicurezza e conformità: stato, controlli e attività prima del lancio
 
-**Revisione tecnica:** 28 ottobre 2026  
-**Ambito verificato:** repository Vivarqo disponibile nel branch `main`, inclusi backend/API e frontend React/PWA. Il repository non contiene documenti legali pubblicati né prove autonome dell’ambiente di produzione.  
+**Revisione tecnica:** 29 ottobre 2026  
+**Ambito verificato:** branch di lavoro `feat/compliance-priorities-2026-10`, inclusi backend/API e frontend React/PWA. Le modifiche sono in una pull request in bozza e non vanno considerate rilasciate; i modelli legali non sono pubblicabili e non sono presenti prove autonome dell’ambiente di produzione.  
 **Importante:** questa è una checklist tecnica, non una certificazione di conformità né un parere legale. La conformità dipende anche da chi gestisce il servizio, dalle finalità effettive, dai fornitori, dai paesi serviti, dai contratti e dai processi organizzativi.
 
 ## 1. Modifiche tecniche applicate in questo branch
@@ -24,10 +24,10 @@ Riferimenti di base: [Regolamento (UE) 2016/679 — GDPR](https://eur-lex.europa
 |---|---|---|
 | Privacy by design/minimizzazione | Query separate per account; campi pubblici in allowlist; log redatti; artefatti temporanei con scadenza. | Verificare il ciclo di vita di tutti i dati, inclusi log, backup, email, fornitori e account disattivati. |
 | Informativa artt. 13–14 | Non è presente nel repository una privacy notice pubblicabile e completa. | Identificare il titolare legale, contatti, finalità, basi giuridiche, categorie di dati, destinatari/responsabili, trasferimenti, retention, diritti e reclamo al Garante. Non inventare questi dati nel codice. |
-| Diritti dell'interessato | È disponibile l'export tecnico. I normali endpoint di modifica consentono rettifica dei dati gestiti dall'app. | Implementare/verificare procedura per accesso completo, rettifica, cancellazione, limitazione, opposizione e portabilità quando applicabile; manca un flusso completo self-service di cancellazione account. Definire eccezioni di conservazione legale e gestione dei backup. |
+| Diritti dell'interessato | È disponibile l'export tecnico; il branch aggiunge DELETE /api/v1/account con verifica password, revoca immediata sessioni/link pubblici e job persistente per pulire record e file. | Testare end-to-end cancellazione e richieste di diritti, definire eccezioni di conservazione legale, verificare storage e rotazione dei backup e allineare i tempi nell'informativa. |
 | Responsabili del trattamento art. 28 | Email transazionali, storage e pagamenti sono integrazioni esterne configurabili. | Verificare e archiviare DPA/accordi con ogni provider, elenco sub-responsabili, regioni effettive e istruzioni di trattamento. |
 | Trasferimenti internazionali | Il codice non dimostra dove il provider o ogni sub-responsabile tratti tutti i dati. | Verificare regione, accessi di supporto, sub-responsabili e meccanismo GDPR per eventuali trasferimenti extra-SEE; predisporre valutazioni supplementari se necessarie. |
-| Sicurezza art. 32 | Autenticazione server-side, hash dei token, CSRF, limiti dimensione, storage privato, logging minimizzato e retention di dati transitori. | Configurare TLS, cifratura a riposo/KMS e backup, least privilege, segreti gestiti e rotati, patching, scansioni dipendenze, test di ripristino e controllo accessi ai log. |
+| Sicurezza art. 32 | Autenticazione server-side, hash dei token, CSRF, rate limiting persistente selettivo, logging minimizzato, storage privato e worker persistenti; il branch aggiunge script/timer template di backup e test dump/restore CI. | Configurare e provare TLS, cifratura a riposo/KMS e copia offsite cifrata, least privilege, segreti gestiti e rotati, patching, scansioni dipendenze, restore drill su staging e controllo accessi ai log. |
 | Violazioni artt. 33–34 | Non esiste un flusso organizzativo per l'incident response nel codice. | Definire procedura e registro incidenti, ruoli e contatti. Il titolare valuta il rischio e, ove richiesto, notifica il Garante senza ingiustificato ritardo e possibilmente entro 72 ore; un rischio elevato può richiedere anche comunicazione agli interessati. |
 | DPIA art. 35 | Non è possibile stabilire dal solo repository se sia obbligatoria. | Effettuare e documentare uno screening DPIA sui trattamenti effettivi; svolgerla prima del trattamento se ricorrono i criteri previsti. |
 | Conservazione | Import/export e token hanno scadenze tecniche ora applicate dal worker. | Approvare un retention schedule per account, sessioni, notifiche, documenti cancellati, audit, supporto, dati amministrativi e backup, quindi allineare policy e processi reali. |
@@ -36,7 +36,7 @@ Il Garante spiega che le violazioni vanno documentate e che la notifica entro 72
 
 ## 3. Cookie, ePrivacy e consenso
 
-Il backend non contiene il frontend né un sistema di analytics/advertising. Non è quindi possibile verificare quali cookie o tracker vengano effettivamente installati dalla UI o da script di terze parti.
+Il branch include un modello di Cookie Policy ma non un audit del browser, CMP/consenso o prova di assenza di analytics/advertising. Non è quindi possibile verificare quali cookie, Web Storage o tracker siano effettivamente usati dal bundle distribuito.
 
 Prima del rilascio:
 - documentare i cookie strettamente necessari (sessione e CSRF) e le loro finalità nella policy pertinente;
@@ -83,3 +83,14 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Far revisionare il contratto di abbonamento e i diritti del consumatore da un professionista competente.
 
 **Non descrivere Vivarqo come “GDPR compliant”, “DSA compliant” o “conforme a tutte le leggi mondiali” finché i punti organizzativi e di prodotto sopra non sono stati verificati e documentati.**
+
+
+## 8. Modifiche implementate nel branch in revisione
+
+- **Frontend stack:** TypeScript e i pacchetti React Router, TanStack Query, React Hook Form, Recharts, Tailwind, vite-plugin-pwa e Workbox sono installati e usati nella entrypoint, schermata impostazioni e grafico peso. La conversione di tutti i moduli JSX non è terminata.
+- **Job persistenti:** pg-boss è integrato per export asincroni, consegne push e cancellazione account. Il livello applicativo registra tentativi push per sottoscrizione e offre un endpoint privato paginato. La consegna push resta best effort, non una garanzia di visualizzazione.
+- **Account:** unità di peso/temperatura e preferenze visuali persistono in PostgreSQL; la UI le applica alle schermate principali dei dati di cura/incubazione e alle liste animali. La cancellazione revoca sessioni e condivisioni prima del lavoro asincrono.
+- **Osservabilità:** il bootstrap Sentry è opzionale via SENTRY_DSN e filtra body/cookie/header/query string nell'evento prima dell'invio. Non è ancora stato provato con un DSN reale di staging.
+- **OpenAPI:** docs/openapi.yaml viene bundle-ato in CI per controllare sintassi e riferimenti. Gli schemi generici rimasti impediscono di definirlo completo rispetto all'intera specifica.
+- **Backup:** il CI esegue il dump e un restore su un database isolato dopo la migrazione. I timer systemd sono template non installati; cifratura/offsite, scheduling di produzione e restore drill reale richiedono configurazione ed evidenze dell'operatore.
+- **Stripe/UE/legal:** non sono state usate chiavi Stripe Test Mode reali, non è stata ispezionata la regione effettiva dei servizi cloud e non sono stati pubblicati i modelli legali. Questi punti restano blocchi espliciti del lancio.
