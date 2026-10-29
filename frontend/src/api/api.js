@@ -22,8 +22,8 @@ async function fetchWithCsrfRetry(url, init, headers) {
   return response;
 }
 export async function apiRequest(path, options = {}) {
-  // Ignore legacy offline-queue options: writes are never queued in the first release.
-  const { queueWhenOffline: _queueWhenOffline, offlineOwner: _offlineOwner, offlineLabel: _offlineLabel, ...requestOptions } = options;
+  // Writes are never queued offline in the first release.
+  const requestOptions = options;
   const method = (requestOptions.method ?? "GET").toUpperCase();
   if (!SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
     const error = new Error("Serve una connessione a Internet per modificare i dati. La modifica non è stata salvata.");
