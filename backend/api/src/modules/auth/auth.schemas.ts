@@ -38,6 +38,14 @@ export const accountPatchSchema = z.object({
   displayName: z.string().trim().min(1).max(120).optional(),
   locale: z.enum(["it", "en"]).optional(),
   timezone: z.string().trim().min(1).max(64).refine(supportedTimezone, "Invalid IANA timezone").optional(),
+  weightUnit: z.enum(["g", "kg", "oz", "lb"]).optional(),
+  temperatureUnit: z.enum(["C", "F"]).optional(),
+  displayPreferences: z.object({
+    animalListDensity: z.enum(["comfortable", "compact"]).optional(),
+    defaultAnimalSort: z.enum(["name", "createdAt", "updatedAt"]).optional(),
+    showArchivedAnimals: z.boolean().optional(),
+    dashboardStartSection: z.enum(["oggi", "animali", "alimentazioni", "attivita"]).optional(),
+  }).strict().optional(),
   email: emailSchema.optional(),
   currentPassword: z.string().min(1).max(128).optional(),
   newPassword: passwordSchema.optional(),
@@ -46,6 +54,9 @@ export const accountPatchSchema = z.object({
     value.displayName === undefined &&
     value.locale === undefined &&
     value.timezone === undefined &&
+    value.weightUnit === undefined &&
+    value.temperatureUnit === undefined &&
+    value.displayPreferences === undefined &&
     value.email === undefined &&
     value.newPassword === undefined
   ) {
