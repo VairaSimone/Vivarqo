@@ -1,16 +1,13 @@
 # Frontend Vivarqo
 
-Prima base React + Vite per l'interfaccia web.
+React + Vite, mobile-first. Avvia dalla root con `pnpm dev:frontend`; l'API deve essere attiva su `http://127.0.0.1:3000` (o imposta `VIVARQO_API_TARGET`).
 
-## Avvio
+## Guide incluse
+- **Guide e tutorial → Tutorial per usare il sito**: accesso, registri, attività e portabilità.
+- **Guide e tutorial → Tutorial per installare e usare la PWA**: installazione Android/desktop/iOS, notifiche e limiti offline.
 
-Dalla root del monorepo:
+## PWA e privacy
+La manifest e il service worker sono inclusi. Il service worker non intercetta né mette in cache `/api/v1/*`, health/readiness o risposte personali. I dati e tutte le scritture richiedono rete e sessione valida; non viene simulata una modalità offline con salvataggi locali. Le notifiche push richiedono consenso esplicito dalla schermata Notifiche.
 
-```bash
-pnpm install
-pnpm dev:frontend
-```
-
-Apri `http://localhost:5173`. Il server di sviluppo inoltra `/api/*`, `/healthz` e `/readyz` all'API locale su `http://127.0.0.1:3000`. Avvia prima il backend e PostgreSQL quando vuoi verificare il collegamento API.
-
-La dashboard contiene ancora dati dimostrativi. Le richieste future dovranno usare il client in `src/api/api.js`, che include i cookie di sessione e mantiene il token CSRF in memoria, non in `localStorage`.
+## Stato delle schermate
+La UI usa API autenticate per login, dashboard, animali, alimentazioni, attività, inventario, riproduzioni, documenti, genetica, registro economico, notifiche, import/export, billing e impostazioni. Alcune azioni avanzate (es. modifica di singoli registri, gestione completa di uova/covate e upload documenti) richiedono ulteriori schermate dedicate: le liste possono mostrare dati API senza esporre ancora ogni azione di modifica.

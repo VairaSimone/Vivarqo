@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Vivarqo — Gestione allevamento",
+  "short_name": "Vivarqo",
+  "description": "Animali, registri di cura, attività e riproduzioni in un unico posto.",
+  "lang": "it-IT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F7F6F0",
+  "theme_color": "#23463D",
+  "icons": [
+    {"src":"/pwa-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ],
+  "shortcuts": [
+    {"name":"Oggi","short_name":"Oggi","url":"/#oggi"},
+    {"name":"Animali","short_name":"Animali","url":"/#animali"},
+    {"name":"Alimentazioni","short_name":"Pasti","url":"/#alimentazioni"}
+  ]
+}
