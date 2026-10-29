@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { apiRequest, apiUpload } from "../api/api.js";
-import { useConfirmDialog } from "../ui/ConfirmDialog.jsx";
+import { useConfirmDialog } from "../ui/ConfirmDialog.tsx";
 
 function Button({ children, variant = "", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 function Field({ label, ...props }) { return <label className="field"><span>{label}</span><input {...props}/></label>; }
