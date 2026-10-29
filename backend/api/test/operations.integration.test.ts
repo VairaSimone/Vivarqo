@@ -195,7 +195,9 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     const now = new Date();
     const today = localDate(now);
     const tomorrow = addDate(today, 1);
-    const dueToday = await task(owner, { title: "Due later today", dueAt: new Date(now.getTime() + 30 * 60 * 1000).toISOString() }).expect(201);
+    const dueTodayAt = new Date(now.getTime() + 30 * 60 * 1000);
+    const expectedInToday = localDate(dueTodayAt) === today;
+    const dueToday = await task(owner, { title: "Due later today", dueAt: dueTodayAt.toISOString() }).expect(201);
     const overdue = await task(owner, { title: "Overdue action", dueAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString() }).expect(201);
 
     const cycle = await prisma.reproductionCycle.create({
@@ -230,7 +232,7 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
 
     const home = await owner.agent.get("/api/v1/home/today").expect(200);
     expect(home.body.timezone).toBe("Europe/Rome");
-    expect(home.body.tasks.dueToday.some((item: { id: string }) => item.id === dueToday.body.task.id)).toBe(true);
+    expect(home.body.tasks.dueToday.some((item: { id: string }) => item.id === dueToday.body.task.id)).toBe(expectedInToday);
     expect(home.body.tasks.overdue.some((item: { id: string }) => item.id === overdue.body.task.id)).toBe(true);
     expect(home.body.quickActions.some((item: { key: string }) => item.key === "bulk-feeding")).toBe(true);
 
