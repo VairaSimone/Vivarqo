@@ -138,7 +138,10 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
     try {
       const result = await saveMutation.mutateAsync(body);
       onNotice(result.message || "Impostazioni aggiornate.");
-      if (result.user) reset(displayDefaults(result.user));
+      if (result.user) {
+        reset(displayDefaults(result.user));
+        window.dispatchEvent(new CustomEvent("vivarqo:profile-updated", { detail: result.user }));
+      }
       else reset({ ...values, currentPassword: "", newPassword: "" });
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Impossibile salvare le impostazioni.", "error");
