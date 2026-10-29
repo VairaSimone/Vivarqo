@@ -28,6 +28,9 @@ export interface AuthContext {
   displayName: string;
   locale: string;
   timezone: string;
+  weightUnit: string;
+  temperatureUnit: string;
+  displayPreferences: Record<string, unknown>;
   emailVerifiedAt: Date;
 }
 
@@ -90,6 +93,9 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
             displayName: true,
             locale: true,
             timezone: true,
+            weightUnit: true,
+            temperatureUnit: true,
+            displayPreferences: true,
             emailVerifiedAt: true,
             deletedAt: true,
             accountStatus: true,
@@ -154,6 +160,9 @@ export const loadOptionalSession: RequestHandler = async (req, res, next) => {
         displayName: session.user.displayName,
         locale: session.user.locale,
         timezone: session.user.timezone,
+        weightUnit: session.user.weightUnit,
+        temperatureUnit: session.user.temperatureUnit,
+        displayPreferences: (session.user.displayPreferences ?? {}) as Record<string, unknown>,
         emailVerifiedAt: session.user.emailVerifiedAt,
       } satisfies AuthContext;
     }
