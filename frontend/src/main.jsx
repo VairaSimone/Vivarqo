@@ -7,7 +7,13 @@ import "./styles.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   let refreshing = false;
+  let hasController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener("controllerchange", () => {
+    // The first controller takeover should not reload a page the user just opened.
+    if (!hasController) {
+      hasController = true;
+      return;
+    }
     if (refreshing) return;
     refreshing = true;
     window.location.reload();
