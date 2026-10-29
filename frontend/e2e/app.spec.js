@@ -57,8 +57,9 @@ test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", 
   await page.goto("/animals");
   await expect(page.getByRole("heading", { name: "Animali", exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: /Nuovo animale/ }).click();
-  await page.getByLabel("Nome", { exact: true }).fill("Smeraldo");
-  await page.getByLabel("Specie", { exact: true }).fill("Boa constrictor imperator");
+  const animalForm = page.locator(".embedded-form form").first();
+  await animalForm.getByLabel("Nome", { exact: true }).fill("Smeraldo");
+  await animalForm.getByLabel("Specie", { exact: true }).fill("Boa constrictor imperator");
   await page.getByLabel("Identificativo", { exact: true }).fill("VRQ-E2E-003");
   await page.getByLabel("Annotazioni genetiche dichiarate").fill("Het dichiarato dall'allevatore");
   await page.getByLabel("La data di nascita è stimata").check();
@@ -119,8 +120,9 @@ test("offline: le modifiche vengono rifiutate e non accodate localmente", async 
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
 
   await page.getByRole("button", { name: /Nuovo animale/ }).click();
-  await page.getByLabel("Nome", { exact: true }).fill("Non salvato offline");
-  await page.getByLabel("Specie", { exact: true }).fill("Python regius");
+  const animalForm = page.locator(".embedded-form form").first();
+  await animalForm.getByLabel("Nome", { exact: true }).fill("Non salvato offline");
+  await animalForm.getByLabel("Specie", { exact: true }).fill("Python regius");
   await page.getByRole("button", { name: "Salva scheda", exact: true }).click();
 
   await expect(page.getByRole("status")).toContainText("Serve una connessione a Internet");
