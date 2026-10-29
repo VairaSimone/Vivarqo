@@ -36,6 +36,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("active");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editor, setEditor] = useState(null);
@@ -47,18 +48,23 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [upcomingTasks, setUpcomingTasks] = useState([]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: "50", status });
-      if (query.trim()) params.set("q", query.trim());
+      if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim());
       const response = await apiRequest("animals?" + params.toString());
       setAnimals(arrayOf(response.animals));
       setPagination(response.pagination || { page, pageSize: 50, total: arrayOf(response.animals).length, totalPages: 1 });
     } catch (err) {
       setError(err.message || "Impossibile caricare gli animali.");
     } finally { setBusy(false); }
-  }, [page, query, status]);
+  }, [page, debouncedQuery, status]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
