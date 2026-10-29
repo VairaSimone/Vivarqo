@@ -141,8 +141,9 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
       if (result.user) {
         reset(displayDefaults(result.user));
         window.dispatchEvent(new CustomEvent("vivarqo:profile-updated", { detail: result.user }));
-      }
-      else reset({ ...values, currentPassword: "", newPassword: "" });
+      } else if (emailChanged || passwordChanged) {
+        window.location.reload();
+      } else reset({ ...values, currentPassword: "", newPassword: "" });
     } catch (error) {
       onNotice(error instanceof Error ? error.message : "Impossibile salvare le impostazioni.", "error");
     }
