@@ -86,6 +86,28 @@ test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", 
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 2);
 });
 
+test("animali: i filtri avanzati e l'ordinamento raggiungono l'API", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/animals");
+  await page.getByText("Filtri avanzati e ordinamento", { exact: true }).click();
+  await page.getByLabel("Specie", { exact: true }).fill("Python regius");
+  await page.getByLabel("Sesso", { exact: true }).selectOption("female");
+  await page.getByLabel("Morph", { exact: true }).fill("Pastel");
+  await page.getByLabel("Posizione / stabulazione", { exact: true }).fill("Rack 2");
+  await page.getByLabel("Ordina per", { exact: true }).selectOption("name");
+  await page.getByRole("button", { name: "Applica filtri", exact: true }).click();
+
+  await expect.poll(() => page.e2eState.requests.some(request => {
+    if (request.path !== "animals" || request.method !== "GET") return false;
+    const query = new URLSearchParams(request.query);
+    return query.get("species") === "Python regius" &&
+      query.get("sex") === "female" &&
+      query.get("morph") === "Pastel" &&
+      query.get("location") === "Rack 2" &&
+      query.get("sort") === "name";
+  })).toBeTruthy();
+});
+
 test("registri: aggiunge una pesata, la modifica e chiede conferma prima di eliminarla", async ({ page }) => {
   await signIn(page);
   await page.goto("/care/weights");
