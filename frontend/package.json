@@ -19,7 +19,9 @@
     "react-hook-form": "^7.91.0",
     "react-router-dom": "^7.18.3",
     "recharts": "^3.10.1",
-    "workbox-precaching": "^7.4.1"
+    "workbox-core": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
