@@ -16,6 +16,7 @@ const TAB_OPTIONS = [
   ["weights", "Peso"], ["sheds", "Mute"], ["notes", "Osservazioni"], ["feedings", "Alimentazioni"], ["genetics", "Genetica"]
 ];
 const TITLES = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings: "Alimentazione", genetics: "Tratti genetici" };
+const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
 const SHED = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
 const FEED_OUTCOME = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
@@ -228,7 +229,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       </div>
       {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali per filtro: pagina {animalsPagination.page} di {animalsPagination.totalPages} · {animalsPagination.total} totali</span><div className="inline-actions"><Button disabled={animalsPage <= 1} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Button><Button disabled={animalsPage >= animalsPagination.totalPages} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Button></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
-      <div className="inline-actions record-tools"><Button variant="primary" onClick={openCreate} disabled={tab !== "feedings" && !animalId}>＋ Nuovo {TITLES[tab].toLowerCase()}</Button>{busy && <span className="muted">Caricamento…</span>}</div>
+      <div className="inline-actions record-tools"><Button variant="primary" onClick={openCreate} disabled={tab !== "feedings" && !animalId}>＋ {CREATE_LABELS[tab] || "Nuovo registro"}</Button>{busy && <span className="muted">Caricamento…</span>}</div>
       {createOpen && <div className="embedded-form"><form className="form-grid" onSubmit={submitNew} key={tab + "-create"}>
         <h3 className="form-full">Nuovo registro · {TITLES[tab]}</h3>
         {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Peso in grammi" name="weightG" type="number" min="0.01" max="100000000" step="0.01" required/><div className="form-full"><Area label="Note" name="notes"/></div></>}

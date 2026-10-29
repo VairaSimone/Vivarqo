@@ -1,3 +1,4 @@
+import React from "react";
 import { Icon } from "../ui/Icon.jsx";
 
 export function MoreHub({onGo,groups,nav}) {

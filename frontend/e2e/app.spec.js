@@ -76,7 +76,7 @@ test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", 
 test("registri: aggiunge una pesata, la modifica e chiede conferma prima di eliminarla", async ({ page }) => {
   await signIn(page);
   await page.goto("/care/weights");
-  await page.getByRole("button", { name: /Nuovo peso/ }).click();
+  await page.getByRole("button", { name: /Nuova pesata/ }).click();
   await page.getByLabel("Peso in grammi").fill("342.5");
   await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
   await expect.poll(() => page.e2eState.weights.length).toBe(1);
@@ -99,7 +99,7 @@ test("registri: aggiunge una pesata, la modifica e chiede conferma prima di elim
 test("registrazioni alimentari: salva una sessione per più animali", async ({ page }) => {
   await signIn(page);
   await page.goto("/feeding");
-  await page.getByRole("button", { name: /Nuovo alimentazione/ }).click();
+  await page.getByRole("button", { name: /Nuova sessione/ }).click();
   await page.locator(".feeding-animal-option").filter({ hasText: "Naga" }).locator("input").check();
   await page.locator(".feeding-animal-option").filter({ hasText: "Boreal" }).locator("input").check();
   await page.getByLabel("Tipo alimento").first().fill("Ratto");
@@ -204,18 +204,61 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await expect.poll(() => page.e2eState.incubationLogs.length).toBe(1);
   await expect(page.getByText("30.5 °C")).toBeVisible();
 
+  const logRow = page.locator(".log-row").filter({ hasText: "controllo" });
+  await logRow.locator("details summary").click();
+  await logRow.getByLabel("Temperatura °C").fill("31");
+  await logRow.getByLabel("Note", { exact: true }).fill("Controllo aggiornato");
+  await logRow.getByRole("button", { name: "Salva controllo", exact: true }).click();
+  await expect.poll(() => page.e2eState.incubationLogs[0]?.temperatureC).toBe(31);
+  await logRow.getByRole("button", { name: "Elimina", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare il registro di incubazione?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  await expect.poll(() => page.e2eState.incubationLogs.length).toBe(1);
+  await logRow.getByRole("button", { name: "Elimina", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Elimina registro", exact: true }).click();
+  await expect.poll(() => page.e2eState.incubationLogs.length).toBe(0);
+
   await page.getByRole("tab", { name: "Piccoli e nascite" }).click();
-  await page.getByLabel("Numero di piccoli").fill("2");
-  await page.getByLabel("Note", { exact: true }).last().fill("Nascita di prova");
-  await page.getByRole("button", { name: "Registra lotto", exact: true }).click();
+  const offspringSection = page.locator(".reproduction-detail-section:visible").last();
+  const createBatchForm = offspringSection.locator(".embedded-form form").first();
+  await createBatchForm.getByLabel("Covata di origine (facoltativa)").selectOption("clutch-2");
+  await createBatchForm.getByLabel("Numero di piccoli").fill("2");
+  await createBatchForm.getByLabel("Note", { exact: true }).fill("Nascita di prova");
+  await createBatchForm.getByRole("button", { name: "Registra lotto", exact: true }).click();
   await expect.poll(() => page.e2eState.batches.length).toBe(1);
   await expect(page.getByText(/2 piccoli/)).toBeVisible();
-  await page.getByRole("button", { name: "Crea schede animali" }).click();
+
+  const batchRow = page.locator(".log-row").filter({ hasText: "2 piccoli" });
+  await batchRow.locator("details summary").click();
+  await batchRow.getByLabel("Note", { exact: true }).fill("Nascita modificata");
+  await batchRow.getByRole("button", { name: "Salva lotto", exact: true }).click();
+  await expect.poll(() => page.e2eState.batches[0]?.notes).toBe("Nascita modificata");
+
+  await createBatchForm.getByLabel("Numero di piccoli").fill("0");
+  await createBatchForm.getByLabel("Note", { exact: true }).fill("Lotto da eliminare");
+  await createBatchForm.getByRole("button", { name: "Registra lotto", exact: true }).click();
+  await expect.poll(() => page.e2eState.batches.length).toBe(2);
+  const disposableBatch = page.locator(".log-row").filter({ hasText: "0 piccoli" });
+  await disposableBatch.getByRole("button", { name: "Elimina lotto", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare il registro dei piccoli?");
+  await page.getByRole("dialog").getByRole("button", { name: "Elimina registro", exact: true }).click();
+  await expect.poll(() => page.e2eState.batches.length).toBe(1);
+
+  await batchRow.getByRole("button", { name: "Crea schede animali", exact: true }).click();
   await page.getByLabel("Prefisso dei nomi").fill("Cucciolo E2E");
   await page.getByLabel("Numero di schede (1–500)").fill("2");
   await page.getByRole("dialog").getByRole("button", { name: "Crea schede" }).click();
   await expect.poll(() => page.e2eState.animals.length).toBe(4);
   expect(page.e2eState.animals.some(item => item.name === "Cucciolo E2E 01")).toBeTruthy();
+
+  const originalClutch = page.locator(".clutch-card").filter({ hasText: "Incubatrice 1" });
+  await originalClutch.getByRole("button", { name: "Elimina", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare la covata?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  await expect.poll(() => page.e2eState.clutches.length).toBe(2);
+  await originalClutch.getByRole("button", { name: "Elimina", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Elimina covata", exact: true }).click();
+  await expect.poll(() => page.e2eState.clutches.length).toBe(1);
 });
 
 test("notifiche: salva preferenze, segna le notifiche lette e gestisce dispositivi", async ({ page }) => {
