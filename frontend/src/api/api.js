@@ -1,34 +1,6 @@
-import { enqueueOfflineMutation } from "../offlineQueue.js";
-
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 let csrfTokenInMemory = null;
 
-function normalizedPath(path) {
-  return String(path || "").replace(/^\/api\/v1\//, "").replace(/^\/+/, "").split("?")[0];
-}
-function isOfflineQueueable(method, path, body) {
-  if (SAFE_METHODS.has(method)) return false;
-  if (body !== undefined && body !== null && (typeof body !== "object" || body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer)) return false;
-  const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-  const p = normalizedPath(path);
-  const allowed = [
-    new RegExp("^animals(?:/" + uuid + ")?$"),
-    new RegExp("^animals/" + uuid + "/(?:weights|sheds|notes)$"),
-    new RegExp("^(?:weights|sheds|animal-notes|feeding-entries|genetic-traits)/" + uuid + "$"),
-    new RegExp("^animals/" + uuid + "/genetic-traits$"),
-    new RegExp("^feeding-sessions$"),
-    new RegExp("^tasks(?:/" + uuid + "(?:/complete)?)?$"),
-    new RegExp("^inventory/items(?:/" + uuid + ")?(?:/movements)?$"),
-    new RegExp("^finance/entries(?:/" + uuid + ")?$"),
-    new RegExp("^reproduction-cycles(?:/" + uuid + ")?(?:/events)?$"),
-    new RegExp("^reproductive-events/" + uuid + "$"),
-    new RegExp("^clutches(?:/" + uuid + ")?(?:/(?:eggs|incubation-logs))?$"),
-    new RegExp("^eggs/" + uuid + "$"),
-    new RegExp("^incubation-logs/" + uuid + "$"),
-    new RegExp("^offspring-batches(?:/" + uuid + ")?(?:/animals)?$")
-  ];
-  return allowed.some(pattern => pattern.test(p));
-}
 export async function getCsrfToken({ refresh = false } = {}) {
   if (csrfTokenInMemory && !refresh) return csrfTokenInMemory;
   const response = await fetch("/api/v1/auth/csrf", { method: "GET", credentials: "include", cache: "no-store", headers: { Accept: "application/json" } });
@@ -50,21 +22,17 @@ async function fetchWithCsrfRetry(url, init, headers) {
   return response;
 }
 export async function apiRequest(path, options = {}) {
-  const { queueWhenOffline = false, offlineOwner = null, offlineLabel = null, ...requestOptions } = options;
+  // Ignore legacy offline-queue options: writes are never queued in the first release.
+  const { queueWhenOffline: _queueWhenOffline, offlineOwner: _offlineOwner, offlineLabel: _offlineLabel, ...requestOptions } = options;
   const method = (requestOptions.method ?? "GET").toUpperCase();
+  if (!SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
+    const error = new Error("Serve una connessione a Internet per modificare i dati. La modifica non è stata salvata.");
+    error.code = "OFFLINE_MUTATION_BLOCKED";
+    error.status = 0;
+    throw error;
+  }
   const headers = new Headers(requestOptions.headers);
   let body = requestOptions.body;
-  if (queueWhenOffline && !SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
-    if (!isOfflineQueueable(method, path, body)) {
-      throw new Error("Questa operazione non può essere messa in coda offline. Riprova quando la connessione è disponibile.");
-    }
-    return enqueueOfflineMutation(offlineOwner, {
-      method,
-      path: normalizedPath(path),
-      body: body === undefined ? null : body,
-      label: offlineLabel || method + " " + normalizedPath(path)
-    });
-  }
   if (!SAFE_METHODS.has(method) && !path.includes("/webhooks/stripe")) headers.set("X-CSRF-Token", await getCsrfToken());
   if (body !== undefined && body !== null && typeof body === "object" && !(body instanceof FormData) && !(body instanceof Blob) && !(body instanceof ArrayBuffer)) {
     headers.set("Content-Type", "application/json");
