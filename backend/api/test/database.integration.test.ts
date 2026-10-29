@@ -19,7 +19,7 @@ describe.skipIf(!integrationEnabled)("PostgreSQL integration", () => {
         AND table_name <> '_prisma_migrations'
     `;
 
-    // Includes the PostgreSQL-backed shared authentication rate-limit table.
-    expect(Number(rows[0]?.table_count)).toBe(32);
+    // Includes the PostgreSQL-backed rate-limit table and push-delivery history.
+    expect(Number(rows[0]?.table_count)).toBe(33);
   });
 });
