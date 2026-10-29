@@ -6,8 +6,31 @@ import { ConfirmProvider } from "./ui/ConfirmDialog.jsx";
 import "./styles.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    navigator.serviceWorker.register("/sw.js").then(registration => {
+      const announceUpdateIfWaiting = () => {
+        if (!registration.waiting || !navigator.serviceWorker.controller) return;
+        window.dispatchEvent(new CustomEvent("vivarqo:pwa-update-ready", {
+          detail: { registration }
+        }));
+      };
+
+      announceUpdateIfWaiting();
+      registration.addEventListener("updatefound", () => {
+        const installing = registration.installing;
+        if (!installing) return;
+        installing.addEventListener("statechange", () => {
+          if (installing.state === "installed") announceUpdateIfWaiting();
+        });
+      });
+    }).catch(() => {
       // L'app rimane utilizzabile online anche se il service worker non si registra.
     });
   });
