@@ -1,4 +1,5 @@
 import { env } from "./config/env.js";
+import { initializeSentry } from "./monitoring/sentry.js";
 import { logger } from "./logger.js";
 import { prisma } from "./db/prisma.js";
 import { ensureDatabaseSchema } from "./db/schema-integrity.js";
@@ -14,6 +15,7 @@ let stopRetentionWorker: () => void = () => undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
+  initializeSentry();
   if (env.NODE_ENV === "production") getVapidCredentials();
 
   // Never accept HTTP traffic before pending migrations and schema verification finish.
