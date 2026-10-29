@@ -184,6 +184,9 @@ export function createAuthRouter(sender?: EmailSender) {
         displayName: auth.displayName,
         locale: auth.locale,
         timezone: auth.timezone,
+        weightUnit: auth.weightUnit,
+        temperatureUnit: auth.temperatureUnit,
+        displayPreferences: auth.displayPreferences,
         emailVerifiedAt: auth.emailVerifiedAt,
       },
     });
