@@ -1,6 +1,6 @@
 # Vivarqo
 
-Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository è organizzato come monorepo: `backend/` contiene l'API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi; `frontend/` contiene la base React + Vite da cui sviluppare le schermate della PWA.
+Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository è organizzato come monorepo: `backend/` contiene l'API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi; `frontend/` contiene l’interfaccia React + Vite con i principali moduli applicativi e la shell installabile PWA.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -45,7 +45,7 @@ curl http://localhost:3000/readyz
 
 - `GET /healthz`: liveness, non dipende da PostgreSQL.
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
-- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti sotto. Il frontend React è inizializzato con una dashboard dimostrativa; le schermate di dominio e l'esperienza PWA completa verranno sviluppate progressivamente.
+- Sono disponibili le API di account, autenticazione e i principali moduli di dominio; il frontend include schermate applicative collegate alle API. La presenza di una schermata non certifica da sola la conformità a ogni dettaglio della specifica.
 
 ## Account e autenticazione
 
@@ -88,11 +88,14 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | `pnpm build:api` | Compila solo l'API |
 
 ## Stato del repository
-Il repository contiene un backend API per account e impostazioni, autenticazione, animali e registri di cura, attività e promemoria, riproduzioni, inventario, documenti/condivisioni pubbliche, import/export, finanze, billing Stripe e notifiche. La presenza di un endpoint non sostituisce la verifica del suo stato operativo, della configurazione dei provider e dei processi di produzione.
 
-Ancora da completare: schermate React collegate alle API, installabilità PWA (manifest/service worker), pagine legali pubblicabili, flusso self-service completo di cancellazione account, gestione del consenso per eventuali tracker e segnalazione/moderazione dei contenuti pubblici. Prima del lancio, verificare i punti in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md).
+Il repository contiene un backend API per account/autenticazione, animali e registri di cura, attività/calendario, riproduzioni, inventario, documenti e condivisioni QR, genetica, finanze, import/export, billing Stripe e notifiche in-app/Web Push. Il frontend include schermate per questi principali flussi; l'implementazione non è ancora integralmente conforme alla specifica tecnica 1.0.
 
-Le discrepanze note sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica ricevuta è conservata in [backend/docs/specification.md](backend/docs/specification.md).
+Le modifiche sui dati richiedono connettività: la coda locale di mutazioni offline è stata rimossa per rispettare il perimetro della prima release. Il service worker memorizza solo asset statici e non conserva le risposte private dell'API.
+
+Restano da completare o verificare prima del lancio: migrazione del frontend allo stack TypeScript e alle librerie UI/dati/form/PWA prescritte; contratto OpenAPI completo; coda persistente per job e notifiche; cancellazione self-service dell'account; preferenze e campi anagrafici non ancora esposti; integrazione Sentry; pagine legali e flussi privacy; configurazione e test reali di storage UE, Stripe Test Mode, backup/ripristino e distribuzione. La checklist in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
+
+Le decisioni e le discrepanze tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica di riferimento è conservata in [backend/docs/specification.md](backend/docs/specification.md).
 
 ## Anagrafiche animali e registri di cura
 
@@ -194,7 +197,7 @@ Creare una regola attiva genera la sua prima attività. Quando questa viene comp
 - `GET /api/v1/home/today`: attività in scadenza oggi, scadute ancora aperte, completate oggi, promemoria imminenti, eventi recenti e collegamento rapido alla registrazione multipla delle alimentazioni. Il giorno è calcolato nel fuso orario dell’account.
 - `GET /api/v1/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD&view=month|week|list`: attività e record riproduttivi reali nel periodo selezionato, con date e fuso orario espliciti. Gli eventi di deposizione sono derivati anche dai record delle covate e vengono deduplicati quando esiste già un evento riproduttivo di deposizione nella stessa data/ciclo. Il calendario esclude per default le attività ignorate; `includeDismissed=true` permette di includerle.
 
-La Home e il calendario sono per ora endpoint backend: la base React è presente, ma queste schermate non sono ancora collegate ai dati reali. Il worker backend controlla ogni minuto le attività aperte già scadute e crea notifiche deduplicate; l'invio push rispetta le preferenze e le fasce di quiet hours.
+La Home e il calendario sono collegati alle API. Il worker controlla le attività aperte scadute, crea notifiche deduplicate e tenta l'invio push rispettando preferenze e fasce di quiet hours; la consegna e i retry persistenti richiedono ancora ulteriori verifiche.
 
 ## Moduli di dominio: riproduzioni, inventario, documenti, finanze e notifiche
 
@@ -306,4 +309,4 @@ Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HT
 - DATABASE_URL=... pnpm db:backup crea un dump PostgreSQL custom in ./backups, verifica l'archivio e scrive un checksum SHA-256. La copia va poi trasferita in storage cifrato e separato dal database.
 - CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump verifica il checksum, se presente, e ripristina nel database di destinazione. Il comando non elimina gli oggetti esistenti: usare un database dedicato e vuoto e predisporre prima uno snapshot di rollback.
 
-La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend sono implementate e il frontend React è inizializzato; l'interfaccia completa e le funzionalità PWA restano da sviluppare.
+La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend e le principali schermate React/PWA sono implementate; restano le discrepanze di stack e i flussi elencati nella sezione Stato del repository.
