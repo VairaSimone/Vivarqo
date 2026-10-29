@@ -16,7 +16,12 @@ const cleanAnimal = raw => ({
   species: String(raw.species || "").trim(),
   sex: raw.sex || "unknown",
   morph: String(raw.morph || "").trim() || null,
+  geneticsNotes: String(raw.geneticsNotes || "").trim() || null,
   birthDate: raw.birthDate || null,
+  birthDateEstimated: raw.birthDateEstimated === true || raw.birthDateEstimated === "on",
+  acquiredDate: raw.acquiredDate || null,
+  originDescription: String(raw.originDescription || "").trim() || null,
+  previousBreeder: String(raw.previousBreeder || "").trim() || null,
   locationLabel: String(raw.locationLabel || "").trim() || null,
   notes: String(raw.notes || "").trim() || null,
   ...(raw.status ? { status: raw.status } : {})
@@ -165,7 +170,12 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
         <Input label="Identificativo" name="identifier" defaultValue={editor.animal?.identifier} maxLength="120"/>
         <Select label="Sesso" name="sex" defaultValue={editor.animal?.sex || "unknown"} options={sexOptions}/>
         <Input label="Morph" name="morph" defaultValue={editor.animal?.morph} maxLength="200"/>
+        <Input label="Annotazioni genetiche dichiarate" name="geneticsNotes" defaultValue={editor.animal?.geneticsNotes} maxLength="10000"/>
         <Input label="Data di nascita" name="birthDate" type="date" defaultValue={editor.animal?.birthDate ? String(editor.animal.birthDate).slice(0, 10) : ""}/>
+        <label className="checkbox-field form-full"><input type="checkbox" name="birthDateEstimated" defaultChecked={Boolean(editor.animal?.birthDateEstimated)}/><span>La data di nascita è stimata</span></label>
+        <Input label="Data di acquisizione" name="acquiredDate" type="date" defaultValue={editor.animal?.acquiredDate ? String(editor.animal.acquiredDate).slice(0, 10) : ""}/>
+        <Input label="Allevatore precedente" name="previousBreeder" defaultValue={editor.animal?.previousBreeder} maxLength="160"/>
+        <label className="field form-full"><span>Provenienza</span><textarea name="originDescription" defaultValue={editor.animal?.originDescription || ""} rows="2" maxLength="5000"/></label>
         <Input label="Stabulazione / posizione" name="locationLabel" defaultValue={editor.animal?.locationLabel} maxLength="160"/>
         {editor.animal?.status !== "archived" && <Select label="Stato" name="status" defaultValue={editor.animal?.status || "active"} options={statusOptions}/>}
         <label className="field form-full"><span>Note</span><textarea name="notes" defaultValue={editor.animal?.notes || ""} rows="3" maxLength="10000"/></label>
