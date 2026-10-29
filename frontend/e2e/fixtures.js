@@ -186,6 +186,7 @@ export async function mockApi(context) {
       return respond({});
     }
     const clutchEggs = path.match(/^clutches\/([^/]+)\/eggs$/);
+    if (clutchEggs && method === "GET") return respond(itemsResponse("eggs", state.eggs.filter(item => item.clutchId === clutchEggs[1])));
     if (clutchEggs && method === "POST") {
       const created = (body.eggs || []).map(item => ({ id: nextId("egg"), clutchId: clutchEggs[1], ...item }));
       state.eggs.push(...created);
@@ -201,6 +202,7 @@ export async function mockApi(context) {
       return respond({});
     }
     const clutchLogs = path.match(/^clutches\/([^/]+)\/incubation-logs$/);
+    if (clutchLogs && method === "GET") return respond(itemsResponse("logs", state.incubationLogs.filter(item => item.clutchId === clutchLogs[1])));
     if (clutchLogs && method === "POST") {
       const created = { id: nextId("log"), clutchId: clutchLogs[1], ...body };
       state.incubationLogs.push(created);
