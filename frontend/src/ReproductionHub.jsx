@@ -177,8 +177,9 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       status: v.status, parentAAnimalId: nullable(v.parentAAnimalId), parentBAnimalId: nullable(v.parentBAnimalId), notes: nullable(v.notes)
     };
     try {
-      const response = await api(editCycle ? "reproduction-cycles/" + editCycle.id : "reproduction-cycles", {
-        method: editCycle ? "PATCH" : "POST", body
+      const editingCycle = Boolean(editCycle?.id);
+      const response = await api(editingCycle ? "reproduction-cycles/" + editCycle.id : "reproduction-cycles", {
+        method: editingCycle ? "PATCH" : "POST", body
       }, "Ciclo riproduttivo");
       if (response.queuedOffline) { setEditCycle(null); return; }
       setEditCycle(null);
@@ -212,8 +213,9 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct)
     };
     try {
-      const response = await api(editEvent ? "reproductive-events/" + editEvent.id : "reproduction-cycles/" + cycleId + "/events", {
-        method: editEvent ? "PATCH" : "POST", body
+      const editingEvent = Boolean(editEvent?.id);
+      const response = await api(editingEvent ? "reproductive-events/" + editEvent.id : "reproduction-cycles/" + cycleId + "/events", {
+        method: editingEvent ? "PATCH" : "POST", body
       }, "Evento riproduttivo");
       if (!response.queuedOffline) { setEditEvent(null); await loadCycle(); }
       else setEditEvent(null);
@@ -232,9 +234,10 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       notes: nullable(v.notes)
     };
     try {
-      const response = await api(editClutch ? "clutches/" + editClutch.id : "clutches", {
-        method: editClutch ? "PATCH" : "POST",
-        body: editClutch ? body : { ...body, cycleId }
+      const editingClutch = Boolean(editClutch?.id);
+      const response = await api(editingClutch ? "clutches/" + editClutch.id : "clutches", {
+        method: editingClutch ? "PATCH" : "POST",
+        body: editingClutch ? body : { ...body, cycleId }
       }, "Covata");
       if (response.queuedOffline) { setEditClutch(null); return; }
       setEditClutch(null);

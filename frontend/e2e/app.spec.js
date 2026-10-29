@@ -161,6 +161,34 @@ test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ p
   expect(page.e2eState.share.isEnabled).toBe(false);
 });
 
+test("riproduzione: crea un ciclo e un evento associato", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/reproduction");
+  await expect(page.locator(".cycle-card").filter({ hasText: "Riproduzione 2026" })).toBeVisible();
+
+  await page.getByRole("button", { name: /Nuovo ciclo/ }).click();
+  await page.getByLabel("Nome del ciclo").fill("Ciclo E2E");
+  await page.getByLabel("Data inizio").fill("2026-06-01");
+  await page.getByLabel("Genitore A").selectOption("animal-1");
+  await page.getByLabel("Genitore B").selectOption("animal-2");
+  await page.getByRole("button", { name: "Salva ciclo", exact: true }).click();
+  await expect.poll(() => page.e2eState.cycles.some(item => item.name === "Ciclo E2E")).toBe(true);
+  expect(page.e2eState.requests.some(item => item.path === "reproduction-cycles" && item.method === "POST")).toBeTruthy();
+
+  const eventsTab = page.getByRole("tab", { name: "Eventi e osservazioni" });
+  await expect(eventsTab).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: /Evento/ }).click();
+  await page.getByLabel("Tipo evento").selectOption("pairing");
+  await page.getByLabel("Data e ora").fill("2026-06-02T12:00");
+  await page.getByLabel("Dettagli").fill("Accoppiamento E2E");
+  await page.getByRole("button", { name: "Salva evento", exact: true }).click();
+
+  await expect.poll(() => page.e2eState.events.length).toBe(1);
+  expect(page.e2eState.events[0].cycleId).toBeTruthy();
+  expect(page.e2eState.requests.some(item => /^reproduction-cycles\/[^/]+\/events$/.test(item.path) && item.method === "POST")).toBeTruthy();
+  await expect(page.getByText("Accoppiamento E2E")).toBeVisible();
+});
+
 test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ page }) => {
   await signIn(page);
   await page.goto("/reproduction");

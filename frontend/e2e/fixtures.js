@@ -23,7 +23,7 @@ export async function mockApi(context) {
   const state = {
     authenticated: false, failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
     animals: [animal, secondAnimal], cycle, cycles: [cycle], clutches: [clutch], eggs: [],
-    incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
+    events: [], incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
     share: null,
     notifications: [{ id: "notice-1", title: "Attività in scadenza", body: "Controlla la scheda di Naga.", category: "task_due", createdAt: "2026-10-28T10:00:00.000Z", readAt: null, targetPath: "/animals/animal-1" }],
     unreadCount: 1,
@@ -161,7 +161,15 @@ export async function mockApi(context) {
 
     if (path === "reproduction-cycles" && method === "GET") return respond(itemsResponse("cycles", state.cycles));
     const cycleEvents = path.match(/^reproduction-cycles\/([^/]+)\/events$/);
-    if (cycleEvents && method === "GET") return respond({ events: [], pagination: pagination([]) });
+    if (cycleEvents && method === "GET") {
+      const list = state.events.filter(item => item.cycleId === cycleEvents[1]);
+      return respond(itemsResponse("events", list));
+    }
+    if (cycleEvents && method === "POST") {
+      const created = { id: nextId("event"), cycleId: cycleEvents[1], ...body };
+      state.events.push(created);
+      return respond({ event: created });
+    }
     const cycleClutches = path.match(/^reproduction-cycles\/([^/]+)\/clutches$/);
     if (cycleClutches && method === "GET") return respond(itemsResponse("clutches", state.clutches.filter(item => item.cycleId === cycleClutches[1])));
     const cycleDetail = path.match(/^reproduction-cycles\/([^/]+)$/);
@@ -176,8 +184,13 @@ export async function mockApi(context) {
       state.cycles.push(state.cycle);
       return respond({ cycle: state.cycle });
     }
-    if (path === "reproductive-events" && method === "POST") return respond({ event: { id: nextId("event"), ...body } });
-    if (/^reproductive-events\/[^/]+$/.test(path) && ["PATCH", "DELETE"].includes(method)) return respond({});
+    const reproductiveEvent = path.match(/^reproductive-events\/([^/]+)$/);
+    if (reproductiveEvent && ["PATCH", "DELETE"].includes(method)) {
+      const index = state.events.findIndex(item => item.id === reproductiveEvent[1]);
+      if (method === "PATCH" && index >= 0) state.events[index] = { ...state.events[index], ...body };
+      if (method === "DELETE" && index >= 0) state.events.splice(index, 1);
+      return respond({});
+    }
     if (path === "clutches" && method === "POST") {
       const created = { id: nextId("clutch"), cycleId: body.cycleId, eggCount: Number(body.eggCount), status: body.status, laidOn: body.laidOn, incubatorLabel: body.incubatorLabel, incubationStartedAt: body.incubationStartedAt, notes: body.notes, _count: { eggs: 0, incubationLogs: 0 } };
       state.clutches.push(created);
