@@ -12,6 +12,10 @@ import { CalendarHub } from "./CalendarHub.jsx";
 import { InventoryMovementHistory } from "./InventoryMovementHistory.jsx";
 import { FinanceSummary } from "./FinanceSummary.jsx";
 import { Icon } from "./ui/Icon.jsx";
+import { Dashboard } from "./components/Dashboard.jsx";
+import { Records } from "./components/Records.jsx";
+import { DataTools } from "./components/DataTools.jsx";
+import { SettingsPage } from "./components/SettingsPage.jsx";
 import { Dialog } from "./ui/Dialog.jsx";
 import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
@@ -176,197 +180,11 @@ function MoreHub({onGo}) {
  return <div className="more-hub">{NAV_GROUPS.map(group=><section className="more-category" key={group.id}><div className="more-category-heading"><p className="eyebrow">{group.label}</p><span>{group.items.length} {group.items.length===1?"sezione":"sezioni"}</span></div><div className="more-grid">{group.items.map(id=>{const [,label,icon,description]=NAV.find(item=>item[0]===id)||[];return <button className="more-card" key={id} onClick={()=>onGo(id)}><span className="more-icon" aria-hidden="true"><Icon name={icon} size={21}/></span><span className="more-copy"><strong>{label}</strong><small>{description}</small></span><span className="more-arrow" aria-hidden="true">↗</span></button>;})}</div></section>)}</div>;
 }
 
-function Dashboard({data,onGo,onRetry}) {
- const due=asArray(data?.tasks?.dueToday??data?.dueToday);
- const overdue=asArray(data?.tasks?.overdue??data?.overdue);
- const [operational,setOperational]=useState({stock:[],cycles:[],feeds:[],animalCount:null,stockLoaded:false,cyclesLoaded:false,feedsLoaded:false,animalsLoaded:false});
- useEffect(()=>{
-  let live=true;
-  Promise.allSettled([
-   apiRequest("inventory/items?page=1&pageSize=8&active=true&lowStock=true"),
-   apiRequest("reproduction-cycles?page=1&pageSize=8"),
-   apiRequest("feeding-sessions?page=1&pageSize=5"),
-   apiRequest("animals?page=1&pageSize=1&status=all")
-  ]).then(([stockResult,cyclesResult,feedsResult,animalsResult])=>{
-   if(!live)return;
-   const inventory=stockResult.status==="fulfilled"?asArray(stockResult.value):[];
-   const cycles=cyclesResult.status==="fulfilled"?asArray(cyclesResult.value):[];
-   const feeds=feedsResult.status==="fulfilled"?asArray(feedsResult.value):[];
-   const animalResponse=animalsResult.status==="fulfilled"?animalsResult.value:null;
-   setOperational({
-    stock:inventory.filter(item=>item.isActive!==false&&item.minimumQuantity!=null&&Number(item.quantityOnHand)<=Number(item.minimumQuantity)),
-    cycles:cycles.filter(item=>["active","planned"].includes(item.status)).slice(0,5),
-    feeds,
-    animalCount:animalResponse?.pagination?.total??null,
-    stockLoaded:stockResult.status==="fulfilled",
-    cyclesLoaded:cyclesResult.status==="fulfilled",
-    feedsLoaded:feedsResult.status==="fulfilled",
-    animalsLoaded:animalsResult.status==="fulfilled"
-   });
-  });
-  return ()=>{live=false;};
- },[]);
- const recent=operational.feeds;
- const taskAnimalNames=[...overdue,...due].map(task=>task.animal?.name||task.animalName).filter(Boolean);
- const animalsToCheck=[...new Set(taskAnimalNames)];
- const recentBreeding=asArray(data?.recentEvents).filter(event=>event.type==="reproduction").slice(0,3);
- const dueCount=data?.counts?.dueToday??data?.dueTodayCount??due.length;
- const overdueCount=data?.counts?.overdue??data?.overdueCount??overdue.length;
- const stat=[
-  ["Animali registrati",operational.animalCount??"—",operational.animalsLoaded?"Schede nel tuo account":"Conteggio non disponibile"],
-  ["Da fare oggi",dueCount,"Attività in scadenza"],
-  ["In ritardo",overdueCount,"Da verificare"],
-  ["Pasti recenti",operational.feedsLoaded?recent.length:"—","Ultime sessioni registrate"]
- ];
- return <div className="operational-dashboard">
-  <div className="stats-grid">{stat.map(([label,val,caption],i)=><article className={"stat-card tone-"+i} key={label}><span>{label}</span><strong>{val}</strong><small>{caption}</small></article>)}</div>
-  <div className="dashboard-grid">
-   <section className="panel dashboard-focus"><div className="panel-heading"><div><p className="eyebrow">PRIORITÀ</p><h2>Da fare e da recuperare</h2><p className="subheading">Prima le scadenze superate, poi quelle di oggi.</p></div><Button variant="quiet" onClick={()=>onGo("attivita")}>Calendario ↗</Button></div>
-    {due.length+overdue.length===0?<div className="dashboard-empty"><span className="status-mark">✓</span><div><strong>Nessuna scadenza segnalata</strong><p>Non risultano attività in ritardo o in scadenza nei dati restituiti dal server.</p></div></div>:<div className="task-list">{[...overdue,...due].slice(0,10).map((task,i)=><article className="task-row" key={task.id||i}><span className={"task-bullet "+(i<overdue.length?"is-overdue":"")}>{i<overdue.length?"!":"•"}</span><div><strong>{value(task,["title","name"],"Attività")}</strong><small>{task.animal?.name||value(task,["description"],"Promemoria")} · {date(value(task,["dueAt","scheduledAt"]))}</small></div><span className={"pill "+(i<overdue.length?"danger":"sage")}>{i<overdue.length?"In ritardo":"Oggi"}</span></article>)}</div>}
-    {animalsToCheck.length>0&&<div className="dashboard-inline-note"><strong>Animali collegati alle scadenze</strong><div className="tag-list">{animalsToCheck.slice(0,8).map(name=><span className="data-tag" key={name}>{name}</span>)}</div></div>}
-   </section>
-   <section className="panel dashboard-actions"><p className="eyebrow">AZIONI FREQUENTI</p><h2>Registra in pochi passaggi</h2><div className="dashboard-action-grid">{[["plus","Nuovo animale","animali"],["feeding","Registra alimentazione","alimentazioni"],["weight","Peso, muta o nota","cure"],["task","Nuova attività","attivita"]].map(([icon,label,id])=><button className="dashboard-action" key={id} onClick={()=>onGo(id)}><span><Icon name={icon} size={18}/></span><strong>{label}</strong><b aria-hidden="true"><Icon name="external" size={14}/></b></button>)}</div><div className="dashboard-inline-links"><button onClick={()=>onGo("inventario")}>Apri inventario</button><button onClick={()=>onGo("riproduzioni")}>Apri riproduzioni</button></div></section>
-  </div>
-  <div className="dashboard-ops-grid">
-   <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ANIMALI</p><h2>Chi richiede attenzione</h2></div><Button variant="quiet" onClick={()=>onGo("animali")}>Apri elenco ↗</Button></div>
-    {animalsToCheck.length>0?<div className="task-list">{animalsToCheck.slice(0,6).map(name=><div className="compact-info-row" key={name}><span className="mini-status-dot"/><strong>{name}</strong><span className="muted">Collegato a una scadenza</span></div>)}</div>:<p className="dashboard-helper">Quando un'attività in ritardo o prevista per oggi è associata a un animale, il suo nome compare qui. Non vengono creati controlli fittizi.</p>}
-   </section>
-   <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ALIMENTAZIONI</p><h2>Ultimi pasti</h2></div><Button variant="quiet" onClick={()=>onGo("alimentazioni")}>Registro ↗</Button></div>
-    {!operational.feedsLoaded?<p className="dashboard-helper">Non è stato possibile leggere le sessioni di alimentazione.</p>:recent.length===0?<p className="dashboard-helper">Nessuna sessione di alimentazione registrata.</p>:<div className="task-list">{recent.slice(0,5).map((item,i)=>{const entries=asArray(item.entries);const animalNames=entries.map(entry=>entry.animal?.name).filter(Boolean);const foods=Array.from(new Set(entries.map(entry=>entry.foodType).filter(Boolean)));return <div className="compact-info-row" key={item.id||i}><span className="feeding-dot">◉</span><div className="compact-info-copy"><strong>{animalNames.join(", ")||"Sessione di alimentazione"}</strong><small>{date(value(item,["performedAt","fedAt","createdAt"]))} · {foods.join(", ")||value(item,["notes"],"Pasto registrato")}</small></div></div>;})}</div>}
-    <Button variant="secondary" onClick={()=>onGo("alimentazioni")}>＋ Registra alimentazione</Button>
-   </section>
-   <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SCORTE</p><h2>Sotto soglia</h2></div><Button variant="quiet" onClick={()=>onGo("inventario")}>Inventario ↗</Button></div>
-    {!operational.stockLoaded?<p className="dashboard-helper">Stato scorte non disponibile. Apri l’inventario per aggiornare i dati.</p>:operational.stock.length===0?<p className="dashboard-helper">Nessun articolo sotto soglia tra quelli restituiti dal server.</p>:<div className="task-list">{operational.stock.slice(0,5).map(item=><div className="compact-info-row" key={item.id}><span className="stock-warning">!</span><div className="compact-info-copy"><strong>{item.name}</strong><small>{item.quantityOnHand} {item.unit||""} disponibili · soglia {item.minimumQuantity}</small></div></div>)}</div>}
-   </section>
-   <section className="panel"><div className="panel-heading"><div><p className="eyebrow">RIPRODUZIONE</p><h2>Cicli e covate da seguire</h2></div><Button variant="quiet" onClick={()=>onGo("riproduzioni")}>Apri ↗</Button></div>
-    {!operational.cyclesLoaded?<p className="dashboard-helper">Non è stato possibile leggere i cicli riproduttivi in questo momento.</p>:operational.cycles.length===0&&!recentBreeding.length?<p className="dashboard-helper">Nessun ciclo pianificato/in corso o evento recente restituito dal server.</p>:<div className="task-list">{operational.cycles.map(cycle=><div className="compact-info-row" key={cycle.id}><span className="cycle-dot">✳</span><div className="compact-info-copy"><strong>{cycle.name||"Ciclo riproduttivo"}</strong><small>{cycle.parentA?.name||"Genitore A —"} × {cycle.parentB?.name||"Genitore B —"} · {cycle.status==="active"?"In corso":"Pianificato"} · {cycle._count?.clutches??0} covate</small></div></div>)}{recentBreeding.map((event,i)=><div className="compact-info-row" key={event.record?.id||event.id||i}><span className="cycle-dot">◷</span><div className="compact-info-copy"><strong>{event.record?.cycle?.name||event.title||"Evento riproduttivo"}</strong><small>{date(value(event,["occurredAt"]))} · {value(event.record||{},["eventType"],event.title||"Registrazione")}</small></div></div>)}</div>}
-   </section>
-  </div>
-  <div className="dashboard-footnote">Dati personali del tuo account. Le liste mostrano ciò che il server restituisce, senza creare record dimostrativi.</div>
- </div>;
-}
-function Records({active,data,rows,onSearch,query,onCare,onReload,onTask,onGo,onEdit,onDelete,onMovement,onHistory,onPageChange}) {
- const titles={animali:"Schede animali",inventario:"Scorte e materiali",alimentazioni:"Storico alimentazioni",attivita:"Attività e promemoria",finanze:"Entrate e uscite",notifiche:"Centro notifiche",riproduzioni:"Riproduzioni",documenti:"Documenti e condivisioni",genetica:"Morph e genetica",peso:"Storico pesi",mute:"Storico mute",note:"Osservazioni"};
- const shown=rows.map(r=>({raw:r,display:active==="animali"?{Nome:value(r,["name"]),Identificativo:value(r,["identifier"]),Specie:value(r,["species"]),Sesso:value(r,["sex"]),Morph:value(r,["morph"]),Stabulazione:value(r,["locationLabel"]),Stato:value(r,["status"])}:active==="inventario"?{Articolo:value(r,["name"]),Categoria:value(r,["category"]),Quantità:value(r,["quantityOnHand"]),Unità:value(r,["unit"]),Soglia:value(r,["minimumQuantity"]),Stato:r.isActive===false?"Archiviato":"Attivo",Scorte:r.minimumQuantity==null?"Soglia non impostata":Number(r.quantityOnHand)<=Number(r.minimumQuantity)?"Sotto soglia":"Adeguate"}:active==="alimentazioni"?{Data:date(value(r,["performedAt","fedAt","createdAt"])),Animale:value(r,["animalName","animalId"]),Esito:value(r,["outcome"]),Cibo:value(r,["foodType"]),Note:value(r,["notes"])}:active==="attivita"?{Attività:value(r,["title","name"]),Scadenza:date(value(r,["dueAt"])),Categoria:value(r,["category"]),Stato:value(r,["status"]),Descrizione:value(r,["description"])}:active==="finanze"?{Descrizione:value(r,["description"]),Tipo:value(r,["entryType"]),Data:date(value(r,["occurredOn"])),Importo:money(value(r,["amountCents"])),Categoria:value(r,["category"])}:active==="notifiche"?{Titolo:value(r,["title"]),Messaggio:value(r,["body"]),Data:date(value(r,["createdAt"])),Stato:r.readAt?"Letta":"Non letta"}:Object.fromEntries(Object.entries(r).filter(([k,v])=>!["userId","updatedAt","createdAt","id"].includes(k)&&["string","number","boolean"].includes(typeof v)).slice(0,6).map(([k,v])=>[k.replace(/([A-Z])/g," $1"),String(v)]))}));
- const rowActions=raw=><div className="inline-actions record-actions">
-   {onEdit&&<Button onClick={()=>onEdit(raw)}><Icon name="edit" size={14}/> Modifica</Button>}
-   {active==="attivita"&&<Button onClick={()=>onTask(raw,"complete")}><Icon name="check" size={14}/> Completa</Button>}
-   {active==="inventario"&&onHistory&&<Button onClick={()=>onHistory(raw)}>Storico</Button>}
-   {active==="inventario"&&onMovement&&<Button onClick={()=>onMovement(raw)}>Movimento</Button>}
-   {onDelete&&<Button variant="danger" onClick={()=>onDelete(raw)}><Icon name={active==="inventario"?"archive":"trash"} size={14}/>{active==="inventario"?"Archivia":"Elimina"}</Button>}
-  </div>;
- return <section className="panel records-panel">
-  <div className="panel-heading"><div><p className="eyebrow">DATI DEL TUO ACCOUNT</p><h2>{titles[active]||TITLES[active]||active}</h2><p className="subheading">Dati reali del tuo allevamento, ordinati per una consultazione rapida.</p></div><Button variant="secondary" onClick={onReload}><Icon name="refresh" size={15}/> Aggiorna</Button></div>
-  {["animali","inventario","alimentazioni","attivita","finanze"].includes(active)&&<input className="search-input" type="search" placeholder="Cerca nei record…" value={query} onChange={e=>onSearch(e.target.value)} aria-label="Cerca nei risultati"/>}
-  {shown.length===0?<div className="empty-state"><span><Icon name="search" size={25}/></span><h3>Nessun dato trovato</h3><p>Prova a modificare la ricerca oppure crea una nuova registrazione nella sezione dedicata.</p></div>:<>
-   <div className="table-wrap"><table><thead><tr>{Object.keys(shown[0].display).map(k=><th key={k}>{k}</th>)}<th>Azioni</th></tr></thead><tbody>{shown.map(({raw,display},i)=><tr key={raw.id||i}>{Object.entries(display).map(([k,v])=><td key={k}>{String(v)}</td>)}<td>{rowActions(raw)}</td></tr>)}</tbody></table></div>
-   <div className="record-mobile-list">{shown.map(({raw,display},i)=>{const entries=Object.entries(display);const [mainLabel,mainValue]=entries[0]||["Record","Record"];return <article className="record-mobile-card" key={raw.id||i}>
-     <header><strong>{String(mainValue)}</strong>{display.Stato&&<span className={"pill "+(/attivo|adeguate|letta/i.test(String(display.Stato))?"sage":"")}>{String(display.Stato)}</span>}</header>
-     <dl>{entries.slice(1).filter(([label])=>label!=="Stato").map(([label,value])=><div key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}</dl>
-     {rowActions(raw)}
-   </article>;})}</div>
-  </>}
-  {data?.pagination&&<div className="pagination-bar"><span className="muted">Pagina {data.pagination.page||1} di {Math.max(1,data.pagination.totalPages||1)} · {data.pagination.total??shown.length} risultati</span><div className="inline-actions"><Button disabled={(data.pagination.page||1)<=1} onClick={()=>onPageChange?.(Math.max(1,(data.pagination.page||1)-1))}><Icon name="back" size={14}/> Precedente</Button><Button disabled={(data.pagination.page||1)>=(data.pagination.totalPages||1)} onClick={()=>onPageChange?.((data.pagination.page||1)+1)}>Successiva <Icon name="next" size={14}/></Button></div></div>}
- </section>;
-}
+
+
 function CareHub({onCare}){return <div className="care-grid">{[["weights","Peso","Registra il peso in grammi e confronta lo storico."],["sheds","Mute","Annota esito e data della muta."],["notes","Osservazioni","Aggiungi una nota alla scheda dell’animale."]].map(([type,title,desc])=><article className="panel care-card" key={type}><span className="care-symbol">＋</span><h2>{title}</h2><p>{desc}</p><Button onClick={()=>onCare(type)}>Nuova registrazione</Button></article>)}</div>;}
-function DataTools({onNotice}) {
-  const confirmAction = useConfirmDialog();
-  const [file, setFile] = useState(null);
-  const [entity, setEntity] = useState("animals");
-  const [preview, setPreview] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [includeDocs, setIncludeDocs] = useState(false);
-  const [exportJob, setExportJob] = useState(null);
-  const entities = [["animals","Animali"],["weights","Pesate"],["sheds","Mute"],["notes","Note"],["feedings","Alimentazioni"],["finance","Finanze"],["inventory","Inventario"],["reproductionCycles","Cicli riproduttivi"],["reproductiveEvents","Eventi riproduttivi"],["clutches","Covate"],["eggs","Uova"],["incubationLogs","Controlli d’incubazione"],["offspringBatches","Lotti di piccoli"]];
-  const upload = async e => {
-    e.preventDefault();
-    if (!file) return onNotice("Scegli prima un file CSV o XLSX.", "error");
-    setBusy(true);
-    try {
-      const result = await apiUpload("imports?entity=" + encodeURIComponent(entity), file);
-      setPreview(result);
-      onNotice("Anteprima pronta: nessun dato importato ancora.");
-    } catch (error) { onNotice(error.message, "error"); }
-    finally { setBusy(false); }
-  };
-  const downloadWhenReady = async id => {
-    setBusy(true);
-    try {
-      const result = await apiRequest("exports/" + encodeURIComponent(id));
-      setExportJob({ ...result.export, ready: result.ready });
-      if (result.ready) window.location.assign("/api/v1/exports/" + encodeURIComponent(id) + "/download");
-      else onNotice("L'esportazione non è ancora pronta. Verifica nuovamente lo stato tra poco.", "warning");
-    } catch (error) { onNotice(error.message, "error"); }
-    finally { setBusy(false); }
-  };
-  const exportData = async () => {
-    setBusy(true);
-    try {
-      const result = await apiRequest("exports", { method: "POST", body: { includeDocuments: includeDocs } });
-      const id = result?.export?.id;
-      if (!id) throw new Error("Il server non ha restituito l'identificativo dell'esportazione.");
-      setExportJob({ ...result.export, ready: false });
-      const status = await apiRequest("exports/" + encodeURIComponent(id));
-      setExportJob({ ...status.export, ready: status.ready });
-      if (status.ready) window.location.assign("/api/v1/exports/" + encodeURIComponent(id) + "/download");
-      else onNotice("L'esportazione non è ancora pronta. Verifica nuovamente lo stato tra poco.", "warning");
-    } catch (error) { onNotice(error.message, "error"); }
-    finally { setBusy(false); }
-  };
-  const confirmImport = async () => {
-    if (!preview) return;
-    const possibleDuplicates = Array.isArray(preview.possibleDuplicates) ? preview.possibleDuplicates : [];
-    let body = {};
-    if (entity === "animals" && possibleDuplicates.length > 0) {
-      const accepted = await confirmAction({title:"Possibili duplicati",message:"L’anteprima segnala "+possibleDuplicates.length+" possibili duplicati per nome e specie. Gli identificativi già esistenti saranno comunque verificati dal server.",confirmLabel:"Procedi con l’importazione",danger:true});
-      if (!accepted) return;
-      body = { allowPossibleDuplicates: true };
-    }
-    setBusy(true);
-    try {
-      const id = preview.importId || preview.id || preview.import?.id;
-      if (!id) throw new Error("L'anteprima non contiene un identificativo d'importazione valido.");
-      await apiRequest("imports/" + id + "/confirm", { method: "POST", body });
-      setPreview(null);
-      onNotice("Importazione completata.");
-    } catch (error) { onNotice(error.message, "error"); }
-    finally { setBusy(false); }
-  };
-  const statusLabel = status => ({ pending: "In attesa", processing: "In elaborazione", completed: "Completata", failed: "Non riuscita" }[status] || status || "Sconosciuto");
-  return <div className="transfer-grid">
-    <section className="panel">
-      <p className="eyebrow">IMPORT GUIDATO</p><h2>Importa dati esistenti</h2>
-      <p>Carica CSV o XLSX. Prima di confermare controlla l'anteprima e gli eventuali errori.</p>
-      <form className="form-stack" onSubmit={upload}>
-        <SelectField label="Tipo di dati" value={entity} onChange={e => { setEntity(e.target.value); setPreview(null); }}>
-          {entities.map(([id,label]) => <option key={id} value={id}>{label}</option>)}
-        </SelectField>
-        <Field label="File CSV o XLSX" type="file" accept=".csv,.xlsx" onChange={e => setFile(e.target.files?.[0] || null)} required/>
-        <Button disabled={busy}>{busy ? "Elaborazione…" : "Crea anteprima"}</Button>
-      </form>
-      {preview && <div className="import-result">
-        <h3>Anteprima importazione</h3>
-        <p>Righe totali: {preview.totalRows ?? "—"} · valide: {preview.validRows ?? "—"} · errori: {preview.invalidRows ?? "—"}</p>
-        {entity === "animals" && Array.isArray(preview.possibleDuplicates) && preview.possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({preview.possibleDuplicates.length}).</strong><p>Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.</p></div>}
-        {(preview.errors || []).slice(0,20).map((error, index) => <p key={index} className="error-text">Riga {error.row}: {error.column} — {error.reason}</p>)}
-        <Button onClick={confirmImport} disabled={busy || !preview.validRows}>Conferma importazione</Button>
-      </div>}
-    </section>
-    <section className="panel">
-      <p className="eyebrow">PORTABILITÀ</p><h2>Esporta il tuo account</h2>
-      <p>Genera un archivio privato con identificativi e relazioni. Gli archivi possono contenere dati personali.</p>
-      <label className="check-row"><input type="checkbox" checked={includeDocs} onChange={e => setIncludeDocs(e.target.checked)}/> Includi documenti e allegati</label>
-      <Button onClick={exportData} disabled={busy}>Genera e scarica archivio ZIP</Button>
-      {exportJob && <div className="import-result">
-        <p>Stato esportazione: <strong>{statusLabel(exportJob.status)}</strong>{exportJob.expiresAt ? " · Scadenza: " + date(exportJob.expiresAt) : ""}</p>
-        <Button onClick={() => void downloadWhenReady(exportJob.id)} disabled={busy}>Verifica stato / scarica archivio</Button>
-      </div>}
-      <p className="muted">Lo stato viene verificato con il backend prima di iniziare il download.</p>
-    </section>
-  </div>;
-}
-function SettingsPage({user,onNotice}){const confirmAction=useConfirmDialog();const [displayName,setName]=useState(user.displayName||""),[locale,setLocale]=useState(user.locale||"it"),[timezone,setTimezone]=useState(user.timezone||"Europe/Rome"),[currentPassword,setCurrent]=useState(""),[newPassword,setNew]=useState(""),[email,setEmail]=useState(user.email||""),[busy,setBusy]=useState(false);const save=async(e)=>{e.preventDefault();setBusy(true);try{const body={displayName,locale,timezone};if(email!==user.email||newPassword){body.email=email;body.currentPassword=currentPassword;if(newPassword)body.newPassword=newPassword;}const r=await apiRequest("account",{method:"PATCH",body});onNotice(r.message||"Impostazioni aggiornate.");setCurrent("");setNew("");}catch(err){onNotice(err.message,"error");}finally{setBusy(false);}};return <section className="panel settings-panel"><p className="eyebrow">PROFILO E SICUREZZA</p><h2>Impostazioni account</h2><form className="form-grid" onSubmit={save}><Field label="Nome visualizzato" value={displayName} onChange={e=>setName(e.target.value)} required maxLength="120"/><Field label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/><SelectField label="Lingua" value={locale} onChange={e=>setLocale(e.target.value)}><option value="it">Italiano</option><option value="en">English</option></SelectField><Field label="Fuso orario IANA" value={timezone} onChange={e=>setTimezone(e.target.value)} required/><Field label="Password attuale (per modifiche sensibili)" type="password" value={currentPassword} onChange={e=>setCurrent(e.target.value)} autoComplete="current-password"/><Field label="Nuova password (facoltativa)" type="password" value={newPassword} onChange={e=>setNew(e.target.value)} autoComplete="new-password" minLength="12"/><div className="form-full"><Button disabled={busy}>{busy?"Salvataggio…":"Salva impostazioni"}</Button></div></form><div className="security-actions"><Button variant="secondary" onClick={async()=>{if(!(await confirmAction({title:"Revocare tutte le sessioni?",message:"Dovrai effettuare nuovamente l’accesso su tutti i dispositivi.",confirmLabel:"Revoca sessioni",danger:true})))return;try{await apiRequest("auth/sessions/revoke-all",{method:"POST",body:{}});onNotice("Sessioni revocate. Esci e accedi di nuovo.");}catch(e){onNotice(e.message,"error");}}}>Revoca tutte le sessioni</Button></div></section>;}
+
+
 function Modal({modal,onClose,onSubmit}) {
  return <Dialog title={modal.title} onClose={onClose} onSubmit={onSubmit} submitLabel="Salva" size={modal.fields.length>6?"wide":"normal"}>
   {modal.fields.map(([name,label,type,initial])=><div className={type==="textarea"?"form-full":""} key={name}>{type==="select"?<SelectField label={label} name={name} defaultValue={initial} required>{(name==="sex"?[["unknown","Non specificato"],["male","Maschio"],["female","Femmina"]]:name==="category"?[["food","Alimenti"],["substrate","Substrati"],["material","Materiali"],["equipment","Attrezzatura"],["other","Altro"]]:name==="taskCategory"?[["feeding","Alimentazioni"],["weighing","Peso"],["shed_check","Muta"],["cleaning","Pulizia"],["reproduction","Riproduzione"],["document","Documenti"],["inventory","Inventario"],["custom","Personalizzata"]]:name==="movementType"?[["in","Carico"],["out","Scarico"],["adjustment","Rettifica"]]:name==="entryType"?[["income","Entrata"],["expense","Uscita"]]:[]).map(([v,l])=><option key={v} value={v}>{l}</option>)}</SelectField>:type==="textarea"?<label className="field"><span>{label}</span><textarea name={name} rows="3" defaultValue={initial}/></label>:<Field label={label} name={name} type={type} defaultValue={initial} step={type==="number"?"0.001":undefined} required={!label.includes("facoltativo")&&name!=="minimumQuantity"&&name!=="unitCostCents"}/>}</div>)}
