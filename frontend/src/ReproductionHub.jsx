@@ -209,7 +209,6 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         method: editingEvent ? "PATCH" : "POST", body
       }, "Evento riproduttivo");
       setEditEvent(null); await loadCycle();
-      else setEditEvent(null);
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEvent = async item => {
