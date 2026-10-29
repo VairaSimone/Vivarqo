@@ -29,3 +29,14 @@ checksum="$(sha256sum "$destination" | awk '{print $1}')"
 printf '%s\n' "$checksum" > "${destination}.sha256"
 chmod 600 "${destination}.sha256"
 printf 'Backup completed and verified: %s\nSHA-256: %s\n' "$destination" "$checksum"
+
+# Rotate local backups only after the new archive passed pg_restore --list and
+# its checksum has been written. The cleanup is restricted to this app's prefix.
+retention_days="${BACKUP_RETENTION_DAYS:-30}"
+if [[ ! "$retention_days" =~ ^[1-9][0-9]*$ ]]; then
+  echo "BACKUP_RETENTION_DAYS must be a positive integer." >&2
+  exit 2
+fi
+while IFS= read -r -d '' old_backup; do
+  rm -f -- "$old_backup" "${old_backup}.sha256"
+done < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'vivarqo-*.dump' -mtime "+${retention_days}" -print0)
