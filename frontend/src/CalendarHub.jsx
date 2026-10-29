@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { Icon } from "./ui/Icon.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const CATEGORIES = [["feeding", "Alimentazione"], ["weighing", "Peso"], ["shed_check", "Muta"], ["cleaning", "Pulizia"], ["reproduction", "Riproduzione"], ["document", "Documenti"], ["inventory", "Inventario"], ["custom", "Altro"]];
 const pad = value => String(value).padStart(2, "0");
@@ -24,7 +26,8 @@ function Field({ label, name, type = "text", defaultValue = "", required = false
 function Select({ label, name, defaultValue, options, ...props }) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? options[0][0]} {...props}>{options.map(([v, label]) => <option value={v} key={v}>{label}</option>)}</select></label>; }
 
 export function CalendarHub({ onNotice = () => {} }) {
-  const [view, setView] = useState("month");
+  const confirmAction = useConfirmDialog();
+  const [view, setView] = useState(() => window.matchMedia?.("(max-width: 760px)").matches ? "list" : "month");
   const [anchor, setAnchor] = useState(() => new Date());
   const [items, setItems] = useState([]);
   const [rules, setRules] = useState([]);
@@ -100,7 +103,7 @@ export function CalendarHub({ onNotice = () => {} }) {
     catch (err) { onNotice(err.message || "Impossibile completare l’attività.", "error"); }
   };
   const deleteTask = async item => {
-    if (!window.confirm("Eliminare l’attività “" + item.title + "”?")) return;
+    if (!(await confirmAction({ title: "Eliminare l’attività?", message: "“" + item.title + "” verrà eliminata definitivamente.", confirmLabel: "Elimina attività", danger: true }))) return;
     try { await apiRequest("tasks/" + item.id, { method: "DELETE" }); onNotice("Attività eliminata.", "success"); await loadCalendar(); }
     catch (err) { onNotice(err.message || "Impossibile eliminare l’attività.", "error"); }
   };
@@ -132,7 +135,7 @@ export function CalendarHub({ onNotice = () => {} }) {
     } catch (err) { onNotice(err.message || "Impossibile aggiornare il promemoria.", "error"); }
   };
   const deleteRule = async rule => {
-    if (!window.confirm("Disattivare il promemoria ricorrente “" + rule.title + "”? Le attività aperte collegate verranno archiviate dal backend.")) return;
+    if (!(await confirmAction({ title: "Terminare il promemoria ricorrente?", message: "“" + rule.title + "” verrà disattivato e le attività aperte collegate saranno archiviate.", confirmLabel: "Termina promemoria", danger: true }))) return;
     try { await apiRequest("tasks/reminder-rules/" + rule.id, { method: "DELETE" }); onNotice("Promemoria disattivato.", "success"); await loadRules(); await loadCalendar(); }
     catch (err) { onNotice(err.message || "Impossibile disattivare il promemoria.", "error"); }
   };
@@ -172,8 +175,8 @@ export function CalendarHub({ onNotice = () => {} }) {
 
   return <div className="advanced-stack">
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">PIANIFICAZIONE</p><h2>Calendario e attività</h2><p className="subheading">Scadenze, eventi riproduttivi e deposizioni letti dal backend.</p></div><div className="inline-actions"><Button variant="primary" onClick={() => beginTask(null)}>＋ Nuova attività</Button><Button onClick={() => void loadCalendar()} disabled={busy}>↻ Aggiorna</Button></div></div>
-      <div className="calendar-toolbar"><div className="inline-actions"><Button onClick={() => move(-1)}>←</Button><Button onClick={() => setAnchor(new Date())}>Oggi</Button><Button onClick={() => move(1)}>→</Button><strong>{title}</strong></div><div className="inline-actions"><div className="tab-strip">{[["month","Mese"],["week","Settimana"],["list","Elenco"]].map(([v, label]) => <button type="button" key={v} className={view === v ? "tab-button active" : "tab-button"} onClick={() => setView(v)}>{label}</button>)}</div></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">PIANIFICAZIONE</p><h2>Calendario e attività</h2><p className="subheading">Scadenze, eventi riproduttivi e deposizioni letti dal backend.</p></div><div className="inline-actions"><Button variant="primary" onClick={() => beginTask(null)}>＋ Nuova attività</Button><Button onClick={() => void loadCalendar()} disabled={busy}><Icon name="refresh" size={16}/> Aggiorna</Button></div></div>
+      <div className="calendar-toolbar"><div className="inline-actions"><Button onClick={() => move(-1)} aria-label="Periodo precedente"><Icon name="back" size={16}/></Button><Button onClick={() => setAnchor(new Date())}>Oggi</Button><Button onClick={() => move(1)} aria-label="Periodo successivo"><Icon name="next" size={16}/></Button><strong>{title}</strong></div><div className="inline-actions"><div className="tab-strip">{[["month","Mese"],["week","Settimana"],["list","Elenco"]].map(([v, label]) => <button type="button" key={v} className={view === v ? "tab-button active" : "tab-button"} onClick={() => setView(v)}>{label}</button>)}</div></div></div>
       <label className="check-row"><input type="checkbox" checked={includeDismissed} onChange={e => setIncludeDismissed(e.target.checked)}/> Includi attività archiviate nel calendario</label>
       {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali disponibili nei selettori · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} attivi)</span><div className="inline-actions"><Button disabled={animalsPage <= 1 || saving} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Button><Button disabled={animalsPage >= animalsPagination.totalPages || saving} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Button></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const fmtDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
@@ -23,10 +24,11 @@ function Area({ label, name, defaultValue, required = false, rows = 3 }) { retur
 function Select({ label, name, defaultValue, options, required = false }) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required}>{options.map(o => <option value={o[0]} key={o[0]}>{o[1]}</option>)}</select></label>; }
 const emptyFeedingEntry = animalId => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
-export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights" }) {
+export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }) {
+  const confirmAction = useConfirmDialog();
   const [tab, setTab] = useState(TAB_OPTIONS.some(o => o[0] === initialTab) ? initialTab : "weights");
   const [animals, setAnimals] = useState([]);
-  const [animalId, setAnimalId] = useState("");
+  const [animalId, setAnimalId] = useState(initialAnimalId || "");
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [records, setRecords] = useState([]);
@@ -49,11 +51,18 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
-    const list = arrayOf(response.animals ?? response);
+    let list = arrayOf(response.animals ?? response);
+    if (initialAnimalId && !list.some(animal => animal.id === initialAnimalId)) {
+      try {
+        const detail = await apiRequest("animals/" + encodeURIComponent(initialAnimalId));
+        const selected = detail.animal || detail;
+        if (selected?.id) list = [selected, ...list];
+      } catch { /* The record endpoint reports invalid identifiers or access errors. */ }
+    }
     setAnimals(previous => Array.from(new Map([...previous, ...list].map(animal => [animal.id, animal])).values()));
     setAnimalsPagination(response.pagination || { page: animalsPage, pageSize: 100, total: list.length, totalPages: 1 });
-    if (!animalId && list.length && tab !== "feedings") setAnimalId(list[0].id);
-  }, [animalId, animalsPage, tab]);
+    if (!animalId && list.length && tab !== "feedings") setAnimalId(initialAnimalId || list[0].id);
+  }, [animalId, animalsPage, tab, initialAnimalId]);
 
   const loadSessionDetail = useCallback(async id => {
     if (!id) { setSelectedSession(null); return; }
@@ -97,6 +106,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   }, [animalId, tab, page, selectedSession]);
 
   useEffect(() => { void loadAnimals().catch(e => setError(e.message)); }, [loadAnimals]);
+  useEffect(() => { if (initialAnimalId) { setAnimalId(initialAnimalId); setPage(1); } }, [initialAnimalId]);
   useEffect(() => { void loadRecords(); }, [loadRecords]);
   useEffect(() => {
     const changed = () => { void loadAnimals().catch(() => {}); void loadRecords().catch(() => {}); };
@@ -182,7 +192,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   };
 
   const remove = async record => {
-    if (!window.confirm("Eliminare questo registro? L'operazione non è reversibile.")) return;
+    if (!(await confirmAction({ title: "Eliminare questo registro?", message: "L’operazione non è reversibile.", confirmLabel: "Elimina registro", danger: true }))) return;
     const endpoint = tab === "weights" ? "weights/" + record.id : tab === "sheds" ? "sheds/" + record.id :
       tab === "notes" ? "animal-notes/" + record.id : tab === "feedings" ? "feeding-entries/" + record.id : "genetic-traits/" + record.id;
     try {

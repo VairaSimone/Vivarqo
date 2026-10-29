@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest, apiUploadDocument, downloadPrivateDocument } from "./api/api.js";
 import { createQrMatrix, qrSvgSource } from "./qr.js";
+import { Dialog } from "./ui/Dialog.jsx";
+import { Icon } from "./ui/Icon.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const displayDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
@@ -45,6 +48,7 @@ function downloadQr(value, name) {
 }
 
 export function DocumentsHub({ onNotice = () => {}, owner }) {
+  const confirmAction = useConfirmDialog();
   const [documents, setDocuments] = useState([]);
   const [documentsPage, setDocumentsPage] = useState(1);
   const [animalsPage, setAnimalsPage] = useState(1);
@@ -65,6 +69,8 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
   const [publicDescription, setPublicDescription] = useState("");
   const [shareEnabled, setShareEnabled] = useState(false);
   const [error, setError] = useState("");
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [savingDocumentEdit, setSavingDocumentEdit] = useState(false);
 
   const loadLists = useCallback(async () => {
     const [docs, animalResponse, cycleResponse] = await Promise.all([
@@ -129,19 +135,25 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   };
   const removeDocument = async doc => {
-    if (!window.confirm("Eliminare definitivamente il documento “" + doc.originalFilename + "”?")) return;
+    if (!(await confirmAction({ title: "Eliminare il documento?", message: "“" + doc.originalFilename + "” verrà eliminato definitivamente dall’archivio privato.", confirmLabel: "Elimina documento", danger: true }))) return;
     try { await apiRequest("documents/" + doc.id, { method: "DELETE", body: {} }); onNotice("Documento eliminato."); await loadLists(); }
     catch (err) { onNotice(err.message, "error"); }
   };
-  const editDocument = async doc => {
-    const nextCategory = window.prompt("Categoria del documento", doc.category || "other");
-    if (nextCategory === null) return;
-    const nextNote = window.prompt("Nota del documento (lascia vuoto per cancellarla)", doc.note || "");
-    if (nextNote === null) return;
+  const editDocument = doc => setEditingDocument({ ...doc });
+  const saveDocumentEdit = async event => {
+    event.preventDefault();
+    if (!editingDocument) return;
+    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const category = String(values.category || "").trim();
+    if (!category) { onNotice("Seleziona una categoria per il documento.", "error"); return; }
+    setSavingDocumentEdit(true);
     try {
-      await apiRequest("documents/" + doc.id, { method: "PATCH", body: { category: nextCategory.trim() || "other", note: nextNote.trim() || null } });
-      onNotice("Metadati del documento aggiornati."); await loadLists();
-    } catch (err) { onNotice(err.message, "error"); }
+      await apiRequest("documents/" + editingDocument.id, { method: "PATCH", body: { category, note: String(values.note || "").trim() || null } });
+      setEditingDocument(null);
+      onNotice("Metadati del documento aggiornati.", "success");
+      await loadLists();
+    } catch (err) { onNotice(err.message || "Impossibile aggiornare il documento.", "error"); }
+    finally { setSavingDocumentEdit(false); }
   };
   const saveShare = async e => {
     e.preventDefault();
@@ -161,7 +173,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
   };
   const revokeShare = async () => {
     if (!share?.id) { setShareEnabled(false); return; }
-    if (!window.confirm("Revocare il link pubblico? Il QR già stampato non mostrerà più il profilo finché non lo riattivi.")) return;
+    if (!(await confirmAction({ title: "Revocare il link pubblico?", message: "Il QR già stampato non mostrerà più il profilo finché non riattivi la condivisione.", confirmLabel: "Revoca link", danger: true }))) return;
     try {
       const result = await apiRequest("public-shares/" + share.id, { method: "PATCH", body: { revoke: true } });
       setShare(result.share || { ...share, isEnabled: false, revokedAt: new Date().toISOString() });
@@ -205,6 +217,10 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
         <div className="qr-frame">{shareEnabled && share.isEnabled ? <QRCode value={publicUrl}/> : <div className="qr-disabled">Attiva e salva la condivisione per rendere disponibile il QR.</div>}</div>
       </div>}
     </section>
+    {editingDocument && <Dialog title="Modifica documento" description="Aggiorna la categoria e la nota conservate nell’archivio privato." onClose={() => setEditingDocument(null)} onSubmit={saveDocumentEdit} submitLabel="Salva modifiche" busy={savingDocumentEdit}>
+      <label className="field"><span>Categoria</span><select name="category" defaultValue={editingDocument.category || "other"} required>{[["other","Altro"],["identity","Identificazione"],["origin","Provenienza"],["veterinary","Veterinario"],["legal","Documentazione legale"],["contract","Contratti"],["reproduction","Riproduzione"]].map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
+      <label className="field form-full"><span>Nota (facoltativa)</span><textarea name="note" rows="4" maxLength="10000" defaultValue={editingDocument.note || ""}/></label>
+    </Dialog>}
   </div>;
 }
 

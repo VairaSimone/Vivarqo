@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { Dialog } from "./ui/Dialog.jsx";
+import { Icon } from "./ui/Icon.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : "";
@@ -35,6 +38,9 @@ const eventTypes = [["pairing", "Accoppiamento"], ["observation", "Osservazione"
 const eggStatuses = [["unknown", "Da valutare"], ["incubating", "In incubazione"], ["fertile", "Fertile"], ["infertile", "Non fertile"], ["hatched", "Schiuso"], ["lost", "Perso"], ["retained", "Trattenuto"]];
 
 export function ReproductionHub({ onNotice = () => {}, owner }) {
+  const confirmAction = useConfirmDialog();
+  const [animalCardsForm, setAnimalCardsForm] = useState(null);
+  const [creatingAnimalCards, setCreatingAnimalCards] = useState(false);
   const [cycles, setCycles] = useState([]);
   const [cyclesPage, setCyclesPage] = useState(1);
   const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
@@ -182,7 +188,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteCycle = async item => {
-    if (!window.confirm("Eliminare il ciclo “" + (item.name || prettyDate(item.startedOn)) + "”? I cicli con registri collegati potrebbero richiedere prima la rimozione dei record figli.")) return;
+    if (!(await confirmAction({ title: "Eliminare il ciclo riproduttivo?", message: "“" + (item.name || prettyDate(item.startedOn)) + "” potrebbe avere registri figli da rimuovere prima. Il server controllerà i collegamenti.", confirmLabel: "Elimina ciclo", danger: true }))) return;
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
       if (result.queuedOffline) return;
@@ -213,7 +219,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEvent = async item => {
-    if (!window.confirm("Eliminare questo evento riproduttivo?")) return;
+    if (!(await confirmAction({ title: "Eliminare l’evento?", message: "L’evento riproduttivo verrà eliminato definitivamente.", confirmLabel: "Elimina evento", danger: true }))) return;
     try { const r = await api("reproductive-events/" + item.id, { method: "DELETE", body: {} }, "Elimina evento"); if (!r.queuedOffline) await loadCycle(); }
     catch (err) { onNotice(err.message, "error"); }
   };
@@ -236,7 +242,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteClutch = async item => {
-    if (!window.confirm("Eliminare la covata e le relative uova/registrazioni d'incubazione? Le covate collegate a piccoli registrati non possono essere eliminate.")) return;
+    if (!(await confirmAction({ title: "Eliminare la covata?", message: "Saranno interessate anche le uova e le registrazioni di incubazione. Le covate collegate a piccoli registrati non possono essere eliminate.", confirmLabel: "Elimina covata", danger: true }))) return;
     try {
       const r = await api("clutches/" + item.id, { method: "DELETE", body: {} }, "Elimina covata");
       if (r.queuedOffline) return;
@@ -263,7 +269,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEgg = async egg => {
-    if (!window.confirm("Eliminare l'uovo " + (egg.code || "") + "?")) return;
+    if (!(await confirmAction({ title: "Eliminare l’uovo?", message: "L’uovo “" + (egg.code || "senza codice") + "” verrà eliminato definitivamente.", confirmLabel: "Elimina uovo", danger: true }))) return;
     try { const r = await api("eggs/" + egg.id, { method: "DELETE", body: {} }, "Elimina uovo"); if (!r.queuedOffline) { await loadClutch(); await loadCycle(); } }
     catch (err) { onNotice(err.message, "error"); }
   };
@@ -290,7 +296,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     catch (err) { onNotice(err.message, "error"); }
   };
   const deleteIncubationLog = async log => {
-    if (!window.confirm("Eliminare il registro di incubazione?")) return;
+    if (!(await confirmAction({ title: "Eliminare il registro di incubazione?", message: "La registrazione verrà eliminata definitivamente.", confirmLabel: "Elimina registro", danger: true }))) return;
     try { const r = await api("incubation-logs/" + log.id, { method: "DELETE", body: {} }, "Elimina registro incubazione"); if (!r.queuedOffline) await loadClutch(); }
     catch (err) { onNotice(err.message, "error"); }
   };
@@ -307,26 +313,38 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     catch (err) { onNotice(err.message, "error"); }
   };
   const deleteBatch = async batch => {
-    if (!window.confirm("Eliminare il registro dei piccoli? Non sarà possibile se sono già state create schede animali da questa covata.")) return;
+    if (!(await confirmAction({ title: "Eliminare il registro dei piccoli?", message: "Non sarà possibile procedere se sono già state create schede animali dal lotto.", confirmLabel: "Elimina registro", danger: true }))) return;
     try { const r = await api("offspring-batches/" + batch.id, { method: "DELETE", body: {} }, "Elimina registro piccoli"); if (!r.queuedOffline) { await loadCycle(); await loadLists(); } }
     catch (err) { onNotice(err.message, "error"); }
   };
-  const createAnimalCards = async batch => {
-    const prefix = window.prompt("Prefisso dei nomi dei piccoli (es. Cucciolo)", "Piccolo");
-    if (prefix === null || !prefix.trim()) return;
-    const species = window.prompt("Specie dei piccoli", val(cycle?.parentA, "species", ""));
-    if (species === null || !species.trim()) return;
-    const count = Math.max(0, Math.min(500, Number(window.prompt("Quante schede creare?", String(batch.count)) || 0)));
-    if (!count) return;
-    const bornOn = dateValue(batch.bornOn);
-    const animalsPayload = Array.from({ length: count }, (_, i) => ({
-      name: prefix.trim() + " " + String(i + 1).padStart(2, "0"),
-      species: species.trim(), sex: "unknown", identifier: null, birthDate: bornOn || null
+  const createAnimalCards = batch => {
+    setAnimalCardsForm({ batch, prefix: "Piccolo", species: val(cycle?.parentA, "species", ""), count: String(batch.count || 1) });
+  };
+  const submitAnimalCards = async event => {
+    event.preventDefault();
+    if (!animalCardsForm) return;
+    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const prefix = String(values.prefix || "").trim();
+    const species = String(values.species || "").trim();
+    const count = Number(values.count);
+    if (!prefix || !species || !Number.isInteger(count) || count < 1 || count > 500) {
+      onNotice("Inserisci prefisso e specie e scegli un numero di schede fra 1 e 500.", "error");
+      return;
+    }
+    const bornOn = dateValue(animalCardsForm.batch.bornOn);
+    const animalsPayload = Array.from({ length: count }, (_, index) => ({
+      name: prefix + " " + String(index + 1).padStart(2, "0"),
+      species, sex: "unknown", identifier: null, birthDate: bornOn || null
     }));
+    setCreatingAnimalCards(true);
     try {
-      const r = await api("offspring-batches/" + batch.id + "/animals", { method: "POST", body: { animals: animalsPayload } }, "Crea schede dei piccoli");
-      if (!r.queuedOffline) onNotice("Create " + (r.createdCount ?? count) + " schede animale.");
+      const response = await api("offspring-batches/" + animalCardsForm.batch.id + "/animals", { method: "POST", body: { animals: animalsPayload } }, "Crea schede dei piccoli");
+      setAnimalCardsForm(null);
+      if (!response.queuedOffline) onNotice("Create " + (response.createdCount ?? count) + " schede animale.", "success");
+      await loadCycle();
+      await loadLists();
     } catch (err) { onNotice(err.message, "error"); }
+    finally { setCreatingAnimalCards(false); }
   };
 
   const cycleForForm = editCycle || {};
@@ -446,5 +464,11 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>← Precedente</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
     </>}
+    {animalCardsForm && <Dialog title="Crea schede dei piccoli" description={"Genera schede animale dal lotto del " + prettyDate(animalCardsForm.batch.bornOn) + "."} onClose={() => setAnimalCardsForm(null)} onSubmit={submitAnimalCards} submitLabel="Crea schede" busy={creatingAnimalCards} size="wide">
+      <label className="field"><span>Prefisso dei nomi</span><input name="prefix" defaultValue={animalCardsForm.prefix} required maxLength="100" placeholder="Es. Piccolo"/></label>
+      <label className="field"><span>Specie</span><input name="species" defaultValue={animalCardsForm.species} required maxLength="160"/></label>
+      <label className="field"><span>Numero di schede (1–500)</span><input name="count" type="number" defaultValue={animalCardsForm.count} min="1" max="500" step="1" required/></label>
+      <p className="muted form-full">I nomi verranno numerati automaticamente. Le nuove schede useranno sesso “Non specificato” e la data di nascita del lotto.</p>
+    </Dialog>}
   </div>;
 }

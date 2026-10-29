@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { Icon } from "./ui/Icon.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const arrayOf = value => Array.isArray(value) ? value : [];
 const sexOptions = [["unknown", "Non specificato"], ["female", "Femmina"], ["male", "Maschio"]];
@@ -30,7 +32,8 @@ function historyDescription(item) {
   return "Registro";
 }
 
-export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
+export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initialAnimalId = null }) {
+  const confirmAction = useConfirmDialog();
   const [animals, setAnimals] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
@@ -104,18 +107,31 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
       apiRequest("animals/bulk", { method: "POST", body: { animals: animalsToCreate } })
     );
   };
-  const archive = animal => {
-    if (!window.confirm("Archiviare " + animal.name + "? La scheda non verrà eliminata.")) return;
+  const archive = async animal => {
+    if (!(await confirmAction({ title: "Archiviare " + animal.name + "?", message: "La scheda verrà archiviata, non eliminata. Potrai ripristinarla in seguito.", confirmLabel: "Archivia scheda", danger: true }))) return;
     void run("Animale archiviato.", () => apiRequest("animals/" + animal.id + "/archive", { method: "POST", body: {} }));
   };
-  const restore = animal => {
-    if (!window.confirm("Ripristinare " + animal.name + "?")) return;
+  const restore = async animal => {
+    if (!(await confirmAction({ title: "Ripristinare " + animal.name + "?", message: "La scheda tornerà disponibile fra gli animali attivi.", confirmLabel: "Ripristina", danger: false }))) return;
     void run("Animale ripristinato.", () => apiRequest("animals/" + animal.id + "/restore", { method: "POST", body: {} }));
   };
-  const remove = animal => {
-    if (!window.confirm("Eliminare definitivamente " + animal.name + "? Se ha registri collegati il backend impedirà la cancellazione.")) return;
+  const remove = async animal => {
+    if (!(await confirmAction({ title: "Eliminare " + animal.name + "?", message: "L’eliminazione è definitiva. Se esistono registri collegati, il server potrebbe impedirla.", confirmLabel: "Elimina definitivamente", danger: true }))) return;
     void run("Animale eliminato.", () => apiRequest("animals/" + animal.id, { method: "DELETE" }));
   };
+  useEffect(() => {
+    if (!initialAnimalId) return;
+    let cancelled = false;
+    apiRequest("animals/" + encodeURIComponent(initialAnimalId))
+      .then(response => {
+        if (cancelled) return;
+        const animal = response.animal || response;
+        if (animal?.id) void loadAnimalHistory(animal, 1);
+      })
+      .catch(error => { if (!cancelled) onNotice(error.message || "Impossibile aprire la scheda animale.", "error"); });
+    return () => { cancelled = true; };
+  }, [initialAnimalId]);
+
   const changeStatus = next => { setStatus(next); setPage(1); };
   const changeQuery = next => { setQuery(next); setPage(1); };
   const loadAnimalHistory = async (animal, nextPage = 1) => {
@@ -177,12 +193,12 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
       <div className="animal-grid">{animals.map(animal => <article className="animal-card" key={animal.id}>
        <div className="animal-card-top"><span className="animal-avatar" aria-hidden="true">{String(animal.name||"?").slice(0,1).toLocaleUpperCase("it-IT")}</span><div className="animal-title-block"><h3>{animal.name}</h3><p>{animal.species}{animal.identifier ? " · "+animal.identifier : ""}</p></div><span className={"pill "+(animal.status==="active"?"sage":"")}>{animal.status==="archived"?"Archiviato":animal.status==="active"||!animal.status?"Attivo":animal.status==="sold"?"Venduto":animal.status==="transferred"?"Trasferito":animal.status==="deceased"?"Deceduto":animal.status}</span></div>
        <dl className="animal-facts"><div><dt>Sesso</dt><dd>{sexOptions.find(([key])=>key===animal.sex)?.[1]||"Non specificato"}</dd></div><div><dt>Morph</dt><dd>{animal.morph||"—"}</dd></div><div><dt>Nascita</dt><dd>{dateLabel(animal.birthDate)}</dd></div><div><dt>Stabulazione</dt><dd>{animal.locationLabel||"—"}</dd></div></dl>
-       <div className="animal-card-actions"><Button variant="primary" onClick={()=>void loadAnimalHistory(animal,1)}>Apri scheda</Button><Button onClick={()=>{setEditor({animal});setBulkOpen(false);}}>Modifica</Button><details className="animal-more-actions"><summary>Altro</summary><div>{animal.status==="archived"?<Button variant="primary" onClick={()=>restore(animal)}>Ripristina</Button>:<Button onClick={()=>archive(animal)}>Archivia</Button>}<Button variant="danger" onClick={()=>remove(animal)}>Elimina</Button></div></details></div>
+       <div className="animal-card-actions"><Button variant="primary" onClick={()=>onGo("animali",{animalId:animal.id})}><Icon name="animals" size={16}/> Apri scheda</Button><Button onClick={()=>{setEditor({animal});setBulkOpen(false);}}>Modifica</Button><details className="animal-more-actions"><summary>Altro</summary><div>{animal.status==="archived"?<Button variant="primary" onClick={()=>restore(animal)}>Ripristina</Button>:<Button onClick={()=>archive(animal)}>Archivia</Button>}<Button variant="danger" onClick={()=>remove(animal)}>Elimina</Button></div></details></div>
       </article>)}</div>}
       <div className="pagination-bar"><span className="muted">Pagina {pagination.page || page} di {Math.max(1, pagination.totalPages || 1)} · {pagination.total ?? animals.length} animali</span><div className="inline-actions"><Button disabled={page <= 1 || busy} onClick={() => setPage(p => Math.max(1, p - 1))}>← Precedente</Button><Button disabled={page >= (pagination.totalPages || 1) || busy} onClick={() => setPage(p => p + 1)}>Successiva →</Button></div></div>
     </section>
       {history && <section className="panel animal-profile-panel">
-        <div className="panel-heading"><div><p className="eyebrow">SCHEDA INDIVIDUALE</p><h2>{history.animal.name}</h2><p className="subheading">{history.animal.species}{history.animal.identifier ? " · "+history.animal.identifier : ""} · {history.animal.morph||"Morph non indicato"}</p></div><Button onClick={() => setHistory(null)}>Chiudi scheda</Button></div>
+        <div className="panel-heading"><div><p className="eyebrow">SCHEDA INDIVIDUALE</p><h2>{history.animal.name}</h2><p className="subheading">{history.animal.species}{history.animal.identifier ? " · "+history.animal.identifier : ""} · {history.animal.morph||"Morph non indicato"} · {sexOptions.find(([key])=>key===history.animal.sex)?.[1]||"Sesso non indicato"}</p></div><Button onClick={() => setHistory(null)}>Chiudi scheda</Button></div>
         <div className="animal-profile-summary">{[
           ["Prossima attività",upcomingTasks[0],task=>dateLabel(task.dueAt),task=>task.title+(new Date(task.dueAt)<new Date()?" · In ritardo":"")],
           ["Ultimo pasto",history.items.find(item=>item.type==="feeding"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
@@ -190,7 +206,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
           ["Ultima muta",history.items.find(item=>item.type==="shed"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
           ["Nota recente",history.items.find(item=>item.type==="note"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)]
         ].map(([label,item,dateText,description])=><div className="animal-profile-metric" key={label}><small>{label}</small><strong>{item?dateText(item):(label==="Prossima attività"?"Nessuna scadenza":"Nessun dato")}</strong><span className="muted">{item?String(description(item)).slice(0,110):label==="Prossima attività"?"Nessun promemoria aperto":"Non registrato"}</span></div>)}</div>
-        <div className="inline-actions profile-actions"><Button onClick={()=>{setEditor({animal:history.animal});setBulkOpen(false);}}>Modifica anagrafica</Button><Button onClick={()=>onGo("alimentazioni")}>Apri alimentazioni</Button><Button onClick={()=>onGo("cure")}>Apri registri di cura</Button></div>
+        <div className="inline-actions profile-actions"><Button onClick={()=>{setEditor({animal:history.animal});setBulkOpen(false);}}><Icon name="edit" size={15}/> Modifica scheda</Button><Button onClick={()=>onGo("alimentazioni",{animalId:history.animal.id})}><Icon name="feeding" size={15}/> Registra pasto</Button><Button onClick={()=>onGo("peso",{animalId:history.animal.id})}><Icon name="weight" size={15}/> Registra peso</Button><Button onClick={()=>onGo("mute",{animalId:history.animal.id})}><Icon name="care" size={15}/> Registra muta</Button><Button onClick={()=>onGo("note",{animalId:history.animal.id})}><Icon name="documents" size={15}/> Aggiungi nota</Button></div>
         <div className="panel-heading profile-history-heading"><div><p className="eyebrow">STORICO</p><h2>Registrazioni recenti</h2><p className="subheading">Alimentazioni, pesate, mute e note in ordine cronologico.</p></div></div>
         {historyLoading ? <p className="loading">Caricamento storico…</p> : history.items.length === 0 ? <div className="empty-state"><h3>Nessuna registrazione</h3><p>Non risultano alimentazioni, pesate, mute o note per questo animale.</p></div> : <div className="animal-history-list">{history.items.map((item,index)=><article className="animal-history-item" key={(item.record?.id||index)+"-"+item.type}><time>{dateLabel(item.occurredAt)}</time><div><strong>{{feeding:"Alimentazione",weight:"Pesata",shed:"Muta",note:"Nota"}[item.type]||item.type}</strong><p>{historyDescription(item)}</p></div></article>)}</div>}
         {history.pagination?.truncated && <p className="notice warning">Per ogni categoria il backend carica al massimo 100 record nello storico unificato: le registrazioni più vecchie oltre tale limite potrebbero non comparire.</p>}
