@@ -33,9 +33,8 @@ function queueUnavailable(): Error {
 }
 
 async function getBoss(): Promise<PgBoss> {
-  if (boss) return boss;
-  if (!startup) startup = Promise.reject(queueUnavailable());
-  return startup;
+  if (!boss) throw queueUnavailable();
+  return boss;
 }
 
 function retryOptions(singletonKey: string) {
