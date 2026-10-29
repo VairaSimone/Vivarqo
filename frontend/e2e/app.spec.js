@@ -60,9 +60,21 @@ test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", 
   await page.getByLabel("Nome", { exact: true }).fill("Smeraldo");
   await page.getByLabel("Specie", { exact: true }).fill("Boa constrictor imperator");
   await page.getByLabel("Identificativo", { exact: true }).fill("VRQ-E2E-003");
+  await page.getByLabel("Annotazioni genetiche dichiarate").fill("Het dichiarato dall'allevatore");
+  await page.getByLabel("La data di nascita è stimata").check();
+  await page.getByLabel("Data di acquisizione").fill("2024-01-02");
+  await page.getByLabel("Allevatore precedente").fill("Allevamento E2E");
+  await page.getByLabel("Provenienza").fill("Nato in cattività presso allevatore precedente");
   await page.getByRole("button", { name: "Salva scheda", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Smeraldo" })).toBeVisible();
-  expect(page.e2eState.animals.some(item => item.name === "Smeraldo")).toBeTruthy();
+  expect(page.e2eState.animals.some(item =>
+    item.name === "Smeraldo" &&
+    item.geneticsNotes === "Het dichiarato dall'allevatore" &&
+    item.birthDateEstimated === true &&
+    item.acquiredDate === "2024-01-02" &&
+    item.previousBreeder === "Allevamento E2E" &&
+    item.originDescription === "Nato in cattività presso allevatore precedente"
+  )).toBeTruthy();
 
   await page.getByRole("button", { name: /Crea in blocco/ }).click();
   await page.getByRole("button", { name: /Riga/ }).click();
