@@ -20,7 +20,8 @@ const ZIP_METHOD_STORE = 0;
 const ZIP_VERSION = 20;
 const DOS_DATE_1980_01_01 = 0x0021;
 const DATA_DESCRIPTOR_SIGNATURE = 0x08074b50;
-const MAX_ZIP_ENTRIES = 10_000;
+export const MAX_ZIP32_ARCHIVE_BYTES = 0xffff_ffff;
+const MAX_ZIP_ENTRIES = 65_535;
 
 function validateEntryName(name: string): Buffer {
   const normalized = name.replace(/\\/g, "/");
@@ -120,10 +121,10 @@ function endOfCentralDirectory(entryCount: number, centralSize: number, centralO
 export async function writeStreamingZip(
   outputPath: string,
   entries: AsyncIterable<StreamingZipEntry>,
-  maxBytes: number,
+  maxBytes = MAX_ZIP32_ARCHIVE_BYTES,
 ): Promise<{ sizeBytes: number; entryCount: number }> {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 22) {
-    throw new Error("maxBytes must be a positive safe integer large enough for a ZIP end record");
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 22 || maxBytes > MAX_ZIP32_ARCHIVE_BYTES) {
+    throw new Error("maxBytes must fit the classic ZIP format and be large enough for an end record");
   }
 
   const file = await open(outputPath, "wx", 0o600);
@@ -133,7 +134,7 @@ export async function writeStreamingZip(
   const write = async (chunk: Uint8Array): Promise<void> => {
     if (chunk.byteLength === 0) return;
     if (totalBytes + chunk.byteLength > maxBytes) {
-      throw new AppError(413, "EXPORT_TOO_LARGE", "The export exceeds the 50 MB limit");
+      throw new AppError(413, "EXPORT_TOO_LARGE", "The archive exceeds the configured or classic ZIP format size limit");
     }
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     let offset = 0;
@@ -148,7 +149,7 @@ export async function writeStreamingZip(
   try {
     for await (const entry of entries) {
       if (centralEntries.length >= MAX_ZIP_ENTRIES) {
-        throw new AppError(413, "EXPORT_TOO_MANY_FILES", "An export cannot contain more than 10,000 files");
+        throw new AppError(413, "EXPORT_TOO_MANY_FILES", "A classic ZIP archive cannot contain more than 65,535 entries");
       }
       const filename = validateEntryName(entry.name);
       const localOffset = totalBytes;
