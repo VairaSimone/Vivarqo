@@ -51,11 +51,6 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
   }, [page]);
 
   useEffect(() => { let live = true; void load().catch(e => setError(e.message)).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
-  useEffect(() => {
-    const changed = () => { void load().catch(() => {}); };
-    window.addEventListener("vivarqo:offline-queue-changed", changed);
-    return () => window.removeEventListener("vivarqo:offline-queue-changed", changed);
-  }, [load]);
 
   const savePreferences = async patch => {
     setBusy(true);
