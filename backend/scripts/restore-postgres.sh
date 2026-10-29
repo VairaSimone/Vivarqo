@@ -6,6 +6,25 @@ if [[ "$#" -ne 1 ]]; then
   exit 2
 fi
 : "${DATABASE_URL:?Set DATABASE_URL to the PostgreSQL restore target}"
+
+normalize_pg_url() {
+  local input="$1" base query item output="" separator=""
+  if [[ "$input" != *\?* ]]; then
+    printf '%s' "$input"
+    return
+  fi
+  base="${input%%\?*}"
+  query="${input#*\?}"
+  IFS='&' read -r -a items <<< "$query"
+  for item in "${items[@]}"; do
+    [[ -z "$item" || "${item%%=*}" == "schema" ]] && continue
+    output+="$separator$item"
+    separator='&'
+  done
+  if [[ -n "$output" ]]; then printf '%s?%s' "$base" "$output"; else printf '%s' "$base"; fi
+}
+pg_database_url="$(normalize_pg_url "$DATABASE_URL")"
+
 if [[ "${CONFIRM_RESTORE:-}" != "YES" ]]; then
   echo "Restore is disabled by default. Set CONFIRM_RESTORE=YES to confirm the operation." >&2
   exit 2
@@ -26,5 +45,5 @@ NOTICE: restore into a dedicated empty target database. This script intentionall
 does not drop existing objects or use pg_restore --clean. Create a database
 snapshot/backup of the target first if you need a rollback path.
 NOTICE
-pg_restore --exit-on-error --no-owner --no-acl --dbname="$DATABASE_URL" "$backup_file"
+pg_restore --exit-on-error --no-owner --no-acl --dbname="$pg_database_url" "$backup_file"
 echo "Restore completed. Run the application's migration/status and smoke checks."
