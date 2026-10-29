@@ -8,7 +8,7 @@ const money = (cents, currency = "EUR") => {
 };
 const initialFilters = { from: "", to: "" };
 
-export function FinanceSummary({ onNotice = () => {} }) {
+export function FinanceSummary({ onNotice = () => {}, refreshKey = 0 }) {
   const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +34,7 @@ export function FinanceSummary({ onNotice = () => {} }) {
     } finally { setBusy(false); }
   }, [onNotice]);
 
-  useEffect(() => { void load(initialFilters); }, [load]);
+  useEffect(() => { void load(filters); }, [load, refreshKey]);
   const updateFilter = (name, value) => setFilters(previous => ({ ...previous, [name]: value }));
 
   return <div className="advanced-stack">
