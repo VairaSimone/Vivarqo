@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../api/api.js";
-import { useConfirmDialog } from "../ui/ConfirmDialog.jsx";
+import { useConfirmDialog } from "../ui/ConfirmDialog.tsx";
 
 type DisplayPreferences = {
   animalListDensity?: "comfortable" | "compact";
