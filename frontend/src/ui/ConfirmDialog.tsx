@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
-import { Icon } from "./Icon.jsx";
-import { Dialog } from "./Dialog.jsx";
+import { Icon } from "./Icon.tsx";
+import { Dialog } from "./Dialog.tsx";
 
 const ConfirmContext = createContext(null);
 
