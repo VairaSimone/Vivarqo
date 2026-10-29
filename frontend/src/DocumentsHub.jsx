@@ -114,11 +114,6 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
 
   useEffect(() => { let live = true; void loadLists().catch(e => setError(e.message)).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadShare(selectedAnimal); }, [selectedAnimal, loadShare]);
-  useEffect(() => {
-    const changed = () => { void loadLists().catch(() => {}); if (selectedAnimal) void loadShare(selectedAnimal); };
-    window.addEventListener("vivarqo:offline-queue-changed", changed);
-    return () => window.removeEventListener("vivarqo:offline-queue-changed", changed);
-  }, [loadLists, loadShare, selectedAnimal]);
 
   const upload = async e => {
     e.preventDefault();
