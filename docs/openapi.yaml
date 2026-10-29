@@ -1324,6 +1324,26 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/JsonSuccess'
+  /api/v1/account/export:
+    post:
+      tags: [Exports]
+      summary: Esporta i dati dell'account (rotta prevista dalla specifica)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                includeDocuments: { type: boolean, default: false }
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '503':
+          $ref: '#/components/responses/Error'
   /api/v1/exports:
     post:
       tags: [Exports]
