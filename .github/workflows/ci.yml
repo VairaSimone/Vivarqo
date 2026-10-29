@@ -60,6 +60,28 @@ jobs:
         run: pnpm db:generate
       - name: Apply PostgreSQL migration
         run: pnpm db:migrate:deploy
+      - name: Verify backup and restore scripts against an isolated PostgreSQL database
+        run: |
+          backup_dir="$RUNNER_TEMP/vivarqo-backup"
+          mkdir -p "$backup_dir"
+          docker run --rm --network host \
+            -e DATABASE_URL='postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public' \
+            -e BACKUP_DIR=/backups \
+            -e RESTORE_DB_URL='postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo_restore_drill' \
+            -e MAINT_URL='postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/postgres' \
+            -v "$GITHUB_WORKSPACE/backend/scripts/backup-postgres.sh:/usr/local/bin/backup-postgres.sh:ro" \
+            -v "$GITHUB_WORKSPACE/backend/scripts/restore-postgres.sh:/usr/local/bin/restore-postgres.sh:ro" \
+            -v "$backup_dir:/backups" \
+            postgres:18 bash -Eeuo pipefail -c '
+              trap '\''psql "$MAINT_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS vivarqo_restore_drill WITH (FORCE)" >/dev/null 2>&1 || true'\'' EXIT
+              bash /usr/local/bin/backup-postgres.sh
+              archive="$(find /backups -maxdepth 1 -type f -name "vivarqo-*.dump" -print -quit)"
+              test -n "$archive"
+              psql "$MAINT_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE vivarqo_restore_drill"
+              DATABASE_URL="$RESTORE_DB_URL" CONFIRM_RESTORE=YES bash /usr/local/bin/restore-postgres.sh "$archive"
+              restored_count="$(psql "$RESTORE_DB_URL" -Atqc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '\''public'\'' AND table_type = '\''BASE TABLE'\'' AND table_name <> '\''_prisma_migrations'\''")"
+              test "$restored_count" -ge 33
+            '
       - name: Type-check API
         run: pnpm typecheck
       - name: Test API
