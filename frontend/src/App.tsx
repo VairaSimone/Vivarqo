@@ -1,25 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { ReproductionHub } from "./ReproductionHub.jsx";
-import { DocumentsHub } from "./DocumentsHub.jsx";
-import { NotificationsHub } from "./NotificationsHub.jsx";
-import { CareRecordsHub } from "./CareRecordsHub.jsx";
-import { AuthScreen as AuthFlowScreen } from "./AuthScreen.jsx";
-import { AnimalsHub } from "./AnimalsHub.jsx";
-import { BillingHub } from "./BillingHub.jsx";
-import { CalendarHub } from "./CalendarHub.jsx";
-import { InventoryMovementHistory } from "./InventoryMovementHistory.jsx";
-import { FinanceSummary } from "./FinanceSummary.jsx";
-import { Icon } from "./ui/Icon.jsx";
-import { Dashboard } from "./components/Dashboard.jsx";
-import { Records } from "./components/Records.jsx";
-import { DataTools } from "./components/DataTools.jsx";
+import { ReproductionHub } from "./ReproductionHub.tsx";
+import { DocumentsHub } from "./DocumentsHub.tsx";
+import { NotificationsHub } from "./NotificationsHub.tsx";
+import { CareRecordsHub } from "./CareRecordsHub.tsx";
+import { AuthScreen as AuthFlowScreen } from "./AuthScreen.tsx";
+import { AnimalsHub } from "./AnimalsHub.tsx";
+import { BillingHub } from "./BillingHub.tsx";
+import { CalendarHub } from "./CalendarHub.tsx";
+import { InventoryMovementHistory } from "./InventoryMovementHistory.tsx";
+import { FinanceSummary } from "./FinanceSummary.tsx";
+import { Icon } from "./ui/Icon.tsx";
+import { Dashboard } from "./components/Dashboard.tsx";
+import { Records } from "./components/Records.tsx";
+import { DataTools } from "./components/DataTools.tsx";
 import { SettingsPage } from "./components/SettingsPage.tsx";
-import { Tutorial } from "./components/Tutorial.jsx";
-import { InventoryFilters } from "./components/InventoryFilters.jsx";
-import { MoreHub } from "./components/MoreHub.jsx";
-import { Dialog } from "./ui/Dialog.jsx";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { Tutorial } from "./components/Tutorial.tsx";
+import { InventoryFilters } from "./components/InventoryFilters.tsx";
+import { MoreHub } from "./components/MoreHub.tsx";
+import { Dialog } from "./ui/Dialog.tsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 
 const NAV = [
   ["oggi","Oggi","home","Panoramica e attività in scadenza"],
