@@ -45,6 +45,9 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
   const [status, setStatus] = useState("active");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const emptyFilters = { species: "", sex: "", morph: "", location: "", sort: "updatedAt" };
+  const [filterDraft, setFilterDraft] = useState(emptyFilters);
+  const [filters, setFilters] = useState(emptyFilters);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editor, setEditor] = useState(null);
@@ -64,15 +67,19 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "50", status });
+      const params = new URLSearchParams({ page: String(page), pageSize: "50", status, sort: filters.sort });
       if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim());
+      if (filters.species.trim()) params.set("species", filters.species.trim());
+      if (filters.sex) params.set("sex", filters.sex);
+      if (filters.morph.trim()) params.set("morph", filters.morph.trim());
+      if (filters.location.trim()) params.set("location", filters.location.trim());
       const response = await apiRequest("animals?" + params.toString());
       setAnimals(arrayOf(response.animals));
       setPagination(response.pagination || { page, pageSize: 50, total: arrayOf(response.animals).length, totalPages: 1 });
     } catch (err) {
       setError(err.message || "Impossibile caricare gli animali.");
     } finally { setBusy(false); }
-  }, [page, debouncedQuery, status]);
+  }, [page, debouncedQuery, status, filters]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -134,6 +141,17 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
 
   const changeStatus = next => { setStatus(next); setPage(1); };
   const changeQuery = next => { setQuery(next); setPage(1); };
+  const applyFilters = event => {
+    event.preventDefault();
+    setFilters({ ...filterDraft });
+    setPage(1);
+  };
+  const resetFilters = () => {
+    const reset = { species: "", sex: "", morph: "", location: "", sort: "updatedAt" };
+    setFilterDraft(reset);
+    setFilters(reset);
+    setPage(1);
+  };
   const loadAnimalHistory = async (animal, nextPage = 1) => {
     setHistoryLoading(true);
     setHistoryPage(nextPage);
@@ -162,6 +180,17 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
         <label className="field"><span>Cerca per nome o identificativo</span><input type="search" value={query} onChange={e => changeQuery(e.target.value)} placeholder="Nome o codice…"/></label>
         <Button onClick={() => void load()}>↻ Aggiorna</Button>
       </div>
+      <details className="record-filter-drawer">
+        <summary>Filtri avanzati e ordinamento</summary>
+        <form className="form-grid" onSubmit={applyFilters}>
+          <Input label="Specie" name="filterSpecies" value={filterDraft.species} onChange={e => setFilterDraft(current => ({ ...current, species: e.target.value }))} maxLength="160"/>
+          <label className="field"><span>Sesso</span><select value={filterDraft.sex} onChange={e => setFilterDraft(current => ({ ...current, sex: e.target.value }))}><option value="">Tutti</option>{sexOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <Input label="Morph" name="filterMorph" value={filterDraft.morph} onChange={e => setFilterDraft(current => ({ ...current, morph: e.target.value }))} maxLength="200"/>
+          <Input label="Posizione / stabulazione" name="filterLocation" value={filterDraft.location} onChange={e => setFilterDraft(current => ({ ...current, location: e.target.value }))} maxLength="160"/>
+          <label className="field"><span>Ordina per</span><select value={filterDraft.sort} onChange={e => setFilterDraft(current => ({ ...current, sort: e.target.value }))}><option value="name">Nome</option><option value="createdAt">Data di creazione</option><option value="updatedAt">Ultima attività</option></select></label>
+          <div className="form-actions form-full"><Button type="button" variant="secondary" onClick={resetFilters}>Azzera filtri</Button><Button type="submit" variant="primary">Applica filtri</Button></div>
+        </form>
+      </details>
       {error && <p className="form-message" role="alert">{error}</p>}
       {editor && <div className="embedded-form"><form className="form-grid" onSubmit={submitEditor} key={editor.animal?.id || "new-animal"}>
         <h3 className="form-full">{editor.animal ? "Modifica scheda" : "Nuova scheda animale"}</h3>
