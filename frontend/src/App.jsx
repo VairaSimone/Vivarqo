@@ -169,7 +169,10 @@ function DataTools({onNotice}) {
       const id = result?.export?.id;
       if (!id) throw new Error("Il server non ha restituito l'identificativo dell'esportazione.");
       setExportJob({ ...result.export, ready: false });
-      await downloadWhenReady(id);
+      const status = await apiRequest("exports/" + encodeURIComponent(id));
+      setExportJob({ ...status.export, ready: status.ready });
+      if (status.ready) window.location.assign("/api/v1/exports/" + encodeURIComponent(id) + "/download");
+      else onNotice("L'esportazione non è ancora pronta. Verifica nuovamente lo stato tra poco.", "warning");
     } catch (error) { onNotice(error.message, "error"); }
     finally { setBusy(false); }
   };
