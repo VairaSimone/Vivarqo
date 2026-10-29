@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "./api/api.js";
 
 const money = (cents, currency = "EUR") => {
@@ -8,8 +8,10 @@ const money = (cents, currency = "EUR") => {
 };
 const initialFilters = { from: "", to: "" };
 
-export function FinanceSummary({ onNotice = () => {} }) {
+export function FinanceSummary({ onNotice = () => {}, refreshKey = 0 }) {
   const [filters, setFilters] = useState(initialFilters);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +36,7 @@ export function FinanceSummary({ onNotice = () => {} }) {
     } finally { setBusy(false); }
   }, [onNotice]);
 
-  useEffect(() => { void load(initialFilters); }, [load]);
+  useEffect(() => { void load(filtersRef.current); }, [load, refreshKey]);
   const updateFilter = (name, value) => setFilters(previous => ({ ...previous, [name]: value }));
 
   return <div className="advanced-stack">
