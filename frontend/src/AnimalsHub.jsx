@@ -184,10 +184,10 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
         <summary>Filtri avanzati e ordinamento</summary>
         <form className="form-grid" onSubmit={applyFilters}>
           <Input label="Specie" name="filterSpecies" value={filterDraft.species} onChange={e => setFilterDraft(current => ({ ...current, species: e.target.value }))} maxLength="160"/>
-          <label className="field"><span>Sesso</span><select value={filterDraft.sex} onChange={e => setFilterDraft(current => ({ ...current, sex: e.target.value }))}><option value="">Tutti</option>{sexOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className="field"><span>Sesso</span><select aria-label="Filtra per sesso" value={filterDraft.sex} onChange={e => setFilterDraft(current => ({ ...current, sex: e.target.value }))}><option value="">Tutti</option>{sexOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
           <Input label="Morph" name="filterMorph" value={filterDraft.morph} onChange={e => setFilterDraft(current => ({ ...current, morph: e.target.value }))} maxLength="200"/>
           <Input label="Posizione / stabulazione" name="filterLocation" value={filterDraft.location} onChange={e => setFilterDraft(current => ({ ...current, location: e.target.value }))} maxLength="160"/>
-          <label className="field"><span>Ordina per</span><select value={filterDraft.sort} onChange={e => setFilterDraft(current => ({ ...current, sort: e.target.value }))}><option value="name">Nome</option><option value="createdAt">Data di creazione</option><option value="updatedAt">Ultima attività</option></select></label>
+          <label className="field"><span>Ordina per</span><select aria-label="Ordina elenco animali" value={filterDraft.sort} onChange={e => setFilterDraft(current => ({ ...current, sort: e.target.value }))}><option value="name">Nome</option><option value="createdAt">Data di creazione</option><option value="updatedAt">Ultima attività</option></select></label>
           <div className="form-actions form-full"><Button type="button" variant="secondary" onClick={resetFilters}>Azzera filtri</Button><Button type="submit" variant="primary">Applica filtri</Button></div>
         </form>
       </details>
