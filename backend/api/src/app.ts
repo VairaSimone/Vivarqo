@@ -4,6 +4,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { env } from "./config/env.js";
+import { installSentryExpressHandler } from "./monitoring/sentry.js";
 import { AppError } from "./errors/app-error.js";
 import { checkDatabaseConnection } from "./db/prisma.js";
 import { errorHandler } from "./middleware/error-handler.js";
@@ -140,6 +141,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use((_req, _res, next) => {
     next(new AppError(404, "NOT_FOUND", "Route not found"));
   });
+  installSentryExpressHandler(app);
   app.use(errorHandler);
   return app;
 }
