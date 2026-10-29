@@ -519,7 +519,7 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const logId = routeUuid(req.params.id, "incubation log id");
     const existing = await prisma.incubationLog.findFirst({
-      where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
       select: { id: true },
     });
     if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
@@ -578,7 +578,7 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const eggId = routeUuid(req.params.id, "egg id");
     const existing = await prisma.egg.findFirst({
-      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
       select: { id: true },
     });
     if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
