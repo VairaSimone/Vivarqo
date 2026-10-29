@@ -7,10 +7,9 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { deletePrivateObject, openPrivateObjectStream, storePrivateObjectFromFile } from "./private-storage.js";
-import { singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
+import { MAX_ZIP32_ARCHIVE_BYTES, singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
 
 const EXPORT_PAGE_SIZE = 250;
-const MAX_EXPORT_BYTES = 50 * 1024 * 1024;
 
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -312,7 +311,7 @@ export function createExportRouter() {
       jobId = job.id;
       tempDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
       const archivePath = join(tempDirectory, "export.zip");
-      await writeStreamingZip(archivePath, exportEntries(auth.userId, input.data.includeDocuments, createdAt), MAX_EXPORT_BYTES);
+      await writeStreamingZip(archivePath, exportEntries(auth.userId, input.data.includeDocuments, createdAt));
       storageKey = await storePrivateObjectFromFile("exports", "zip", archivePath);
       const completed = await prisma.exportJob.update({
         where: { id: job.id },
@@ -362,7 +361,7 @@ export function createExportRouter() {
       throw new AppError(410, "EXPORT_EXPIRED", "The export is not available or has expired");
     }
 
-    const stored = await openPrivateObjectStream(job.storageKey, MAX_EXPORT_BYTES);
+    const stored = await openPrivateObjectStream(job.storageKey, MAX_ZIP32_ARCHIVE_BYTES);
     res.setHeader("Content-Type", "application/zip");
     if (stored.sizeBytes !== null) res.setHeader("Content-Length", stored.sizeBytes);
     res.setHeader("Content-Disposition", `attachment; filename="vivarqo-export-${job.id}.zip"`);
