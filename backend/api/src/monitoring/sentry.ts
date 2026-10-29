@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/node";
-import { env } from "./config/env.js";
+import { env } from "../config/env.js";
 
 let initialized = false;
 
@@ -15,7 +15,6 @@ export function initializeSentry(): void {
   Sentry.init({
     dsn: env.SENTRY_DSN,
     environment: env.NODE_ENV,
-    sendDefaultPii: false,
     maxBreadcrumbs: 50,
     beforeSend(event) {
       if (event.request) {
