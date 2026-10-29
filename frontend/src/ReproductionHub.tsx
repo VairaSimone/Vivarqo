@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { Dialog } from "./ui/Dialog.jsx";
-import { Icon } from "./ui/Icon.jsx";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { Dialog } from "./ui/Dialog.tsx";
+import { Icon } from "./ui/Icon.tsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : "";
