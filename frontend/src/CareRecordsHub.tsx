@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 import { WeightChart } from "./components/WeightChart.tsx";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
