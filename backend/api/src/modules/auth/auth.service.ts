@@ -345,7 +345,7 @@ export async function patchAccount(
   input: AccountPatchInput,
   sender: EmailSender,
   requestId: string,
-): Promise<{ user: { id: string; email: string; displayName: string; locale: string; timezone: string }; emailChanged: boolean; passwordChanged: boolean }> {
+): Promise<{ user: { id: string; email: string; displayName: string; locale: string; timezone: string; weightUnit: string; temperatureUnit: string; displayPreferences: unknown }; emailChanged: boolean; passwordChanged: boolean }> {
   const current = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
   if (!current || current.accountStatus !== "active") {
     throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication required");
@@ -382,7 +382,7 @@ export async function patchAccount(
 
   const rawVerificationToken = emailChanged ? createOpaqueToken() : undefined;
   const now = new Date();
-  let updatedUser: { id: string; email: string; displayName: string; locale: string; timezone: string };
+  let updatedUser: { id: string; email: string; displayName: string; locale: string; timezone: string; weightUnit: string; temperatureUnit: string; displayPreferences: unknown };
 
   try {
     updatedUser = await prisma.$transaction(async (tx) => {
@@ -392,10 +392,13 @@ export async function patchAccount(
           ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
           ...(input.locale !== undefined ? { locale: input.locale } : {}),
           ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+          ...(input.weightUnit !== undefined ? { weightUnit: input.weightUnit } : {}),
+          ...(input.temperatureUnit !== undefined ? { temperatureUnit: input.temperatureUnit } : {}),
+          ...(input.displayPreferences !== undefined ? { displayPreferences: input.displayPreferences as never } : {}),
           ...(emailChanged ? { email: normalizedEmail!, emailVerifiedAt: null } : {}),
           ...(newPasswordHash ? { passwordHash: newPasswordHash } : {}),
         },
-        select: { id: true, email: true, displayName: true, locale: true, timezone: true },
+        select: { id: true, email: true, displayName: true, locale: true, timezone: true, weightUnit: true, temperatureUnit: true, displayPreferences: true },
       });
 
       if (emailChanged || passwordChanged) {
