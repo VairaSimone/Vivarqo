@@ -13,6 +13,7 @@
     "jsx": "react-jsx",
     "strict": false,
     "allowJs": true,
+    "allowImportingTsExtensions": true,
     "checkJs": false,
     "types": ["vite/client"]
   },
