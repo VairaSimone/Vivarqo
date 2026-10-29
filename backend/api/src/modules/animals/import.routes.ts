@@ -5,6 +5,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { createAnimalSchema } from "./animals.schemas.js";
 import { parseAnimalFile } from "./animal-file-parser.js";
 
@@ -177,7 +178,7 @@ function authId(res: Response): string {
 export function createImportRouter() {
   const router = Router();
 
-  router.post("/", requireSession, fileBody, async (req, res, next: NextFunction) => {
+  router.post("/", requireSession, persistentRateLimit(10, "import-create"), fileBody, async (req, res, next: NextFunction) => {
     const entity = typeof req.query.entity === "string" ? req.query.entity : "animals";
     if (entity !== "animals") { next(); return; }
     const userId = authId(res);
