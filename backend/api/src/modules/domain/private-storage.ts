@@ -192,6 +192,7 @@ export async function storePrivateObjectFromFile(
   folder: PrivateFolder,
   extension: PrivateExtension,
   sourcePath: string,
+  objectName?: string,
 ): Promise<string> {
   const maximum = folder === "exports" ? MAX_ZIP32_ARCHIVE_BYTES : MAX_FILE_BYTES;
   const fileInfo = await stat(sourcePath);
@@ -199,7 +200,12 @@ export async function storePrivateObjectFromFile(
     throw new AppError(413, "FILE_TOO_LARGE", "File exceeds the storage limit");
   }
 
-  const key = `${folder}/${randomUUID()}.${extension}`;
+  if (objectName !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(objectName)) {
+    throw new AppError(400, "INVALID_STORAGE_KEY", "Object name must be a generated UUID");
+  }
+  // A generated object name lets a retried background job replace the same
+  // object instead of creating an orphaned export for every attempt.
+  const key = `${folder}/${objectName ?? randomUUID()}.${extension}`;
   const config = s3Config();
   if (config) {
     try {
