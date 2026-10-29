@@ -77,7 +77,7 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Verificare cancellazione account, cancellazione effettiva di storage e routine dei backup; mantenere solo i dati che devono essere conservati per obbligo legale documentato.
 - [ ] Definire e provare il piano di risposta ai data breach con responsabilità, escalation e tempistiche.
 - [ ] Configurare e verificare TLS, storage/database/backup cifrati, regione UE ove richiesta, secret manager e accessi minimi.
-- [ ] Valutare la necessità di rate limiting distribuito per il limite generale API in ambienti multi-replica; il limite globale attuale resta per-processo, mentre i limiti di autenticazione sono persistenti.
+- [ ] Valutare la necessità di rate limiting distribuito per il limite generale API in ambienti multi-replica; il limite globale resta per-processo. I limiti di autenticazione, creazione/importazione e conferma degli import, e creazione di link pubblici usano invece contatori persistenti PostgreSQL.
 - [ ] Aggiungere test di sicurezza periodici, scansione delle dipendenze, patching e test di ripristino.
 - [ ] Valutare DSA per le schede pubbliche e implementare una procedura di segnalazione prima di promuovere la funzione.
 - [ ] Far revisionare il contratto di abbonamento e i diritti del consumatore da un professionista competente.
