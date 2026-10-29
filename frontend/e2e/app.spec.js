@@ -256,9 +256,11 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await expect.poll(() => page.e2eState.batches.length).toBe(1);
   await expect(page.getByText(/2 piccoli/)).toBeVisible();
 
-  const batchRow = page.locator(".log-row").filter({ hasText: "2 piccoli" });
+  const batchRow = page.locator(".log-list .log-row").filter({ hasText: "2 piccoli" });
   await batchRow.locator("details summary").click();
-  await batchRow.getByLabel("Note", { exact: true }).fill("Nascita modificata");
+  const batchNotes = batchRow.locator('textarea[name="notes"]');
+  await expect(batchNotes).toBeVisible();
+  await batchNotes.fill("Nascita modificata");
   await batchRow.getByRole("button", { name: "Salva lotto", exact: true }).click();
   await expect.poll(() => page.e2eState.batches[0]?.notes).toBe("Nascita modificata");
 
@@ -295,7 +297,7 @@ test("notifiche: salva preferenze, segna le notifiche lette e gestisce dispositi
   await page.goto("/notifications");
   await expect(page.getByRole("heading", { name: "Avvisi e lettura" })).toBeVisible();
   await page.getByLabel("Dalle").fill("22:00");
-  await page.getByLabel("Alle").fill("07:30");
+  await page.getByLabel("Alle", { exact: true }).fill("07:30");
   await page.locator(".preference-switches .preference-row").filter({ hasText: "Notifiche nell'app" }).locator("input").uncheck();
   await page.locator(".category-toggle").filter({ hasText: "Scadenze attività" }).locator("input").uncheck();
   await page.getByRole("button", { name: "Salva preferenze", exact: true }).click();
