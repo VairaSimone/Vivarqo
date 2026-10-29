@@ -51,7 +51,7 @@ export function createTasksRouter() {
         { title: { contains: query.q, mode: "insensitive" } },
         { description: { contains: query.q, mode: "insensitive" } },
         { animal: { is: { name: { contains: query.q, mode: "insensitive" } } } },
-        { animal: { is: { identifier: { contains: query.q, mode: "insensitive" } } },
+        { animal: { is: { identifier: { contains: query.q, mode: "insensitive" } } } },
       ];
     }
     const from = parseDateBound(query.from, auth.timezone);
