@@ -7,7 +7,7 @@
 
 ## 1. Tecnologie effettivamente usate
 
-Inventariare cookie HTTP, localStorage/sessionStorage, service worker/cache, Web Push, SDK, pixel, analytics, script di terze parti, font remoti, anti-abuse e identificatori lato server. Non limitare l'audit ai cookie visibili nel browser.
+Inventariare cookie HTTP, localStorage/sessionStorage, service worker/cache, Web Push, SDK, pixel, analytics, script di terze parti, font remoti, anti-abuse e identificatori lato server. Non limitare l'audit ai cookie visibili nel browser. Includere anche i pixel di tracciamento nelle email e le impostazioni del provider di invio: il Garante ha adottato linee guida dedicate il 17 aprile 2026 (Doc. web 10241943, pubblicato in G.U. il 29 aprile 2026). Verificare informativa, eccezioni applicabili, consenso preventivo quando richiesto e revoca granulare: https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/10241943.
 
 | Nome/tecnologia | Prima/terza parte | Finalità | Dati | Durata | Base/consenso richiesto? | Come disattivare |
 |---|---|---|---|---|---|---|
