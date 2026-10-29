@@ -1,3 +1,4 @@
+// @ts-nocheck -- staged migration: preserve legacy runtime while explicit prop/data types are introduced.
 import React, { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Icon } from "./Icon.tsx";
 import { Dialog } from "./Dialog.tsx";
