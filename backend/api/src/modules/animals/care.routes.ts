@@ -55,6 +55,7 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const page = pageOptions(req.query);
     const where: Record<string, unknown> = { userId: auth.userId };
+    const searchQuery = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
     const entryFilters: Array<Record<string, unknown>> = [{ animal: { is: { userId: auth.userId } } }];
     if (typeof req.query.animalId === "string") {
       entryFilters.push({ animalId: parseUuid(req.query.animalId, "animalId") });
@@ -67,6 +68,21 @@ export function createCareRouter() {
     }
     if (entryFilters.length > 1) where.entries = { some: { AND: entryFilters } };
     else where.entries = { some: entryFilters[0] };
+    if (searchQuery) {
+      where.OR = [
+        { notes: { contains: searchQuery, mode: "insensitive" } },
+        { entries: { some: { AND: [
+          { animal: { is: { userId: auth.userId } } },
+          { OR: [
+            { foodType: { contains: searchQuery, mode: "insensitive" } },
+            { foodSize: { contains: searchQuery, mode: "insensitive" } },
+            { notes: { contains: searchQuery, mode: "insensitive" } },
+            { animal: { is: { name: { contains: searchQuery, mode: "insensitive" } } } },
+            { animal: { is: { identifier: { contains: searchQuery, mode: "insensitive" } } } },
+          ] },
+        ] } } },
+      ];
+    }
     if (typeof req.query.from === "string" || typeof req.query.to === "string") {
       const dateFilter: Record<string, Date> = {};
       if (typeof req.query.from === "string") {

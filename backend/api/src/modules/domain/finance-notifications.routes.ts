@@ -63,6 +63,7 @@ export function createFinanceRouter() {
       pageSize: z.coerce.number().int().min(1).max(100).default(25),
       entryType: entryType.optional(),
       category: z.string().trim().max(80).optional(),
+      q: z.string().trim().max(160).optional(),
       from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       animalId: z.string().uuid().optional(),
@@ -72,12 +73,33 @@ export function createFinanceRouter() {
       const animal = await prisma.animal.findFirst({ where: { id: query.animalId, userId: auth.userId }, select: { id: true } });
       if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     }
+    const searchFilters: Array<Record<string, unknown>> = [];
+    if (query.q) {
+      searchFilters.push(
+        { description: { contains: query.q, mode: "insensitive" } },
+        { category: { contains: query.q, mode: "insensitive" } },
+      );
+      const searchType = query.q.toLowerCase();
+      if (searchType === "income" || searchType === "expense") searchFilters.push({ entryType: searchType });
+      if (/^\\d{4}-\\d{2}-\\d{2}$/.test(query.q)) {
+        const dateCandidate = new Date(`${query.q}T00:00:00.000Z`);
+        if (!Number.isNaN(dateCandidate.getTime()) && dateCandidate.toISOString().slice(0, 10) === query.q) {
+          searchFilters.push({ occurredOn: dateCandidate });
+        }
+      }
+      const amountText = query.q.replace(/^€\\s*/u, "").replace(",", ".");
+      if (/^\\d+(?:\\.\\d{1,2})?$/.test(amountText)) {
+        const cents = Math.round(Number(amountText) * 100);
+        if (Number.isSafeInteger(cents) && cents > 0) searchFilters.push({ amountCents: BigInt(cents) });
+      }
+    }
     const where = {
       userId: auth.userId,
       ...(query.entryType ? { entryType: query.entryType } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.animalId ? { animalId: query.animalId } : {}),
       ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}),
+      ...(searchFilters.length ? { OR: searchFilters } : {}),
     };
     const [total, entries] = await Promise.all([
       prisma.financeEntry.count({ where }),
