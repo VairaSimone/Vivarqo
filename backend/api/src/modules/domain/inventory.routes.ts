@@ -122,12 +122,14 @@ export function createInventoryRouter() {
     if (query.category) where.category = query.category;
     if (query.q) {
       const search = query.q;
-      where.OR = [
+      const searchFilters: Array<Record<string, unknown>> = [
         { name: { contains: search, mode: "insensitive" } },
-        { category: { equals: categories.find((category) => category === search), mode: "insensitive" } },
         { unit: { contains: search, mode: "insensitive" } },
         { notes: { contains: search, mode: "insensitive" } },
-      ].filter((condition) => !("category" in condition) || Boolean(condition.category.equals));
+      ];
+      const exactCategory = categories.find((category) => category === search);
+      if (exactCategory) searchFilters.push({ category: exactCategory });
+      where.OR = searchFilters;
     }
     const [total, items] = await Promise.all([
       prisma.inventoryItem.count({ where: where as never }),
