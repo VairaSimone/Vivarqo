@@ -80,7 +80,7 @@ test("registri: aggiunge una pesata, la modifica e chiede conferma prima di elim
   await page.getByLabel("Peso in grammi").fill("342.5");
   await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
   await expect.poll(() => page.e2eState.weights.length).toBe(1);
-  await expect(page.getByText(/342\.5 g/)).toBeVisible();
+  await expect(page.getByText("342.5 g")).toBeVisible();
 
   await page.getByRole("button", { name: "Modifica", exact: true }).click();
   await page.getByLabel("Peso in grammi").last().fill("350");
@@ -117,7 +117,7 @@ test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ p
   await page.getByLabel("File").setInputFiles({
     name: "scheda-naga.pdf",
     mimeType: "application/pdf",
-    buffer: Buffer.from("%PDF-1.4\\n% e2e fixture\\n")
+    buffer: Buffer.from("%PDF-1.4 test fixture")
   });
   await page.getByRole("button", { name: "Carica documento" }).click();
   await expect(page.getByText("scheda-naga.pdf")).toBeVisible();
@@ -143,7 +143,7 @@ test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ p
   await page.getByRole("button", { name: "Salva condivisione" }).click();
   await expect(page.getByText("Link attivo")).toBeVisible();
   await expect(page.getByRole("img", { name: "Codice QR del profilo pubblico" })).toBeVisible();
-  const publicLink = page.getByRole("link", { name: /\\/public\\/animals\\/naga-e2e/ });
+  const publicLink = page.locator(".share-url a");
   await expect(publicLink).toBeVisible();
   const [popup] = await Promise.all([page.context().waitForEvent("page"), publicLink.click()]);
   await expect(popup.getByRole("heading", { name: "Naga", exact: true })).toBeVisible();
@@ -190,7 +190,7 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await page.getByLabel("Umidità %").fill("80");
   await page.getByRole("button", { name: "Registra controllo", exact: true }).click();
   await expect.poll(() => page.e2eState.incubationLogs.length).toBe(1);
-  await expect(page.getByText(/30\\.5 °C/)).toBeVisible();
+  await expect(page.getByText("30.5 °C")).toBeVisible();
 
   await page.getByRole("tab", { name: "Piccoli e nascite" }).click();
   await page.getByLabel("Numero di piccoli").fill("2");
