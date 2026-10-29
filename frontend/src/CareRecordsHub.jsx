@@ -43,12 +43,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [selectedSession, setSelectedSession] = useState(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
-  const api = useCallback((path, options, label) => apiRequest(path, {
-    ...options,
-    queueWhenOffline: Boolean(options?.method && options.method !== "GET"),
-    offlineOwner: owner,
-    offlineLabel: label
-  }), [owner]);
+  const api = useCallback((path, options) => apiRequest(path, options), []);
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
@@ -109,11 +104,6 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   useEffect(() => { void loadAnimals().catch(e => setError(e.message)); }, [loadAnimals]);
   useEffect(() => { if (initialAnimalId) { setAnimalId(initialAnimalId); setPage(1); } }, [initialAnimalId]);
   useEffect(() => { void loadRecords(); }, [loadRecords]);
-  useEffect(() => {
-    const changed = () => { void loadAnimals().catch(() => {}); void loadRecords().catch(() => {}); };
-    window.addEventListener("vivarqo:offline-queue-changed", changed);
-    return () => window.removeEventListener("vivarqo:offline-queue-changed", changed);
-  }, [loadAnimals, loadRecords]);
 
   const changeTab = next => {
     setTab(next); setPage(1); setEditing(null); setCreateOpen(false);
@@ -156,12 +146,9 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     try {
       const result = await api(path, { method: "POST", body }, "Nuovo registro: " + TITLES[tab]);
       setCreateOpen(false); setFeedingEntries([]);
-      if (result.queuedOffline) onNotice("Registro conservato in coda sul dispositivo. Sarà sincronizzato al ritorno della connessione.", "warning");
-      else {
-        onNotice(tab === "feedings" ? "Sessione salvata per " + body.entries.length + " animali." : "Registro creato.", "success");
-        await loadRecords();
-        if (tab === "feedings" && result.session?.id) await loadSessionDetail(result.session.id);
-      }
+      onNotice(tab === "feedings" ? "Sessione salvata per " + body.entries.length + " animali." : "Registro creato.", "success");
+      await loadRecords();
+      if (tab === "feedings" && result.session?.id) await loadSessionDetail(result.session.id);
     } catch (err) { onNotice(err.message, "error"); }
   };
 
@@ -187,8 +174,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     try {
       const result = await api(path, { method: "PATCH", body }, "Modifica registro: " + TITLES[tab]);
       setEditing(null);
-      if (result.queuedOffline) onNotice("Modifica conservata in coda sul dispositivo.", "warning");
-      else { onNotice("Registro aggiornato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id); }
+      onNotice("Registro aggiornato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id);
     } catch (err) { onNotice(err.message, "error"); }
   };
 
@@ -198,8 +184,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       tab === "notes" ? "animal-notes/" + record.id : tab === "feedings" ? "feeding-entries/" + record.id : "genetic-traits/" + record.id;
     try {
       const result = await api(endpoint, { method: "DELETE", body: {} }, "Elimina registro: " + TITLES[tab]);
-      if (result.queuedOffline) onNotice("Eliminazione conservata in coda sul dispositivo.", "warning");
-      else { onNotice("Registro eliminato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id); }
+      onNotice("Registro eliminato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id);
     } catch (err) { onNotice(err.message, "error"); }
   };
 
