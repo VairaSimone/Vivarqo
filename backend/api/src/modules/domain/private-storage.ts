@@ -8,6 +8,7 @@ import { AppError } from "../../errors/app-error.js";
 
 const root = resolve(process.cwd(), env.PRIVATE_STORAGE_PATH);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_ZIP32_ARCHIVE_BYTES = 0xffff_ffff;
 type PrivateFolder = "documents" | "exports";
 type PrivateExtension = "pdf" | "jpg" | "png" | "webp" | "zip";
 type S3Config = { endpoint: string | undefined; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
@@ -192,7 +193,7 @@ export async function storePrivateObjectFromFile(
   extension: PrivateExtension,
   sourcePath: string,
 ): Promise<string> {
-  const maximum = folder === "exports" ? 50 * 1024 * 1024 : MAX_FILE_BYTES;
+  const maximum = folder === "exports" ? MAX_ZIP32_ARCHIVE_BYTES : MAX_FILE_BYTES;
   const fileInfo = await stat(sourcePath);
   if (!fileInfo.isFile() || fileInfo.size === 0 || fileInfo.size > maximum) {
     throw new AppError(413, "FILE_TOO_LARGE", "File exceeds the storage limit");
@@ -241,7 +242,7 @@ export async function storePrivateObject(folder: PrivateFolder, extension: Priva
   return key;
 }
 
-const MAX_OBJECT_STREAM_BYTES = 50 * 1024 * 1024;
+const MAX_OBJECT_STREAM_BYTES = MAX_ZIP32_ARCHIVE_BYTES;
 
 function enforceStreamLimit(source: Readable, maximumBytes: number): Readable {
   let totalBytes = 0;
