@@ -193,7 +193,7 @@ export function SettingsPage({ user, onNotice }: SettingsPageProps) {
       <h2>Impostazioni account</h2>
       <p className="subheading">Lingua, fuso orario, unità e visualizzazione vengono salvati sul tuo account.</p>
       {profileQuery.isFetching && <p className="muted" role="status">Aggiornamento delle preferenze salvate…</p>}
-      {profileQuery.isError && <p className="muted">Non è stato possibile aggiornare il profilo dal server; puoi comunque modificare i valori già caricati.</p>
+      {profileQuery.isError && <p className="muted">Non è stato possibile aggiornare il profilo dal server; puoi comunque modificare i valori già caricati.</p>}
       <form className="form-grid" onSubmit={handleSubmit(save)}>
         <Field label="Nome visualizzato" {...register("displayName", { required: "Inserisci un nome.", maxLength: { value: 120, message: "Massimo 120 caratteri." } })} />
         <Field label="Email" type="email" autoComplete="email" {...register("email", { required: "Inserisci un indirizzo email.", maxLength: 254 })} />
