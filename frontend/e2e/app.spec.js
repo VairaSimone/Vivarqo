@@ -96,6 +96,27 @@ test("registri: aggiunge una pesata, la modifica e chiede conferma prima di elim
   await expect.poll(() => page.e2eState.weights.length).toBe(0);
 });
 
+test("offline: le modifiche vengono rifiutate e non accodate localmente", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/animals");
+  await expect(page.getByRole("heading", { name: "Animali", exact: true }).first()).toBeVisible();
+
+  const initialAnimalCount = page.e2eState.animals.length;
+  const initialCreateRequests = page.e2eState.requests.filter(item => item.method === "POST" && item.path === "animals").length;
+  await page.context().setOffline(true);
+  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
+
+  await page.getByRole("button", { name: /Nuovo animale/ }).click();
+  await page.getByLabel("Nome", { exact: true }).fill("Non salvato offline");
+  await page.getByLabel("Specie", { exact: true }).fill("Python regius");
+  await page.getByRole("button", { name: "Salva scheda", exact: true }).click();
+
+  await expect(page.getByRole("status")).toContainText("Serve una connessione a Internet");
+  expect(page.e2eState.animals).toHaveLength(initialAnimalCount);
+  expect(page.e2eState.requests.filter(item => item.method === "POST" && item.path === "animals")).toHaveLength(initialCreateRequests);
+  await expect(page.getByRole("heading", { name: "Nuova scheda animale" })).toBeVisible();
+});
+
 test("registrazioni alimentari: salva una sessione per più animali", async ({ page }) => {
   await signIn(page);
   await page.goto("/feeding");
