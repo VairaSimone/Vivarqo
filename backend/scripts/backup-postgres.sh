@@ -2,6 +2,28 @@
 set -Eeuo pipefail
 
 : "${DATABASE_URL:?Set DATABASE_URL to the PostgreSQL database to back up}"
+
+# Prisma URLs commonly include ?schema=public. libpq (pg_dump/pg_restore)
+# doesn't use that Prisma-only parameter, so remove only the schema parameter
+# while preserving SSL and all other connection options.
+normalize_pg_url() {
+  local input="$1" base query item output="" separator=""
+  if [[ "$input" != *\?* ]]; then
+    printf '%s' "$input"
+    return
+  fi
+  base="${input%%\?*}"
+  query="${input#*\?}"
+  IFS='&' read -r -a items <<< "$query"
+  for item in "${items[@]}"; do
+    [[ -z "$item" || "${item%%=*}" == "schema" ]] && continue
+    output+="$separator$item"
+    separator='&'
+  done
+  if [[ -n "$output" ]]; then printf '%s?%s' "$base" "$output"; else printf '%s' "$base"; fi
+}
+pg_database_url="$(normalize_pg_url "$DATABASE_URL")"
+
 command -v pg_dump >/dev/null 2>&1 || { echo "pg_dump is required (install PostgreSQL client tools)." >&2; exit 127; }
 command -v pg_restore >/dev/null 2>&1 || { echo "pg_restore is required (install PostgreSQL client tools)." >&2; exit 127; }
 
@@ -17,7 +39,7 @@ if [[ -e "$destination" ]]; then
   exit 1
 fi
 
-pg_dump --format=custom --no-owner --no-acl --file="$destination" "$DATABASE_URL"
+pg_dump --format=custom --no-owner --no-acl --file="$destination" "$pg_database_url"
 if ! pg_restore --list "$destination" >/dev/null; then
   rm -f "$destination"
   echo "Backup verification failed; incomplete file removed." >&2
