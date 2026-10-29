@@ -2,7 +2,6 @@ openapi: 3.1.0
 info:
   title: Vivarqo REST API
   version: 1.0.0-draft
-  summary: Snapshot del contratto API Vivarqo
   description: >
     Contratto iniziale versionato per le route implementate nel branch main.
     Le rotte mutative browser richiedono X-CSRF-Token. Le rotte private richiedono
