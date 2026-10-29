@@ -3,7 +3,8 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { getVapidPublicKey, isSupportedPushEndpoint, sendPushToUser } from "./web-push.js";
+import { getVapidPublicKey, isSupportedPushEndpoint } from "./web-push.js";
+import { enqueuePushDelivery } from "./background-jobs.js";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
