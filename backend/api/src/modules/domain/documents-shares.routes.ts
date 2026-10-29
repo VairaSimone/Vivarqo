@@ -7,6 +7,7 @@ import { logger } from "../../logger.js";
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { deletePrivateObject, openPrivateObjectStream, storePrivateObject, validatePrivateFile } from "./private-storage.js";
 
 const uploadBody = raw({
@@ -227,7 +228,7 @@ export function createDocumentShareRouter() {
     res.status(200).json({ share: { ...share, url: share.isEnabled && share.revokedAt === null ? env.APP_ORIGIN + "/public/animals/" + share.slug : null } });
   });
 
-  router.post("/animals/:id/public-share", requireSession, async (req, res) => {
+  router.post("/animals/:id/public-share", requireSession, persistentRateLimit(20, "public-share-create"), async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = id(req.params.id, "animal id");
     const animal = await prisma.animal.findFirst({ where: { id: animalId, userId: auth.userId }, select: { id: true } });
