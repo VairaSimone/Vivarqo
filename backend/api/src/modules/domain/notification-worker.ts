@@ -1,7 +1,7 @@
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../logger.js";
-import { sendPushToUser } from "./web-push.js";
+import { enqueuePushDelivery } from "./background-jobs.js";
 
 type DueTask = {
   id: string;
@@ -100,17 +100,23 @@ export async function dispatchDueTaskNotifications(now = new Date()): Promise<Re
     });
     if (!preferences?.pushEnabled || !env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) continue;
 
-    const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
-    if (!notification) continue;
-    const delivery = await sendPushToUser(task.userId, {
-      title: notification.title,
-      body: notification.body,
-      url: notification.targetPath ?? "/tasks",
-      category: notification.category,
+    const notification = await prisma.notification.findUnique({
+      where: { id: notificationId },
+      select: { id: true },
     });
-    summary.pushAttempted += delivery.attempted;
-    summary.pushSent += delivery.sent;
-    summary.pushFailed += delivery.failed + delivery.removed;
+    if (!notification) continue;
+    try {
+      await enqueuePushDelivery({ userId: task.userId, notificationId: notification.id });
+      // This counts queued notification deliveries; the durable worker records
+      // per-subscription attempts and outcomes separately.
+      summary.pushAttempted += 1;
+    } catch (error) {
+      summary.pushFailed += 1;
+      logger.warn({
+        notificationId,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      }, "Push delivery could not be queued");
+    }
   }
   return summary;
 }
