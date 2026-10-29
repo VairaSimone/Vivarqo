@@ -41,6 +41,11 @@ const createDocumentSchema = z.object({
   note: z.string().trim().max(10_000).nullable().optional(),
 }).strict().refine((v) => Boolean(v.animalId || v.cycleId), "A document must be linked to an animal or a reproduction cycle");
 
+const patchDocumentSchema = z.object({
+  category: z.string().trim().min(1).max(40).optional(),
+  note: z.string().trim().max(10_000).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+
 export function createDocumentShareRouter() {
   const router = Router();
 
@@ -158,6 +163,33 @@ export function createDocumentShareRouter() {
     stored.stream.pipe(res);
   });
 
+
+  router.patch("/documents/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const documentId = id(req.params.id, "document id");
+    const input = parseBody(patchDocumentSchema, req.body);
+    const existing = await prisma.document.findFirst({
+      where: { id: documentId, userId: auth.userId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
+    const document = await prisma.$transaction(async (tx) => {
+      const updated = await tx.document.update({
+        where: { id: documentId },
+        data: input,
+        select: {
+          id: true, animalId: true, cycleId: true, originalFilename: true, mimeType: true,
+          sizeBytes: true, category: true, note: true, createdAt: true,
+        },
+      });
+      await tx.auditEvent.create({
+        data: { userId: auth.userId, action: "document.updated", entityType: "document", entityId: documentId, requestId: requestId(res) },
+      });
+      return updated;
+    });
+    res.status(200).json({ document: { ...document, sizeBytes: document.sizeBytes.toString() } });
+  });
+
   router.delete("/documents/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const documentId = id(req.params.id, "document id");
@@ -182,6 +214,17 @@ export function createDocumentShareRouter() {
       });
     });
     res.status(204).send();
+  });
+
+
+  router.get("/animals/:id/public-share", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = id(req.params.id, "animal id");
+    const animal = await prisma.animal.findFirst({ where: { id: animalId, userId: auth.userId }, select: { id: true } });
+    if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+    const share = await prisma.publicShare.findFirst({ where: { animalId, userId: auth.userId } });
+    if (!share) throw new AppError(404, "PUBLIC_SHARE_NOT_FOUND", "Public share not found");
+    res.status(200).json({ share: { ...share, url: share.isEnabled && share.revokedAt === null ? env.APP_ORIGIN + "/public/animals/" + share.slug : null } });
   });
 
   router.post("/animals/:id/public-share", requireSession, async (req, res) => {
@@ -211,7 +254,7 @@ export function createDocumentShareRouter() {
             publicDescription: input.publicDescription ?? null, isEnabled: input.isEnabled ?? false,
           },
         });
-    res.status(201).json({ share: { ...share, url: `${env.API_ORIGIN}/api/v1/public/animals/${share.slug}` } });
+    res.status(201).json({ share: { ...share, url: share.isEnabled && share.revokedAt === null ? env.APP_ORIGIN + "/public/animals/" + share.slug : null } });
   });
 
   router.patch("/public-shares/:id", requireSession, async (req, res) => {
@@ -234,7 +277,7 @@ export function createDocumentShareRouter() {
         ...(input.revoke ? { isEnabled: false, revokedAt: new Date() } : {}),
       },
     });
-    res.status(200).json({ share, url: `${env.API_ORIGIN}/api/v1/public/animals/${share.slug}` });
+    res.status(200).json({ share, url: share.isEnabled && share.revokedAt === null ? env.APP_ORIGIN + "/public/animals/" + share.slug : null });
   });
 
   router.get("/public/animals/:slug", async (req, res) => {

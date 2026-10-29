@@ -328,6 +328,21 @@ export function createTasksRouter() {
     res.status(200).json({ reminderRule: rule });
   });
 
+
+  router.delete("/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeId(req.params.id, "task id");
+    const existing = await prisma.task.findFirst({ where: { id, userId: auth.userId }, select: { id: true } });
+    if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
+    await prisma.$transaction(async (tx) => {
+      await tx.task.delete({ where: { id } });
+      await tx.auditEvent.create({
+        data: { userId: auth.userId, action: "task.deleted", entityType: "task", entityId: id, requestId: requestId(res) },
+      });
+    });
+    res.status(204).send();
+  });
+
   router.get("/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id, "task id");

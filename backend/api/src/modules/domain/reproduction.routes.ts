@@ -448,5 +448,186 @@ export function createReproductionRouter() {
     res.status(201).json({ animals: created, createdCount: created.length, batchId });
   });
 
+
+  router.patch("/reproductive-events/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eventId = routeUuid(req.params.id, "reproductive event id");
+    const input = parseBody(z.object({
+      eventType: z.enum(eventTypes).optional(),
+      occurredAt: z.string().datetime({ offset: true }).optional(),
+      animalId: nullableUuid,
+      details: z.string().trim().max(20_000).nullable().optional(),
+      temperatureC: z.coerce.number().min(-100).max(100).nullable().optional(),
+      humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
+    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const existing = await prisma.reproductiveEvent.findFirst({
+      where: { id: eventId, cycle: { is: { userId: auth.userId } } },
+    });
+    if (!existing) throw new AppError(404, "REPRODUCTIVE_EVENT_NOT_FOUND", "Reproductive event not found");
+    if (input.animalId !== undefined) await assertOwnedAnimals(auth.userId, [input.animalId]);
+    const data: Record<string, unknown> = { ...input };
+    if (input.occurredAt) data.occurredAt = new Date(input.occurredAt);
+    const event = await prisma.$transaction(async (tx) => {
+      const updated = await tx.reproductiveEvent.update({ where: { id: eventId }, data: data as never });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "reproductive_event.updated", entityType: "reproductive_event", entityId: eventId } });
+      return updated;
+    });
+    res.status(200).json({ event });
+  });
+
+  router.delete("/reproductive-events/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eventId = routeUuid(req.params.id, "reproductive event id");
+    const existing = await prisma.reproductiveEvent.findFirst({
+      where: { id: eventId, cycle: { is: { userId: auth.userId } } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "REPRODUCTIVE_EVENT_NOT_FOUND", "Reproductive event not found");
+    await prisma.$transaction(async (tx) => {
+      await tx.reproductiveEvent.delete({ where: { id: eventId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "reproductive_event.deleted", entityType: "reproductive_event", entityId: eventId } });
+    });
+    res.status(204).send();
+  });
+
+  router.patch("/incubation-logs/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const logId = routeUuid(req.params.id, "incubation log id");
+    const input = parseBody(z.object({
+      recordedAt: z.string().datetime({ offset: true }).optional(),
+      temperatureC: z.coerce.number().min(-100).max(100).nullable().optional(),
+      humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
+      eventType: z.string().trim().min(1).max(24).optional(),
+      notes: z.string().trim().max(10_000).nullable().optional(),
+    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const existing = await prisma.incubationLog.findFirst({
+      where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
+    const data: Record<string, unknown> = { ...input };
+    if (input.recordedAt) data.recordedAt = new Date(input.recordedAt);
+    const log = await prisma.$transaction(async (tx) => {
+      const updated = await tx.incubationLog.update({ where: { id: logId }, data: data as never });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "incubation_log.updated", entityType: "incubation_log", entityId: logId } });
+      return updated;
+    });
+    res.status(200).json({ log });
+  });
+
+  router.delete("/incubation-logs/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const logId = routeUuid(req.params.id, "incubation log id");
+    const existing = await prisma.incubationLog.findFirst({
+      where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
+    await prisma.$transaction(async (tx) => {
+      await tx.incubationLog.delete({ where: { id: logId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "incubation_log.deleted", entityType: "incubation_log", entityId: logId } });
+    });
+    res.status(204).send();
+  });
+
+  router.patch("/offspring-batches/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const batchId = routeUuid(req.params.id, "offspring batch id");
+    const input = parseBody(z.object({
+      clutchId: nullableUuid,
+      bornOn: dateOnly.optional(),
+      count: z.coerce.number().int().min(0).max(10_000).optional(),
+      notes: z.string().trim().max(20_000).nullable().optional(),
+    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const existing = await prisma.offspringBatch.findFirst({
+      where: { id: batchId, cycle: { is: { userId: auth.userId } } },
+    });
+    if (!existing) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found");
+    if (input.clutchId) {
+      const clutch = await ownedClutch(auth.userId, input.clutchId);
+      if (clutch.cycleId !== existing.cycleId) throw new AppError(400, "CLUTCH_CYCLE_MISMATCH", "Clutch and offspring batch must belong to the same cycle");
+    }
+    const data: Record<string, unknown> = { ...input };
+    if (input.bornOn) data.bornOn = validDate(input.bornOn);
+    const batch = await prisma.$transaction(async (tx) => {
+      const updated = await tx.offspringBatch.update({ where: { id: batchId }, data: data as never });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "offspring_batch.updated", entityType: "offspring_batch", entityId: batchId } });
+      return updated;
+    });
+    res.status(200).json({ offspringBatch: batch });
+  });
+
+  router.delete("/offspring-batches/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const batchId = routeUuid(req.params.id, "offspring batch id");
+    const existing = await prisma.offspringBatch.findFirst({
+      where: { id: batchId, cycle: { is: { userId: auth.userId } } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found");
+    const linkedAnimals = await prisma.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
+    if (linkedAnimals > 0) throw new AppError(409, "OFFSPRING_BATCH_HAS_ANIMALS", "This offspring batch has animal records. Remove or reassign those records before deleting the batch.");
+    await prisma.$transaction(async (tx) => {
+      await tx.offspringBatch.delete({ where: { id: batchId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "offspring_batch.deleted", entityType: "offspring_batch", entityId: batchId } });
+    });
+    res.status(204).send();
+  });
+
+  router.delete("/eggs/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const existing = await prisma.egg.findFirst({
+      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    await prisma.$transaction(async (tx) => {
+      await tx.egg.delete({ where: { id: eggId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.deleted", entityType: "egg", entityId: eggId } });
+    });
+    res.status(204).send();
+  });
+
+  router.delete("/clutches/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const clutchId = routeUuid(req.params.id, "clutch id");
+    const clutch = await ownedClutch(auth.userId, clutchId);
+    const [offspring, linkedAnimals] = await Promise.all([
+      prisma.offspringBatch.count({ where: { clutchId, cycle: { is: { userId: auth.userId } } } }),
+      prisma.animal.count({ where: { userId: auth.userId, originClutchId: clutchId } }),
+    ]);
+    if (offspring > 0 || linkedAnimals > 0) {
+      throw new AppError(409, "CLUTCH_HAS_OFFSPRING", "This clutch is linked to offspring records. Remove or reassign those records before deleting the clutch.");
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.incubationLog.deleteMany({ where: { clutchId } });
+      await tx.egg.deleteMany({ where: { clutchId } });
+      await tx.clutch.delete({ where: { id: clutchId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "clutch.deleted", entityType: "clutch", entityId: clutchId } });
+    });
+    res.status(204).send();
+  });
+
+  router.delete("/reproduction-cycles/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const cycleId = routeUuid(req.params.id, "cycle id");
+    await ownedCycle(auth.userId, cycleId);
+    const [events, clutches, offspring, documents] = await Promise.all([
+      prisma.reproductiveEvent.count({ where: { cycleId } }),
+      prisma.clutch.count({ where: { cycleId } }),
+      prisma.offspringBatch.count({ where: { cycleId } }),
+      prisma.document.count({ where: { userId: auth.userId, cycleId } }),
+    ]);
+    if (events + clutches + offspring + documents > 0) {
+      throw new AppError(409, "REPRODUCTION_CYCLE_HAS_RECORDS", "This cycle still has linked events, clutches, offspring batches, or documents. Remove those records first.");
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.reproductionCycle.delete({ where: { id: cycleId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "reproduction_cycle.deleted", entityType: "reproduction_cycle", entityId: cycleId } });
+    });
+    res.status(204).send();
+  });
+
   return router;
 }

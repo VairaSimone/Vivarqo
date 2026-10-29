@@ -191,12 +191,19 @@ export function createNotificationRouter() {
       unreadOnly: z.enum(["true", "false"]).default("false"),
       category: z.string().trim().max(30).optional(),
     }), req.query);
+    const prefs = await prisma.notificationPreferences.findUnique({ where: { userId: auth.userId }, select: { inAppEnabled: true } });
+    if (prefs?.inAppEnabled === false) {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.status(200).json({ notifications: [], unreadCount: 0, pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 0 } });
+      return;
+    }
     const where = { userId: auth.userId, ...(query.unreadOnly === "true" ? { readAt: null } : {}), ...(query.category ? { category: query.category } : {}) };
     const [total, unreadCount, notifications] = await Promise.all([
       prisma.notification.count({ where }),
       prisma.notification.count({ where: { userId: auth.userId, readAt: null } }),
       prisma.notification.findMany({ where, orderBy: { createdAt: "desc" }, skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
     ]);
+    res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({ notifications, unreadCount, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
@@ -256,6 +263,18 @@ export function createNotificationRouter() {
       update: data as never,
     });
     res.status(200).json({ preferences: { ...prefs, quietHoursStart: timeString(prefs.quietHoursStart), quietHoursEnd: timeString(prefs.quietHoursEnd) } });
+  });
+
+
+  router.get("/push-subscriptions", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const subscriptions = await prisma.pushSubscription.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, userAgent: true, createdAt: true, lastSuccessAt: true },
+    });
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({ subscriptions });
   });
 
   router.post("/push-subscriptions", requireSession, async (req, res) => {
