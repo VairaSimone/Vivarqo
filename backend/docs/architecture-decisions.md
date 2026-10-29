@@ -53,3 +53,7 @@
 - Il service worker attende l'accettazione esplicita prima di attivare un aggiornamento disponibile; la UI può mostrare l'avviso e ricaricare la pagina dopo il cambio di controller.
 - La prima bozza OpenAPI è disponibile in `docs/openapi.yaml`. Diverse request/response restano documentate con uno schema generico: il contratto va completato e validato in CI prima di considerarlo conforme alla sezione 20.
 - Test E2E aggiunti per il blocco delle mutazioni offline, i campi anagrafici estesi e la trasmissione all'API dei filtri/ordinamenti.
+
+
+- La route `POST /api/v1/account/export` prevista dalla specifica è ora disponibile come alias della route `/api/v1/exports`; entrambe condividono lo stesso router e lo stesso limite di concorrenza.
+- I limiti persistenti PostgreSQL si applicano alle creazioni e conferme degli import e alla creazione di condivisioni pubbliche; il limite globale API resta per-processo e richiede ancora una decisione per deploy multi-replica.
