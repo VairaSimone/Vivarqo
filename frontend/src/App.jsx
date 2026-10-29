@@ -207,7 +207,7 @@ function DataTools({onNotice}) {
       {preview && <div className="import-result">
         <h3>Anteprima importazione</h3>
         <p>Righe totali: {preview.totalRows ?? "—"} · valide: {preview.validRows ?? "—"} · errori: {preview.invalidRows ?? "—"}</p>
-        {entity === "animals" && possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({possibleDuplicates.length}).</strong><p>Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.</p></div>}
+        {entity === "animals" && Array.isArray(preview.possibleDuplicates) && preview.possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({preview.possibleDuplicates.length}).</strong><p>Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.</p></div>}
         {(preview.errors || []).slice(0,20).map((error, index) => <p key={index} className="error-text">Riga {error.row}: {error.column} — {error.reason}</p>)}
         <Button onClick={confirmImport} disabled={busy || !preview.validRows}>Conferma importazione</Button>
       </div>}
