@@ -33,8 +33,10 @@ const API = {
 };
 const TITLES = Object.fromEntries(NAV.map(([id,label])=>[id,label]));
 function initialSectionFromPath(pathname) {
- const path = String(pathname || "/").replace(/\\/+$/, "") || "/";
- if (/^\\/tasks(?:\\/[^/]+)?$/.test(path)) return "attivita";
+ let path = String(pathname || "/");
+ while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+ const segments = path.split("/").filter(Boolean);
+ if (segments[0] === "tasks" && segments.length <= 2) return "attivita";
  if (path === "/settings/notifications" || path === "/notifications") return "notifiche";
  if (path === "/animals") return "animali";
  if (path === "/reproduction") return "riproduzioni";
