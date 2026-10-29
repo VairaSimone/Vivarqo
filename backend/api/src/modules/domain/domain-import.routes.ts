@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { parseAnimalFile } from "../animals/animal-file-parser.js";
 
 const uploadBody = raw({
@@ -304,7 +305,7 @@ export function createDomainImportRouter() {
       invalidRows: errors.length, errors, preview: validRows.slice(0, 20), expiresAt: job.expiresAt });
   });
 
-  router.post("/:id/confirm", requireSession, async (req, res, next) => {
+  router.post("/:id/confirm", requireSession, persistentRateLimit(30, "import-confirm"), async (req, res, next) => {
     const auth = res.locals.auth as AuthContext;
     const jobId = id(req.params.id);
     const current = await prisma.importJob.findFirst({ where: { id: jobId, userId: auth.userId } });
