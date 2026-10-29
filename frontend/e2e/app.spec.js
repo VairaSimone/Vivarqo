@@ -251,6 +251,7 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await expect.poll(() => page.e2eState.animals.length).toBe(4);
   expect(page.e2eState.animals.some(item => item.name === "Cucciolo E2E 01")).toBeTruthy();
 
+  await page.getByRole("tab", { name: "Covate, uova e incubazione" }).click();
   const originalClutch = page.locator(".clutch-card").filter({ hasText: "Incubatrice 1" });
   await originalClutch.getByRole("button", { name: "Elimina", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Eliminare la covata?");
