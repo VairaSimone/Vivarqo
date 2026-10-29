@@ -1,7 +1,7 @@
 # Sicurezza e conformità: stato, controlli e attività prima del lancio
 
 **Revisione tecnica:** 28 ottobre 2026  
-**Ambito verificato:** repository backend/API Vivarqo disponibile in questo branch. Il repository non contiene il frontend React/PWA né i documenti legali pubblicati.  
+**Ambito verificato:** repository Vivarqo disponibile nel branch `main`, inclusi backend/API e frontend React/PWA. Il repository non contiene documenti legali pubblicati né prove autonome dell’ambiente di produzione.  
 **Importante:** questa è una checklist tecnica, non una certificazione di conformità né un parere legale. La conformità dipende anche da chi gestisce il servizio, dalle finalità effettive, dai fornitori, dai paesi serviti, dai contratti e dai processi organizzativi.
 
 ## 1. Modifiche tecniche applicate in questo branch
