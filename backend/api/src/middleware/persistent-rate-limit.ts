@@ -1,5 +1,5 @@
 import rateLimit from "express-rate-limit";
-import type { Request, RequestHandler, Response } from "express";
+import type { RequestHandler, Response } from "express";
 import { PostgresRateLimitStore } from "./postgres-rate-limit-store.js";
 
 function rateLimitedResponse(res: Response): void {
