@@ -172,7 +172,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       const response = await api(editingCycle ? "reproduction-cycles/" + editCycle.id : "reproduction-cycles", {
         method: editingCycle ? "PATCH" : "POST", body
       }, "Ciclo riproduttivo");
-      if (response.queuedOffline) { setEditCycle(null); return; }
+      
       setEditCycle(null);
       await loadLists();
       const created = response.cycle;
@@ -184,7 +184,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     if (!(await confirmAction({ title: "Eliminare il ciclo riproduttivo?", message: "“" + (item.name || prettyDate(item.startedOn)) + "” potrebbe avere registri figli da rimuovere prima. Il server controllerà i collegamenti.", confirmLabel: "Elimina ciclo", danger: true }))) return;
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
-      if (result.queuedOffline) return;
+      
       setCycles(previous => previous.filter(cycle => cycle.id !== item.id));
       if (cycleId === item.id) {
         setCycleId(""); setClutchId(""); setCyclesPage(1);
@@ -208,13 +208,13 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       const response = await api(editingEvent ? "reproductive-events/" + editEvent.id : "reproduction-cycles/" + cycleId + "/events", {
         method: editingEvent ? "PATCH" : "POST", body
       }, "Evento riproduttivo");
-      if (!response.queuedOffline) { setEditEvent(null); await loadCycle(); }
+      setEditEvent(null); await loadCycle();
       else setEditEvent(null);
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEvent = async item => {
     if (!(await confirmAction({ title: "Eliminare l’evento?", message: "L’evento riproduttivo verrà eliminato definitivamente.", confirmLabel: "Elimina evento", danger: true }))) return;
-    try { const r = await api("reproductive-events/" + item.id, { method: "DELETE", body: {} }, "Elimina evento"); if (!r.queuedOffline) await loadCycle(); }
+    try { const r = await api("reproductive-events/" + item.id, { method: "DELETE", body: {} }, "Elimina evento"); await loadCycle(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const submitClutch = async e => {
@@ -230,7 +230,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         method: editingClutch ? "PATCH" : "POST",
         body: editingClutch ? body : { ...body, cycleId }
       }, "Covata");
-      if (response.queuedOffline) { setEditClutch(null); return; }
+      
       setEditClutch(null);
       if (response.clutch?.id) { setClutchId(response.clutch.id); setEggsPage(1); setLogsPage(1); }
       await loadCycle();
@@ -240,7 +240,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     if (!(await confirmAction({ title: "Eliminare la covata?", message: "Saranno interessate anche le uova e le registrazioni di incubazione. Le covate collegate a piccoli registrati non possono essere eliminate.", confirmLabel: "Elimina covata", danger: true }))) return;
     try {
       const r = await api("clutches/" + item.id, { method: "DELETE", body: {} }, "Elimina covata");
-      if (r.queuedOffline) return;
+      
       if (clutchId === item.id) setClutchId("");
       await loadCycle();
     } catch (err) { onNotice(err.message, "error"); }
@@ -255,7 +255,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     }));
     try {
       const r = await api("clutches/" + clutchId + "/eggs", { method: "POST", body: { eggs: created } }, "Aggiungi uova");
-      if (!r.queuedOffline) { await loadClutch(); await loadCycle(); }
+      await loadClutch(); await loadCycle();
     } catch (err) { onNotice(err.message, "error"); }
   };
   const saveEggRow = async (egg, row) => {
@@ -267,12 +267,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     };
     try {
       const result = await api("eggs/" + egg.id, { method: "PATCH", body }, "Modifica uovo");
-      if (!result.queuedOffline) await loadClutch();
+      await loadClutch();
     } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEgg = async egg => {
     if (!(await confirmAction({ title: "Eliminare l’uovo?", message: "L’uovo “" + (egg.code || "senza codice") + "” verrà eliminato definitivamente.", confirmLabel: "Elimina uovo", danger: true }))) return;
-    try { const r = await api("eggs/" + egg.id, { method: "DELETE", body: {} }, "Elimina uovo"); if (!r.queuedOffline) { await loadClutch(); await loadCycle(); } }
+    try { const r = await api("eggs/" + egg.id, { method: "DELETE", body: {} }, "Elimina uovo"); await loadClutch(); await loadCycle(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const addIncubationLog = async e => {
@@ -283,7 +283,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
-    try { const r = await api("clutches/" + clutchId + "/incubation-logs", { method: "POST", body }, "Registro incubazione"); if (!r.queuedOffline) await loadClutch(); }
+    try { const r = await api("clutches/" + clutchId + "/incubation-logs", { method: "POST", body }, "Registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const editIncubationLog = async (e, log) => {
@@ -294,29 +294,29 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
-    try { const r = await api("incubation-logs/" + log.id, { method: "PATCH", body }, "Modifica registro incubazione"); if (!r.queuedOffline) await loadClutch(); }
+    try { const r = await api("incubation-logs/" + log.id, { method: "PATCH", body }, "Modifica registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const deleteIncubationLog = async log => {
     if (!(await confirmAction({ title: "Eliminare il registro di incubazione?", message: "La registrazione verrà eliminata definitivamente.", confirmLabel: "Elimina registro", danger: true }))) return;
-    try { const r = await api("incubation-logs/" + log.id, { method: "DELETE", body: {} }, "Elimina registro incubazione"); if (!r.queuedOffline) await loadClutch(); }
+    try { const r = await api("incubation-logs/" + log.id, { method: "DELETE", body: {} }, "Elimina registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const createBatch = async e => {
     e.preventDefault(); const v = readForm(e);
     const body = { cycleId, clutchId: nullable(v.clutchId), bornOn: v.bornOn, count: Number(v.count), notes: nullable(v.notes) };
-    try { const r = await api("offspring-batches", { method: "POST", body }, "Registro piccoli"); if (!r.queuedOffline) { await loadCycle(); await loadLists(); } }
+    try { const r = await api("offspring-batches", { method: "POST", body }, "Registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const editBatch = async (e, batch) => {
     e.preventDefault(); const v = readForm(e);
     const body = { bornOn: v.bornOn, count: Number(v.count), notes: nullable(v.notes), clutchId: nullable(v.clutchId) };
-    try { const r = await api("offspring-batches/" + batch.id, { method: "PATCH", body }, "Modifica registro piccoli"); if (!r.queuedOffline) { await loadCycle(); await loadLists(); } }
+    try { const r = await api("offspring-batches/" + batch.id, { method: "PATCH", body }, "Modifica registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const deleteBatch = async batch => {
     if (!(await confirmAction({ title: "Eliminare il registro dei piccoli?", message: "Non sarà possibile procedere se sono già state create schede animali dal lotto.", confirmLabel: "Elimina registro", danger: true }))) return;
-    try { const r = await api("offspring-batches/" + batch.id, { method: "DELETE", body: {} }, "Elimina registro piccoli"); if (!r.queuedOffline) { await loadCycle(); await loadLists(); } }
+    try { const r = await api("offspring-batches/" + batch.id, { method: "DELETE", body: {} }, "Elimina registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(err.message, "error"); }
   };
   const createAnimalCards = batch => {
@@ -342,7 +342,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     try {
       const response = await api("offspring-batches/" + animalCardsForm.batch.id + "/animals", { method: "POST", body: { animals: animalsPayload } }, "Crea schede dei piccoli");
       setAnimalCardsForm(null);
-      if (!response.queuedOffline) onNotice("Create " + (response.createdCount ?? count) + " schede animale.", "success");
+      onNotice("Create " + (response.createdCount ?? count) + " schede animale.", "success");
       await loadCycle();
       await loadLists();
     } catch (err) { onNotice(err.message, "error"); }
