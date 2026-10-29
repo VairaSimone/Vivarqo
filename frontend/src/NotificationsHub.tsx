@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
-import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
+import { useConfirmDialog } from "./ui/ConfirmDialog.tsx";
 
 const categories = [
   ["task_due", "Scadenze attività"], ["system", "Sistema e test push"]
