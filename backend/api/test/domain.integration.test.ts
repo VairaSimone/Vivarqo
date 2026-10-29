@@ -323,6 +323,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(noDocZip.includes(Buffer.from("'  =HYPERLINK("))).toBe(true);
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
+    const accountExport = await owner.agent.post("/api/v1/account/export")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(201);
+    expect(accountExport.body.export.status).toBe("completed");
+    const accountExportZip = Buffer.from((await getZip(accountExport.body.downloadPath)).body as Buffer);
+    expect(accountExportZip.subarray(0, 2).toString("hex")).toBe("504b");
+
     const withDocumentFiles = await owner.agent.post("/api/v1/exports")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: true }).expect(201);
     const withDocZip = Buffer.from((await getZip(withDocumentFiles.body.downloadPath)).body as Buffer);
