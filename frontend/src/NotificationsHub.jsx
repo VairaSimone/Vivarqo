@@ -28,6 +28,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
   const [preferences, setPreferences] = useState({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
   const [devices, setDevices] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -49,7 +50,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
     setDevices(arrayOf(subs.subscriptions ?? subs));
   }, [page]);
 
-  useEffect(() => { void load().catch(e => setError(e.message)); }, [load]);
+  useEffect(() => { let live = true; void load().catch(e => setError(e.message)).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
   useEffect(() => {
     const changed = () => { void load().catch(() => {}); };
     window.addEventListener("vivarqo:offline-queue-changed", changed);
@@ -161,7 +162,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">CENTRO NOTIFICHE</p><h2>Avvisi e lettura</h2><p className="subheading">{unreadCount} non lette · le preferenze si applicano al tuo account.</p></div><div className="inline-actions"><Button onClick={() => load().catch(e => setError(e.message))}>↻ Aggiorna</Button><Button disabled={!unreadCount} onClick={markAll}>Segna tutte come lette</Button></div></div>
       {error && <p className="form-message" role="alert">{error}</p>}
-      {notifications.length === 0 ? <div className="empty-state"><h3>Nessuna notifica</h3><p>Gli avvisi generati dal server appariranno in questa sezione.</p></div> :
+      {initialLoading ? <p className="loading" role="status">Caricamento notifiche…</p> : notifications.length === 0 ? <div className="empty-state"><h3>Nessuna notifica</h3><p>Gli avvisi generati dal server appariranno in questa sezione.</p></div> :
         <div className="notice-list">{notifications.map(item => <article className={"notification-row " + (item.readAt ? "is-read" : "is-unread")} key={item.id}><span className="notification-dot">{item.readAt ? "✓" : "•"}</span><div className="notification-copy"><strong>{item.title}</strong><p>{item.body}</p><small>{item.category} · {dateTime(item.createdAt)}</small></div><div className="notification-actions">{item.targetPath && <a href={item.targetPath} className="text-link">Apri</a>}{!item.readAt && <Button onClick={() => markRead(item)}>Segna letta</Button>}</div></article>)}</div>}
       {pagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {pagination.page || page} di {pagination.totalPages} · {pagination.total} notifiche</span><div className="inline-actions"><Button disabled={page <= 1 || busy} onClick={() => setPage(p => p - 1)}>← Precedente</Button><Button disabled={page >= pagination.totalPages || busy} onClick={() => setPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>

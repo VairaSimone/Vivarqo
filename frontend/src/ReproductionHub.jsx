@@ -72,6 +72,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
   const [editEvent, setEditEvent] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listsLoaded, setListsLoaded] = useState(false);
 
   const api = useCallback(async (path, options = {}, label) => {
     const result = await apiRequest(path, { ...options, queueWhenOffline: options.method && options.method !== "GET", offlineOwner: owner, offlineLabel: label });
@@ -160,7 +161,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   }, [cycleId, loadLists, loadCycle]);
 
-  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, [loadLists]);
+  useEffect(() => { let live = true; void loadLists().catch(e => setError(e.message)).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadCycle(cycleId).catch(e => setError(e.message)); }, [loadCycle]);
   useEffect(() => { void loadClutch(clutchId).catch(e => setError(e.message)); }, [loadClutch]);
   useEffect(() => {
@@ -263,10 +264,17 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       if (!r.queuedOffline) { await loadClutch(); await loadCycle(); }
     } catch (err) { onNotice(err.message, "error"); }
   };
-  const saveEgg = async (e, egg) => {
-    e.preventDefault(); const v = readForm(e);
-    try { const r = await api("eggs/" + egg.id, { method: "PATCH", body: { code: nullable(v.code), status: v.status, notes: nullable(v.notes) } }, "Modifica uovo"); if (!r.queuedOffline) await loadClutch(); }
-    catch (err) { onNotice(err.message, "error"); }
+  const saveEggRow = async (egg, row) => {
+    if (!row) return;
+    const body = {
+      code: nullable(row.querySelector('[data-egg-field="code"]')?.value?.trim()),
+      status: row.querySelector('[data-egg-field="status"]')?.value || "unknown",
+      notes: nullable(row.querySelector('[data-egg-field="notes"]')?.value?.trim())
+    };
+    try {
+      const result = await api("eggs/" + egg.id, { method: "PATCH", body }, "Modifica uovo");
+      if (!result.queuedOffline) await loadClutch();
+    } catch (err) { onNotice(err.message, "error"); }
   };
   const deleteEgg = async egg => {
     if (!(await confirmAction({ title: "Eliminare l’uovo?", message: "L’uovo “" + (egg.code || "senza codice") + "” verrà eliminato definitivamente.", confirmLabel: "Elimina uovo", danger: true }))) return;
@@ -359,7 +367,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali caricati · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} totali)</span><div className="inline-actions"><Action disabled={animalsPage <= 1 || busy} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Action><Action disabled={animalsPage >= animalsPagination.totalPages || busy} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Action></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
       {busy && <p className="muted">Caricamento dati riproduttivi…</p>}
-      {cycles.length === 0 ? <div className="empty-state"><h3>Nessun ciclo registrato</h3><p>Crea un ciclo per collegare genitori, eventi, covate e piccoli.</p></div> :
+      {!listsLoaded && cycles.length === 0 ? <p className="loading" role="status">Caricamento cicli riproduttivi…</p> : cycles.length === 0 ? <div className="empty-state"><h3>Nessun ciclo registrato</h3><p>Crea un ciclo per collegare genitori, eventi, covate e piccoli.</p></div> :
         <div className="cycle-grid">{cycles.map(item => <article className={"cycle-card " + (item.id === cycleId ? "selected" : "")} key={item.id}>
           <button className="cycle-select" onClick={() => selectCycle(item.id)}><strong>{item.name || "Ciclo senza nome"}</strong><span>{prettyDate(item.startedOn)} · {val(item, "status")}</span><small>{item.parentA?.name || animals.find(a => a.id === item.parentAAnimalId)?.name || "Genitore A non assegnato"} × {item.parentB?.name || animals.find(a => a.id === item.parentBAnimalId)?.name || "Genitore B non assegnato"}</small><small>{item._count?.clutches ?? 0} covate · {item._count?.events ?? 0} eventi · {item._count?.offspringBatches ?? 0} registri piccoli</small></button>
           <div className="inline-actions"><Action onClick={() => setEditCycle(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteCycle(item)}>Elimina</Action></div>
@@ -422,7 +430,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       {clutchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {clutchesPagination.page || clutchesPage} di {clutchesPagination.totalPages} · {clutchesPagination.total} covate</span><div className="inline-actions"><Action disabled={clutchesPage <= 1} onClick={() => setClutchesPage(p => p - 1)}>← Precedente</Action><Action disabled={clutchesPage >= clutchesPagination.totalPages} onClick={() => setClutchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
 
-      {clutch && <section className="panel">
+      {clutch && <section className={"panel reproduction-detail-section " + (detailTab === "clutches" ? "" : "is-hidden")}>
         <SectionTitle eyebrow="SCHEDA COVATA" title={"Uova · " + prettyDate(clutch.laidOn)}>
           <span className="muted">{eggs.length} visibili</span>
         </SectionTitle>
@@ -434,7 +442,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
           <Input label="Nota iniziale (facoltativa)" name="notes"/>
           <div className="form-actions form-full"><Action variant="primary">Aggiungi uova</Action></div>
         </form></div>
-        {eggs.length === 0 ? <p className="muted">Nessun uovo tracciato singolarmente. Il conteggio della covata rimane separato dalle schede individuali.</p> : <div className="table-wrap"><table><thead><tr><th>Codice</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead><tbody>{eggs.map(egg => <tr key={egg.id}><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><input className="compact-input" name="code" defaultValue={egg.code || ""} placeholder="Codice"/></form></td><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><select name="status" defaultValue={egg.status}>{eggStatuses.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></form></td><td><form className="inline-form" onSubmit={e => saveEgg(e, egg)}><input className="compact-input" name="notes" defaultValue={egg.notes || ""} placeholder="Note"/></form></td><td><div className="inline-actions"><Action onClick={e => { const row = e.currentTarget.closest("tr"); const forms = row.querySelectorAll("form"); const values = Object.fromEntries(Array.from(new FormData(forms[0]).entries())); const status = forms[1].querySelector("select").value; const notes = forms[2].querySelector("input").value; void api("eggs/" + egg.id, { method: "PATCH", body: { code: nullable(values.code), status, notes: nullable(notes) } }, "Modifica uovo").then(r => { if (!r.queuedOffline) loadClutch(); }).catch(err => onNotice(err.message, "error")); }}>Salva</Action><Action variant="danger" onClick={() => deleteEgg(egg)}>Elimina</Action></div></td></tr>)}</tbody></table></div>}
+        {eggs.length === 0 ? <p className="muted">Nessun uovo tracciato singolarmente. Il conteggio della covata rimane separato dalle schede individuali.</p> : <div className="table-wrap"><table><thead><tr><th>Codice</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead><tbody>{eggs.map(egg => <tr key={egg.id}>
+          <td><input className="compact-input" data-egg-field="code" aria-label={"Codice uovo " + (egg.code || egg.id)} defaultValue={egg.code || ""} placeholder="Codice" onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
+          <td><select className="compact-input" data-egg-field="status" aria-label={"Stato uovo " + (egg.code || egg.id)} defaultValue={egg.status} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}>{eggStatuses.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></td>
+          <td><input className="compact-input" data-egg-field="notes" aria-label={"Note uovo " + (egg.code || egg.id)} defaultValue={egg.notes || ""} placeholder="Note" onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
+          <td><div className="inline-actions"><Action type="button" onClick={event => void saveEggRow(egg, event.currentTarget.closest("tr"))}>Salva</Action><Action type="button" variant="danger" onClick={() => deleteEgg(egg)}>Elimina</Action></div></td>
+        </tr>)}}</tbody></table></div>}
 
         {eggsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eggsPagination.page || eggsPage} di {eggsPagination.totalPages} · {eggsPagination.total} uova</span><div className="inline-actions"><Action disabled={eggsPage <= 1} onClick={() => setEggsPage(p => p - 1)}>← Precedente</Action><Action disabled={eggsPage >= eggsPagination.totalPages} onClick={() => setEggsPage(p => p + 1)}>Successiva →</Action></div></div>}
         <SectionTitle eyebrow="CONTROLLI AMBIENTALI" title="Registro incubazione"/>

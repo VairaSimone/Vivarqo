@@ -64,6 +64,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
   const [category, setCategory] = useState("other");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listsLoaded, setListsLoaded] = useState(false);
   const [share, setShare] = useState(null);
   const [shareFields, setShareFields] = useState(["name", "species", "morph"]);
   const [publicDescription, setPublicDescription] = useState("");
@@ -111,7 +112,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   }, [loadLists, loadShare, selectedAnimal]);
 
-  useEffect(() => { void loadLists().catch(e => setError(e.message)); }, [loadLists]);
+  useEffect(() => { let live = true; void loadLists().catch(e => setError(e.message)).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadShare(selectedAnimal); }, [selectedAnimal, loadShare]);
   useEffect(() => {
     const changed = () => { void loadLists().catch(() => {}); if (selectedAnimal) void loadShare(selectedAnimal); };
@@ -181,7 +182,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
       onNotice("Link pubblico revocato.");
     } catch (err) { onNotice(err.message, "error"); }
   };
-  const publicUrl = shareEnabled && share?.isEnabled && share?.revokedAt === null ? (share.url || (share.slug ? window.location.origin + "/public/animals/" + share.slug : "")) : "";
+  const publicUrl = shareEnabled && share?.isEnabled && share?.revokedAt == null ? (share.url || (share.slug ? window.location.origin + "/public/animals/" + share.slug : "")) : "";
   const selectedName = animals.find(a => a.id === selectedAnimal)?.name || "animale";
 
   return <div className="advanced-stack">
@@ -198,7 +199,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
         <div className="form-full"><Field label="Nota (facoltativa)"><textarea value={note} onChange={e => setNote(e.target.value)} rows="2" maxLength="10000"/></Field></div>
         <div className="form-actions form-full"><Button variant="primary" disabled={busy || !file}>{busy ? "Attendi…" : "Carica documento"}</Button></div>
       </form>
-      {documents.length === 0 ? <div className="empty-state"><h3>Nessun documento</h3><p>I documenti caricati compariranno qui e resteranno privati finché non li colleghi a una condivisione esplicita.</p></div> :
+      {!listsLoaded && documents.length === 0 ? <p className="loading" role="status">Caricamento documenti…</p> : documents.length === 0 ? <div className="empty-state"><h3>Nessun documento</h3><p>I documenti caricati compariranno qui e resteranno privati finché non li colleghi a una condivisione esplicita.</p></div> :
         <div className="table-wrap"><table><thead><tr><th>Nome file</th><th>Categoria</th><th>Dimensione</th><th>Data</th><th>Collegamento</th><th>Azioni</th></tr></thead><tbody>{documents.map(doc => <tr key={doc.id}><td><strong>{doc.originalFilename}</strong>{doc.note && <small className="table-subtext">{doc.note}</small>}</td><td>{doc.category}</td><td>{bytes(doc.sizeBytes)}</td><td>{displayDate(doc.createdAt)}</td><td>{animals.find(a => a.id === doc.animalId)?.name || cycles.find(c => c.id === doc.cycleId)?.name || (doc.animalId ? "Animale" : doc.cycleId ? "Ciclo riproduttivo" : "—")}</td><td><div className="inline-actions"><Button onClick={() => downloadPrivateDocument(doc.id, doc.originalFilename).catch(e => onNotice(e.message, "error"))}>Scarica</Button><Button onClick={() => editDocument(doc)}>Modifica</Button><Button variant="danger" onClick={() => removeDocument(doc)}>Elimina</Button></div></td></tr>)}</tbody></table></div>}
       {documentsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {documentsPagination.page || documentsPage} di {documentsPagination.totalPages} · {documentsPagination.total} documenti</span><div className="inline-actions"><Button disabled={documentsPage <= 1 || busy} onClick={() => setDocumentsPage(p => p - 1)}>← Precedente</Button><Button disabled={documentsPage >= documentsPagination.totalPages || busy} onClick={() => setDocumentsPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>
