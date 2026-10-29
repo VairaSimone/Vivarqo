@@ -45,6 +45,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
 
   const load = useCallback(async () => {
     setBusy(true); setError("");
@@ -115,8 +116,15 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
     setHistoryLoading(true);
     setHistoryPage(nextPage);
     setHistory({ animal, page: nextPage, items: [], pagination: null });
+    if (nextPage === 1) setUpcomingTasks([]);
     try {
-      const response = await apiRequest("animals/" + encodeURIComponent(animal.id) + "/history?page=" + nextPage + "&pageSize=50");
+      const [response, tasksResponse] = await Promise.all([
+        apiRequest("animals/" + encodeURIComponent(animal.id) + "/history?page=" + nextPage + "&pageSize=50"),
+        nextPage === 1
+          ? apiRequest("tasks?animalId=" + encodeURIComponent(animal.id) + "&status=open&page=1&pageSize=5").catch(() => null)
+          : Promise.resolve(null)
+      ]);
+      if (tasksResponse) setUpcomingTasks(arrayOf(tasksResponse.tasks).filter(task => task?.dueAt).slice(0, 5));
       setHistory({ animal, page: nextPage, items: arrayOf(response.items), pagination: response.pagination || { page: nextPage, pageSize: 50, total: arrayOf(response.items).length, truncated: false } });
     } catch (err) {
       setHistory(null);
@@ -170,11 +178,12 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {} }) {
       {history && <section className="panel animal-profile-panel">
         <div className="panel-heading"><div><p className="eyebrow">SCHEDA INDIVIDUALE</p><h2>{history.animal.name}</h2><p className="subheading">{history.animal.species}{history.animal.identifier ? " · "+history.animal.identifier : ""} · {history.animal.morph||"Morph non indicato"}</p></div><Button onClick={() => setHistory(null)}>Chiudi scheda</Button></div>
         <div className="animal-profile-summary">{[
-          ["Ultimo pasto",history.items.find(item=>item.type==="feeding")],
-          ["Ultima pesata",history.items.find(item=>item.type==="weight")],
-          ["Ultima muta",history.items.find(item=>item.type==="shed")],
-          ["Nota recente",history.items.find(item=>item.type==="note")]
-        ].map(([label,item])=><div className="animal-profile-metric" key={label}><small>{label}</small><strong>{item?dateLabel(item.occurredAt):"Nessun dato"}</strong><span className="muted">{item?historyDescription(item):"Non registrato"}</span></div>)}</div>
+          ["Prossima attività",upcomingTasks[0],task=>dateLabel(task.dueAt),task=>task.title+(new Date(task.dueAt)<new Date()?" · In ritardo":"")],
+          ["Ultimo pasto",history.items.find(item=>item.type==="feeding"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
+          ["Ultima pesata",history.items.find(item=>item.type==="weight"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
+          ["Ultima muta",history.items.find(item=>item.type==="shed"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
+          ["Nota recente",history.items.find(item=>item.type==="note"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)]
+        ].map(([label,item,dateText,description])=><div className="animal-profile-metric" key={label}><small>{label}</small><strong>{item?dateText(item):(label==="Prossima attività"?"Nessuna scadenza":"Nessun dato")}</strong><span className="muted">{item?String(description(item)).slice(0,110):label==="Prossima attività"?"Nessun promemoria aperto":"Non registrato"}</span></div>)}</div>
         <div className="inline-actions profile-actions"><Button onClick={()=>{setEditor({animal:history.animal});setBulkOpen(false);}}>Modifica anagrafica</Button><Button onClick={()=>onGo("alimentazioni")}>Apri alimentazioni</Button><Button onClick={()=>onGo("cure")}>Apri registri di cura</Button></div>
         <div className="panel-heading profile-history-heading"><div><p className="eyebrow">STORICO</p><h2>Registrazioni recenti</h2><p className="subheading">Alimentazioni, pesate, mute e note in ordine cronologico.</p></div></div>
         {historyLoading ? <p className="loading">Caricamento storico…</p> : history.items.length === 0 ? <div className="empty-state"><h3>Nessuna registrazione</h3><p>Non risultano alimentazioni, pesate, mute o note per questo animale.</p></div> : <div className="animal-history-list">{history.items.map((item,index)=><article className="animal-history-item" key={(item.record?.id||index)+"-"+item.type}><time>{dateLabel(item.occurredAt)}</time><div><strong>{{feeding:"Alimentazione",weight:"Pesata",shed:"Muta",note:"Nota"}[item.type]||item.type}</strong><p>{historyDescription(item)}</p></div></article>)}</div>}
