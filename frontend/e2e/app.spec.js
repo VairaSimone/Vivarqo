@@ -1,0 +1,224 @@
+import { test, expect } from "@playwright/test";
+import { mockApi, signIn } from "./fixtures.js";
+
+test.beforeEach(async ({ page }) => {
+  page.e2eState = await mockApi(page.context());
+  await page.goto("/");
+});
+
+test("accesso: mostra un errore utile e poi apre l'account", async ({ page }) => {
+  page.e2eState.failLogin = true;
+  await page.getByLabel("Email").fill("allevatore@example.test");
+  await page.getByLabel("Password").fill("Password-di-test-123!");
+  await page.getByRole("button", { name: "Accedi", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Credenziali non valide per il test");
+  page.e2eState.failLogin = false;
+  await page.getByRole("button", { name: "Accedi", exact: true }).click();
+  await expect(page.locator(".app-shell")).toBeVisible();
+  await expect(page.getByText("Allevatore E2E")).toBeVisible();
+});
+
+test("navigazione: URL e stato del browser restano sincronizzati", async ({ page }, testInfo) => {
+  await signIn(page);
+  if (testInfo.project.name === "mobile-chromium") {
+    await page.locator(".mobile-nav").getByRole("button", { name: "Animali" }).click();
+    await expect(page).toHaveURL(/\/animals$/);
+    await page.locator(".mobile-nav").getByRole("button", { name: "Altro" }).click();
+    await page.locator(".more-card").filter({ hasText: "Documenti e QR" }).click();
+    await expect(page).toHaveURL(/\/documents$/);
+    return;
+  }
+  await page.locator(".nav-item").filter({ hasText: "Animali" }).click();
+  await expect(page).toHaveURL(/\/animals$/);
+  const group = page.locator(".nav-group").filter({ hasText: "Allevamento" });
+  await group.locator("summary").click();
+  await group.locator(".nav-item").filter({ hasText: "Documenti e QR" }).click();
+  await expect(page).toHaveURL(/\/documents$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/animals$/);
+  await expect(page.getByRole("heading", { name: "Animali", exact: true }).first()).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/\/documents$/);
+  await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
+});
+
+test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/animals");
+  await expect(page.getByRole("heading", { name: "Animali", exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: /Nuovo animale/ }).click();
+  await page.getByLabel("Nome", { exact: true }).fill("Smeraldo");
+  await page.getByLabel("Specie", { exact: true }).fill("Boa constrictor imperator");
+  await page.getByLabel("Identificativo", { exact: true }).fill("VRQ-E2E-003");
+  await page.getByRole("button", { name: "Salva scheda", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Smeraldo" })).toBeVisible();
+  expect(page.e2eState.animals.some(item => item.name === "Smeraldo")).toBeTruthy();
+
+  await page.getByRole("button", { name: /Crea in blocco/ }).click();
+  await page.getByRole("button", { name: /Riga/ }).click();
+  await page.getByRole("button", { name: /Riga/ }).click();
+  await expect(page.getByRole("heading", { name: "Crea più animali" })).toBeVisible();
+  await expect(page.locator(".table-wrap tbody tr")).toHaveCount(3);
+  const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
+  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 2);
+});
+
+test("registri: aggiunge una pesata, la modifica e chiede conferma prima di eliminarla", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/care/weights");
+  await page.getByRole("button", { name: /Nuovo peso/ }).click();
+  await page.getByLabel("Peso in grammi").fill("342.5");
+  await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
+  await expect.poll(() => page.e2eState.weights.length).toBe(1);
+  await expect(page.getByText(/342\.5 g/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Modifica", exact: true }).click();
+  await page.getByLabel("Peso in grammi").last().fill("350");
+  await page.locator(".embedded-form form").getByRole("button", { name: "Salva modifiche" }).click();
+  await expect.poll(() => page.e2eState.weights[0]?.weightG).toBe(350);
+
+  await page.getByRole("button", { name: "Elimina", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare questo registro?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  expect(page.e2eState.requests.some(item => item.method === "DELETE" && item.path.startsWith("weights/"))).toBeFalsy();
+  await page.getByRole("button", { name: "Elimina", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Elimina registro" }).click();
+  await expect.poll(() => page.e2eState.weights.length).toBe(0);
+});
+
+test("registrazioni alimentari: salva una sessione per più animali", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/feeding");
+  await page.getByRole("button", { name: /Nuovo alimentazione/ }).click();
+  await page.locator(".feeding-animal-option").filter({ hasText: "Naga" }).locator("input").check();
+  await page.locator(".feeding-animal-option").filter({ hasText: "Boreal" }).locator("input").check();
+  await page.getByLabel("Tipo alimento").first().fill("Ratto");
+  await page.getByLabel("Tipo alimento").nth(1).fill("Topo");
+  await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
+  await expect.poll(() => page.e2eState.sessions.length).toBe(1);
+  expect(page.e2eState.sessions[0].entries).toHaveLength(2);
+  expect(page.e2eState.sessions[0].entries.map(entry => entry.foodType)).toEqual(["Ratto", "Topo"]);
+});
+
+test("documenti e QR: carica un file, condivide il profilo e protegge la cancellazione", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/documents");
+  await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
+  await page.getByLabel("File").setInputFiles({
+    name: "scheda-naga.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n% e2e fixture\n")
+  });
+  await page.getByRole("button", { name: "Carica documento" }).click();
+  await expect(page.getByText("scheda-naga.pdf")).toBeVisible();
+  expect(page.e2eState.documents).toHaveLength(1);
+
+  await page.getByLabel("Attiva il link pubblico").check();
+  await page.getByLabel("Descrizione pubblica (facoltativa)").fill("Profilo pubblico verificato dai test.");
+  await page.getByRole("button", { name: "Salva condivisione" }).click();
+  await expect(page.getByText("Link attivo")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Codice QR del profilo pubblico" })).toBeVisible();
+  const publicLink = page.getByRole("link", { name: /\/public\/animals\/naga-e2e/ });
+  await expect(publicLink).toBeVisible();
+  const [popup] = await Promise.all([page.context().waitForEvent("page"), publicLink.click()]);
+  await expect(popup.getByRole("heading", { name: "Naga", exact: true })).toBeVisible();
+  await popup.close();
+
+  await page.locator(".table-wrap tbody tr").filter({ hasText: "scheda-naga.pdf" }).getByRole("button", { name: "Elimina" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare il documento?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  await expect(page.getByText("scheda-naga.pdf")).toBeVisible();
+});
+
+test("riproduzione: traccia uova e piccoli e genera schede animali", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/reproduction");
+  await expect(page.getByRole("heading", { name: "Cicli riproduttivi" })).toBeVisible();
+  await page.getByRole("tab", { name: "Covate, uova e incubazione" }).click();
+  await page.getByLabel("Quante uova").fill("2");
+  await page.getByLabel("Prefisso codice (facoltativo)").fill("E2E");
+  await page.getByRole("button", { name: "Aggiungi uova", exact: true }).click();
+  await expect.poll(() => page.e2eState.eggs.length).toBe(2);
+  await expect(page.getByText("E2E-01")).toBeVisible();
+
+  const eggRow = page.locator("tr").filter({ hasText: "E2E-01" });
+  await eggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).fill("E2E-01-M");
+  await eggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).press("Enter");
+  await expect.poll(() => page.e2eState.eggs.find(item => item.id === "egg-1")?.code).toBe("E2E-01-M");
+
+  await page.getByRole("tab", { name: "Piccoli e nascite" }).click();
+  await page.getByLabel("Numero di piccoli").fill("2");
+  await page.getByLabel("Note", { exact: true }).last().fill("Nascita di prova");
+  await page.getByRole("button", { name: "Registra lotto", exact: true }).click();
+  await expect.poll(() => page.e2eState.batches.length).toBe(1);
+  await expect(page.getByText(/2 piccoli/)).toBeVisible();
+  await page.getByRole("button", { name: "Crea schede animali" }).click();
+  await page.getByLabel("Prefisso dei nomi").fill("Cucciolo E2E");
+  await page.getByLabel("Numero di schede (1–500)").fill("2");
+  await page.getByRole("dialog").getByRole("button", { name: "Crea schede" }).click();
+  await expect.poll(() => page.e2eState.animals.length).toBe(4);
+  await expect(page.getByRole("heading", { name: "Cucciolo E2E 01" })).toBeVisible();
+});
+
+test("notifiche: salva preferenze, segna le notifiche lette e gestisce dispositivi", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/notifications");
+  await expect(page.getByRole("heading", { name: "Avvisi e lettura" })).toBeVisible();
+  await page.getByLabel("Dalle").fill("22:00");
+  await page.getByLabel("Alle").fill("07:30");
+  await page.locator(".preference-switches .preference-row").filter({ hasText: "Notifiche nell'app" }).locator("input").uncheck();
+  await page.getByRole("button", { name: "Salva preferenze", exact: true }).click();
+  await expect.poll(() => page.e2eState.preferences.quietHoursStart).toBe("22:00");
+  await expect.poll(() => page.e2eState.preferences.quietHoursEnd).toBe("07:30");
+  expect(page.e2eState.preferences.inAppEnabled).toBe(false);
+
+  await page.getByRole("button", { name: "Segna tutte come lette" }).click();
+  await expect.poll(() => page.e2eState.unreadCount).toBe(0);
+  await page.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Rimuovere questo dispositivo?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  expect(page.e2eState.requests.some(item => item.method === "DELETE" && item.path.startsWith("push-subscriptions/"))).toBeFalsy();
+  await page.getByRole("button", { name: "Rimuovi", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Rimuovi dispositivo" }).click();
+  await expect.poll(() => page.e2eState.devices.length).toBe(0);
+});
+
+test("caricamento, errore API e schermata vuota sono stati distinti", async ({ page }) => {
+  await signIn(page);
+  page.e2eState.animalListDelayMs = 750;
+  await page.goto("/animals");
+  await expect(page.getByText("Caricamento animali…")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Naga" })).toBeVisible();
+
+  page.e2eState.animals = [];
+  page.e2eState.animalListDelayMs = 0;
+  await page.getByRole("button", { name: /Aggiorna/ }).click();
+  await expect(page.getByText("Nessun animale in questa vista")).toBeVisible();
+
+  page.e2eState.failAnimalList = true;
+  await page.getByRole("button", { name: /Aggiorna/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Errore caricamento animali E2E.");
+});
+
+test("documenti e notifiche distinguono caricamento e stato vuoto", async ({ page }) => {
+  await signIn(page);
+  page.e2eState.documentListDelayMs = 700;
+  await page.goto("/documents");
+  await expect(page.getByText("Caricamento documenti…")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
+
+  page.e2eState.notificationListDelayMs = 700;
+  await page.goto("/notifications");
+  await expect(page.getByText("Caricamento notifiche…")).toBeVisible();
+  await expect(page.getByText("Attività in scadenza")).toBeVisible();
+});
+
+test("le viste mobile non provocano overflow orizzontale sulle aree operative", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium", "Controllo di viewport previsto sul progetto mobile.");
+  await signIn(page);
+  for (const path of ["/animals", "/care/weights", "/documents", "/reproduction", "/notifications"]) {
+    await page.goto(path);
+    await page.locator(".page-wrap").waitFor();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBeTruthy();
+  }
+});

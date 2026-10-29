@@ -73,3 +73,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build frontend
         run: pnpm build:frontend
+      - name: Install browser-test dependencies
+        working-directory: frontend/e2e
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium for Playwright
+        working-directory: frontend/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Run browser end-to-end tests
+        working-directory: frontend/e2e
+        run: npm test
