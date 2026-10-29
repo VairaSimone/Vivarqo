@@ -27,15 +27,17 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [preferences, setPreferences] = useState({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
   const [devices, setDevices] = useState([]);
+  const [deliveryAttempts, setDeliveryAttempts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    const [notices, pref, subs] = await Promise.all([
+    const [notices, pref, subs, deliveries] = await Promise.all([
       apiRequest("notifications?page=" + page + "&pageSize=50"),
       apiRequest("notification-preferences"),
-      apiRequest("push-subscriptions")
+      apiRequest("push-subscriptions"),
+      apiRequest("push-delivery-attempts?page=1&pageSize=10")
     ]);
     setNotifications(arrayOf(notices.notifications ?? notices));
     setPagination(notices.pagination || { page, pageSize: 50, total: arrayOf(notices.notifications ?? notices).length, totalPages: 1 });
@@ -48,6 +50,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
       quietHoursStart: p.quietHoursStart || "", quietHoursEnd: p.quietHoursEnd || ""
     });
     setDevices(arrayOf(subs.subscriptions ?? subs));
+    setDeliveryAttempts(arrayOf(deliveries.attempts ?? deliveries));
   }, [page]);
 
   useEffect(() => { let live = true; void load().catch(e => setError(e.message)).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
@@ -134,7 +137,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
   };
   const testPush = async () => {
     setBusy(true);
-    try { const result = await apiRequest("notifications/test-push", { method: "POST", body: {} }); onNotice("Test push richiesto. Esito: " + JSON.stringify(result.delivery || {})); await load(); }
+    try { await apiRequest("notifications/test-push", { method: "POST", body: {} }); onNotice("Notifica di prova accodata. Lo stato di consegna comparirà qui sotto."); await load(); }
     catch (e) { onNotice(e.message, "error"); }
     finally { setBusy(false); }
   };
@@ -176,6 +179,14 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
       {!isSupported() && <p className="muted">Questo browser o contesto non supporta push web. Le notifiche in-app restano disponibili.</p>}
       {preferences.pushEnabled && devices.length === 0 && <p className="form-message">Il server non restituisce dispositivi push. Verifica la registrazione o disattiva e riattiva la funzione.</p>}
       {devices.length > 0 && <><h3>Dispositivi registrati</h3><div className="device-list">{devices.map(device => <article className="device-row" key={device.id}><div><strong>{device.userAgent || "Browser registrato"}</strong><small>Registrato il {dateTime(device.createdAt)}</small></div><Button variant="danger" onClick={() => removeDevice(device)}>Rimuovi</Button></article>)}</div></>}
+      <h3>Storico consegne push</h3>
+      <p className="muted">Gli invii e i tentativi sono registrati lato server. I dettagli non includono gli endpoint privati del browser.</p>
+      {deliveryAttempts.length === 0
+        ? <p className="muted">Nessun tentativo di consegna registrato.</p>
+        : <div className="device-list">{deliveryAttempts.map(item => <article className="device-row" key={item.id}>
+            <div><strong>{item.notification?.title || "Notifica non più disponibile"}</strong><small>{item.notification?.category || "sistema"} · tentativo {item.attemptNumber} · {dateTime(item.attemptedAt)}</small></div>
+            <span className={"pill " + (item.status === "sent" ? "sage" : item.status === "failed" ? "danger" : "")}>{({ queued: "In coda", sent: "Consegnata", retry: "Nuovo tentativo", failed: "Fallita", removed: "Dispositivo scaduto", skipped: "Saltata" })[item.status] || item.status}</span>
+          </article>)}</div>}
     </section>
   </div>;
 }
