@@ -3,7 +3,12 @@ import { apiRequest } from "./api/api.js";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const fmtDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const dtInput = value => value ? new Date(value).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
+const dtInput = value => {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = part => String(part).padStart(2, "0");
+  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
+};
 const inputDate = value => value ? new Date(value).toISOString().slice(0, 10) : "";
 const nullIfBlank = value => value === "" || value === undefined ? null : value;
 const formData = e => Object.fromEntries(Array.from(new FormData(e.currentTarget).entries()).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]));

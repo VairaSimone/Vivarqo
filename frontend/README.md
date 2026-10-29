@@ -1,22 +1,41 @@
 # Frontend Vivarqo
 
-React + Vite, mobile-first. Avvia dalla root con `pnpm dev:frontend`; l'API deve essere attiva su `http://127.0.0.1:3000` (o imposta `VIVARQO_API_TARGET`).
+Frontend React + Vite con interfaccia mobile-first, area desktop responsive e PWA installabile. La UI usa le API di Vivarqo; non usa record fittizi per sostituire le risposte del backend.
 
-## Guide incluse
-- **Guide e tutorial → Tutorial per usare il sito**: accesso, registri, attività e portabilità.
-- **Guide e tutorial → Tutorial per installare e usare la PWA**: installazione Android/desktop/iOS, notifiche e limiti offline.
+## Avvio locale
 
-## PWA e privacy
-La manifest e il service worker sono inclusi. Il service worker non intercetta né mette in cache `/api/v1/*`, health/readiness o risposte personali. I dati e tutte le scritture richiedono rete e sessione valida; non viene simulata una modalità offline con salvataggi locali. Le notifiche push richiedono consenso esplicito dalla schermata Notifiche.
+Dalla root del repository:
 
-## Stato delle schermate
-La UI usa API autenticate per login, dashboard, animali, alimentazioni, attività, inventario, riproduzioni, documenti, genetica, registro economico, notifiche, import/export, billing e impostazioni. Alcune azioni avanzate (es. modifica di singoli registri, gestione completa di uova/covate e upload documenti) richiedono ulteriori schermate dedicate: le liste possono mostrare dati API senza esporre ancora ogni azione di modifica.
+- `pnpm install`
+- `pnpm dev:api` in un terminale
+- `pnpm dev:frontend` in un secondo terminale
+- Apri `http://localhost:5173`
 
+Il backend richiede PostgreSQL e la configurazione `.env` descritta nella documentazione backend. Il proxy Vite punta per default a `http://127.0.0.1:3000`; configura `VIVARQO_API_TARGET` se l'API è su un altro indirizzo.
 
-## Funzioni avanzate e uso offline
+## Moduli coperti
 
-- **Riproduzioni**: cicli, genitori, eventi, covate, uova singole, controlli d'incubazione e lotti di piccoli; i lotti possono creare schede animali. Le eliminazioni rispettano i legami fra record e restituiscono un errore esplicito quando è necessario rimuovere prima i record collegati.
-- **Registri**: peso, mute, note, alimentazioni e tratti genetici dispongono di creazione, modifica ed eliminazione; anche schede animali, attività, articoli d'inventario e voci economiche espongono le operazioni disponibili per il relativo contratto API. Le quantità di magazzino si modificano tramite movimenti, non alterando direttamente la giacenza.
-- **Documenti e QR**: PDF e immagini vengono caricati e scaricati solo online; la pagina consente di modificare i metadati, eliminare i file, scegliere i campi pubblici e revocare la condivisione. Il QR SVG è generato nel browser senza inviare il link a servizi esterni. I profili pubblici sono aperti solo attraverso il percorso /public/animals/:slug.
-- **Notifiche**: la pagina gestisce notifiche in-app, preferenze, orari di silenzio, sottoscrizioni push per browser, revoca dei dispositivi e invio di prova. Le categorie configurate corrispondono a quelle attualmente generate dal server: scadenze delle attività e notifiche di sistema. Le notifiche push richiedono HTTPS, permesso del browser e chiavi VAPID valide sul server.
-- **PWA/offline**: il service worker mette in cache solo la shell e risorse statiche; non intercetta né memorizza risposte /api, documenti privati o dati autenticati. Alcune modifiche JSON vengono accodate in IndexedDB (massimo 250 elementi per account, payload massimo 64 KiB ciascuno) e inviate automaticamente quando la connessione torna disponibile e Vivarqo è aperto. Non vengono accodati upload di file, pagamenti, condivisioni, registrazione push o preferenze. In caso di esito incerto la coda richiede una verifica manuale per evitare duplicati. I dati della coda locale non sono cifrati dall'app: non usare questa funzione su dispositivi condivisi non protetti.
+- Account: registrazione, accesso, recupero password, sessione, impostazioni.
+- Allevamento: schede animali, alimentazioni, peso, mute, note, genetica e storico.
+- Organizzazione: attività, promemoria, calendario, inventario e movimenti di magazzino, registro economico.
+- Riproduzione: cicli, genitori, eventi, covate, uova, registri d'incubazione, lotti di piccoli e creazione di schede animali dai lotti.
+- Documenti e QR: upload/download privati, modifica metadati, eliminazione documenti, link pubblici configurabili e revocabili, QR SVG generato sul dispositivo.
+- Notifiche: lettura in-app, preferenze, categorie, orari di silenzio, iscrizioni push per browser, rimozione dispositivi e invio di prova.
+- Dati e piano: import/export e schermata abbonamento.
+- Guide: tutorial separati per l'uso del sito e per installazione/uso della PWA.
+
+Le operazioni di modifica/eliminazione rispettano i contratti disponibili nel backend; operazioni bloccate da record collegati devono mostrare l'errore del server, non simulare l'eliminazione.
+
+## PWA, privacy e uso offline
+
+Il manifest e il service worker sono inclusi. Il service worker mette in cache solo risorse statiche pubbliche e la shell di navigazione; non intercetta né memorizza risposte `/api/v1/*`, documenti privati o dati dell'account. I profili pubblici sono visualizzati dalla rotta frontend `/public/animals/:slug`; la pagina legge i soli campi esplicitamente condivisi tramite l'API `/api/v1/public/animals/:slug`.
+
+Alcune modifiche JSON compatibili possono essere accodate in IndexedDB e inviate automaticamente quando la connessione torna disponibile e Vivarqo è aperto. La coda ha un limite di sicurezza di 250 modifiche per account e 64 KiB per singolo payload. Upload, allegati, import/export, pagamenti, condivisioni pubbliche, registrazioni push e preferenze notifiche richiedono la connessione. Non è implementata la sincronizzazione in background quando l'app è chiusa.
+
+Se una richiesta ha un esito di rete incerto, Vivarqo non la ripete automaticamente: mostra una verifica manuale per ridurre il rischio di duplicati. La coda è locale e non cifrata dall'app; usa questa funzione solo su dispositivi personali protetti, e non cancellare la coda prima di aver verificato o sincronizzato le modifiche.
+
+Le notifiche push richiedono HTTPS, consenso esplicito del browser, service worker attivo e chiavi VAPID valide lato server. La disponibilità della consegna dipende anche dal browser e dal sistema operativo.
+
+## Verifiche automatiche
+
+La CI esegue i test/type-check/build del backend e una build separata del frontend. La build non sostituisce un test manuale dei flussi, soprattutto per notifiche push, PWA installata e servizi esterni.

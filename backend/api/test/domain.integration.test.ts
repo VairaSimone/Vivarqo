@@ -204,7 +204,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ visibleFields: ["species", "morph"], publicDescription: "A public description", isEnabled: true })
       .expect(201);
     const publicPath = new URL(share.body.share.url).pathname;
-    const publicPage = await request(app).get(publicPath).expect(200);
+    const publicPage = await request(app).get(`/api/v1${publicPath}`).expect(200);
     expect(publicPage.body.animal).toEqual({ species: "Boa constrictor", morph: "Hypo" });
     expect(JSON.stringify(publicPage.body)).not.toContain("Private name");
     expect(JSON.stringify(publicPage.body)).not.toContain("PRIVATE NOTES");
@@ -212,7 +212,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ revoke: true })
       .expect(200);
-    await request(app).get(publicPath).expect(404);
+    await request(app).get(`/api/v1${publicPath}`).expect(404);
   });
 
   it("records finance in integer cents, reports summaries, and isolates in-app notifications/preferences", async () => {

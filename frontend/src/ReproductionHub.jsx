@@ -3,7 +3,12 @@ import { apiRequest } from "./api/api.js";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : "";
-const localDateTime = value => value ? new Date(value).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16);
+const localDateTime = value => {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = part => String(part).padStart(2, "0");
+  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
+};
 const prettyDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
 const val = (obj, key, fallback = "—") => obj?.[key] === null || obj?.[key] === undefined || obj?.[key] === "" ? fallback : obj[key];
 const readForm = e => Object.fromEntries(Array.from(new FormData(e.currentTarget).entries()).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
@@ -371,7 +376,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
         <SectionTitle eyebrow="NASCITA E CRESCITA" title="Piccoli e lotti di nascita"/>
         <div className="embedded-form"><form className="form-grid" onSubmit={createBatch}>
           <h3 className="form-full">Registra un lotto di piccoli</h3>
-          <Input label="Data di nascita / schiusa" name="bornOn" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required/>
+          <Input label="Data di nascita / schiusa" name="bornOn" type="date" defaultValue={localDateTime().slice(0, 10)} required/>
           <Input label="Numero di piccoli" name="count" type="number" min="0" max="10000" defaultValue="1" required/>
           <Choice label="Covata di origine (facoltativa)" name="clutchId" options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn) + " · " + c.eggCount + " uova"])]}/>
           <div className="form-full"><TextArea label="Note" name="notes"/></div>
