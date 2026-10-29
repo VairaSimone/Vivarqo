@@ -348,6 +348,36 @@ export function createNotificationRouter() {
     res.status(204).send();
   });
 
+  router.get("/push-delivery-attempts", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const query = parseBody(z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      pageSize: z.coerce.number().int().min(1).max(100).default(25),
+      status: z.enum(["queued", "sent", "retry", "failed", "removed", "skipped"]).optional(),
+    }), req.query);
+    const where = { userId: auth.userId, ...(query.status ? { status: query.status } : {}) };
+    const [total, attempts] = await Promise.all([
+      prisma.pushDeliveryAttempt.count({ where }),
+      prisma.pushDeliveryAttempt.findMany({
+        where,
+        orderBy: { attemptedAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: {
+          id: true, notificationId: true, attemptNumber: true, status: true,
+          responseStatus: true, errorCode: true, attemptedAt: true,
+          nextAttemptAt: true, deliveredAt: true,
+          notification: { select: { title: true, category: true } },
+        },
+      }),
+    ]);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({
+      attempts,
+      pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) },
+    });
+  });
+
   router.post("/notifications/test-push", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
     // Validate configuration before persisting a test notification.
@@ -368,13 +398,11 @@ export function createNotificationRouter() {
         targetPath: "/settings/notifications",
       },
     });
-    const delivery = await sendPushToUser(auth.userId, {
-      title: notification.title,
-      body: notification.body,
-      url: notification.targetPath ?? "/settings/notifications",
-      category: notification.category,
+    await enqueuePushDelivery({ userId: auth.userId, notificationId: notification.id });
+    res.status(202).json({
+      notificationId: notification.id,
+      delivery: { status: "queued", attemptsEndpoint: "/api/v1/push-delivery-attempts" },
     });
-    res.status(200).json({ notificationId: notification.id, delivery });
   });
 
   return router;
