@@ -94,11 +94,11 @@ export async function processAccountDeletion(userId: string): Promise<void> {
     });
     await tx.egg.deleteMany({ where: { clutch: { is: { cycle: { is: { userId } } } } });
     await tx.incubationLog.deleteMany({ where: { clutch: { is: { cycle: { is: { userId } } } } });
-    await tx.offspringBatch.deleteMany({ where: { cycle: { is: { userId } } });
     await tx.animal.updateMany({
       where: { userId },
       data: { originClutchId: null, originOffspringBatchId: null },
     });
+    await tx.offspringBatch.deleteMany({ where: { cycle: { is: { userId } } });
     await tx.clutch.deleteMany({ where: { cycle: { is: { userId } } });
     await tx.reproductionCycle.deleteMany({ where: { userId } });
     await tx.animalGeneticTrait.deleteMany({
