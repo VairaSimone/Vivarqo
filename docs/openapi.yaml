@@ -1,0 +1,1624 @@
+openapi: 3.1.0
+info:
+  title: Vivarqo REST API
+  version: 1.0.0-draft
+  summary: Snapshot del contratto API Vivarqo
+  description: >
+    Contratto iniziale versionato per le route implementate nel branch main.
+    Le rotte mutative browser richiedono X-CSRF-Token. Le rotte private richiedono
+    una sessione server-side tramite cookie HttpOnly. I payload ApiObject sono
+    provvisori per le aree il cui schema Zod non è ancora stato promosso a schema
+    request/response dedicato; questo documento non è ancora la prova di conformità
+    completa alla specifica tecnica 1.0.
+servers:
+  - url: https://api.example.invalid
+    description: Segnaposto; sostituire con API_ORIGIN dell'ambiente.
+tags:
+  - name: Auth
+  - name: Account
+  - name: Animals
+  - name: Care
+  - name: Operations
+  - name: Reproduction
+  - name: Inventory
+  - name: Documents
+  - name: Genetics
+  - name: Finance
+  - name: Notifications
+  - name: Imports
+  - name: Exports
+  - name: Billing
+security:
+  - sessionCookieDev: []
+  - sessionCookieProd: []
+paths:
+  /healthz:
+    get:
+      tags: [Operations]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: Processo API attivo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /readyz:
+    get:
+      tags: [Operations]
+      summary: Readiness probe
+      security: []
+      responses:
+        '200':
+          description: API pronta e database raggiungibile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/csrf:
+    get:
+      tags: [Auth]
+      summary: Ottiene un token CSRF per le richieste browser
+      security: []
+      responses:
+        '200':
+          description: Token CSRF e cookie associato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [csrfToken]
+                properties:
+                  csrfToken:
+                    type: string
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registra un account e invia la verifica email
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '202':
+          description: Richiesta accettata; la risposta non rivela se l'email esiste.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiObject'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Consuma il token monouso di verifica email
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Richiede un nuovo link di verifica
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Crea una sessione server-side
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoca la sessione corrente
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/auth/sessions/revoke-all:
+    post:
+      tags: [Auth]
+      summary: Revoca tutte le sessioni dell'account
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Richiede il reset password
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Consuma il token monouso per reimpostare la password
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Restituisce il profilo autenticato
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/account:
+    patch:
+      tags: [Account]
+      summary: Modifica profilo, lingua, fuso orario, email o password
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountPatchRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '202':
+          description: Modifica email in attesa di verifica.
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals:
+    get:
+      tags: [Animals]
+      summary: Elenca gli animali con paginazione, ricerca e filtri
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: species
+          in: query
+          schema: { type: string }
+        - name: sex
+          in: query
+          schema: { type: string, enum: [male, female, unknown] }
+        - name: morph
+          in: query
+          schema: { type: string }
+        - name: location
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, sold, transferred, deceased, archived, all] }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [name, createdAt, updatedAt] }
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Animals]
+      summary: Crea un animale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnimalWrite'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/bulk:
+    post:
+      tags: [Animals]
+      summary: Crea più animali in una transazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [animals]
+              properties:
+                animals:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    $ref: '#/components/schemas/AnimalWrite'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Animals]
+      summary: Legge il dettaglio di un animale
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Animals]
+      summary: Modifica un animale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnimalPatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Animals]
+      summary: Elimina un animale solo se le relazioni lo consentono
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Animale eliminato.
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/{id}/archive:
+    post:
+      tags: [Animals]
+      summary: Archivia un animale senza cancellarne lo storico
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/animals/{id}/restore:
+    post:
+      tags: [Animals]
+      summary: Ripristina un animale archiviato
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/feeding-sessions:
+    get:
+      tags: [Care]
+      summary: Elenca sessioni di alimentazione
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Care]
+      summary: Registra una sessione con risultati indipendenti per animale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedingSessionWrite'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/feeding-sessions/{id}:
+    get:
+      tags: [Care]
+      summary: Legge la sessione con le relative voci
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/feeding-entries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Care]
+      summary: Corregge una voce di alimentazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Care]
+      summary: Elimina una voce di alimentazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Voce eliminata.
+  /api/v1/animals/{animalId}/weights:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      tags: [Care]
+      summary: Elenca le pesate dell'animale
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Care]
+      summary: Registra una pesata in grammi
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeightWrite'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/animals/{animalId}/sheds:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      tags: [Care]
+      summary: Elenca le mute
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Care]
+      summary: Registra una muta
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/animals/{animalId}/notes:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      tags: [Care]
+      summary: Elenca le osservazioni
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Care]
+      summary: Crea un'osservazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/weights/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Care]
+      summary: Modifica una pesata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Care]
+      summary: Elimina una pesata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Pesata eliminata.
+  /api/v1/sheds/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Care]
+      summary: Modifica una muta
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Care]
+      summary: Elimina una muta
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Muta eliminata.
+  /api/v1/animal-notes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Care]
+      summary: Modifica una nota
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Care]
+      summary: Elimina una nota
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Nota eliminata o archiviata secondo il flusso applicativo.
+  /api/v1/animals/{animalId}/history:
+    get:
+      tags: [Care]
+      summary: Cronologia unificata e paginata dell'animale
+      parameters:
+        - $ref: '#/components/parameters/AnimalId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/tasks:
+    get:
+      tags: [Operations]
+      summary: Elenca attività con filtri
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Operations]
+      summary: Crea un'attività
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskWrite'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Operations]
+      summary: Legge un'attività
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    patch:
+      tags: [Operations]
+      summary: Modifica un'attività
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Operations]
+      summary: Elimina un'attività
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Attività eliminata.
+  /api/v1/tasks/{id}/complete:
+    post:
+      tags: [Operations]
+      summary: Completa un'attività e genera la prossima occorrenza se ricorrente
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/tasks/reminder-rules:
+    get:
+      tags: [Operations]
+      summary: Elenca regole di promemoria
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Operations]
+      summary: Crea una regola di promemoria
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/tasks/reminder-rules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Operations]
+      summary: Modifica una regola di promemoria
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Operations]
+      summary: Elimina una regola di promemoria
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Regola eliminata.
+  /api/v1/home/today:
+    get:
+      tags: [Operations]
+      summary: Riepilogo operativo Oggi
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/calendar:
+    get:
+      tags: [Operations]
+      summary: Eventi derivati e attività nel periodo
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: view
+          in: query
+          schema: { type: string, enum: [month, week, list] }
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/reproduction-cycles:
+    get:
+      tags: [Reproduction]
+      summary: Elenca cicli riproduttivi
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Reproduction]
+      summary: Crea un ciclo riproduttivo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/reproduction-cycles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Reproduction]
+      summary: Legge un ciclo
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    patch:
+      tags: [Reproduction]
+      summary: Modifica un ciclo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Reproduction]
+      summary: Elimina un ciclo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Ciclo eliminato se le relazioni lo consentono.
+  /api/v1/reproduction-cycles/{id}/events:
+    get:
+      tags: [Reproduction]
+      summary: Elenca eventi riproduttivi del ciclo
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Reproduction]
+      summary: Registra un evento riproduttivo
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/clutches:
+    post:
+      tags: [Reproduction]
+      summary: Crea una covata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/clutches/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Reproduction]
+      summary: Legge una covata
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    patch:
+      tags: [Reproduction]
+      summary: Modifica una covata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Reproduction]
+      summary: Elimina una covata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Covata eliminata se non esistono riferimenti restrittivi.
+  /api/v1/clutches/{id}/eggs:
+    get:
+      tags: [Reproduction]
+      summary: Elenca uova della covata
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Reproduction]
+      summary: Aggiunge uova alla covata
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/eggs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Reproduction]
+      summary: Modifica un uovo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Reproduction]
+      summary: Elimina un uovo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Uovo eliminato.
+  /api/v1/clutches/{id}/incubation-logs:
+    get:
+      tags: [Reproduction]
+      summary: Elenca misurazioni di incubazione
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Reproduction]
+      summary: Registra una misurazione storica di incubazione
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/incubation-logs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Reproduction]
+      summary: Modifica una misurazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Reproduction]
+      summary: Elimina una misurazione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Misurazione eliminata.
+  /api/v1/offspring-batches:
+    get:
+      tags: [Reproduction]
+      summary: Elenca gruppi di nascita
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Reproduction]
+      summary: Crea un gruppo di nascita
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/offspring-batches/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Reproduction]
+      summary: Modifica un gruppo di nascita
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Reproduction]
+      summary: Elimina un gruppo di nascita
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Gruppo eliminato.
+  /api/v1/offspring-batches/{id}/animals:
+    post:
+      tags: [Reproduction]
+      summary: Genera schede individuali dai piccoli
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/inventory/items:
+    get:
+      tags: [Inventory]
+      summary: Elenca articoli e saldo magazzino
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Inventory]
+      summary: Crea un articolo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/inventory/items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Inventory]
+      summary: Legge un articolo
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    patch:
+      tags: [Inventory]
+      summary: Modifica un articolo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/inventory/items/{id}/movements:
+    get:
+      tags: [Inventory]
+      summary: Elenca movimenti di un articolo
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Inventory]
+      summary: Registra un movimento di magazzino
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/inventory/items/{id}/archive:
+    post:
+      tags: [Inventory]
+      summary: Archivia un articolo
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/documents:
+    get:
+      tags: [Documents]
+      summary: Elenca i documenti privati
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Documents]
+      summary: Carica un documento privato (body binario; MIME verificato dal server)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/png:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '413':
+          $ref: '#/components/responses/Error'
+  /api/v1/documents/{id}/download:
+    get:
+      tags: [Documents]
+      summary: Scarica un documento dopo aver verificato la proprietà
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Contenuto binario del documento privato.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/documents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Documents]
+      summary: Modifica categoria o nota del documento
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Documents]
+      summary: Elimina un documento privato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Documento eliminato.
+  /api/v1/animals/{id}/public-share:
+    get:
+      tags: [Documents]
+      summary: Legge le impostazioni di condivisione pubblica
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Documents]
+      summary: Crea o abilita una condivisione pubblica
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/public-shares/{id}:
+    patch:
+      tags: [Documents]
+      summary: Modifica o revoca una condivisione pubblica
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/public/animals/{slug}:
+    get:
+      tags: [Documents]
+      summary: Restituisce solo i campi autorizzati della scheda pubblica
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, minLength: 20, maxLength: 100 }
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/{animalId}/genetic-traits:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      tags: [Genetics]
+      summary: Elenca i tratti genetici dichiarati dall'allevatore
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Genetics]
+      summary: Aggiunge un tratto genetico
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/genetic-traits/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Genetics]
+      summary: Modifica un tratto genetico
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Genetics]
+      summary: Elimina un tratto genetico
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Tratto eliminato.
+  /api/v1/finance/entries:
+    get:
+      tags: [Finance]
+      summary: Elenca entrate e uscite
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Finance]
+      summary: Registra un'entrata o un'uscita in centesimi
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/finance/entries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Finance]
+      summary: Modifica una voce economica
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    delete:
+      tags: [Finance]
+      summary: Elimina una voce economica
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Voce eliminata.
+  /api/v1/finance/summary:
+    get:
+      tags: [Finance]
+      summary: Riepilogo economico per periodo e categoria
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: Elenca notifiche in-app
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Segna una notifica come letta
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Segna tutte le notifiche come lette
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/notification-preferences:
+    get:
+      tags: [Notifications]
+      summary: Legge le preferenze di notifica
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    patch:
+      tags: [Notifications]
+      summary: Modifica preferenze, categorie e quiet hours
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/push/public-key:
+    get:
+      tags: [Notifications]
+      summary: Chiave pubblica VAPID per la sottoscrizione browser
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/push-subscriptions:
+    get:
+      tags: [Notifications]
+      summary: Elenca dispositivi push dell'account
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+    post:
+      tags: [Notifications]
+      summary: Registra una sottoscrizione browser
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        $ref: '#/components/requestBodies/JsonObject'
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/push-subscriptions/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Rimuove una sottoscrizione push
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Sottoscrizione rimossa.
+  /api/v1/notifications/test-push:
+    post:
+      tags: [Notifications]
+      summary: Invia una notifica push di prova
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/imports:
+    post:
+      tags: [Imports]
+      summary: Carica e prepara un'anteprima CSV/XLSX
+      description: Il body è il file caricato come bytes; i dati restano privati e scadono.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - name: entity
+          in: query
+          schema: { type: string }
+        - name: sheet
+          in: query
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string, format: binary }
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/imports/{id}:
+    get:
+      tags: [Imports]
+      summary: Legge stato e anteprima di un'importazione
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/imports/{id}/confirm:
+    post:
+      tags: [Imports]
+      summary: Conferma un'importazione dopo l'anteprima
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/exports:
+    post:
+      tags: [Exports]
+      summary: Richiede un export ZIP privato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                includeDocuments: { type: boolean, default: false }
+      responses:
+        '201':
+          $ref: '#/components/responses/JsonSuccess'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/exports/{id}:
+    get:
+      tags: [Exports]
+      summary: Legge lo stato di un export
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/exports/{id}/download:
+    get:
+      tags: [Exports]
+      summary: Scarica un export non scaduto e appartenente all'account
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: File ZIP privato.
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '410':
+          $ref: '#/components/responses/Error'
+  /api/v1/billing/checkout:
+    post:
+      tags: [Billing]
+      summary: Crea una sessione Stripe Checkout
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/billing/portal:
+    post:
+      tags: [Billing]
+      summary: Crea una sessione Stripe Customer Portal
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/billing/subscription:
+    get:
+      tags: [Billing]
+      summary: Legge lo stato Stripe sincronizzato dal backend
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/webhooks/stripe:
+    post:
+      tags: [Billing]
+      summary: Riceve webhook Stripe firmati (body raw)
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    sessionCookieDev:
+      type: apiKey
+      in: cookie
+      name: vivarqo_session
+      description: Cookie HttpOnly in development e test.
+    sessionCookieProd:
+      type: apiKey
+      in: cookie
+      name: __Host-vivarqo_session
+      description: Cookie HttpOnly Secure in produzione.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  parameters:
+    CsrfHeader:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AnimalId:
+      name: animalId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+  requestBodies:
+    JsonObject:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiObject'
+  responses:
+    JsonSuccess:
+      description: Operazione riuscita.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiObject'
+    Error:
+      description: Errore strutturato.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ApiObject:
+      type: object
+      additionalProperties: true
+      description: Schema transitorio; sostituire con uno schema di dominio specifico.
+    Health:
+      type: object
+      required: [status, requestId]
+      properties:
+        status: { type: string, enum: [ok, ready] }
+        requestId: { type: string }
+    ErrorResponse:
+      type: object
+      required: [code, message, details, requestId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: 'null'
+        requestId: { type: string }
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName, email, password]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 12, maxLength: 128 }
+        locale: { type: string, enum: [it, en] }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 1, maxLength: 128 }
+    EmailRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+    TokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [token, password]
+      properties:
+        token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        password: { type: string, minLength: 12, maxLength: 128 }
+    AccountPatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        locale: { type: string, enum: [it, en] }
+        timezone: { type: string, maxLength: 64, description: Nome fuso IANA }
+        email: { type: string, format: email, maxLength: 254 }
+        currentPassword: { type: string, minLength: 1, maxLength: 128 }
+        newPassword: { type: string, minLength: 12, maxLength: 128 }
+    AnimalWrite:
+      type: object
+      additionalProperties: false
+      required: [name, species]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        identifier: { type: [string, 'null'], maxLength: 120 }
+        species: { type: string, minLength: 1, maxLength: 160 }
+        sex: { type: string, enum: [male, female, unknown], default: unknown }
+        morph: { type: [string, 'null'], maxLength: 200 }
+        geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
+        birthDate: { type: [string, 'null'], format: date }
+        birthDateEstimated: { type: boolean, default: false }
+        acquiredDate: { type: [string, 'null'], format: date }
+        originDescription: { type: [string, 'null'], maxLength: 5000 }
+        previousBreeder: { type: [string, 'null'], maxLength: 160 }
+        locationLabel: { type: [string, 'null'], maxLength: 160 }
+        status: { type: string, enum: [active, sold, transferred, deceased], default: active }
+        notes: { type: [string, 'null'], maxLength: 10000 }
+    AnimalPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        identifier: { type: [string, 'null'], maxLength: 120 }
+        species: { type: string, minLength: 1, maxLength: 160 }
+        sex: { type: string, enum: [male, female, unknown] }
+        morph: { type: [string, 'null'], maxLength: 200 }
+        geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
+        birthDate: { type: [string, 'null'], format: date }
+        birthDateEstimated: { type: boolean }
+        acquiredDate: { type: [string, 'null'], format: date }
+        originDescription: { type: [string, 'null'], maxLength: 5000 }
+        previousBreeder: { type: [string, 'null'], maxLength: 160 }
+        locationLabel: { type: [string, 'null'], maxLength: 160 }
+        status: { type: string, enum: [active, sold, transferred, deceased] }
+        notes: { type: [string, 'null'], maxLength: 10000 }
+    FeedingSessionWrite:
+      type: object
+      additionalProperties: false
+      required: [performedAt, entries]
+      properties:
+        performedAt: { type: string, format: date-time }
+        notes: { type: [string, 'null'], maxLength: 5000 }
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [animalId, outcome]
+            properties:
+              animalId: { type: string, format: uuid }
+              outcome: { type: string, enum: [ate, refused, not_offered, unknown] }
+              foodType: { type: [string, 'null'], maxLength: 120 }
+              foodSize: { type: [string, 'null'], maxLength: 120 }
+              foodWeightG: { type: [number, 'null'], exclusiveMinimum: 0 }
+              notes: { type: [string, 'null'], maxLength: 5000 }
+    WeightWrite:
+      type: object
+      additionalProperties: false
+      required: [measuredAt, weightG]
+      properties:
+        measuredAt: { type: string, format: date-time }
+        weightG: { type: number, exclusiveMinimum: 0 }
+        notes: { type: [string, 'null'], maxLength: 5000 }
+    TaskWrite:
+      type: object
+      additionalProperties: false
+      required: [title, category, dueAt]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: [string, 'null'], maxLength: 10000 }
+        category: { type: string, enum: [feeding, weighing, shed_check, cleaning, reproduction, document, inventory, custom] }
+        dueAt: { type: string, format: date-time }
+        animalId: { type: [string, 'null'], format: uuid }
