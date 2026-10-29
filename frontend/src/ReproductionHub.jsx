@@ -74,15 +74,11 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
   const [busy, setBusy] = useState(false);
   const [listsLoaded, setListsLoaded] = useState(false);
 
-  const api = useCallback(async (path, options = {}, label) => {
-    const result = await apiRequest(path, { ...options, queueWhenOffline: options.method && options.method !== "GET", offlineOwner: owner, offlineLabel: label });
-    if (result?.queuedOffline) {
-      onNotice("Modifica conservata sul dispositivo. Verrà sincronizzata quando tornerà la connessione.", "warning");
-      return result;
-    }
+  const api = useCallback(async (path, options = {}) => {
+    const result = await apiRequest(path, options);
     onNotice("Modifiche salvate.");
     return result;
-  }, [owner, onNotice]);
+  }, [onNotice]);
 
   const selectCycle = id => {
     setCycleId(id);
@@ -164,11 +160,6 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
   useEffect(() => { let live = true; void loadLists().catch(e => setError(e.message)).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadCycle(cycleId).catch(e => setError(e.message)); }, [loadCycle]);
   useEffect(() => { void loadClutch(clutchId).catch(e => setError(e.message)); }, [loadClutch]);
-  useEffect(() => {
-    const changed = () => { void loadLists().then(() => loadCycle()).catch(() => {}); };
-    window.addEventListener("vivarqo:offline-queue-changed", changed);
-    return () => window.removeEventListener("vivarqo:offline-queue-changed", changed);
-  }, [loadLists, loadCycle]);
 
   const submitCycle = async e => {
     e.preventDefault(); const v = readForm(e);
