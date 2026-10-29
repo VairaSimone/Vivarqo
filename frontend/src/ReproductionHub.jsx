@@ -180,8 +180,14 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
       if (result.queuedOffline) return;
-      if (cycleId === item.id) { setCycleId(""); setClutchId(""); setEventsPage(1); setClutchesPage(1); setBatchesPage(1); }
-      await loadLists();
+      if (cycleId === item.id) {
+        setCycleId(""); setClutchId(""); setCyclesPage(1);
+        setEventsPage(1); setClutchesPage(1); setBatchesPage(1); setEggsPage(1); setLogsPage(1);
+        // The selected cycle was deleted; the changed cycleId triggers the list refresh
+        // without sending the now-invalid id as an offspring-batch filter.
+      } else {
+        await loadLists();
+      }
     } catch (err) { onNotice(err.message, "error"); }
   };
   const submitEvent = async e => {
