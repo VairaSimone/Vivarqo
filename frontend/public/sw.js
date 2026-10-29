@@ -3,7 +3,11 @@ const CACHE = "vivarqo-static-v2";
 const STATIC = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 const STATIC_DESTINATIONS = new Set(["script", "style", "image", "font"]);
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC)).then(() => self.skipWaiting()));
+  // Keep the previous worker active until the user accepts an available update.
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC)));
+});
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 self.addEventListener("activate", event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("vivarqo-static-") && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
