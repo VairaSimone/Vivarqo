@@ -50,7 +50,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
     const list = arrayOf(response.animals ?? response);
-    setAnimals(list);
+    setAnimals(previous => Array.from(new Map([...previous, ...list].map(animal => [animal.id, animal])).values()));
     setAnimalsPagination(response.pagination || { page: animalsPage, pageSize: 100, total: list.length, totalPages: 1 });
     if (!animalId && list.length && tab !== "feedings") setAnimalId(list[0].id);
   }, [animalId, animalsPage, tab]);

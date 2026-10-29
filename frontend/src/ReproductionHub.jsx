@@ -39,6 +39,8 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
   const [cyclesPage, setCyclesPage] = useState(1);
   const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [animals, setAnimals] = useState([]);
+  const [animalsPage, setAnimalsPage] = useState(1);
+  const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [cycleId, setCycleId] = useState("");
   const [cycle, setCycle] = useState(null);
   const [clutches, setClutches] = useState([]);
@@ -85,18 +87,20 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     if (cycleId) batchQuery.set("cycleId", cycleId);
     const [cycleResult, animalResult, batchResult] = await Promise.all([
       apiRequest("reproduction-cycles?page=" + cyclesPage + "&pageSize=50"),
-      apiRequest("animals?page=1&pageSize=100"),
+      apiRequest("animals?page=" + animalsPage + "&pageSize=100"),
       apiRequest("offspring-batches?" + batchQuery.toString())
     ]);
     const nextCycles = arrayOf(cycleResult.cycles ?? cycleResult);
     const nextBatches = arrayOf(batchResult.offspringBatches ?? batchResult);
-    setCycles(nextCycles);
+    setCycles(previous => Array.from(new Map([...previous, ...nextCycles].map(cycle => [cycle.id, cycle])).values()));
     setCyclesPagination(cycleResult.pagination || { page: cyclesPage, pageSize: 50, total: nextCycles.length, totalPages: 1 });
-    setAnimals(arrayOf(animalResult.animals ?? animalResult));
+    const nextAnimals = arrayOf(animalResult.animals ?? animalResult);
+    setAnimals(previous => Array.from(new Map([...previous, ...nextAnimals].map(animal => [animal.id, animal])).values()));
+    setAnimalsPagination(animalResult.pagination || { page: animalsPage, pageSize: 100, total: nextAnimals.length, totalPages: 1 });
     setBatches(nextBatches);
     setBatchesPagination(batchResult.pagination || { page: batchesPage, pageSize: 50, total: nextBatches.length, totalPages: 1 });
     if (!cycleId && nextCycles.length) setCycleId(nextCycles[0].id);
-  }, [cycleId, cyclesPage, batchesPage]);
+  }, [cycleId, cyclesPage, batchesPage, animalsPage]);
 
   const loadCycle = useCallback(async (id = cycleId) => {
     if (!id) {
@@ -180,6 +184,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
       if (result.queuedOffline) return;
+      setCycles(previous => previous.filter(cycle => cycle.id !== item.id));
       if (cycleId === item.id) {
         setCycleId(""); setClutchId(""); setCyclesPage(1);
         setEventsPage(1); setClutchesPage(1); setBatchesPage(1); setEggsPage(1); setLogsPage(1);
@@ -331,6 +336,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }) {
       <SectionTitle eyebrow="GESTIONE RIPRODUTTIVA" title="Cicli riproduttivi">
         <Action onClick={() => setEditCycle({})}>＋ Nuovo ciclo</Action><Action onClick={() => refresh()} disabled={busy}>↻ Aggiorna</Action>
       </SectionTitle>
+      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali caricati · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} totali)</span><div className="inline-actions"><Action disabled={animalsPage <= 1 || busy} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Action><Action disabled={animalsPage >= animalsPagination.totalPages || busy} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Action></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
       {busy && <p className="muted">Caricamento dati riproduttivi…</p>}
       {cycles.length === 0 ? <div className="empty-state"><h3>Nessun ciclo registrato</h3><p>Crea un ciclo per collegare genitori, eventi, covate e piccoli.</p></div> :

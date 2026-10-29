@@ -47,6 +47,10 @@ function downloadQr(value, name) {
 export function DocumentsHub({ onNotice = () => {}, owner }) {
   const [documents, setDocuments] = useState([]);
   const [documentsPage, setDocumentsPage] = useState(1);
+  const [animalsPage, setAnimalsPage] = useState(1);
+  const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
+  const [cyclesPage, setCyclesPage] = useState(1);
+  const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [documentsPagination, setDocumentsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [animals, setAnimals] = useState([]);
   const [cycles, setCycles] = useState([]);
@@ -65,16 +69,19 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
   const loadLists = useCallback(async () => {
     const [docs, animalResponse, cycleResponse] = await Promise.all([
       apiRequest("documents?page=" + documentsPage + "&pageSize=50"),
-      apiRequest("animals?page=1&pageSize=100"),
-      apiRequest("reproduction-cycles?page=1&pageSize=100")
+      apiRequest("animals?page=" + animalsPage + "&pageSize=100"),
+      apiRequest("reproduction-cycles?page=" + cyclesPage + "&pageSize=100")
     ]);
     setDocuments(arrayOf(docs.documents ?? docs));
     setDocumentsPagination(docs.pagination || { page: documentsPage, pageSize: 50, total: arrayOf(docs.documents ?? docs).length, totalPages: 1 });
     const nextAnimals = arrayOf(animalResponse.animals ?? animalResponse);
-    setAnimals(nextAnimals);
-    setCycles(arrayOf(cycleResponse.cycles ?? cycleResponse));
+    const nextCycles = arrayOf(cycleResponse.cycles ?? cycleResponse);
+    setAnimals(previous => Array.from(new Map([...previous, ...nextAnimals].map(animal => [animal.id, animal])).values()));
+    setCycles(previous => Array.from(new Map([...previous, ...nextCycles].map(cycle => [cycle.id, cycle])).values()));
+    setAnimalsPagination(animalResponse.pagination || { page: animalsPage, pageSize: 100, total: nextAnimals.length, totalPages: 1 });
+    setCyclesPagination(cycleResponse.pagination || { page: cyclesPage, pageSize: 100, total: nextCycles.length, totalPages: 1 });
     if (!selectedAnimal && nextAnimals.length) setSelectedAnimal(nextAnimals[0].id);
-  }, [selectedAnimal, documentsPage]);
+  }, [selectedAnimal, documentsPage, animalsPage, cyclesPage]);
 
   const loadShare = useCallback(async id => {
     if (!id) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); return; }
@@ -171,7 +178,9 @@ export function DocumentsHub({ onNotice = () => {}, owner }) {
       {error && <p className="form-message" role="alert">{error}</p>}
       <form className="form-grid" onSubmit={upload}>
         <Field label="Animale collegato"><select value={selectedAnimal} onChange={e => { setSelectedAnimal(e.target.value); if (e.target.value) setSelectedCycle(""); }}><option value="">— Seleziona un animale —</option>{animals.map(a => <option value={a.id} key={a.id}>{a.name} · {a.species}</option>)}</select></Field>
+        {animalsPagination.totalPages > 1 && <div className="form-full inline-actions"><span className="muted">Animali · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} totali)</span><Button type="button" disabled={animalsPage <= 1 || busy} onClick={() => setAnimalsPage(p => p - 1)}>← Precedenti</Button><Button type="button" disabled={animalsPage >= animalsPagination.totalPages || busy} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Button></div>}
         <Field label="Ciclo riproduttivo"><select value={selectedCycle} onChange={e => { setSelectedCycle(e.target.value); if (e.target.value) setSelectedAnimal(""); }}><option value="">— Seleziona un ciclo —</option>{cycles.map(c => <option value={c.id} key={c.id}>{c.name || displayDate(c.startedOn)}</option>)}</select></Field>
+        {cyclesPagination.totalPages > 1 && <div className="form-full inline-actions"><span className="muted">Cicli · pagina {cyclesPagination.page}/{cyclesPagination.totalPages} ({cyclesPagination.total} totali)</span><Button type="button" disabled={cyclesPage <= 1 || busy} onClick={() => setCyclesPage(p => p - 1)}>← Precedenti</Button><Button type="button" disabled={cyclesPage >= cyclesPagination.totalPages || busy} onClick={() => setCyclesPage(p => p + 1)}>Altri cicli →</Button></div>}
         <Field label="Categoria"><select value={category} onChange={e => setCategory(e.target.value)}>{[["other","Altro"],["identity","Identificazione"],["origin","Provenienza"],["veterinary","Veterinario"],["legal","Documentazione legale"],["contract","Contratti"],["reproduction","Riproduzione"]].map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></Field>
         <Field label="File"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={e => setFile(e.target.files?.[0] || null)} required/></Field>
         <div className="form-full"><Field label="Nota (facoltativa)"><textarea value={note} onChange={e => setNote(e.target.value)} rows="2" maxLength="10000"/></Field></div>

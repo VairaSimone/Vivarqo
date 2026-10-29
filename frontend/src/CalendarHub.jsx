@@ -31,6 +31,8 @@ export function CalendarHub({ onNotice = () => {} }) {
   const [rulePagination, setRulePagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [rulePage, setRulePage] = useState(1);
   const [animals, setAnimals] = useState([]);
+  const [animalsPage, setAnimalsPage] = useState(1);
+  const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [includeDismissed, setIncludeDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,13 +55,15 @@ export function CalendarHub({ onNotice = () => {} }) {
     try {
       const [rulesResponse, animalResponse] = await Promise.all([
         apiRequest("tasks/reminder-rules?page=" + rulePage + "&pageSize=50&enabled=all"),
-        apiRequest("animals?page=1&pageSize=100&status=active")
+        apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active")
       ]);
       setRules(Array.isArray(rulesResponse.reminderRules) ? rulesResponse.reminderRules : []);
       setRulePagination(rulesResponse.pagination || { page: rulePage, pageSize: 50, total: 0, totalPages: 0 });
-      setAnimals(Array.isArray(animalResponse.animals) ? animalResponse.animals : []);
+      const nextAnimals = Array.isArray(animalResponse.animals) ? animalResponse.animals : [];
+      setAnimals(previous => Array.from(new Map([...previous, ...nextAnimals].map(animal => [animal.id, animal])).values()));
+      setAnimalsPagination(animalResponse.pagination || { page: animalsPage, pageSize: 100, total: nextAnimals.length, totalPages: 1 });
     } catch (err) { setError(err.message || "Impossibile caricare i promemoria."); }
-  }, [rulePage]);
+  }, [rulePage, animalsPage]);
   useEffect(() => { void loadCalendar(); }, [loadCalendar]);
   useEffect(() => { void loadRules(); }, [loadRules]);
   useEffect(() => {
@@ -171,6 +175,7 @@ export function CalendarHub({ onNotice = () => {} }) {
       <div className="panel-heading"><div><p className="eyebrow">PIANIFICAZIONE</p><h2>Calendario e attività</h2><p className="subheading">Scadenze, eventi riproduttivi e deposizioni letti dal backend.</p></div><div className="inline-actions"><Button variant="primary" onClick={() => beginTask(null)}>＋ Nuova attività</Button><Button onClick={() => void loadCalendar()} disabled={busy}>↻ Aggiorna</Button></div></div>
       <div className="calendar-toolbar"><div className="inline-actions"><Button onClick={() => move(-1)}>←</Button><Button onClick={() => setAnchor(new Date())}>Oggi</Button><Button onClick={() => move(1)}>→</Button><strong>{title}</strong></div><div className="inline-actions"><div className="tab-strip">{[["month","Mese"],["week","Settimana"],["list","Elenco"]].map(([v, label]) => <button type="button" key={v} className={view === v ? "tab-button active" : "tab-button"} onClick={() => setView(v)}>{label}</button>)}</div></div></div>
       <label className="check-row"><input type="checkbox" checked={includeDismissed} onChange={e => setIncludeDismissed(e.target.checked)}/> Includi attività archiviate nel calendario</label>
+      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali disponibili nei selettori · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} attivi)</span><div className="inline-actions"><Button disabled={animalsPage <= 1 || saving} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Button><Button disabled={animalsPage >= animalsPagination.totalPages || saving} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Button></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
       {taskFormOpen && <div className="embedded-form"><form className="form-grid" onSubmit={saveTask} key={taskEditing?.id || "new-task"}>
         <h3 className="form-full">{taskEditing ? "Modifica attività" : "Nuova attività"}</h3>
