@@ -36,10 +36,15 @@ export function assertValidLocalDate(date: string): void {
 
 export function zonedDateTimeToUtc(date: string, time: string, timeZone: string): Date {
   assertValidLocalDate(date);
-  let candidate = Date.parse(`${date}T${time}Z`);
-  if (!Number.isFinite(candidate)) throw new AppError(400, "VALIDATION_ERROR", "Invalid date/time");
+  const wallClockAsUtc = Date.parse(`${date}T${time}Z`);
+  if (!Number.isFinite(wallClockAsUtc)) throw new AppError(400, "VALIDATION_ERROR", "Invalid date/time");
+
+  // Compare the represented local wall-clock time with the requested wall-clock
+  // value. Comparing it with the candidate UTC instant applies the timezone
+  // offset repeatedly and moves midnight outside the intended local day.
+  let candidate = wallClockAsUtc;
   try {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
       const parts = dateParts(new Date(candidate), timeZone);
       const represented = Date.UTC(
         parts.year!,
@@ -49,9 +54,11 @@ export function zonedDateTimeToUtc(date: string, time: string, timeZone: string)
         parts.minute!,
         parts.second!,
       );
-      const correction = represented - candidate;
+      const correction = represented - wallClockAsUtc;
       if (correction === 0) break;
-      candidate -= correction;
+      const adjusted = candidate - correction;
+      if (adjusted === candidate) break;
+      candidate = adjusted;
     }
   } catch {
     throw new AppError(400, "INVALID_TIMEZONE", "The account timezone is invalid");
