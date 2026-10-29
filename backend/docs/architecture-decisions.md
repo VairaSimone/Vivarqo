@@ -36,4 +36,11 @@
 - L'export produce ZIP privati CSV/ZIP con ID stabili, dati relazionali e documenti solo su richiesta; il link autenticato scade dopo 24 ore. L'importazione CSV/XLSX supporta anagrafiche animali e registri strutturati di pesi, mute, note e alimentazioni; importazioni riproduttive e di altre entità richiedono template dedicati.
 - Le quantità `in` e `out` sono variazioni positive; `adjustment.quantity` rappresenta il nuovo saldo fisico contato, non una variazione. Il movimento e il saldo sono salvati in transazione con lock della riga. Questa decisione evita di violare il vincolo SQL che richiede quantità di movimento positive.
 - L'integrazione Stripe usa le API REST HTTPS, richiede STRIPE_SECRET_KEY, STRIPE_PRICE_ID e STRIPE_WEBHOOK_SECRET; i webhook verificano la firma e memorizzano l'ID evento per l'idempotenza. La CI non possiede credenziali Stripe e non esegue acquisti reali.
-- Le notifiche in-app sono persistite e leggibili, con preferenze, finestre quiet hours e registrazione delle sottoscrizioni push. L'invio effettivo delle notifiche push via VAPID non è attivo in questo incremento, per cui non viene dichiarata una consegna push.
+- Le notifiche in-app sono persistite; Web Push via VAPID è implementato con cifratura del payload, preferenze, quiet hours e rimozione delle sottoscrizioni che rispondono 404/410. Restano da aggiungere una coda persistente (`pg-boss`) e uno storico persistente dei tentativi/retry per rispettare integralmente la specifica. La consegna non è garantita dal sistema operativo.
+
+
+## Verifica conformità — 29 ottobre 2026
+
+- La coda frontend delle mutazioni offline è stata rimossa: le richieste mutative vengono rifiutate lato client quando il browser segnala di essere offline. La cache del service worker resta limitata agli asset statici.
+- L'export ZIP è generato incrementalmente su disco, senza il limite prodotto arbitrario di 50 MiB. Restano i limiti strutturali del formato ZIP classico (dimensione complessiva fino a circa 4 GiB, massimo 65.535 entry) e la generazione avviene ancora nella richiesta HTTP, non tramite un worker persistente.
+- Rimangono non conformità aperte: frontend JavaScript/JSX anziché TypeScript e librerie prescritte non installate; assenza del contratto OpenAPI completo e di `pg-boss`; campi/preferenze dell'account incompleti; cancellazione account self-service e verifiche operative/legali ancora da completare.
