@@ -28,6 +28,14 @@ const accountDeletionSchema = z.object({
 let boss: PgBoss | undefined;
 let startup: Promise<PgBoss> | undefined;
 
+function libpqCompatibleUrl(raw: string): string {
+  const url = new URL(raw);
+  // Prisma uses this URL parameter to select its schema, but node-postgres
+  // and pg-boss do not understand it. Keep sslmode and other libpq options.
+  url.searchParams.delete("schema");
+  return url.toString();
+}
+
 function queueUnavailable(): Error {
   return new Error("The persistent PostgreSQL job queue is not running");
 }
@@ -65,7 +73,7 @@ export async function startBackgroundJobs(): Promise<() => Promise<void>> {
 
   startup = (async () => {
     const instance = new PgBoss({
-      connectionString: env.DATABASE_URL,
+      connectionString: libpqCompatibleUrl(env.DATABASE_URL),
       schema: "pgboss",
       application_name: "vivarqo-background-jobs",
     });
