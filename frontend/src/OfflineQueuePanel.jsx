@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 import { clearOfflineMutations, listOfflineMutations, removeOfflineMutation, updateOfflineMutation } from "./offlineQueue.js";
 
 function Button({ children, variant = "secondary", ...props }) {
@@ -8,6 +9,7 @@ function Button({ children, variant = "secondary", ...props }) {
 const statusLabel = status => status === "queued" ? "In attesa" : status === "syncing" ? "Invio in corso" : status === "failed" ? "Da correggere" : "Verifica richiesta";
 
 export function OfflineQueuePanel({ owner, online, onNotice = () => {} }) {
+  const confirmAction = useConfirmDialog();
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -90,19 +92,19 @@ export function OfflineQueuePanel({ owner, online, onNotice = () => {} }) {
     if (!online) { onNotice("Torna online prima di sincronizzare le modifiche.", "warning"); return; }
     let allowUncertain = false;
     if (item.status === "uncertain") {
-      if (!window.confirm("Questa richiesta potrebbe essere già stata applicata al server. Controlla prima lo storico dell'account: riprovare può creare un duplicato. Vuoi riprovare comunque?")) return;
+      if (!(await confirmAction({ title: "Riprovare una richiesta dall’esito incerto?", message: "La richiesta potrebbe essere già stata applicata al server. Controlla lo storico prima di riprovare: un nuovo invio potrebbe creare un duplicato.", confirmLabel: "Riprova comunque", danger: true }))) return;
       allowUncertain = true;
     }
     await syncQueued({ retryId: item.id, allowUncertain });
     onNotice("Controllo della modifica terminato. Verifica l'esito nella lista.", "info");
   };
   const discard = async item => {
-    if (!window.confirm("Eliminare questa modifica in attesa? Non verrà inviata al server.")) return;
+    if (!(await confirmAction({ title: "Rimuovere la modifica in attesa?", message: "La modifica locale verrà eliminata e non sarà inviata al server.", confirmLabel: "Rimuovi modifica", danger: true }))) return;
     try { await removeOfflineMutation(owner, item.id); onNotice("Modifica rimossa dalla coda."); }
     catch (e) { setStorageError(e.message); }
   };
   const clearQueue = async () => {
-    if (!window.confirm("Rimuovere tutte le modifiche locali di questo account? Quelle non sincronizzate andranno perse.")) return;
+    if (!(await confirmAction({ title: "Svuotare la coda offline?", message: "Tutte le modifiche locali di questo account saranno rimosse. Quelle non sincronizzate andranno perse.", confirmLabel: "Svuota coda", danger: true }))) return;
     try { await clearOfflineMutations(owner); onNotice("Coda locale svuotata."); }
     catch (e) { setStorageError(e.message); }
   };

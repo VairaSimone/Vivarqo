@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "./api/api.js";
+import { useConfirmDialog } from "./ui/ConfirmDialog.jsx";
 
 const categories = [
   ["task_due", "Scadenze attività"], ["system", "Sistema e test push"]
@@ -19,6 +20,7 @@ function isSupported() {
 }
 
 export function NotificationsHub({ onNotice = () => {}, owner }) {
+  const confirmAction = useConfirmDialog();
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
@@ -141,7 +143,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }) {
     finally { setBusy(false); }
   };
   const removeDevice = async item => {
-    if (!window.confirm("Rimuovere la registrazione push di questo dispositivo?")) return;
+    if (!(await confirmAction({ title: "Rimuovere questo dispositivo?", message: "Il browser non riceverà più notifiche push da Vivarqo su questo dispositivo.", confirmLabel: "Rimuovi dispositivo", danger: true }))) return;
     try {
       await apiRequest("push-subscriptions/" + encodeURIComponent(item.id), { method: "DELETE" });
       const key = "vivarqo.pushSubscriptionId:" + String(owner || "account");
