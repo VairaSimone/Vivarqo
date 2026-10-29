@@ -237,6 +237,32 @@ paths:
           description: Modifica email in attesa di verifica.
         '400':
           $ref: '#/components/responses/Error'
+  /api/v1/account:
+    delete:
+      tags: [Account]
+      summary: Richiede la cancellazione self-service dell'account
+      description: Richiede la password corrente e la conferma esplicita DELETE. Revoca immediatamente le sessioni e le condivisioni pubbliche; la cancellazione dei dati e dei file prosegue tramite job persistente.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDeleteRequest'
+      responses:
+        '202':
+          description: Cancellazione accodata e accesso disattivato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionAccepted'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
   /api/v1/animals:
     get:
       tags: [Animals]
@@ -1271,6 +1297,27 @@ paths:
       responses:
         '204':
           description: Sottoscrizione rimossa.
+  /api/v1/push-delivery-attempts:
+    get:
+      tags: [Notifications]
+      summary: Elenca lo storico privato dei tentativi di consegna push
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [queued, sent, retry, failed, removed, skipped] }
+      responses:
+        '200':
+          description: Tentativi di consegna paginati, filtrati per account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDeliveryAttemptsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
   /api/v1/notifications/test-push:
     post:
       tags: [Notifications]
@@ -1278,8 +1325,14 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
       responses:
-        '200':
-          $ref: '#/components/responses/JsonSuccess'
+        '202':
+          description: Notifica di prova inserita nella coda persistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDeliveryQueued'
+        '401':
+          $ref: '#/components/responses/Error'
   /api/v1/imports:
     post:
       tags: [Imports]
@@ -1340,8 +1393,12 @@ paths:
               properties:
                 includeDocuments: { type: boolean, default: false }
       responses:
-        '201':
-          $ref: '#/components/responses/JsonSuccess'
+        '202':
+          description: Export creato e accodato per l'elaborazione asincrona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportQueued'
         '503':
           $ref: '#/components/responses/Error'
   /api/v1/exports:
@@ -1359,8 +1416,12 @@ paths:
               properties:
                 includeDocuments: { type: boolean, default: false }
       responses:
-        '201':
-          $ref: '#/components/responses/JsonSuccess'
+        '202':
+          description: Export creato e accodato per l'elaborazione asincrona.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportQueued'
         '503':
           $ref: '#/components/responses/Error'
   /api/v1/exports/{id}:
@@ -1564,6 +1625,82 @@ components:
         email: { type: string, format: email, maxLength: 254 }
         currentPassword: { type: string, minLength: 1, maxLength: 128 }
         newPassword: { type: string, minLength: 12, maxLength: 128 }
+        weightUnit: { type: string, enum: [g, kg, oz, lb] }
+        temperatureUnit: { type: string, enum: [C, F] }
+        displayPreferences:
+          type: object
+          additionalProperties: false
+          properties:
+            animalListDensity: { type: string, enum: [comfortable, compact] }
+            defaultAnimalSort: { type: string, enum: [name, createdAt, updatedAt] }
+            showArchivedAnimals: { type: boolean }
+            dashboardStartSection: { type: string, enum: [oggi, animali, alimentazioni, attivita] }
+    AccountDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, confirmation]
+      properties:
+        currentPassword: { type: string, minLength: 1, maxLength: 128 }
+        confirmation: { type: string, const: DELETE }
+    AccountDeletionAccepted:
+      type: object
+      required: [status, message]
+      properties:
+        status: { type: string, const: deletion_pending }
+        message: { type: string }
+    ExportQueued:
+      type: object
+      required: [export, ready, statusPath, downloadPath, includeDocuments]
+      properties:
+        export: { $ref: '#/components/schemas/ApiObject' }
+        ready: { type: boolean, const: false }
+        statusPath: { type: string }
+        downloadPath: { type: string }
+        includeDocuments: { type: boolean }
+    PushDeliveryQueued:
+      type: object
+      required: [notificationId, delivery]
+      properties:
+        notificationId: { type: string, format: uuid }
+        delivery:
+          type: object
+          required: [status, attemptsEndpoint]
+          properties:
+            status: { type: string, const: queued }
+            attemptsEndpoint: { type: string }
+    PushDeliveryAttempt:
+      type: object
+      required: [id, attemptNumber, status, attemptedAt]
+      properties:
+        id: { type: string, format: uuid }
+        notificationId: { type: [string, 'null'], format: uuid }
+        attemptNumber: { type: integer, minimum: 1 }
+        status: { type: string, enum: [queued, sent, retry, failed, removed, skipped] }
+        responseStatus: { type: [integer, 'null'], minimum: 100, maximum: 599 }
+        errorCode: { type: [string, 'null'] }
+        attemptedAt: { type: string, format: date-time }
+        nextAttemptAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        notification:
+          type: [object, 'null']
+          properties:
+            title: { type: string }
+            category: { type: string }
+    PushDeliveryAttemptsResponse:
+      type: object
+      required: [attempts, pagination]
+      properties:
+        attempts:
+          type: array
+          items: { $ref: '#/components/schemas/PushDeliveryAttempt' }
+        pagination:
+          type: object
+          required: [page, pageSize, total, totalPages]
+          properties:
+            page: { type: integer }
+            pageSize: { type: integer }
+            total: { type: integer }
+            totalPages: { type: integer }
     AnimalWrite:
       type: object
       additionalProperties: false
