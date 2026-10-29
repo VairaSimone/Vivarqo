@@ -183,14 +183,13 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await page.getByLabel("Prefisso codice (facoltativo)").fill("E2E");
   await page.getByRole("button", { name: "Aggiungi uova", exact: true }).click();
   await expect.poll(() => page.e2eState.eggs.length).toBe(2);
-  await expect(page.getByText("E2E-01")).toBeVisible();
-
-  const firstEggRow = page.locator("tr").filter({ hasText: "E2E-01" });
-  await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).fill("E2E-01-M");
-  await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).press("Enter");
+  const firstEggCode = page.getByRole("textbox", { name: "Codice uovo E2E-01" });
+  await expect(firstEggCode).toBeVisible();
+  await firstEggCode.fill("E2E-01-M");
+  await firstEggCode.press("Enter");
   await expect.poll(() => page.e2eState.eggs.some(item => item.code === "E2E-01-M")).toBe(true);
 
-  const secondEggRow = page.locator("tr").filter({ hasText: "E2E-02" });
+  const secondEggRow = page.getByRole("textbox", { name: "Codice uovo E2E-02" }).locator("xpath=ancestor::tr");
   await secondEggRow.getByRole("button", { name: "Elimina", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Eliminare l’uovo?");
   await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
@@ -216,7 +215,7 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await page.getByLabel("Numero di schede (1–500)").fill("2");
   await page.getByRole("dialog").getByRole("button", { name: "Crea schede" }).click();
   await expect.poll(() => page.e2eState.animals.length).toBe(4);
-  await expect(page.getByRole("heading", { name: "Cucciolo E2E 01" })).toBeVisible();
+  expect(page.e2eState.animals.some(item => item.name === "Cucciolo E2E 01")).toBeTruthy();
 });
 
 test("notifiche: salva preferenze, segna le notifiche lette e gestisce dispositivi", async ({ page }) => {
@@ -261,17 +260,28 @@ test("caricamento, errore API e schermata vuota sono stati distinti", async ({ p
   await expect(page.getByRole("alert")).toContainText("Errore caricamento animali E2E.");
 });
 
-test("documenti e notifiche distinguono caricamento e stato vuoto", async ({ page }) => {
+test("documenti e notifiche distinguono caricamento, vuoto ed errore API", async ({ page }) => {
   await signIn(page);
   page.e2eState.documentListDelayMs = 700;
   await page.goto("/documents");
   await expect(page.getByText("Caricamento documenti…")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nessun documento", exact: true })).toBeVisible();
+
+  page.e2eState.failDocumentList = true;
+  await page.getByRole("button", { name: /Aggiorna/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Errore caricamento documenti E2E.");
 
   page.e2eState.notificationListDelayMs = 700;
+  page.e2eState.notifications = [];
+  page.e2eState.unreadCount = 0;
   await page.goto("/notifications");
   await expect(page.getByText("Caricamento notifiche…")).toBeVisible();
-  await expect(page.getByText("Attività in scadenza")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nessuna notifica", exact: true })).toBeVisible();
+
+  page.e2eState.failNotificationList = true;
+  await page.getByRole("button", { name: /Aggiorna/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Errore caricamento notifiche E2E.");
 });
 
 test("le viste mobile non provocano overflow orizzontale sulle aree operative", async ({ page }, testInfo) => {

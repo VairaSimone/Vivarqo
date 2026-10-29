@@ -21,7 +21,7 @@ export async function mockApi(context) {
     notes: "", _count: { eggs: 0, incubationLogs: 0 }
   };
   const state = {
-    authenticated: false, failLogin: false, failAnimalList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
+    authenticated: false, failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
     animals: [animal, secondAnimal], cycle, cycles: [cycle], clutches: [clutch], eggs: [],
     incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
     share: null,
@@ -249,7 +249,7 @@ export async function mockApi(context) {
       return respond({});
     }
 
-    if (path === "documents" && method === "GET") { if (state.documentListDelayMs) await new Promise(resolve => setTimeout(resolve, state.documentListDelayMs)); return respond(itemsResponse("documents", state.documents)); }
+    if (path === "documents" && method === "GET") { if (state.documentListDelayMs) await new Promise(resolve => setTimeout(resolve, state.documentListDelayMs)); if (state.failDocumentList) return respond({ message: "Errore caricamento documenti E2E." }, 503); return respond(itemsResponse("documents", state.documents)); }
     if (path === "documents" && method === "POST") {
       const created = {
         id: nextId("doc"), originalFilename: headers["x-document-name"] || "documento.pdf",
@@ -274,7 +274,7 @@ export async function mockApi(context) {
         : respond({ message: "Profilo non disponibile." }, 404);
     }
 
-    if (path === "notifications" && method === "GET") { if (state.notificationListDelayMs) await new Promise(resolve => setTimeout(resolve, state.notificationListDelayMs)); return respond({ notifications: state.notifications, unreadCount: state.unreadCount, pagination: pagination(state.notifications) }); }
+    if (path === "notifications" && method === "GET") { if (state.notificationListDelayMs) await new Promise(resolve => setTimeout(resolve, state.notificationListDelayMs)); if (state.failNotificationList) return respond({ message: "Errore caricamento notifiche E2E." }, 503); return respond({ notifications: state.notifications, unreadCount: state.unreadCount, pagination: pagination(state.notifications) }); }
     if (path === "notification-preferences" && method === "GET") return respond({ preferences: state.preferences });
     if (path === "notification-preferences" && method === "PATCH") {
       state.preferences = { ...state.preferences, ...body, categories: { ...state.preferences.categories, ...(body.categories || {}) } };
