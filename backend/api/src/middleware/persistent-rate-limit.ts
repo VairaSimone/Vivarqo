@@ -1,5 +1,6 @@
 import rateLimit from "express-rate-limit";
-import type { RequestHandler, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+import type { Options } from "express-rate-limit";
 import { PostgresRateLimitStore } from "./postgres-rate-limit-store.js";
 
 function rateLimitedResponse(res: Response): void {
@@ -28,6 +29,6 @@ export function persistentRateLimit(
     store: new PostgresRateLimitStore(namespace),
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    handler: (_req: Request, res: Response) => rateLimitedResponse(res),
+    handler: (_req: Request, res: Response, _next: NextFunction, _options: Options) => rateLimitedResponse(res),
   });
 }
