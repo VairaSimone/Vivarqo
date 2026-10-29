@@ -93,9 +93,9 @@ Il repository contiene un backend API per account/autenticazione, animali e regi
 
 Le modifiche sui dati richiedono connettività: la coda locale di mutazioni offline è stata rimossa per rispettare il perimetro della prima release. Il service worker memorizza solo asset statici e non conserva le risposte private dell'API.
 
-Restano da completare o verificare prima del lancio: migrazione del frontend allo stack TypeScript e alle librerie UI/dati/form/PWA prescritte; contratto OpenAPI completo; coda persistente per job e notifiche; cancellazione self-service dell'account; preferenze e campi anagrafici non ancora esposti; integrazione Sentry; pagine legali e flussi privacy; configurazione e test reali di storage UE, Stripe Test Mode, backup/ripristino e distribuzione. La checklist in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
+Restano da completare o verificare prima del lancio: migrazione del frontend allo stack TypeScript e alle librerie UI/dati/form/PWA prescritte; completamento del contratto OpenAPI (la bozza iniziale è in [docs/openapi.yaml](docs/openapi.yaml), con diversi schemi ancora generici); coda persistente per job e notifiche; cancellazione self-service dell'account; preferenze e campi anagrafici non ancora esposti; integrazione Sentry; pagine legali e flussi privacy; configurazione e test reali di storage UE, Stripe Test Mode, backup/ripristino e distribuzione. La checklist in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
 
-Le decisioni e le discrepanze tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica di riferimento è conservata in [backend/docs/specification.md](backend/docs/specification.md).
+Il contratto API preliminare è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni e le discrepanze tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica di riferimento è conservata in [backend/docs/specification.md](backend/docs/specification.md).
 
 ## Anagrafiche animali e registri di cura
 
