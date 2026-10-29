@@ -70,11 +70,6 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
   }, [page, debouncedQuery, status]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const changed = () => { void load(); };
-    window.addEventListener("vivarqo:offline-queue-changed", changed);
-    return () => window.removeEventListener("vivarqo:offline-queue-changed", changed);
-  }, [load]);
 
   const run = async (label, operation) => {
     setSaving(true);
