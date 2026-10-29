@@ -1,5 +1,5 @@
 import React, { useId } from "react";
-import { Icon } from "./Icon.jsx";
+import { Icon } from "./Icon.tsx";
 
 export function Dialog({
   title, description, children, onClose, onSubmit,
