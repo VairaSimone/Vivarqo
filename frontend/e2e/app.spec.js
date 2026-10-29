@@ -18,6 +18,16 @@ test("accesso: mostra un errore utile e poi apre l'account", async ({ page }) =>
   await expect(page.getByText("Allevatore E2E")).toBeVisible();
 });
 
+test("registrazione: conferma la creazione dell'account", async ({ page }) => {
+  await page.getByRole("button", { name: "Crea un account", exact: true }).click();
+  await page.getByLabel("Nome visualizzato").fill("Nuovo allevatore");
+  await page.getByLabel("Email").fill("nuovo@example.test");
+  await page.getByLabel("Password").fill("Password-nuova-123!");
+  await page.getByRole("button", { name: "Crea account", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Account creato");
+  await expect(page.getByRole("heading", { name: "Accedi a Vivarqo" })).toBeVisible();
+});
+
 test("navigazione: URL e stato del browser restano sincronizzati", async ({ page }, testInfo) => {
   await signIn(page);
   if (testInfo.project.name === "mobile-chromium") {
@@ -100,37 +110,58 @@ test("registrazioni alimentari: salva una sessione per più animali", async ({ p
   expect(page.e2eState.sessions[0].entries.map(entry => entry.foodType)).toEqual(["Ratto", "Topo"]);
 });
 
-test("documenti e QR: carica un file, condivide il profilo e protegge la cancellazione", async ({ page }) => {
+test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ page }) => {
   await signIn(page);
   await page.goto("/documents");
   await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
   await page.getByLabel("File").setInputFiles({
     name: "scheda-naga.pdf",
     mimeType: "application/pdf",
-    buffer: Buffer.from("%PDF-1.4\n% e2e fixture\n")
+    buffer: Buffer.from("%PDF-1.4\\n% e2e fixture\\n")
   });
   await page.getByRole("button", { name: "Carica documento" }).click();
   await expect(page.getByText("scheda-naga.pdf")).toBeVisible();
   expect(page.e2eState.documents).toHaveLength(1);
+
+  const documentRow = page.locator(".table-wrap tbody tr").filter({ hasText: "scheda-naga.pdf" });
+  await documentRow.getByRole("button", { name: "Modifica", exact: true }).click();
+  const editDialog = page.getByRole("dialog");
+  await editDialog.getByLabel("Categoria").selectOption("veterinary");
+  await editDialog.getByLabel("Nota (facoltativa)").fill("Aggiornato dal test end-to-end.");
+  await editDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await expect.poll(() => page.e2eState.documents[0]?.category).toBe("veterinary");
+  await expect.poll(() => page.e2eState.documents[0]?.note).toBe("Aggiornato dal test end-to-end.");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    documentRow.getByRole("button", { name: "Scarica", exact: true }).click()
+  ]);
+  expect(download.suggestedFilename()).toBe("scheda-naga.pdf");
 
   await page.getByLabel("Attiva il link pubblico").check();
   await page.getByLabel("Descrizione pubblica (facoltativa)").fill("Profilo pubblico verificato dai test.");
   await page.getByRole("button", { name: "Salva condivisione" }).click();
   await expect(page.getByText("Link attivo")).toBeVisible();
   await expect(page.getByRole("img", { name: "Codice QR del profilo pubblico" })).toBeVisible();
-  const publicLink = page.getByRole("link", { name: /\/public\/animals\/naga-e2e/ });
+  const publicLink = page.getByRole("link", { name: /\\/public\\/animals\\/naga-e2e/ });
   await expect(publicLink).toBeVisible();
   const [popup] = await Promise.all([page.context().waitForEvent("page"), publicLink.click()]);
   await expect(popup.getByRole("heading", { name: "Naga", exact: true })).toBeVisible();
   await popup.close();
 
-  await page.locator(".table-wrap tbody tr").filter({ hasText: "scheda-naga.pdf" }).getByRole("button", { name: "Elimina" }).click();
+  await documentRow.getByRole("button", { name: "Elimina", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Eliminare il documento?");
   await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
   await expect(page.getByText("scheda-naga.pdf")).toBeVisible();
+
+  await page.getByRole("button", { name: "Revoca link", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Revocare il link pubblico?");
+  await page.getByRole("dialog").getByRole("button", { name: "Revoca link", exact: true }).click();
+  await expect(page.getByText("Link disattivato")).toBeVisible();
+  expect(page.e2eState.share.isEnabled).toBe(false);
 });
 
-test("riproduzione: traccia uova e piccoli e genera schede animali", async ({ page }) => {
+test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ page }) => {
   await signIn(page);
   await page.goto("/reproduction");
   await expect(page.getByRole("heading", { name: "Cicli riproduttivi" })).toBeVisible();
@@ -141,10 +172,25 @@ test("riproduzione: traccia uova e piccoli e genera schede animali", async ({ pa
   await expect.poll(() => page.e2eState.eggs.length).toBe(2);
   await expect(page.getByText("E2E-01")).toBeVisible();
 
-  const eggRow = page.locator("tr").filter({ hasText: "E2E-01" });
-  await eggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).fill("E2E-01-M");
-  await eggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).press("Enter");
+  const firstEggRow = page.locator("tr").filter({ hasText: "E2E-01" });
+  await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).fill("E2E-01-M");
+  await firstEggRow.getByRole("textbox", { name: "Codice uovo E2E-01" }).press("Enter");
   await expect.poll(() => page.e2eState.eggs.find(item => item.id === "egg-1")?.code).toBe("E2E-01-M");
+
+  const secondEggRow = page.locator("tr").filter({ hasText: "E2E-02" });
+  await secondEggRow.getByRole("button", { name: "Elimina", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText("Eliminare l’uovo?");
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla", exact: true }).click();
+  await expect.poll(() => page.e2eState.eggs.length).toBe(2);
+  await secondEggRow.getByRole("button", { name: "Elimina", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Elimina uovo", exact: true }).click();
+  await expect.poll(() => page.e2eState.eggs.length).toBe(1);
+
+  await page.getByLabel("Temperatura °C").fill("30.5");
+  await page.getByLabel("Umidità %").fill("80");
+  await page.getByRole("button", { name: "Registra controllo", exact: true }).click();
+  await expect.poll(() => page.e2eState.incubationLogs.length).toBe(1);
+  await expect(page.getByText(/30\\.5 °C/)).toBeVisible();
 
   await page.getByRole("tab", { name: "Piccoli e nascite" }).click();
   await page.getByLabel("Numero di piccoli").fill("2");
@@ -167,10 +213,12 @@ test("notifiche: salva preferenze, segna le notifiche lette e gestisce dispositi
   await page.getByLabel("Dalle").fill("22:00");
   await page.getByLabel("Alle").fill("07:30");
   await page.locator(".preference-switches .preference-row").filter({ hasText: "Notifiche nell'app" }).locator("input").uncheck();
+  await page.locator(".category-toggle").filter({ hasText: "Scadenze attività" }).locator("input").uncheck();
   await page.getByRole("button", { name: "Salva preferenze", exact: true }).click();
   await expect.poll(() => page.e2eState.preferences.quietHoursStart).toBe("22:00");
   await expect.poll(() => page.e2eState.preferences.quietHoursEnd).toBe("07:30");
   expect(page.e2eState.preferences.inAppEnabled).toBe(false);
+  expect(page.e2eState.preferences.categories.task_due).toBe(false);
 
   await page.getByRole("button", { name: "Segna tutte come lette" }).click();
   await expect.poll(() => page.e2eState.unreadCount).toBe(0);
