@@ -231,7 +231,7 @@ export async function processQueuedAnimalImport(jobId: string, userId: string, l
       },
     });
     if (completed.count !== 1) throw new Error("Import processing lease was lost before commit");
-  });
+  }, { maxWait: 10_000, timeout: 120_000 });
 }
 
 export function createImportRouter() {
