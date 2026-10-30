@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
 import { deletePrivateObject } from "../src/modules/domain/private-storage.js";
+import { dispatchExportJob, dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
 
 const enabled = process.env.RUN_DB_INTEGRATION === "true";
 const origin = "http://localhost:5173";
@@ -289,7 +290,10 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(preview.body.invalidRows).toBe(0);
 
     await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(202);
+    await dispatchImportJob(preview.body.importId);
+    const importStatus = await owner.agent.get("/api/v1/imports/" + preview.body.importId).expect(200);
+    expect(importStatus.body.status).toBe("completed");
     const measurement = await prisma.weightMeasurement.findFirstOrThrow({
       where: { animalId: animal.id, weightG: 420 },
     });
@@ -315,8 +319,11 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     }).expect(200);
 
     const noDocumentFiles = await owner.agent.post("/api/v1/exports")
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(201);
-    expect(noDocumentFiles.body.export.status).toBe("completed");
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(202);
+    expect(noDocumentFiles.body.export.status).toBe("pending");
+    await dispatchExportJob(noDocumentFiles.body.export.id);
+    const noDocumentStatus = await owner.agent.get("/api/v1/exports/" + noDocumentFiles.body.export.id).expect(200);
+    expect(noDocumentStatus.body.ready).toBe(true);
     const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
     expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
     expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
@@ -324,13 +331,18 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
     const accountExport = await owner.agent.post("/api/v1/account/export")
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(201);
-    expect(accountExport.body.export.status).toBe("completed");
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: false }).expect(202);
+    await dispatchExportJob(accountExport.body.export.id);
+    const accountExportStatus = await owner.agent.get("/api/v1/exports/" + accountExport.body.export.id).expect(200);
+    expect(accountExportStatus.body.ready).toBe(true);
     const accountExportZip = Buffer.from((await getZip(accountExport.body.downloadPath)).body as Buffer);
     expect(accountExportZip.subarray(0, 2).toString("hex")).toBe("504b");
 
     const withDocumentFiles = await owner.agent.post("/api/v1/exports")
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: true }).expect(201);
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ includeDocuments: true }).expect(202);
+    await dispatchExportJob(withDocumentFiles.body.export.id);
+    const withDocumentStatus = await owner.agent.get("/api/v1/exports/" + withDocumentFiles.body.export.id).expect(200);
+    expect(withDocumentStatus.body.ready).toBe(true);
     const withDocZip = Buffer.from((await getZip(withDocumentFiles.body.downloadPath)).body as Buffer);
     expect(withDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
     expect(withDocZip.includes(Buffer.from(documentPath))).toBe(true);
