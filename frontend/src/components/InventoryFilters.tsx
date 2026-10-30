@@ -1,7 +1,7 @@
 import React from "react";
 import type { InventoryFiltersState } from "../types";
-function Button({children,variant="secondary",...props}){return <button className={"button "+variant} {...props}>{children}</button>;}
-function SelectField({label,children,...props}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>;}
+function Button({children,variant="secondary",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{children}</button>;}
+function SelectField({label,children,...props}: React.SelectHTMLAttributes<HTMLSelectElement> & {label:string;children?:React.ReactNode}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>;}
 
 export function InventoryFilters({filters,onChange,onReset}: { filters: InventoryFiltersState; onChange: (key: keyof InventoryFiltersState, value: string | boolean) => void; onReset: () => void }) {
  return <section className="panel inventory-filter-panel" aria-labelledby="inventory-filters-title">
