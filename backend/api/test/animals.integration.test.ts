@@ -5,6 +5,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
+import { dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
 
 const integrationEnabled = process.env.RUN_DB_INTEGRATION === "true";
 const origin = "http://localhost:5173";
@@ -273,12 +274,16 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(preview.body.invalidRows).toBe(1);
     expect(preview.body.errors[0].row).toBe(3);
 
-    const completed = await owner.agent
+    const queued = await owner.agent
       .post(`/api/v1/imports/${preview.body.importId}/confirm`)
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .send({})
-      .expect(200);
+      .expect(202);
+    expect(queued.body.status).toBe("queued");
+    await dispatchImportJob(preview.body.importId);
+    const completed = await owner.agent.get(`/api/v1/imports/${preview.body.importId}`).expect(200);
+    expect(completed.body.status).toBe("completed");
     expect(completed.body.createdCount).toBe(1);
     expect(completed.body.errorCount).toBe(1);
 
@@ -301,7 +306,11 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .send({})
-      .expect(200);
+      .expect(202);
+    await dispatchImportJob(xlsxPreview.body.importId);
+    const xlsxCompleted = await owner.agent.get(`/api/v1/imports/${xlsxPreview.body.importId}`).expect(200);
+    expect(xlsxCompleted.body.status).toBe("completed");
+    expect(xlsxCompleted.body.createdCount).toBe(1);
 
     const tooManyColumns = makeXlsx([Array.from({ length: 257 }, (_, index) => index === 0 ? "name" : `col${index}`), Array(257).fill("value")]);
     const rejected = await owner.agent
