@@ -38,7 +38,7 @@ test("browser, real API and PostgreSQL enforce account isolation", async ({ brow
       appOrigin + "/api/v1/animals?status=all&page=1&pageSize=100"
     );
     expect(ownerListResponse.status()).toBe(200);
-    const ownerList = await ownerListResponse.json();
+    const ownerList = await ownerListResponse.json() as { animals: Array<{ id: string; name: string }> };
     const animal = ownerList.animals.find((item) => item.name === animalName);
     expect(animal?.id).toBeTruthy();
 
@@ -50,7 +50,7 @@ test("browser, real API and PostgreSQL enforce account isolation", async ({ brow
       appOrigin + "/api/v1/animals?status=all&page=1&pageSize=100"
     );
     expect(otherListResponse.status()).toBe(200);
-    const otherList = await otherListResponse.json();
+    const otherList = await otherListResponse.json() as { animals: Array<{ id: string; name: string }> };
     expect(otherList.animals.some((item) => item.id === animal.id)).toBe(false);
     expect(otherList.animals.some((item) => item.name === animalName)).toBe(false);
 

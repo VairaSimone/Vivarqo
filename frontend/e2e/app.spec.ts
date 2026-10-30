@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockApi, signIn } from "./fixtures";
+import { mockApi, signIn, type E2ERecord } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   page.e2eState = await mockApi(page.context());
@@ -164,7 +164,7 @@ test("registrazioni alimentari: salva una sessione per più animali", async ({ p
   await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
   await expect.poll(() => page.e2eState.sessions.length).toBe(1);
   expect(page.e2eState.sessions[0].entries).toHaveLength(2);
-  expect(page.e2eState.sessions[0].entries.map(entry => entry.foodType)).toEqual(["Ratto", "Topo"]);
+  expect(page.e2eState.sessions[0].entries.map((entry: E2ERecord) => entry.foodType)).toEqual(["Ratto", "Topo"]);
 });
 
 test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ page }) => {
@@ -215,7 +215,7 @@ test("documenti e QR: carica, modifica, scarica, condivide e revoca", async ({ p
   await expect(page.getByRole("dialog")).toContainText("Revocare il link pubblico?");
   await page.getByRole("dialog").getByRole("button", { name: "Revoca link", exact: true }).click();
   await expect(page.getByText("Link disattivato")).toBeVisible();
-  expect(page.e2eState.share.isEnabled).toBe(false);
+  expect(page.e2eState.share?.isEnabled).toBe(false);
 });
 
 test("riproduzione: crea un ciclo e un evento associato", async ({ page }) => {

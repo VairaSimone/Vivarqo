@@ -124,7 +124,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
       return respond({ animal: created });
     }
     if (path === "animals/bulk" && method === "POST") {
-      const created = (body.animals || []).map(item => makeAnimal({ ...item, id: nextId("animal") }));
+      const created = (body.animals || []).map((item: E2ERecord) => makeAnimal({ ...item, id: nextId("animal") }));
       state.animals.push(...created);
       return respond({ animals: created, createdCount: created.length });
     }
@@ -176,7 +176,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
 
     if (path === "feeding-sessions" && method === "GET") return respond(itemsResponse("sessions", state.sessions));
     if (path === "feeding-sessions" && method === "POST") {
-      const session = { id: nextId("session"), performedAt: body.performedAt, notes: body.notes, entries: (body.entries || []).map(entry => ({ id: nextId("entry"), ...entry, animal: state.animals.find(a => a.id === entry.animalId) })) };
+      const session = { id: nextId("session"), performedAt: body.performedAt, notes: body.notes, entries: (body.entries || []).map((entry: E2ERecord) => ({ id: nextId("entry"), ...entry, animal: state.animals.find(a => a.id === entry.animalId) })) };
       state.sessions.push(session);
       return respond({ session });
     }
@@ -185,7 +185,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     const feedingEntry = path.match(/^feeding-entries\/([^/]+)$/);
     if (feedingEntry && ["PATCH", "DELETE"].includes(method)) {
       for (const item of state.sessions) {
-        const index = item.entries.findIndex(entry => entry.id === feedingEntry[1]);
+        const index = item.entries.findIndex((entry: E2ERecord) => entry.id === feedingEntry[1]);
         if (index >= 0 && method === "PATCH") item.entries[index] = { ...item.entries[index], ...body };
         if (index >= 0 && method === "DELETE") item.entries.splice(index, 1);
       }
@@ -244,7 +244,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     const clutchEggs = path.match(/^clutches\/([^/]+)\/eggs$/);
     if (clutchEggs && method === "GET") return respond(itemsResponse("eggs", state.eggs.filter(item => item.clutchId === clutchEggs[1])));
     if (clutchEggs && method === "POST") {
-      const created = (body.eggs || []).map(item => ({ id: nextId("egg"), clutchId: clutchEggs[1], ...item }));
+      const created = (body.eggs || []).map((item: E2ERecord) => ({ id: nextId("egg"), clutchId: clutchEggs[1], ...item }));
       state.eggs.push(...created);
       const current = state.clutches.find(item => item.id === clutchEggs[1]);
       if (current) current._count.eggs = state.eggs.filter(item => item.clutchId === current.id).length;
@@ -315,8 +315,9 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     if (document && method === "DELETE") { state.documents = state.documents.filter(item => item.id !== document[1]); return respond({}); }
     const publicAnimal = path.match(/^public\/animals\/([^/]+)$/);
     if (publicAnimal && method === "GET") {
-      return state.share?.isEnabled
-        ? respond({ animal: state.animals.find(item => item.id === state.share.animalId) || state.animals[0], description: state.share.publicDescription || "", visibleFields: state.share.visibleFields || ["name", "species", "morph"] })
+      const activeShare = state.share;
+      return activeShare?.isEnabled
+        ? respond({ animal: state.animals.find((item: E2ERecord) => item.id === activeShare.animalId) || state.animals[0], description: activeShare.publicDescription || "", visibleFields: activeShare.visibleFields || ["name", "species", "morph"] })
         : respond({ message: "Profilo non disponibile." }, 404);
     }
 
