@@ -91,4 +91,14 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - Cancellazione self-service: autenticazione con password attuale e doppia conferma; cancellazione dei dati gestionali e dei file privati; annullamento Stripe prima dell'eliminazione; tombstone account anonimizzata. Un errore Stripe/storage blocca la cancellazione per evitare dati orfani o addebiti ricorrenti.
 - Storico push persistente: ogni tentativo è collegato ad account, notifica e, se ancora esistente, sottoscrizione del browser. Retry con backoff, recupero claim dopo lease, rimozione endpoint 404/410. La consultazione non espone endpoint push né chiavi crittografiche.
 - Retention dello storico push: 90 giorni. Va rivista insieme alla policy privacy e alla retention di log/backup.
-- Limite architetturale residuo: il worker push è PostgreSQL-native e non usa ancora pg-boss; export/import non sono ancora spostati su job asincroni pg-boss.
+- Scelta architetturale: notifiche push e job import/export usano code PostgreSQL-native con lease, claim e retry; non è stata aggiunta una dipendenza esterna come pg-boss. I test provider/browser reali restano una verifica operativa distinta.
+
+
+## 6. Aggiornamento 30 ottobre 2026 — job dati e documentazione legale
+
+- Import ed export sono accodati nelle tabelle PostgreSQL esistenti; conferme e richieste rispondono `202`. I worker usano claim atomico `FOR UPDATE SKIP LOCKED`, heartbeat, token UUID di proprietà della lease, recupero dei job abbandonati e massimo tre tentativi.
+- Gli export continuano a produrre CSV/ZIP in streaming su file temporanei privati. Non è stata aggiunta una coda esterna: le repliche API condividono lo stato tramite PostgreSQL.
+- Il workflow CI è configurato per un backup/restore drill su un database temporaneo del PostgreSQL effimero.
+- Il workflow manuale staging richiede `STAGING_DATABASE_URL` e un ruolo autorizzato a creare/eliminare database; ripristina solo nel database temporaneo e non modifica il database sorgente.
+- Gli script Stripe Test Mode e Web Push effettuano chiamate reali solo quando eseguiti esplicitamente con chiavi e sottoscrizioni di test. Non sono eseguiti automaticamente dalla CI.
+- Le bozze in `docs/legal/` contengono segnaposto per informazioni che il codice non può conoscere. Non pubblicarle né dichiarare conformità prima di compilazione, verifica dei provider e revisione professionale.

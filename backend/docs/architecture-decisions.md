@@ -65,3 +65,13 @@
 - DELETE /api/v1/account richiede password attuale e la stringa DELETE, cancella i dati e i file privati dopo aver tentato l'annullamento dell'abbonamento Stripe. Se Stripe o lo storage non confermano l'operazione, la cancellazione non procede. La riga utente viene anonimizzata come tombstone tecnica; i webhook Stripe ignorano gli account cancellati.
 - Le push sono accodate in push_delivery_attempts. La consegna usa un worker PostgreSQL con claim SKIP LOCKED, lease recuperabili dopo crash, chiave logica univoca e retry fino a cinque tentativi. Lo storico è consultabile tramite GET /api/v1/push-delivery-attempts e viene conservato 90 giorni.
 - La coda push usa al momento una tabella outbox/worker PostgreSQL nativa. Non è ancora pg-boss: l'adozione della libreria resta pianificata insieme alla rigenerazione del lockfile pnpm e al worker unificato export/import. Le consegne esterne sono at-least-once: un crash dopo l'accettazione da parte del provider ma prima della conferma DB può generare una ripetizione.
+
+
+## Job asincroni import/export e prove operative — 30 ottobre 2026
+
+- Le tabelle `import_jobs` ed `export_jobs` fungono da coda persistente. Le conferme import e le richieste export rispondono `202`; il frontend interroga endpoint di stato.
+- Claim atomico PostgreSQL con `FOR UPDATE SKIP LOCKED`, lease con heartbeat, UUID di lease come fencing token, recupero dopo crash e massimo tre tentativi.
+- La coda è condivisa da tutte le repliche; non è stato aggiunto pg-boss o un broker separato, evitando un servizio aggiuntivo per il carico attuale.
+- La generazione ZIP resta in streaming e viene eseguita fuori dalla richiesta HTTP, con file temporanei e storage privato.
+- CI configurata per un backup/restore drill su database temporaneo; workflow manuale staging con database temporaneo separato.
+- Le chiamate live Stripe e Web Push sono opt-in, con account e sottoscrizioni di test, e non vengono eseguite automaticamente.

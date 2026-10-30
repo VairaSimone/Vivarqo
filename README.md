@@ -86,18 +86,23 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | `pnpm test` | Esegue i test API |
 | `pnpm typecheck` | Type-check TypeScript |
 | `pnpm build:api` | Compila solo l'API |
+| `pnpm db:backup` | Crea dump PostgreSQL custom e checksum SHA-256 |
+| `pnpm db:restore` | Ripristina solo su database vuoto dopo conferma esplicita |
+| `pnpm db:restore:drill` | Crea un DB temporaneo, ripristina e confronta schema/dati |
+| `pnpm verify:stripe:test` | Crea una sessione Checkout usando solo Stripe Test Mode |
+| `pnpm verify:web-push:live` | Invia una push a una sottoscrizione browser temporanea
 
 ## Stato del repository
 
-Il repository contiene un backend API per account/autenticazione, animali e registri di cura, attività/calendario, riproduzioni, inventario, documenti e condivisioni QR, genetica, finanze, import/export, billing Stripe e notifiche in-app/Web Push. Il frontend include schermate per questi principali flussi; l'implementazione non è ancora integralmente conforme alla specifica tecnica 1.0.
+Nel repository sono presenti backend e frontend per account/autenticazione, animali, registri di cura, attività e calendario, riproduzioni, inventario, documenti e condivisioni pubbliche, finanze, import/export, abbonamenti Stripe e notifiche Web Push.
 
-Le modifiche sui dati richiedono connettività: la coda locale di mutazioni offline è stata rimossa per rispettare il perimetro della prima release. Il service worker memorizza solo asset statici e non conserva le risposte private dell'API; quando è pronta una nuova versione, l'interfaccia può avvisare l'utente e attivarla su richiesta.
+Le richieste di importazione ed esportazione ora usano job persistenti PostgreSQL: conferme e richieste rispondono `202 Accepted`, i worker recuperano job abbandonati con lease e token di proprietà e il frontend mostra lo stato. Gli export generano gli archivi in streaming su file temporanei privati. I test di codice non sostituiscono le prove reali provider/browser descritte nella guida operativa.
 
-La scheda animale espone i campi anagrafici aggiuntivi (annotazioni genetiche, data di acquisizione e stimata, provenienza, allevatore precedente); la lista include filtri per specie, sesso, morph e posizione e ordinamento server-side.
+Prima del lancio restano da completare o validare: configurazione dei provider reali e dei relativi contratti/regioni; prova Stripe Test Mode e Web Push sullo staging; restore drill effettivamente eseguito sul cluster staging; pubblicazione dei documenti legali solo dopo aver compilato i dati effettivi del titolare e dei fornitori e aver ottenuto revisione professionale; completamento del contratto OpenAPI e integrazione Sentry; allineamento del frontend allo stack TypeScript/UI indicato dalla specifica. Le bozze legali in [docs/legal](docs/legal/) non sono pronte per la pubblicazione.
 
-Restano da completare o verificare prima del lancio: migrazione del frontend allo stack TypeScript e alle librerie UI/dati/form/PWA prescritte; completamento del contratto OpenAPI (la bozza iniziale è in [docs/openapi.yaml](docs/openapi.yaml), con diversi schemi ancora generici); coda persistente per job e notifiche e retry persistenti delle push; cancellazione self-service dell'account; preferenze di unità/visualizzazione e ulteriori campi non ancora esposti; integrazione Sentry; pagine legali e flussi privacy; configurazione e test reali di storage UE, Stripe Test Mode, backup/ripristino e distribuzione. La checklist in [backend/docs/security-and-compliance-readiness.md](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
+La PWA conserva gli asset statici ma non supporta ancora modifiche offline con sincronizzazione automatica. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
 
-Il contratto API preliminare è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni e le discrepanze tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md). La specifica di riferimento è conservata in [backend/docs/specification.md](backend/docs/specification.md).
+Il contratto API preliminare è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md); la specifica di riferimento è in [backend/docs/specification.md](backend/docs/specification.md).
 
 ## Anagrafiche animali e registri di cura
 
@@ -259,13 +264,15 @@ Gli importi sono espressi in centesimi interi, restituiti come stringhe per evit
 - `GET/PATCH /api/v1/notification-preferences`: canali, categorie e fascia di quiet hours.
 - `POST /api/v1/push-subscriptions` e `DELETE /api/v1/push-subscriptions/:id`: registra o rimuove una sottoscrizione del browser.
 
-Il mittente Web Push usa VAPID ES256 e cifratura RFC 8291 (ECDH P-256, HKDF-SHA256, AES-128-GCM). GET /api/v1/push/public-key espone la chiave pubblica; POST /api/v1/notifications/test-push invia una notifica di prova all'account autenticato. Gli endpoint provider in uscita sono allowlistati per limitare SSRF; le sottoscrizioni che rispondono 404/410 vengono rimosse. Configurare VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT prima di attivare push. Generare una coppia con pnpm vapid:generate e conservare la chiave privata solo nel secret manager/ambiente.
+Il mittente Web Push usa VAPID ES256 e cifratura RFC 8291 (ECDH P-256, HKDF-SHA256, AES-128-GCM). GET /api/v1/push/public-key espone la chiave pubblica; POST /api/v1/notifications/test-push invia una notifica di prova all'account autenticato. Gli endpoint provider in uscita sono allowlistati per limitare SSRF; le sottoscrizioni che rispondono 404/410 vengono rimosse. Configurare VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT prima di attivare push. Per una prova reale su browser temporaneo dello staging usa `pnpm verify:web-push:live` con endpoint e chiavi della sottoscrizione di test. Il comando controlla l'accettazione HTTP del provider; la ricezione effettiva va confermata manualmente sul browser.
 
 ### Importazione ed esportazione
 
-L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono supportati `entity=animals`, `entity=weights`, `entity=sheds`, `entity=notes` ed `entity=feedings`. Per i registri di cura il file deve includere `animalId` oppure `animalIdentifier`, oltre ai campi del registro. Le righe vengono validate con numero di riga/colonna e importate in una transazione; per le alimentazioni si raggruppano le voci con lo stesso istante in un’unica sessione.
+L'upload CSV/XLSX produce un'anteprima privata e richiede conferma esplicita. Sono supportati animali, pesi, mute, note, alimentazioni, finanze, inventario e moduli riproduttivi (cicli, eventi, covate, uova, controlli di incubazione e piccoli). La conferma non esegue più le scritture nella richiesta HTTP: risponde `202 Accepted` e il worker PostgreSQL elabora il job. Per verificare lo stato usa `GET /api/v1/imports/:id`; `?statusOnly=true` restituisce i contatori senza caricare il report completo.
 
-`POST /api/v1/exports` produce un archivio ZIP di CSV con identificativi stabili, dati essenziali dell'account e dell'abbonamento, chiavi di relazione, dati di dominio, condivisioni e preferenze notifiche; non include password hash o token di autenticazione. Ogni CSV ha intestazioni anche quando non contiene righe. Il file `documents.csv` indicizza i documenti e i relativi percorsi; `includeDocuments: true` aggiunge anche i file privati, mentre il valore predefinito non include gli allegati. L'export legge le tabelle in pagine da 250 righe, genera ZIP e CSV in streaming e applica il limite di 50 MiB durante la scrittura. Gli export scadono dopo 24 ore e il worker di retention elimina i file e i metadati scaduti. La generazione è limitata a 2 export simultanei per processo API. `GET /api/v1/exports/:id` mostra lo stato e `GET /api/v1/exports/:id/download` permette il download autenticato in streaming.
+`POST /api/v1/exports` crea un job persistente e risponde `202`. `GET /api/v1/exports/:id` restituisce lo stato; il download autenticato è disponibile solo quando è `completed`. L'archivio contiene CSV con identificativi stabili e relazioni; `documents.csv` indicizza gli allegati e `includeDocuments: true` aggiunge i file privati. Password hash e token di autenticazione non vengono esportati.
+
+La coda usa le tabelle PostgreSQL esistenti, claim atomico `FOR UPDATE SKIP LOCKED`, lease con heartbeat, token UUID di proprietà, recupero dopo crash e massimo tre tentativi. Non è richiesto un broker esterno. Ogni replica API può eseguire un worker, coordinato dal database. Gli export leggono i record in pagine e generano ZIP/CSV in streaming su file temporaneo; sono consentiti al massimo due export in coda o attivi per account e scadono dopo 24 ore.
 
 ### Abbonamenti e Stripe
 
@@ -274,7 +281,7 @@ L’importazione CSV/XLSX usa anteprima privata e conferma esplicita. Sono suppo
 - `GET /api/v1/billing/subscription`: restituisce stato locale e autorizzazione per la sottoscrizione.
 - `POST /api/v1/webhooks/stripe`: verifica la firma sul body raw e deduplica l’ID evento.
 
-Prima di attivare gli acquisti, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` e `STRIPE_WEBHOOK_SECRET`, quindi registra l’URL webhook nella dashboard Stripe. La CI esegue test end-to-end deterministici con trasporto Stripe simulato e persistenza PostgreSQL: Checkout, Customer Portal, checkout.session.completed, aggiornamento, pagamento fallito/ripetuto e deduplicazione webhook. Non sono presenti credenziali per chiamare Stripe Test Mode reale, quindi prima del lancio va svolta una prova finale in staging con chiavi sk_test_... e webhook Stripe CLI/dashboard. Gli stati locali sono aggiornati da eventi firmati, non dal redirect del browser.
+Prima di attivare gli acquisti, configura `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` e `STRIPE_WEBHOOK_SECRET`, quindi registra l’URL webhook nella dashboard Stripe. I test automatizzati usano un trasporto Stripe simulato e non provano l'account del gestore. Per generare una sessione Checkout reale in Test Mode usa `pnpm verify:stripe:test` con una chiave `sk_test_`, un Price ricorrente attivo e un utente di test; il completamento Checkout, il Customer Portal e i webhook firmati vanno verificati in staging con Stripe CLI e un secret `whsec_` di test. Gli stati locali sono aggiornati da eventi firmati, non dal redirect del browser.
 
 
 Esempio di importazione dei pesi:
@@ -308,10 +315,11 @@ Le risposte API e le email transazionali supportano italiano e inglese. La lingu
 Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HTTPS, un CSRF_SECRET non predefinito, credenziali email, configurazione Stripe, chiavi VAPID o storage S3. Le credenziali devono essere fornite tramite secret manager o variabili dell'ambiente e non devono essere inserite nel repository. Verificare /healthz per liveness e /readyz per la connessione PostgreSQL.
 
 - pnpm vapid:generate genera una coppia VAPID per sviluppo/staging. In produzione usare un secret manager e non rigenerare la coppia a ogni deploy.
-- DATABASE_URL=... pnpm db:backup crea un dump PostgreSQL custom in ./backups, verifica l'archivio e scrive un checksum SHA-256. La copia va poi trasferita in storage cifrato e separato dal database.
-- CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump verifica il checksum, se presente, e ripristina nel database di destinazione. Il comando non elimina gli oggetti esistenti: usare un database dedicato e vuoto e predisporre prima uno snapshot di rollback.
-
-La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend e le principali schermate React/PWA sono implementate; restano le discrepanze di stack e i flussi elencati nella sezione Stato del repository.
+- `DATABASE_URL=... pnpm db:backup` crea un dump custom e il checksum SHA-256. Copiare entrambi in storage cifrato separato dal cluster.
+- `CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump` richiede un checksum valido e rifiuta qualunque target che contenga già oggetti nello schema `public`; non usa `pg_restore --clean`.
+- `pnpm db:restore:drill` esegue dump e restore in un database temporaneo dello stesso cluster, confronta tabelle, migrazioni e conteggi delle tabelle chiave, quindi elimina il database temporaneo.
+- Il workflow manuale [Staging backup and restore drill](.github/workflows/staging-backup-restore.yml) esegue lo stesso controllo sul cluster staging senza sovrascrivere il DB sorgente. Richiede il secret `STAGING_DATABASE_URL` e un ruolo autorizzato a creare/eliminare il database temporaneo.
+- Il backup va inoltre copiato off-site, cifrato, con retention approvata e prove periodiche di restore: gli script non configurano da soli pianificazione, cifratura o storage esterno. Le API backend e le principali schermate React/PWA sono implementate; restano le discrepanze di stack e i flussi elencati nella sezione Stato del repository.
 
 
 ## Preferenze e privacy account
@@ -319,3 +327,8 @@ La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale
 Le preferenze di unità e visualizzazione sono memorizzate lato server. Dalle impostazioni è possibile richiedere la cancellazione dell'account con password e conferma esplicita; in presenza di un abbonamento attivo il backend ne richiede prima la cancellazione a Stripe. Le consegne push sono accodate in PostgreSQL e hanno storico persistente con retry; lo storico viene conservato per 90 giorni.
 
 Nota tecnica: lo scheduler delle push usa attualmente un outbox/worker PostgreSQL nativo; il passaggio a pg-boss e lo spostamento degli export/import in coda restano da completare.
+
+
+## Documentazione legale e privacy
+
+Le bozze italiane di informativa privacy, termini e condizioni e cookie/tracking notice sono in [docs/legal](docs/legal/). Sono documenti di lavoro, non pronti per la pubblicazione: vanno completati con i dati reali del titolare, dei provider, delle regioni, delle retention, dei prezzi e dei flussi commerciali, quindi revisionati da un professionista competente. Vedi [la checklist di rilascio](docs/legal/RELEASE-CHECKLIST.md).
