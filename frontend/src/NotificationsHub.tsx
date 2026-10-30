@@ -10,11 +10,13 @@ const categories: Array<[string, string]> = [
 ];
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
 const dateTime = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
-function fromBase64Url(value: string): Uint8Array {
+function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
   const raw = atob(padded);
-  return Uint8Array.from(raw, character => character.charCodeAt(0));
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index);
+  return bytes;
 }
 function isSupported() {
   return typeof window !== "undefined" && window.isSecureContext && "serviceWorker" in navigator &&
