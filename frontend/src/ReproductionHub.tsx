@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { readFormValues } from "./types";
-import { apiRequest } from "./api/api";
+import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { Dialog } from "./ui/Dialog";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : "";
-const localDateTime = value => {
+const localDateTime = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
   const pad = part => String(part).padStart(2, "0");
@@ -34,7 +34,7 @@ function TextArea({ label, name, defaultValue, rows = 3, placeholder, ...props }
 }
 interface ChoiceProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
   label: string; name: string; defaultValue?: string | number | null;
-  options: Array<[string, string] | { value: string; label: string }>; required?: boolean;
+  options: Array<string[] | { value: string; label: string }>; required?: boolean;
 }
 function Choice({ label, name, defaultValue, options, required = false, ...props }: ChoiceProps) {
   return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required} {...props}>{options.map(o => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>;
@@ -86,7 +86,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
   const [busy, setBusy] = useState(false);
   const [listsLoaded, setListsLoaded] = useState(false);
 
-  const api = useCallback(async (path: string, options: RequestInit = {}, _actionLabel?: string) => {
+  const api = useCallback(async (path: string, options: ApiRequestOptions = {}, _actionLabel?: string) => {
     const result = await apiRequest(path, options);
     onNotice("Modifiche salvate.");
     return result;
@@ -405,8 +405,8 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
           <Choice label="Tipo evento" name="eventType" defaultValue={editEvent.eventType || "observation"} options={eventTypes} required/>
           <Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={localDateTime(editEvent.occurredAt)} required/>
           <Choice label="Animale coinvolto (facoltativo)" name="animalId" defaultValue={editEvent.animalId || ""} options={[["", "Nessuno"], ...animals.map(a => [a.id, a.name])]} />
-          <Input label="Temperatura °C" name="temperatureC" type="number" step="0.1" defaultValue={editEvent.temperatureC}/>
-          <Input label="Umidità %" name="humidityPct" type="number" min="0" max="100" step="0.1" defaultValue={editEvent.humidityPct}/>
+          <Input label="Temperatura °C" name="temperatureC" type="number" step={0.1} defaultValue={editEvent.temperatureC}/>
+          <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={editEvent.humidityPct}/>
           <div className="form-full"><TextArea label="Dettagli" name="details" defaultValue={editEvent.details}/></div>
           <div className="form-actions form-full"><Action type="button" onClick={() => setEditEvent(null)}>Annulla</Action><Action variant="primary">Salva evento</Action></div>
         </form></div>}
@@ -421,7 +421,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
         {editClutch && <div className="embedded-form"><form className="form-grid" onSubmit={submitClutch}>
           <h3 className="form-full">{editClutch.id ? "Modifica covata" : "Registra covata"}</h3>
           <Input label="Data deposizione" name="laidOn" type="date" defaultValue={dateValue(clutchForForm.laidOn)} required/>
-          <Input label="Numero uova" name="eggCount" type="number" min="0" max="10000" defaultValue={clutchForForm.eggCount ?? 1} required/>
+          <Input label="Numero uova" name="eggCount" type="number" min={0} max={10000} defaultValue={clutchForForm.eggCount ?? 1} required/>
           <Choice label="Stato" name="status" defaultValue={clutchForForm.status || "active"} options={[["active","Attiva"],["incubating","In incubazione"],["completed","Completata"],["lost","Persa"],["archived","Archiviata"]]} required/>
           <Input label="Incubatrice / posizione" name="incubatorLabel" defaultValue={clutchForForm.incubatorLabel}/>
           <Input label="Inizio incubazione" name="incubationStartedAt" type="datetime-local" defaultValue={localDateTime(clutchForForm.incubationStartedAt)}/>
@@ -441,7 +441,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
         </SectionTitle>
         <div className="embedded-form"><form className="form-grid" onSubmit={addEggs}>
           <h3 className="form-full">Aggiungi uova in blocco</h3>
-          <Input label="Quante uova" name="count" type="number" min="1" max="1000" defaultValue="1" required/>
+          <Input label="Quante uova" name="count" type="number" min={1} max={1000} defaultValue="1" required/>
           <Input label="Prefisso codice (facoltativo)" name="prefix" placeholder="Es. COVATA-A"/>
           <Choice label="Stato iniziale" name="status" defaultValue="unknown" options={eggStatuses}/>
           <Input label="Nota iniziale (facoltativa)" name="notes"/>
@@ -459,12 +459,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
         <div className="embedded-form"><form className="form-grid" onSubmit={addIncubationLog}>
           <Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime()} required/>
           <Input label="Evento" name="eventType" defaultValue="controllo" required/>
-          <Input label="Temperatura °C" name="temperatureC" type="number" step="0.1"/>
-          <Input label="Umidità %" name="humidityPct" type="number" min="0" max="100" step="0.1"/>
+          <Input label="Temperatura °C" name="temperatureC" type="number" step={0.1}/>
+          <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1}/>
           <div className="form-full"><TextArea label="Note" name="notes"/></div>
           <div className="form-actions form-full"><Action variant="primary">Registra controllo</Action></div>
         </form></div>
-        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{log.temperatureC ?? "—"} °C · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label="Temperatura °C" name="temperatureC" type="number" step="0.1" defaultValue={log.temperatureC}/><Input label="Umidità %" name="humidityPct" type="number" min="0" max="100" step="0.1" defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
+        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{log.temperatureC ?? "—"} °C · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label="Temperatura °C" name="temperatureC" type="number" step={0.1} defaultValue={log.temperatureC}/><Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
         {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>← Precedente</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>}
 
@@ -473,19 +473,19 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
         <div className="embedded-form"><form className="form-grid" onSubmit={createBatch}>
           <h3 className="form-full">Registra un lotto di piccoli</h3>
           <Input label="Data di nascita / schiusa" name="bornOn" type="date" defaultValue={localDateTime().slice(0, 10)} required/>
-          <Input label="Numero di piccoli" name="count" type="number" min="0" max="10000" defaultValue="1" required/>
+          <Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue="1" required/>
           <Choice label="Covata di origine (facoltativa)" name="clutchId" options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn) + " · " + c.eggCount + " uova"])]}/>
           <div className="form-full"><TextArea label="Note" name="notes"/></div>
           <div className="form-actions form-full"><Action variant="primary">Registra lotto</Action></div>
         </form></div>
-        {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {clutches.find(c => c.id === batch.clutchId) ? prettyDate(clutches.find(c => c.id === batch.clutchId).laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min="0" max="10000" defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>)}</div>}
+        {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {clutches.find(c => c.id === batch.clutchId) ? prettyDate(clutches.find(c => c.id === batch.clutchId).laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>)}</div>}
         {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>← Precedente</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
     </>}
     {animalCardsForm && <Dialog title="Crea schede dei piccoli" description={"Genera schede animale dal lotto del " + prettyDate(animalCardsForm.batch.bornOn) + "."} onClose={() => setAnimalCardsForm(null)} onSubmit={submitAnimalCards} submitLabel="Crea schede" busy={creatingAnimalCards} size="wide">
-      <label className="field"><span>Prefisso dei nomi</span><input name="prefix" defaultValue={animalCardsForm.prefix} required maxLength="100" placeholder="Es. Piccolo"/></label>
-      <label className="field"><span>Specie</span><input name="species" defaultValue={animalCardsForm.species} required maxLength="160"/></label>
-      <label className="field"><span>Numero di schede (1–500)</span><input name="count" type="number" defaultValue={animalCardsForm.count} min="1" max="500" step="1" required/></label>
+      <label className="field"><span>Prefisso dei nomi</span><input name="prefix" defaultValue={animalCardsForm.prefix} required maxLength={100} placeholder="Es. Piccolo"/></label>
+      <label className="field"><span>Specie</span><input name="species" defaultValue={animalCardsForm.species} required maxLength={160}/></label>
+      <label className="field"><span>Numero di schede (1–500)</span><input name="count" type="number" defaultValue={animalCardsForm.count} min={1} max={500} step={1} required/></label>
       <p className="muted form-full">I nomi verranno numerati automaticamente. Le nuove schede useranno sesso “Non specificato” e la data di nascita del lotto.</p>
     </Dialog>}
   </div>;

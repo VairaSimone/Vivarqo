@@ -5,12 +5,12 @@ import { apiRequest } from "./api/api";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const CATEGORIES = [["feeding", "Alimentazione"], ["weighing", "Peso"], ["shed_check", "Muta"], ["cleaning", "Pulizia"], ["reproduction", "Riproduzione"], ["document", "Documenti"], ["inventory", "Inventario"], ["custom", "Altro"]];
+const CATEGORIES: string[][] = [["feeding", "Alimentazione"], ["weighing", "Peso"], ["shed_check", "Muta"], ["cleaning", "Pulizia"], ["reproduction", "Riproduzione"], ["document", "Documenti"], ["inventory", "Inventario"], ["custom", "Altro"]];
 const pad = value => String(value).padStart(2, "0");
 const dateKey = date => date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
 const toDate = value => new Date(value + "T00:00:00");
 const dateLabel = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
-const dtInput = value => {
+const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
@@ -29,7 +29,7 @@ interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "
 }
 function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }: FieldProps) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props}/></label>; }
 interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
-  label: string; name: string; defaultValue?: string | number; options: Array<[string, string]>;
+  label: string; name: string; defaultValue?: string | number; options: string[][];
 }
 function Select({ label, name, defaultValue, options, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? options[0][0]} {...props}>{options.map(([v, label]) => <option value={v} key={v}>{label}</option>)}</select></label>; }
 
@@ -190,11 +190,11 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       {error && <p className="form-message" role="alert">{error}</p>}
       {taskFormOpen && <div className="embedded-form"><form className="form-grid" onSubmit={saveTask} key={taskEditing?.id || "new-task"}>
         <h3 className="form-full">{taskEditing ? "Modifica attività" : "Nuova attività"}</h3>
-        <Field label="Titolo" name="title" defaultValue={taskEditing?.title || ""} required maxLength="160"/>
+        <Field label="Titolo" name="title" defaultValue={taskEditing?.title || ""} required maxLength={160}/>
         <Select label="Categoria" name="category" defaultValue={taskEditing?.category || "custom"} options={CATEGORIES}/>
         <Field label="Scadenza" name="dueAt" type="datetime-local" defaultValue={dtInput(taskEditing?.dueAt)} required/>
         <label className="field"><span>Animale (facoltativo)</span><select name="animalId" defaultValue={taskEditing?.animalId || ""}><option value="">Nessun animale</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
-        <label className="field form-full"><span>Descrizione</span><textarea name="description" defaultValue={taskEditing?.description || ""} rows="3" maxLength="10000"/></label>
+        <label className="field form-full"><span>Descrizione</span><textarea name="description" defaultValue={taskEditing?.description || ""} rows={3} maxLength={10000}/></label>
         <div className="form-actions form-full"><Button type="button" onClick={() => { setTaskFormOpen(false); setTaskEditing(null); }}>Annulla</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva attività"}</Button></div>
       </form></div>}
       {busy ? <div className="loading">Caricamento calendario…</div> : view === "list" ? <div className="log-list">{items.length ? items.map(renderItem) : <p className="muted">Nessun evento nell’intervallo scelto.</p>}</div> : <>
@@ -211,9 +211,9 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       <div className="panel-heading"><div><p className="eyebrow">AUTOMAZIONI</p><h2>Promemoria ricorrenti</h2><p className="subheading">Crea, modifica, sospendi o riattiva regole automatiche di scadenza.</p></div><Button variant="primary" onClick={() => setRuleForm({ id: null, title: "", category: "feeding", intervalDays: 14, nextDueAt: dtInput(), animalId: "", isEnabled: true })}>＋ Nuova regola</Button></div>
       {ruleForm && <div className="embedded-form"><form className="form-grid" onSubmit={saveRule} key={ruleForm.id || "new-rule"}>
         <h3 className="form-full">{ruleForm.id ? "Modifica regola" : "Nuova regola ricorrente"}</h3>
-        <Field label="Titolo" name="title" defaultValue={ruleForm.title} required maxLength="160"/>
+        <Field label="Titolo" name="title" defaultValue={ruleForm.title} required maxLength={160}/>
         <Select label="Categoria" name="category" defaultValue={ruleForm.category} options={CATEGORIES}/>
-        <Field label="Intervallo (giorni)" name="intervalDays" type="number" defaultValue={ruleForm.intervalDays} min="1" max="3650" required/>
+        <Field label="Intervallo (giorni)" name="intervalDays" type="number" defaultValue={ruleForm.intervalDays} min={1} max={3650} required/>
         <Field label="Prossima scadenza" name="nextDueAt" type="datetime-local" defaultValue={dtInput(ruleForm.nextDueAt)} required/>
         <label className="field"><span>Animale (facoltativo)</span><select name="animalId" defaultValue={ruleForm.animalId || ""}><option value="">Nessun animale</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
         <label className="check-row"><input type="checkbox" name="isEnabled" defaultChecked={ruleForm.isEnabled !== false}/> Regola attiva</label>

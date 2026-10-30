@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { readFormValues } from "./types";
-import { apiRequest } from "./api/api";
+import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const fmtDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const dtInput = value => {
+const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
   const pad = part => String(part).padStart(2, "0");
@@ -19,8 +19,8 @@ const TAB_OPTIONS = [
 ];
 const TITLES = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings: "Alimentazione", genetics: "Tratti genetici" };
 const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
-const SHED = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
-const FEED_OUTCOME = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
+const SHED: string[][] = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
+const FEED_OUTCOME: string[][] = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
   label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
@@ -32,7 +32,7 @@ interface AreaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElemen
 }
 function Area({ label, name, defaultValue, required = false, rows = 3, ...props }: AreaProps) { return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} required={required} rows={rows} {...props}/></label>; }
 interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
-  label: string; name: string; defaultValue?: string | number | null; options: Array<[string, string]>; required?: boolean;
+  label: string; name: string; defaultValue?: string | number | null; options: string[][]; required?: boolean;
 }
 function Select({ label, name, defaultValue, options, required = false, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required} {...props}>{options.map(o => <option value={o[0]} key={o[0]}>{o[1]}</option>)}</select></label>; }
 const emptyFeedingEntry = animalId => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
@@ -55,7 +55,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [selectedSession, setSelectedSession] = useState(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
-  const api = useCallback((path: string, options?: RequestInit, _actionLabel?: string) => apiRequest(path, options), []);
+  const api = useCallback((path: string, options?: ApiRequestOptions, _actionLabel?: string) => apiRequest(path, options), []);
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
@@ -229,7 +229,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       <div className="inline-actions record-tools"><Button variant="primary" onClick={openCreate} disabled={tab !== "feedings" && !animalId}>＋ {CREATE_LABELS[tab] || "Nuovo registro"}</Button>{busy && <span className="muted">Caricamento…</span>}</div>
       {createOpen && <div className="embedded-form"><form className="form-grid" onSubmit={submitNew} key={tab + "-create"}>
         <h3 className="form-full">Nuovo registro · {TITLES[tab]}</h3>
-        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Peso in grammi" name="weightG" type="number" min="0.01" max="100000000" step="0.01" required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
+        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Peso in grammi" name="weightG" type="number" min={0.01} max={100000000} step={0.01} required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
         {tab === "sheds" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Select label="Esito" name="outcome" options={SHED} required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
         {tab === "notes" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Titolo" name="title"/><Input label="Categoria" name="category" defaultValue="general" required/><div className="form-full"><Area label="Osservazione" name="body" required/></div></>}
         {tab === "feedings" && <>
@@ -243,10 +243,10 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
             const animal = animals.find(item => item.id === entry.animalId);
             return <fieldset className="feeding-entry-form form-full" key={entry.animalId}><legend>{animal?.name || "Animale selezionato"}</legend><div className="form-grid">
               <label className="field"><span>Esito</span><select value={entry.outcome} onChange={e => updateFeeding(entry.animalId, { outcome: e.target.value })} required>{FEED_OUTCOME.map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-              <label className="field"><span>Tipo alimento</span><input value={entry.foodType} maxLength="120" onChange={e => updateFeeding(entry.animalId, { foodType: e.target.value })} placeholder="Altro"/></label>
-              <label className="field"><span>Dimensione</span><input value={entry.foodSize} maxLength="120" onChange={e => updateFeeding(entry.animalId, { foodSize: e.target.value })} placeholder="Es. ratto medio"/></label>
-              <label className="field"><span>Peso alimento (g)</span><input type="number" min="0.01" max="1000000" step="0.01" value={entry.foodWeightG} onChange={e => updateFeeding(entry.animalId, { foodWeightG: e.target.value })}/></label>
-              <div className="form-full"><label className="field"><span>Note per l’animale</span><textarea rows="2" maxLength="5000" value={entry.notes} onChange={e => updateFeeding(entry.animalId, { notes: e.target.value })}/></label></div>
+              <label className="field"><span>Tipo alimento</span><input value={entry.foodType} maxLength={120} onChange={e => updateFeeding(entry.animalId, { foodType: e.target.value })} placeholder="Altro"/></label>
+              <label className="field"><span>Dimensione</span><input value={entry.foodSize} maxLength={120} onChange={e => updateFeeding(entry.animalId, { foodSize: e.target.value })} placeholder="Es. ratto medio"/></label>
+              <label className="field"><span>Peso alimento (g)</span><input type="number" min={0.01} max={1000000} step={0.01} value={entry.foodWeightG} onChange={e => updateFeeding(entry.animalId, { foodWeightG: e.target.value })}/></label>
+              <div className="form-full"><label className="field"><span>Note per l’animale</span><textarea rows={2} maxLength={5000} value={entry.notes} onChange={e => updateFeeding(entry.animalId, { notes: e.target.value })}/></label></div>
               <div className="form-full"><Button type="button" variant="danger" onClick={() => toggleFeedingAnimal(entry.animalId, false)}>Rimuovi dalla sessione</Button></div>
             </div></fieldset>;
           })}
@@ -256,10 +256,10 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       </form></div>}
       {editing && <div className="embedded-form"><form className="form-grid" onSubmit={submitEdit}>
         <h3 className="form-full">Modifica registro · {TITLES[tab]}</h3>
-        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput(target.measuredAt)} required/><Input label="Peso in grammi" name="weightG" type="number" min="0.01" max="100000000" step="0.01" defaultValue={target.weightG} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
+        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput(target.measuredAt)} required/><Input label="Peso in grammi" name="weightG" type="number" min={0.01} max={100000000} step={0.01} defaultValue={target.weightG} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
         {tab === "sheds" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput(target.occurredAt)} required/><Select label="Esito" name="outcome" defaultValue={target.outcome} options={SHED} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
         {tab === "notes" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput(target.occurredAt)} required/><Input label="Titolo" name="title" defaultValue={target.title}/><Input label="Categoria" name="category" defaultValue={target.category} required/><div className="form-full"><Area label="Osservazione" name="body" defaultValue={target.body} required/></div></>}
-        {tab === "feedings" && <><Select label="Esito" name="outcome" defaultValue={target.outcome} options={FEED_OUTCOME} required/><Input label="Tipo di alimento" name="foodType" defaultValue={target.foodType || "Altro"}/><Input label="Dimensione" name="foodSize" defaultValue={target.foodSize}/><Input label="Peso alimento (g)" name="foodWeightG" type="number" min="0.01" max="1000000" step="0.01" defaultValue={target.foodWeightG}/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
+        {tab === "feedings" && <><Select label="Esito" name="outcome" defaultValue={target.outcome} options={FEED_OUTCOME} required/><Input label="Tipo di alimento" name="foodType" defaultValue={target.foodType || "Altro"}/><Input label="Dimensione" name="foodSize" defaultValue={target.foodSize}/><Input label="Peso alimento (g)" name="foodWeightG" type="number" min={0.01} max={1000000} step={0.01} defaultValue={target.foodWeightG}/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
         {tab === "genetics" && <><Input label="Nome tratto" name="traitName" defaultValue={target.traitName} required/><Input label="Valore / morph" name="traitValue" defaultValue={target.traitValue} required/><Select label="Animale fonte (facoltativo)" name="sourceAnimalId" defaultValue={target.sourceAnimalId || ""} options={optionsAnimals}/><div className="form-full"><Area label="Nota sulla confidenza" name="confidenceNote" defaultValue={target.confidenceNote}/></div></>}
         <div className="form-actions form-full"><Button type="button" onClick={() => setEditing(null)}>Annulla</Button><Button variant="primary">Salva modifiche</Button></div>
       </form></div>}

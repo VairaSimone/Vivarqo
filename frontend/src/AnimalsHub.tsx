@@ -7,7 +7,7 @@ import { useConfirmDialog } from "./ui/ConfirmDialog";
 const arrayOf = value => Array.isArray(value) ? value : [];
 const sexOptions = [["unknown", "Non specificato"], ["female", "Femmina"], ["male", "Maschio"]];
 const statusOptions = [["active", "Attivo"], ["sold", "Venduto"], ["transferred", "Trasferito"], ["deceased", "Deceduto"]];
-const dateLabel = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 function Input({ label, name, type = "text", defaultValue = "", required = false, ...props }) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props}/></label>; }
 function Select({ label, name, defaultValue = "unknown", options }) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>; }
