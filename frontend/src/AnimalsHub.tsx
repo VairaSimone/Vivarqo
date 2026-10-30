@@ -83,7 +83,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
 
   useEffect(() => { void load(); }, [load]);
 
-  const run = async (label, operation) => {
+  const run = async (label: string, operation: () => Promise<unknown>) => {
     setSaving(true);
     try {
       await operation();
@@ -93,7 +93,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     } catch (err) { onNotice(errorMessage(err) || "Operazione non riuscita.", "error"); }
     finally { setSaving(false); }
   };
-  const submitEditor = event => {
+  const submitEditor = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const body = cleanAnimal(Object.fromEntries(new FormData(event.currentTarget).entries()));
     if (!body.name || !body.species) return onNotice("Nome e specie sono obbligatori.", "error");
@@ -102,7 +102,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       apiRequest(current ? "animals/" + current.id : "animals", { method: current ? "PATCH" : "POST", body })
     );
   };
-  const submitBulk = event => {
+  const submitBulk = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const animalsToCreate = bulkRows.filter(row => row.name.trim() || row.species.trim()).map(cleanAnimal);
     if (!animalsToCreate.length) return onNotice("Inserisci almeno un animale.", "error");
@@ -114,15 +114,15 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       apiRequest("animals/bulk", { method: "POST", body: { animals: animalsToCreate } })
     );
   };
-  const archive = async animal => {
+  const archive = async (animal: AnyRecord) => {
     if (!(await confirmAction({ title: "Archiviare " + animal.name + "?", message: "La scheda verrà archiviata, non eliminata. Potrai ripristinarla in seguito.", confirmLabel: "Archivia scheda", danger: true }))) return;
     void run("Animale archiviato.", () => apiRequest("animals/" + animal.id + "/archive", { method: "POST", body: {} }));
   };
-  const restore = async animal => {
+  const restore = async (animal: AnyRecord) => {
     if (!(await confirmAction({ title: "Ripristinare " + animal.name + "?", message: "La scheda tornerà disponibile fra gli animali attivi.", confirmLabel: "Ripristina", danger: false }))) return;
     void run("Animale ripristinato.", () => apiRequest("animals/" + animal.id + "/restore", { method: "POST", body: {} }));
   };
-  const remove = async animal => {
+  const remove = async (animal: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare " + animal.name + "?", message: "L’eliminazione è definitiva. Se esistono registri collegati, il server potrebbe impedirla.", confirmLabel: "Elimina definitivamente", danger: true }))) return;
     void run("Animale eliminato.", () => apiRequest("animals/" + animal.id, { method: "DELETE" }));
   };
@@ -139,9 +139,9 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     return () => { cancelled = true; };
   }, [initialAnimalId]);
 
-  const changeStatus = next => { setStatus(next); setPage(1); };
-  const changeQuery = next => { setQuery(next); setPage(1); };
-  const applyFilters = event => {
+  const changeStatus = (next: string) => { setStatus(next); setPage(1); };
+  const changeQuery = (next: string) => { setQuery(next); setPage(1); };
+  const applyFilters = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFilters({ ...filterDraft });
     setPage(1);
@@ -152,7 +152,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     setFilters(reset);
     setPage(1);
   };
-  const loadAnimalHistory = async (animal, nextPage = 1) => {
+  const loadAnimalHistory = async (animal: AnyRecord, nextPage = 1) => {
     setHistoryLoading(true);
     setHistoryPage(nextPage);
     setHistory({ animal, page: nextPage, items: [], pagination: null });
@@ -233,13 +233,13 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     </section>
       {history && <section className="panel animal-profile-panel">
         <div className="panel-heading"><div><p className="eyebrow">SCHEDA INDIVIDUALE</p><h2>{history.animal.name}</h2><p className="subheading">{history.animal.species}{history.animal.identifier ? " · "+history.animal.identifier : ""} · {history.animal.morph||"Morph non indicato"} · {sexOptions.find(([key])=>key===history.animal.sex)?.[1]||"Sesso non indicato"}</p></div><Button onClick={() => setHistory(null)}>Chiudi scheda</Button></div>
-        <div className="animal-profile-summary">{[
-          ["Prossima attività",upcomingTasks[0],task=>dateLabel(task.dueAt),task=>task.title+(new Date(task.dueAt)<new Date()?" · In ritardo":"")],
-          ["Ultimo pasto",history.items.find(item=>item.type==="feeding"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
-          ["Ultima pesata",history.items.find(item=>item.type==="weight"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
-          ["Ultima muta",history.items.find(item=>item.type==="shed"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)],
-          ["Nota recente",history.items.find(item=>item.type==="note"),item=>dateLabel(item.occurredAt),item=>historyDescription(item)]
-        ].map(([label,item,dateText,description])=><div className="animal-profile-metric" key={label}><small>{label}</small><strong>{item?dateText(item):(label==="Prossima attività"?"Nessuna scadenza":"Nessun dato")}</strong><span className="muted">{item?String(description(item)).slice(0,110):label==="Prossima attività"?"Nessun promemoria aperto":"Non registrato"}</span></div>)}</div>
+        <div className="animal-profile-summary">{([
+          ["Prossima attività",upcomingTasks[0],(task: AnyRecord)=>dateLabel(task.dueAt),(task: AnyRecord)=>task.title+(new Date(task.dueAt)<new Date()?" · In ritardo":"")],
+          ["Ultimo pasto",history.items.find((item: AnyRecord)=>item.type==="feeding"),(item: AnyRecord)=>dateLabel(item.occurredAt),(item: AnyRecord)=>historyDescription(item)],
+          ["Ultima pesata",history.items.find((item: AnyRecord)=>item.type==="weight"),(item: AnyRecord)=>dateLabel(item.occurredAt),(item: AnyRecord)=>historyDescription(item)],
+          ["Ultima muta",history.items.find((item: AnyRecord)=>item.type==="shed"),(item: AnyRecord)=>dateLabel(item.occurredAt),(item: AnyRecord)=>historyDescription(item)],
+          ["Nota recente",history.items.find((item: AnyRecord)=>item.type==="note"),(item: AnyRecord)=>dateLabel(item.occurredAt),(item: AnyRecord)=>historyDescription(item)]
+        ] as Array<[string, AnyRecord | undefined, (item: AnyRecord)=>string, (item: AnyRecord)=>string]>).map(([label,item,dateText,description])=><div className="animal-profile-metric" key={label}><small>{label}</small><strong>{item?dateText(item):(label==="Prossima attività"?"Nessuna scadenza":"Nessun dato")}</strong><span className="muted">{item?String(description(item)).slice(0,110):label==="Prossima attività"?"Nessun promemoria aperto":"Non registrato"}</span></div>)}</div>
         <div className="inline-actions profile-actions"><Button onClick={()=>{setEditor({animal:history.animal});setBulkOpen(false);}}><Icon name="edit" size={15}/> Modifica scheda</Button><Button onClick={()=>onGo("alimentazioni",{animalId:history.animal.id})}><Icon name="feeding" size={15}/> Registra pasto</Button><Button onClick={()=>onGo("peso",{animalId:history.animal.id})}><Icon name="weight" size={15}/> Registra peso</Button><Button onClick={()=>onGo("mute",{animalId:history.animal.id})}><Icon name="care" size={15}/> Registra muta</Button><Button onClick={()=>onGo("note",{animalId:history.animal.id})}><Icon name="documents" size={15}/> Aggiungi nota</Button></div>
         <div className="panel-heading profile-history-heading"><div><p className="eyebrow">STORICO</p><h2>Registrazioni recenti</h2><p className="subheading">Alimentazioni, pesate, mute e note in ordine cronologico.</p></div></div>
         {historyLoading ? <p className="loading">Caricamento storico…</p> : history.items.length === 0 ? <div className="empty-state"><h3>Nessuna registrazione</h3><p>Non risultano alimentazioni, pesate, mute o note per questo animale.</p></div> : <div className="animal-history-list">{history.items.map((item,index)=><article className="animal-history-item" key={(item.record?.id||index)+"-"+item.type}><time>{dateLabel(item.occurredAt)}</time><div><strong>{{feeding:"Alimentazione",weight:"Pesata",shed:"Muta",note:"Nota"}[item.type]||item.type}</strong><p>{historyDescription(item)}</p></div></article>)}</div>}

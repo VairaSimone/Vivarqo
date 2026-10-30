@@ -63,10 +63,10 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
   const [busy, setBusy] = useState(false);
   const [listsLoaded, setListsLoaded] = useState(false);
 
-  const api = useCallback(async (path: string, options: ApiRequestOptions = {}, _actionLabel?: string) => {
+  const api = useCallback(async (path: string, options: ApiRequestOptions = {}, _actionLabel?: string): Promise<AnyRecord> => {
     const result = await apiRequest(path, options);
     onNotice("Modifiche salvate.");
-    return result;
+    return result ?? {};
   }, [onNotice]);
 
   const selectCycle = (id: string) => {
@@ -194,8 +194,9 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct)
     };
     try {
-      const editingEvent = Boolean(editEvent?.id);
-      const response = await api(editingEvent ? "reproductive-events/" + editEvent.id : "reproduction-cycles/" + cycleId + "/events", {
+      const editEventId = typeof editEvent?.id === "string" ? editEvent.id : null;
+      const editingEvent = Boolean(editEventId);
+      const response = await api(editEventId ? "reproductive-events/" + editEventId : "reproduction-cycles/" + cycleId + "/events", {
         method: editingEvent ? "PATCH" : "POST", body
       }, "Evento riproduttivo");
       setEditEvent(null); await loadCycle();
@@ -251,9 +252,9 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
   const saveEggRow = async (egg: AnyRecord, row: HTMLTableRowElement | null) => {
     if (!row) return;
     const body = {
-      code: nullable(row.querySelector('[data-egg-field="code"]')?.value?.trim()),
-      status: row.querySelector('[data-egg-field="status"]')?.value || "unknown",
-      notes: nullable(row.querySelector('[data-egg-field="notes"]')?.value?.trim())
+      code: nullable((row.querySelector('[data-egg-field="code"]') as HTMLInputElement | null)?.value?.trim()),
+      status: (row.querySelector('[data-egg-field="status"]') as HTMLSelectElement | null)?.value || "unknown",
+      notes: nullable((row.querySelector('[data-egg-field="notes"]') as HTMLInputElement | null)?.value?.trim())
     };
     try {
       const result = await api("eggs/" + egg.id, { method: "PATCH", body }, "Modifica uovo");
@@ -457,7 +458,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
           <div className="form-full"><TextArea label="Note" name="notes"/></div>
           <div className="form-actions form-full"><Action variant="primary">Registra lotto</Action></div>
         </form></div>
-        {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {clutches.find(c => c.id === batch.clutchId) ? prettyDate(clutches.find(c => c.id === batch.clutchId).laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>)}</div>}
+        {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => { const linkedClutch = clutches.find(c => c.id === batch.clutchId); return <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {linkedClutch ? prettyDate(linkedClutch.laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>; })}</div>}
         {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>← Precedente</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>
     </>}

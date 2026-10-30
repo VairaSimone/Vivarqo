@@ -19,7 +19,7 @@ const bytes = (value: string | number | null | undefined) => {
 const fields = [
   ["name", "Nome"], ["species", "Specie"], ["morph", "Morph"], ["sex", "Sesso"], ["birthDate", "Data di nascita"]
 ];
-function QRCode({ value }) {
+function QRCode({ value }: { value: string }) {
   const result = useMemo(() => {
     if (!value) return null;
     try { return createQrMatrix(value); } catch { return null; }
@@ -57,7 +57,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const [cycles, setCycles] = useState<AnyRecord[]>([]);
   const [selectedAnimal, setSelectedAnimal] = useState("");
   const [selectedCycle, setSelectedCycle] = useState("");
-  const [file, setFile] = useState<AnyRecord | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -87,7 +87,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
     if (!selectedAnimal && nextAnimals.length) setSelectedAnimal(nextAnimals[0].id);
   }, [selectedAnimal, documentsPage, animalsPage, cyclesPage]);
 
-  const loadShare = useCallback(async id => {
+  const loadShare = useCallback(async (id: string | null) => {
     if (!id) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); return; }
     try {
       const result = await apiRequest("animals/" + id + "/public-share");
@@ -97,7 +97,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       setPublicDescription(saved?.publicDescription || "");
       setShareEnabled(Boolean(saved?.isEnabled));
     } catch (e) {
-      if (e.status === 404) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); }
+      if (typeof e === "object" && e !== null && "status" in e && e.status === 404) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); }
       else setError(errorMessage(e));
     }
   }, []);
@@ -112,7 +112,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   useEffect(() => { let live = true; void loadLists().catch(e => setError(errorMessage(e))).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadShare(selectedAnimal); }, [selectedAnimal, loadShare]);
 
-  const upload = async e => {
+  const upload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     if (!file) { onNotice("Seleziona un file prima di caricare.", "error"); return; }
@@ -127,13 +127,13 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
     } catch (err) { onNotice(errorMessage(err), "error"); }
     finally { setBusy(false); }
   };
-  const removeDocument = async doc => {
+  const removeDocument = async (doc: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare il documento?", message: "“" + doc.originalFilename + "” verrà eliminato definitivamente dall’archivio privato.", confirmLabel: "Elimina documento", danger: true }))) return;
     try { await apiRequest("documents/" + doc.id, { method: "DELETE", body: {} }); onNotice("Documento eliminato."); await loadLists(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const editDocument = doc => setEditingDocument({ ...doc });
-  const saveDocumentEdit = async event => {
+  const editDocument = (doc: AnyRecord) => setEditingDocument({ ...doc });
+  const saveDocumentEdit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingDocument) return;
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -148,7 +148,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
     } catch (err) { onNotice(errorMessage(err) || "Impossibile aggiornare il documento.", "error"); }
     finally { setSavingDocumentEdit(false); }
   };
-  const saveShare = async e => {
+  const saveShare = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedAnimal) { onNotice("Seleziona un animale per gestire il suo profilo QR.", "error"); return; }
     setBusy(true);

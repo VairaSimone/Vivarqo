@@ -7,7 +7,7 @@ import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
-const fmtDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const fmtDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
 const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
@@ -16,18 +16,19 @@ const dtInput = (value?: string | null) => {
 };
 const nullIfBlank = (value: unknown) => value === "" || value === undefined ? null : value;
 const formData = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
-const TAB_OPTIONS = [
+type CareTab = "weights" | "sheds" | "notes" | "feedings" | "genetics";
+const TAB_OPTIONS: Array<[CareTab, string]> = [
   ["weights", "Peso"], ["sheds", "Mute"], ["notes", "Osservazioni"], ["feedings", "Alimentazioni"], ["genetics", "Genetica"]
 ];
-const TITLES = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings: "Alimentazione", genetics: "Tratti genetici" };
-const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
+const TITLES: Record<CareTab, string> = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings: "Alimentazione", genetics: "Tratti genetici" };
+const CREATE_LABELS: Record<CareTab, string> = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
 const SHED: string[][] = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
 const FEED_OUTCOME: string[][] = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
 const emptyFeedingEntry = (animalId: string) => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
 export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
-  const [tab, setTab] = useState(TAB_OPTIONS.some(o => o[0] === initialTab) ? initialTab : "weights");
+  const [tab, setTab] = useState<CareTab>(TAB_OPTIONS.some(o => o[0] === initialTab) ? initialTab as CareTab : "weights");
   const [animals, setAnimals] = useState<AnyRecord[]>([]);
   const [animalId, setAnimalId] = useState(initialAnimalId || "");
   const [animalsPage, setAnimalsPage] = useState(1);
@@ -43,7 +44,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [selectedSession, setSelectedSession] = useState<AnyRecord | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
-  const api = useCallback((path: string, options?: ApiRequestOptions, _actionLabel?: string) => apiRequest(path, options), []);
+  const api = useCallback((path: string, options: ApiRequestOptions = {}, _actionLabel?: string) => apiRequest(path, options), []);
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
@@ -60,7 +61,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     if (!animalId && list.length && tab !== "feedings") setAnimalId(initialAnimalId || list[0].id);
   }, [animalId, animalsPage, tab, initialAnimalId]);
 
-  const loadSessionDetail = useCallback(async id => {
+  const loadSessionDetail = useCallback(async (id: string) => {
     if (!id) { setSelectedSession(null); return; }
     setSessionBusy(true);
     try {
@@ -84,13 +85,13 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
         setPagination(response.pagination || { page, pageSize: 25, total: sessions.length, totalPages: 1 });
         if (selectedSession && !sessions.some(session => session.id === selectedSession.id)) setSelectedSession(null);
       } else {
-        const endpoints = {
+        const endpoints: Record<Exclude<CareTab, "feedings">, string> = {
           weights: "animals/" + animalId + "/weights?page=" + page + "&pageSize=50",
           sheds: "animals/" + animalId + "/sheds?page=" + page + "&pageSize=50",
           notes: "animals/" + animalId + "/notes?page=" + page + "&pageSize=50",
           genetics: "animals/" + animalId + "/genetic-traits?page=" + page + "&pageSize=50"
         };
-        const response = await apiRequest(endpoints[tab]);
+        const response = await apiRequest(endpoints[tab as Exclude<CareTab, "feedings">]);
         const key = tab === "weights" ? "weights" : tab === "sheds" ? "sheds" : tab === "notes" ? "notes" : "traits";
         const list = arrayOf(response[key] ?? response);
         setRecords(list);
@@ -105,17 +106,17 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   useEffect(() => { if (initialAnimalId) { setAnimalId(initialAnimalId); setPage(1); } }, [initialAnimalId]);
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
-  const changeTab = next => {
+  const changeTab = (next: CareTab) => {
     setTab(next); setPage(1); setEditing(null); setCreateOpen(false);
     if (next === "feedings") { setAnimalId(""); setSelectedSession(null); }
     else if (!animalId && animals.length) setAnimalId(animals[0].id);
   };
-  const updateFeeding = (id, patch) => setFeedingEntries(entries => entries.map(entry => entry.animalId === id ? { ...entry, ...patch } : entry));
-  const toggleFeedingAnimal = (id, checked) => setFeedingEntries(entries => checked
+  const updateFeeding = (id: string, patch: Partial<AnyRecord>) => setFeedingEntries(entries => entries.map(entry => entry.animalId === id ? { ...entry, ...patch } : entry));
+  const toggleFeedingAnimal = (id: string, checked: boolean) => setFeedingEntries(entries => checked
     ? (entries.some(entry => entry.animalId === id) ? entries : [...entries, emptyFeedingEntry(id)])
     : entries.filter(entry => entry.animalId !== id));
 
-  const submitNew = async e => {
+  const submitNew = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = formData(e);
     let path = "", body: Record<string, any> = {};
     if (tab === "weights") {
@@ -152,23 +153,26 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
-  const submitEdit = async e => {
-    e.preventDefault(); const v = formData(e);
+  const submitEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const currentEdit = editing;
+    if (!currentEdit) return;
+    const v = formData(e);
     let path = "", body = {};
     if (tab === "weights") {
-      path = "weights/" + editing.id;
+      path = "weights/" + currentEdit.id;
       body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: Number(v.weightG), notes: nullIfBlank(v.notes) };
     } else if (tab === "sheds") {
-      path = "sheds/" + editing.id;
+      path = "sheds/" + currentEdit.id;
       body = { occurredAt: new Date(v.occurredAt).toISOString(), outcome: v.outcome, notes: nullIfBlank(v.notes) };
     } else if (tab === "notes") {
-      path = "animal-notes/" + editing.id;
+      path = "animal-notes/" + currentEdit.id;
       body = { occurredAt: new Date(v.occurredAt).toISOString(), title: nullIfBlank(v.title), category: v.category, body: v.body };
     } else if (tab === "feedings") {
-      path = "feeding-entries/" + editing.id;
+      path = "feeding-entries/" + currentEdit.id;
       body = { outcome: v.outcome, foodType: nullIfBlank(v.foodType) || "Altro", foodSize: nullIfBlank(v.foodSize), foodWeightG: v.foodWeightG === "" ? null : Number(v.foodWeightG), notes: nullIfBlank(v.notes) };
     } else {
-      path = "genetic-traits/" + editing.id;
+      path = "genetic-traits/" + currentEdit.id;
       body = { traitName: v.traitName, traitValue: v.traitValue, sourceAnimalId: nullIfBlank(v.sourceAnimalId), confidenceNote: nullIfBlank(v.confidenceNote) };
     }
     try {
@@ -178,7 +182,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
-  const remove = async record => {
+  const remove = async (record: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare questo registro?", message: "L’operazione non è reversibile.", confirmLabel: "Elimina registro", danger: true }))) return;
     const endpoint = tab === "weights" ? "weights/" + record.id : tab === "sheds" ? "sheds/" + record.id :
       tab === "notes" ? "animal-notes/" + record.id : tab === "feedings" ? "feeding-entries/" + record.id : "genetic-traits/" + record.id;
@@ -188,7 +192,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
-  const display = record => {
+  const display = (record: AnyRecord) => {
     if (tab === "weights") return { Data: fmtDate(record.measuredAt), Peso: (record.weightG ?? "—") + " g", Note: record.notes || "—" };
     if (tab === "sheds") return { Data: fmtDate(record.occurredAt), Esito: record.outcome || "—", Note: record.notes || "—" };
     if (tab === "notes") return { Data: fmtDate(record.occurredAt), Titolo: record.title || "—", Categoria: record.category, Nota: record.body };
