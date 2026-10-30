@@ -17,7 +17,7 @@ async function claimAttempt(now: Date): Promise<string | null> {
       WHERE (status = 'queued' AND scheduled_at <= ${now})
          OR (status = 'processing' AND attempted_at <= ${new Date(now.getTime() - CLAIM_LEASE_MS)})
       ORDER BY scheduled_at ASC, created_at ASC
-      FOR UPDATE SKIP LOCKED LIMIT 1
+      LIMIT 1 FOR UPDATE SKIP LOCKED
     )
     UPDATE push_delivery_attempts AS attempt
     SET status = 'processing', attempted_at = ${now}, updated_at = ${now}

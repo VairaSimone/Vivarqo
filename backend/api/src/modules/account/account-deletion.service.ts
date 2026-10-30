@@ -123,6 +123,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId } } } });
     await tx.inventoryItem.deleteMany({ where: { userId } });
     await tx.animal.deleteMany({ where: { userId } });
+    await tx.pushDeliveryAttempt.deleteMany({ where: { userId } });
     await tx.notification.deleteMany({ where: { userId } });
     await tx.notificationPreferences.deleteMany({ where: { userId } });
     await tx.userPreference.deleteMany({ where: { userId } });

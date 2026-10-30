@@ -1,7 +1,6 @@
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../logger.js";
-import { sendPushToUser } from "./web-push.js";
 
 type DueTask = {
   id: string;
@@ -20,10 +19,9 @@ export interface ReminderDispatchSummary {
   pushFailed: number;
 }
 
-async function createDueNotification(task: DueTask, now: Date): Promise<string | null> {
+async function createDueNotification(task: DueTask, now: Date): Promise<{ id: string; queuedCount: number } | null> {
   return prisma.$transaction(async (tx) => {
-    // Lock per task across multiple API replicas. The in-transaction existence check
-    // makes retries and overlapping schedulers idempotent.
+    // Lock per task across replicas; notification and push outbox entries commit atomically.
     const locks = await tx.$queryRaw<Array<{ locked: boolean }>>`
       SELECT pg_try_advisory_xact_lock(hashtextextended(${"vivarqo:task-due:" + task.id}, 0)) AS locked
     `;
@@ -55,9 +53,29 @@ async function createDueNotification(task: DueTask, now: Date): Promise<string |
         body: dueText,
         targetPath: path,
       },
-      select: { id: true },
+      select: { id: true, title: true, body: true, category: true, targetPath: true },
     });
-    return notification.id;
+
+    let queuedCount = 0;
+    if (pushEnabled && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT) {
+      const subscriptions = await tx.pushSubscription.findMany({ where: { userId: task.userId }, select: { id: true } });
+      if (subscriptions.length) {
+        const queued = await tx.pushDeliveryAttempt.createMany({
+          data: subscriptions.map((subscription) => ({
+            userId: task.userId,
+            notificationId: notification.id,
+            pushSubscriptionId: subscription.id,
+            deliveryKey: `${notification.id}:${subscription.id}`,
+            attemptNumber: 1,
+            status: "queued",
+            scheduledAt: now,
+          })),
+          skipDuplicates: true,
+        });
+        queuedCount = queued.count;
+      }
+    }
+    return { id: notification.id, queuedCount };
   });
 }
 
@@ -91,29 +109,11 @@ export async function dispatchDueTaskNotifications(now = new Date()): Promise<Re
 
   const summary: ReminderDispatchSummary = { scanned: tasks.length, created: 0, pushAttempted: 0, pushQueued: 0, pushSent: 0, pushFailed: 0 };
   for (const task of tasks) {
-    const notificationId = await createDueNotification(task, now);
-    if (!notificationId) continue;
+    const created = await createDueNotification(task, now);
+    if (!created) continue;
     summary.created += 1;
-
-    const preferences = await prisma.notificationPreferences.findUnique({
-      where: { userId: task.userId },
-      select: { pushEnabled: true },
-    });
-    if (!preferences?.pushEnabled || !env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) continue;
-
-    const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
-    if (!notification) continue;
-    const delivery = await sendPushToUser(task.userId, {
-      title: notification.title,
-      body: notification.body,
-      url: notification.targetPath ?? "/tasks",
-      category: notification.category,
-      notificationId: notification.id,
-    });
-    summary.pushAttempted += delivery.attempted;
-    summary.pushQueued += delivery.queued ?? 0;
-    summary.pushSent += delivery.sent;
-    summary.pushFailed += delivery.failed + delivery.removed;
+    summary.pushQueued += created.queuedCount;
+    summary.pushAttempted += created.queuedCount;
   }
   return summary;
 }

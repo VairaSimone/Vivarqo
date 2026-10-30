@@ -57,3 +57,11 @@
 
 - La route `POST /api/v1/account/export` prevista dalla specifica è ora disponibile come alias della route `/api/v1/exports`; entrambe condividono lo stesso router e lo stesso limite di concorrenza.
 - I limiti persistenti PostgreSQL si applicano alle creazioni e conferme degli import e alla creazione di condivisioni pubbliche; il limite globale API resta per-processo e richiede ancora una decisione per deploy multi-replica.
+
+
+## Incremento — preferenze account e consegna push persistente (30 ottobre 2026)
+
+- user_preferences conserva unità di peso/temperatura, formato data, schermata iniziale, tema e densità tabellare; GET/PATCH /api/v1/account/preferences è autenticata e isolata per account.
+- DELETE /api/v1/account richiede password attuale e la stringa DELETE, cancella i dati e i file privati dopo aver tentato l'annullamento dell'abbonamento Stripe. Se Stripe o lo storage non confermano l'operazione, la cancellazione non procede. La riga utente viene anonimizzata come tombstone tecnica; i webhook Stripe ignorano gli account cancellati.
+- Le push sono accodate in push_delivery_attempts. La consegna usa un worker PostgreSQL con claim SKIP LOCKED, lease recuperabili dopo crash, chiave logica univoca e retry fino a cinque tentativi. Lo storico è consultabile tramite GET /api/v1/push-delivery-attempts e viene conservato 90 giorni.
+- La coda push usa al momento una tabella outbox/worker PostgreSQL nativa. Non è ancora pg-boss: l'adozione della libreria resta pianificata insieme alla rigenerazione del lockfile pnpm e al worker unificato export/import. Le consegne esterne sono at-least-once: un crash dopo l'accettazione da parte del provider ma prima della conferma DB può generare una ripetizione.

@@ -83,3 +83,12 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Far revisionare il contratto di abbonamento e i diritti del consumatore da un professionista competente.
 
 **Non descrivere Vivarqo come “GDPR compliant”, “DSA compliant” o “conforme a tutte le leggi mondiali” finché i punti organizzativi e di prodotto sopra non sono stati verificati e documentati.**
+
+
+## 5. Aggiornamento 30 ottobre 2026 — account e push
+
+- Preferenze utente persistenti aggiunte con migrazione Prisma: unità di peso/temperatura, formato data, landing page, tema e tabelle compatte.
+- Cancellazione self-service: autenticazione con password attuale e doppia conferma; cancellazione dei dati gestionali e dei file privati; annullamento Stripe prima dell'eliminazione; tombstone account anonimizzata. Un errore Stripe/storage blocca la cancellazione per evitare dati orfani o addebiti ricorrenti.
+- Storico push persistente: ogni tentativo è collegato ad account, notifica e, se ancora esistente, sottoscrizione del browser. Retry con backoff, recupero claim dopo lease, rimozione endpoint 404/410. La consultazione non espone endpoint push né chiavi crittografiche.
+- Retention dello storico push: 90 giorni. Va rivista insieme alla policy privacy e alla retention di log/backup.
+- Limite architetturale residuo: il worker push è PostgreSQL-native e non usa ancora pg-boss; export/import non sono ancora spostati su job asincroni pg-boss.

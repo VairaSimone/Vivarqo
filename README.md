@@ -312,3 +312,10 @@ Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HT
 - CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump verifica il checksum, se presente, e ripristina nel database di destinazione. Il comando non elimina gli oggetti esistenti: usare un database dedicato e vuoto e predisporre prima uno snapshot di rollback.
 
 La CI copre build, tipi, migrazione e test su PostgreSQL. Prima del lancio reale servono ancora un test di restore su staging, la verifica della configurazione S3 reale, il test Stripe Test Mode con credenziali del proprietario e una prova da browser reale per i permessi push. Le API backend e le principali schermate React/PWA sono implementate; restano le discrepanze di stack e i flussi elencati nella sezione Stato del repository.
+
+
+## Preferenze e privacy account
+
+Le preferenze di unità e visualizzazione sono memorizzate lato server. Dalle impostazioni è possibile richiedere la cancellazione dell'account con password e conferma esplicita; in presenza di un abbonamento attivo il backend ne richiede prima la cancellazione a Stripe. Le consegne push sono accodate in PostgreSQL e hanno storico persistente con retry; lo storico viene conservato per 90 giorni.
+
+Nota tecnica: lo scheduler delle push usa attualmente un outbox/worker PostgreSQL nativo; il passaggio a pg-boss e lo spostamento degli export/import in coda restano da completare.
