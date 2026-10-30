@@ -2,10 +2,20 @@ import React, { useEffect, useState } from "react";
 import type { AccountUser, NoticeHandler } from "../types";
 import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest } from "../api/api";
+import { errorMessage } from "../types";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
 
 
-const DEFAULT_PREFERENCES = {
+type UserPreferences = {
+  weightUnit: string;
+  temperatureUnit: string;
+  dateFormat: string;
+  defaultLandingPage: string;
+  compactTables: boolean;
+  theme: string;
+};
+
+const DEFAULT_PREFERENCES: UserPreferences = {
   weightUnit: "g",
   temperatureUnit: "c",
   dateFormat: "locale",
@@ -23,7 +33,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
   const [newPassword, setNew] = useState("");
   const [email, setEmail] = useState(user.email || "");
   const [busy, setBusy] = useState(false);
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
@@ -36,15 +46,15 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
         if (active) setPreferences({ ...DEFAULT_PREFERENCES, ...(result.preferences || {}) });
       })
       .catch((error) => {
-        if (active) onNotice(error.message || "Impossibile caricare le preferenze.", "error");
+        if (active) onNotice(errorMessage(error), "error");
       })
       .finally(() => { if (active) setPreferencesLoaded(true); });
     return () => { active = false; };
   }, [onNotice]);
 
-  const updatePreference = (key, value) => setPreferences((current) => ({ ...current, [key]: value }));
+  const updatePreference = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => setPreferences((current) => ({ ...current, [key]: value }));
 
-  const save = async (event) => {
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
     try {
@@ -60,7 +70,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
       setCurrent("");
       setNew("");
     } catch (error) {
-      onNotice(error.message || "Impossibile salvare le impostazioni.", "error");
+      onNotice(errorMessage(error), "error");
     } finally {
       setBusy(false);
     }
@@ -86,7 +96,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
       });
       window.location.replace("/");
     } catch (error) {
-      onNotice(error.message || "Impossibile eliminare l'account.", "error");
+      onNotice(errorMessage(error), "error");
     } finally {
       setDeleting(false);
     }
@@ -96,7 +106,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
     <p className="eyebrow">PROFILO E SICUREZZA</p>
     <h2>Impostazioni account</h2>
     <form className="form-grid" onSubmit={save}>
-      <Field label="Nome visualizzato" value={displayName} onChange={(event) => setName(event.target.value)} required maxLength="120"/>
+      <Field label="Nome visualizzato" value={displayName} onChange={(event) => setName(event.target.value)} required maxLength={120}/>
       <Field label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/>
       <SelectField label="Lingua" value={locale} onChange={(event) => setLocale(event.target.value)}>
         <option value="it">Italiano</option><option value="en">English</option>
@@ -121,7 +131,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
       <label className="field checkbox-field"><span>Tabelle compatte</span><input type="checkbox" checked={preferences.compactTables} onChange={(event) => updatePreference("compactTables", event.target.checked)}/></label>
       <div className="form-full">
         <Field label="Password attuale (richiesta per modificare email o password)" type="password" value={currentPassword} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password"/>
-        <Field label="Nuova password (facoltativa)" type="password" value={newPassword} onChange={(event) => setNew(event.target.value)} autoComplete="new-password" minLength="12"/>
+        <Field label="Nuova password (facoltativa)" type="password" value={newPassword} onChange={(event) => setNew(event.target.value)} autoComplete="new-password" minLength={12}/>
       </div>
       <div className="form-full"><Button disabled={busy || !preferencesLoaded}>{busy ? "Salvataggio…" : "Salva impostazioni"}</Button></div>
     </form>
@@ -132,7 +142,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
         try {
           await apiRequest("auth/sessions/revoke-all", { method: "POST", body: {} });
           onNotice("Sessioni revocate. Esci e accedi di nuovo.");
-        } catch (error) { onNotice(error.message, "error"); }
+        } catch (error) { onNotice(errorMessage(error), "error"); }
       }}>Revoca tutte le sessioni</Button>
     </div>
 
