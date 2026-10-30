@@ -87,6 +87,9 @@ jobs:
       - name: Install browser-test dependencies
         working-directory: frontend/e2e
         run: npm install --no-audit --no-fund
+      - name: Type-check browser tests
+        working-directory: frontend/e2e
+        run: npm run typecheck
       - name: Install Chromium for Playwright
         working-directory: frontend/e2e
         run: npx playwright install --with-deps chromium
@@ -159,12 +162,15 @@ jobs:
       - name: Install Playwright test dependencies
         working-directory: frontend/e2e
         run: npm install --no-audit --no-fund
+      - name: Type-check browser tests
+        working-directory: frontend/e2e
+        run: npm run typecheck
       - name: Install Chromium
         working-directory: frontend/e2e
         run: npx playwright install --with-deps chromium
       - name: Run browser tests against real API and PostgreSQL
         working-directory: frontend/e2e
-        run: npx playwright test --config=playwright.real.config.js
+        run: npx playwright test --config=playwright.real.config.ts
       - name: Show API log on failure
         if: failure()
         run: cat "$RUNNER_TEMP/vivarqo-api.log"

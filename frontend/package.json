@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build:service-worker": "tsc -p tsconfig.sw.json",
+    "build": "pnpm build:service-worker && pnpm typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -16,6 +18,9 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
   }
 }

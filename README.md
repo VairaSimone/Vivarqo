@@ -332,3 +332,8 @@ Nota tecnica: lo scheduler delle push usa attualmente un outbox/worker PostgreSQ
 ## Documentazione legale e privacy
 
 Le bozze italiane di informativa privacy, termini e condizioni e cookie/tracking notice sono in [docs/legal](docs/legal/). Sono documenti di lavoro, non pronti per la pubblicazione: vanno completati con i dati reali del titolare, dei provider, delle regioni, delle retention, dei prezzi e dei flussi commerciali, quindi revisionati da un professionista competente. Vedi [la checklist di rilascio](docs/legal/RELEASE-CHECKLIST.md).
+
+
+## Frontend TypeScript
+
+Il frontend React è migrato a TypeScript/TSX. Vedi [frontend/README.md](frontend/README.md) per type-check, build e service worker.
