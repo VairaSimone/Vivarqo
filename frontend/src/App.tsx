@@ -21,7 +21,7 @@ import { MoreHub } from "./components/MoreHub";
 import { Dialog } from "./ui/Dialog";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 import { useRef } from "react";
-import type { AnyRecord, AccountUser, NoticeKind } from "./types";
+import type { AnyRecord, AccountUser, InventoryFiltersState, NoticeKind } from "./types";
 import { errorMessage } from "./types";
 import { readFormValues } from "./types";
 
@@ -49,7 +49,7 @@ const NAV_GROUPS = [
   { id: "gestione", label: "Gestione", items: ["inventario", "finanze"] },
   { id: "account", label: "Account", items: ["notifiche", "dati", "abbonamento", "impostazioni", "guide"] }
 ];
-const API = {
+const API: Record<string, string> = {
   oggi: "home/today", animali:"animals?page=1&pageSize=50", alimentazioni:"feeding-sessions?page=1&pageSize=50",
   peso:"weights?page=1&pageSize=50", mute:"sheds?page=1&pageSize=50", note:"notes?page=1&pageSize=50",
   attivita:"tasks?page=1&pageSize=50", riproduzioni:"reproduction-cycles?page=1&pageSize=100",
@@ -57,9 +57,9 @@ const API = {
   genetica:"genetic-traits", finanze:"finance/entries?page=1&pageSize=50", notifiche:"notifications?page=1&pageSize=50",
   abbonamento:"billing/subscription"
 };
-const TITLES = Object.fromEntries([...NAV.map(([id,label])=>[id,label]), ["peso","Peso"], ["mute","Mute"], ["note","Note"], ["altro","Altro"]]);
-const DESCRIPTIONS = Object.fromEntries([...NAV.map(([id,label,icon,description])=>[id,description]), ["peso","Registra e consulta le pesate degli animali."], ["mute","Annota le mute e il loro esito."], ["note","Consulta e aggiungi osservazioni alle schede." ]]);
-const SECTION_PATHS = {
+const TITLES: Record<string, string> = Object.fromEntries([...NAV.map(([id,label])=>[id,label]), ["peso","Peso"], ["mute","Mute"], ["note","Note"], ["altro","Altro"]]);
+const DESCRIPTIONS: Record<string, string> = Object.fromEntries([...NAV.map(([id,label,icon,description])=>[id,description]), ["peso","Registra e consulta le pesate degli animali."], ["mute","Annota le mute e il loro esito."], ["note","Consulta e aggiungi osservazioni alle schede." ]]);
+const SECTION_PATHS: Record<string, string> = {
   oggi: "/", animali: "/animals", alimentazioni: "/feeding", cure: "/care",
   peso: "/care/weights", mute: "/care/sheds", note: "/care/notes",
   attivita: "/calendar", riproduzioni: "/reproduction", inventario: "/inventory",
@@ -98,21 +98,40 @@ const money = (v: string | number | null | undefined) => { if (v === null || v =
 function Brand(){return <a className="brand" href="#oggi" aria-label="Vivarqo, Oggi"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a>;}
 function Button({children,variant="",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{children}</button>;}
 function Field({label,...props}: React.InputHTMLAttributes<HTMLInputElement> & {label:string}){return <label className="field"><span>{label}</span><input {...props}/></label>;}
-function SelectField({label,children,...props}: React.SelectHTMLAttributes<HTMLSelectElement> & {label:string;children?:React.ReactNode}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>;
+function SelectField({label,children,...props}: React.SelectHTMLAttributes<HTMLSelectElement> & {label:string;children?:React.ReactNode}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>; }
 function Notice({notice}:{notice:{text:string;kind?:NoticeKind}|null}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{notice.text}</div>:null;}
 
 
 
 
 function App() {
- const [user,setUser]=useState<AccountUser|null>(null),[active,setActive]=useState(()=>initialSectionFromPath(window.location.pathname)),[data,setData]=useState<AnyRecord|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState<{text:string;kind:NoticeKind}|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<AnyRecord|null>(null),[installEvent,setInstallEvent]=useState<(Event & {prompt?:()=>Promise<void>;userChoice?:Promise<{outcome:string}>})|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
- const [inventoryFilters,setInventoryFilters]=useState({active:"true",category:"",lowStock:false});
+ type ModalField = [
+  name: string,
+  label: string,
+  type: "text" | "number" | "date" | "datetime-local" | "select" | "textarea",
+  initial?: string | number | null
+];
+type ModalForm = {
+  title: string;
+  endpoint: string;
+  method?: "POST" | "PATCH";
+  fields: ModalField[];
+  transform?: (values: Record<string, string>) => Record<string, unknown>;
+};
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: string }>;
+};
+type NoticeState = { text: string; kind: NoticeKind };
+
+const [user,setUser]=useState<AccountUser|null>(null),[active,setActive]=useState(()=>initialSectionFromPath(window.location.pathname)),[data,setData]=useState<AnyRecord|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState<NoticeState|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<ModalForm|null>(null),[installEvent,setInstallEvent]=useState<BeforeInstallPromptEvent|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
+ const [inventoryFilters,setInventoryFilters]=useState<InventoryFiltersState>({active:"true",category:"",lowStock:false});
  const [financeRefreshKey,setFinanceRefreshKey]=useState(0);
  const [targetAnimalId,setTargetAnimalId]=useState<string|null>(()=>animalIdFromLocation());
  const confirmAction=useConfirmDialog();
  const noticeTimer=useRef<number | null>(null);
  const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text,kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
- useEffect(()=>{const onInstall=(event:Event)=>{event.preventDefault();setInstallEvent(event as Event & {prompt?:()=>Promise<void>;userChoice?:Promise<{outcome:string}>});};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
+ useEffect(()=>{const onInstall=(event:Event)=>{event.preventDefault();setInstallEvent(event as BeforeInstallPromptEvent);};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
  useEffect(()=>{const syncLocation=()=>{setActive(initialSectionFromPath(window.location.pathname));setTargetAnimalId(animalIdFromLocation());setQuery("");setModal(null);setHistoryItem(null);};window.addEventListener("popstate",syncLocation);return()=>window.removeEventListener("popstate",syncLocation);},[]);
  useEffect(()=>{const onUpdateReady=(event: Event)=>setPwaUpdateRegistration((event as CustomEvent<{registration?: ServiceWorkerRegistration}>).detail?.registration??null);window.addEventListener("vivarqo:pwa-update-ready",onUpdateReady);return()=>window.removeEventListener("vivarqo:pwa-update-ready",onUpdateReady);},[]);
  const loadMe=useCallback(async()=>{try{const r=await apiRequest("auth/me");setUser(r.user??r);return true;}catch(e){setUser(null);return false;}},[]);
@@ -121,11 +140,11 @@ function App() {
  useEffect(()=>{if(!user)return;const timer=window.setTimeout(()=>void loadData(active),query.trim()?280:0);return()=>window.clearTimeout(timer);},[user,active,loadData,query]);
  const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);setActive("oggi");showNotice("Hai terminato la sessione.");};
  const go=(id: string, options: {animalId?: string | null}={})=>{const animalId=options?.animalId||null;const basePath=id==="animali"&&animalId?"/animals/"+encodeURIComponent(animalId):(SECTION_PATHS[id]||"/");const nextPath=animalId&&id!=="animali"?basePath+"?animal="+encodeURIComponent(animalId):basePath;if(window.location.pathname+window.location.search!==nextPath)window.history.pushState({section:id},"",nextPath);setActive(id);setTargetAnimalId(animalId);setQuery("");setModal(null);setHistoryItem(null);if(window.innerWidth<900)document.querySelector(".sidebar")?.classList.remove("sidebar--open");};
- const updateInventoryFilter=(name:"active"|"category"|"lowStock",value:string|boolean)=>{setInventoryFilters(current=>({...current,[name]:value}));setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
+ const updateInventoryFilter=(name:keyof InventoryFiltersState,value:string|boolean)=>{setInventoryFilters(current=>name==="lowStock"?{...current,lowStock:Boolean(value)}:{...current,[name]:String(value)});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const resetInventoryFilters=()=>{setInventoryFilters({active:"true",category:"",lowStock:false});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const updateRecordSearch=(next:string)=>{setQuery(next);setListPages(current=>({...current,[active]:1}));};
  const rows=useMemo(()=>asArray(data),[data]);
- const saveEntity=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const form=new FormData(e.currentTarget);const raw=readFormValues(e.currentTarget);const {endpoint,method="POST",transform}=modal;try{const result=await apiRequest(endpoint,{method,body:transform?transform(raw):raw});setModal(null);showNotice("Modifiche salvate.");if(active==="finanze")setFinanceRefreshKey(key=>key+1);await loadData(active);}catch(err){showNotice(errorMessage(err),"error");}};
+ const saveEntity=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const raw=readFormValues(e.currentTarget);const currentModal=modal;if(!currentModal)return;const {endpoint,method="POST",transform}=currentModal;try{await apiRequest(endpoint,{method,body:transform?transform(raw):raw});setModal(null);showNotice("Modifiche salvate.");if(active==="finanze")setFinanceRefreshKey(key=>key+1);await loadData(active);}catch(err){showNotice(errorMessage(err),"error");}};
  const addAnimal=()=>setModal({title:"Nuovo animale",endpoint:"animals",fields:[["name","Nome","text"],["identifier","Identificativo (facoltativo)","text"],["species","Specie","text"],["sex","Sesso","select"],["morph","Morph","text"],["birthDate","Data di nascita","date"],["locationLabel","Stabulazione / posizione","text"],["notes","Note","textarea"]],transform:v=>({...v,identifier:v.identifier||null,morph:v.morph||null,birthDate:v.birthDate||null,locationLabel:v.locationLabel||null,notes:v.notes||null})});
  const addInventory=()=>setModal({title:"Nuovo articolo",endpoint:"inventory/items",fields:[["name","Nome","text"],["category","Categoria","select"],["unit","Unità","text"],["quantityOnHand","Quantità iniziale","number"],["minimumQuantity","Soglia minima","number"],["notes","Note","textarea"]],transform:v=>({...v,quantityOnHand:Number(v.quantityOnHand||0),minimumQuantity:v.minimumQuantity===""?null:Number(v.minimumQuantity),notes:v.notes||null})});
  const addFinance=()=>setModal({title:"Nuova voce economica",endpoint:"finance/entries",fields:[["entryType","Tipo","select"],["occurredOn","Data","date"],["amount","Importo (€)","number"],["category","Categoria","text"],["description","Descrizione","text"]],transform:v=>({entryType:v.entryType,occurredOn:v.occurredOn,amountCents:Math.round(Number(v.amount)*100),currency:"EUR",category:v.category,description:v.description})});
@@ -164,7 +183,7 @@ const actionButton = active==="inventario"?["＋ Nuovo articolo",addInventory]:a
 
 
 
-function Modal({modal,onClose,onSubmit}: { modal: UnknownRecord; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
+function Modal({modal,onClose,onSubmit}: { modal: ModalForm; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
  return <Dialog title={modal.title} onClose={onClose} onSubmit={onSubmit} submitLabel="Salva" size={modal.fields.length>6?"wide":"normal"}>
   {modal.fields.map(([name,label,type,initial])=><div className={type==="textarea"?"form-full":""} key={name}>{type==="select"?<SelectField label={label} name={name} defaultValue={initial} required>{(name==="sex"?[["unknown","Non specificato"],["male","Maschio"],["female","Femmina"]]:name==="category"?[["food","Alimenti"],["substrate","Substrati"],["material","Materiali"],["equipment","Attrezzatura"],["other","Altro"]]:name==="taskCategory"?[["feeding","Alimentazioni"],["weighing","Peso"],["shed_check","Muta"],["cleaning","Pulizia"],["reproduction","Riproduzione"],["document","Documenti"],["inventory","Inventario"],["custom","Personalizzata"]]:name==="movementType"?[["in","Carico"],["out","Scarico"],["adjustment","Rettifica"]]:name==="entryType"?[["income","Entrata"],["expense","Uscita"]]:[]).map(([v,l])=><option key={v} value={v}>{l}</option>)}</SelectField>:type==="textarea"?<label className="field"><span>{label}</span><textarea name={name} rows={3} defaultValue={initial}/></label>:<Field label={label} name={name} type={type} defaultValue={initial} step={type==="number"?0.001:undefined} required={!label.includes("facoltativo")&&name!=="minimumQuantity"&&name!=="unitCostCents"}/>}</div>)}
  </Dialog>;
