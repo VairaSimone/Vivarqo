@@ -5,7 +5,7 @@ const inCI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: ".",
   testMatch: "**/*.spec.ts",
-  testIgnore: ["**/*.real.spec.js"],
+  testIgnore: ["**/*.real.spec.ts"],
   fullyParallel: false,
   forbidOnly: inCI,
   retries: inCI ? 1 : 0,
