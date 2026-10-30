@@ -5,7 +5,7 @@ import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest, apiUpload } from "../api/api";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
 
-const date = value => { if (!value) return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
+const date = (value?: string | Date | null) => { if (!value) return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
 
 export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
   const confirmAction = useConfirmDialog();
@@ -17,7 +17,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
   const [exportJob, setExportJob] = useState<AnyRecord | null>(null);
   const [importJob, setImportJob] = useState<AnyRecord | null>(null);
   const entities = [["animals","Animali"],["weights","Pesate"],["sheds","Mute"],["notes","Note"],["feedings","Alimentazioni"],["finance","Finanze"],["inventory","Inventario"],["reproductionCycles","Cicli riproduttivi"],["reproductiveEvents","Eventi riproduttivi"],["clutches","Covate"],["eggs","Uova"],["incubationLogs","Controlli d’incubazione"],["offspringBatches","Lotti di piccoli"]];
-  const upload = async e => {
+  const upload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!file) return onNotice("Scegli prima un file CSV o XLSX.", "error");
     setBusy(true);
@@ -28,7 +28,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
     } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
-  const downloadWhenReady = async id => {
+  const downloadWhenReady = async (id: string) => {
     setBusy(true);
     try {
       const result = await apiRequest("exports/" + encodeURIComponent(id));
@@ -69,7 +69,8 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
     } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
-  const statusLabel = status => ({ pending: "In attesa", queued: "In coda", processing: "In elaborazione", completed: "Completata", failed: "Non riuscita", expired: "Scaduta" }[status] || status || "Sconosciuto");
+  const statusLabels: Record<string, string> = { pending: "In attesa", queued: "In coda", processing: "In elaborazione", completed: "Completata", failed: "Non riuscita", expired: "Scaduta" };
+  const statusLabel = (status: string) => statusLabels[status] || status || "Sconosciuto";
 
   useEffect(() => {
     if (!importJob?.id || ["completed", "failed", "expired"].includes(importJob.status)) return undefined;
@@ -129,7 +130,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
         <h3>Anteprima importazione</h3>
         <p>Righe totali: {preview.totalRows ?? "—"} · valide: {preview.validRows ?? "—"} · errori: {preview.invalidRows ?? "—"}</p>
         {entity === "animals" && Array.isArray(preview.possibleDuplicates) && preview.possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({preview.possibleDuplicates.length}).</strong><p>Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.</p></div>}
-        {(preview.errors || []).slice(0,20).map((error, index) => <p key={index} className="error-text">Riga {error.row}: {error.column} — {error.reason}</p>)}
+        {(preview.errors || []).slice(0,20).map((error: AnyRecord, index: number) => <p key={index} className="error-text">Riga {error.row}: {error.column} — {error.reason}</p>)}
         <Button onClick={confirmImport} disabled={busy || !preview.validRows}>Conferma importazione</Button>
       </div>}
     </section>

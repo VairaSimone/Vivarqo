@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { apiRequest } from "./api/api";
-import { readFormValues } from "./types";
+import { readFormValues, errorMessage } from "./types";
+import type { NoticeKind } from "./types";
 
 const currentUrl = () => new URL(window.location.href);
-function initialMode() {
+type AuthMode = "login" | "register" | "forgot" | "resend" | "verify" | "reset";
+function initialMode(): AuthMode {
   const url = currentUrl();
   const path = url.pathname.replace(/\/$/, "");
   const queryMode = url.searchParams.get("mode");
@@ -11,10 +13,10 @@ function initialMode() {
   if (path === "/reset-password" || queryMode === "reset") return "reset";
   return "login";
 }
-function Button({ children, variant = "", ...props }) {
+function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) {
   return <button className={"button " + variant} {...props}>{children}</button>;
 }
-function Field({ label, ...props }) {
+function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return <label className="field"><span>{label}</span><input {...props}/></label>;
 }
 function cleanFlowUrl() {
@@ -29,11 +31,11 @@ function cleanFlowUrl() {
 }
 
 export function AuthScreen({ onLogin = () => window.location.assign("/") }: { onLogin?: () => void }) {
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [token, setToken] = useState(() => currentUrl().searchParams.get("token") || "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageKind, setMessageKind] = useState("info");
+  const [messageKind, setMessageKind] = useState<NoticeKind>("info");
   const tokenRequired = mode === "verify" || mode === "reset";
   const title = useMemo(() => ({
     login: "Accedi a Vivarqo",
@@ -44,7 +46,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
     reset: "Scegli una nuova password"
   }[mode] || "Accedi a Vivarqo"), [mode]);
 
-  const switchMode = next => {
+  const switchMode = (next: AuthMode) => {
     setMode(next);
     setMessage("");
     if (next === "login" && /^\/(verify-email|reset-password)\/?$/.test(window.location.pathname)) {
@@ -52,7 +54,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
     }
   };
 
-  const submit = async event => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
     setMessage("");
@@ -98,7 +100,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
         setMessageKind("success");
       }
     } catch (error) {
-      setMessage(error?.message || "Operazione non riuscita. Riprova.");
+      setMessage(errorMessage(error) || "Operazione non riuscita. Riprova.");
       setMessageKind("error");
     } finally {
       setBusy(false);

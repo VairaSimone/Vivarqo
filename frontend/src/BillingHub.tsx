@@ -2,12 +2,14 @@ import type { AnyRecord } from "./types";
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { apiRequest } from "./api/api";
+import { errorMessage } from "./types";
 
-const dateLabel = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const statusLabel = value => ({ active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" }[value] || value || "Nessun abbonamento");
-function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-function safeStripeRedirect(raw, kind) {
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const statusLabel = (value?: string | null) => ({ active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" }[value] || value || "Nessun abbonamento");
+function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
+function safeStripeRedirect(raw: string | null | undefined, kind: "checkout" | "portal"): string | null {
   try {
+    if (!raw) return null;
     const url = new URL(raw);
     const validHost = kind === "checkout"
       ? (url.hostname === "checkout.stripe.com" || url.hostname.endsWith(".stripe.com"))
@@ -23,11 +25,11 @@ export function BillingHub({ onNotice = () => {} }: CommonHubProps) {
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try { setData(await apiRequest("billing/subscription")); }
-    catch (err) { setError(err.message || "Impossibile leggere lo stato dell’abbonamento."); }
+    catch (err) { setError(errorMessage(err)); }
     finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-  const go = async kind => {
+  const go = async (kind: "checkout" | "portal") => {
     setBusy(true); setError("");
     try {
       const response = await apiRequest(kind === "checkout" ? "billing/checkout" : "billing/portal", { method: "POST", body: {} });
@@ -35,7 +37,7 @@ export function BillingHub({ onNotice = () => {} }: CommonHubProps) {
       if (!url) throw new Error("Il backend non ha restituito un indirizzo Stripe valido.");
       window.location.assign(url);
     } catch (err) {
-      const msg = err.message || "Impossibile aprire la pagina di pagamento.";
+      const msg = errorMessage(err);
       setError(msg); onNotice(msg, "error"); setBusy(false);
     }
   };

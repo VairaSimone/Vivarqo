@@ -81,7 +81,7 @@ function allCodewords(data: number[], version: QrVersion): number[] {
 function appendBits(bits: number[], value: number, count: number): void {
   for (let i = count - 1; i >= 0; i--) bits.push((value >>> i) & 1);
 }
-function bchFormat(value) {
+function bchFormat(value: number): number {
   let remainder = value << 10;
   const generator = 0x537;
   for (let bit = 14; bit >= 10; bit--) {
@@ -140,7 +140,7 @@ export function createQrMatrix(value: string): boolean[][] {
   for (let i = 8; i <= 14; i++) put(8, size - 15 + i, false);
   put(8, size - 8, true);
 
-  const bits = [];
+  const bits: number[] = [];
   for (const byte of codewords) appendBits(bits, byte, 8);
   let bitIndex = 0;
   let upward = true;

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { AnyRecord, NoticeHandler } from "./types";
 import { apiRequest } from "./api/api";
+import { errorMessage } from "./types";
 
-const money = (cents, currency = "EUR") => {
+const money = (cents: number | string | null | undefined, currency = "EUR") => {
   const amount = Number(cents);
   if (!Number.isFinite(amount)) return "—";
   return new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(amount / 100);
@@ -31,14 +32,14 @@ export function FinanceSummary({ onNotice = () => {}, refreshKey = 0 }: { onNoti
       params.set("currency", "EUR");
       setSummary(await apiRequest("finance/summary?" + params.toString()));
     } catch (err) {
-      const message = err.message || "Impossibile caricare il riepilogo economico.";
+      const message = errorMessage(err);
       setError(message);
       onNotice(message, "error");
     } finally { setBusy(false); }
   }, [onNotice]);
 
   useEffect(() => { void load(filtersRef.current); }, [load, refreshKey]);
-  const updateFilter = (name, value) => setFilters(previous => ({ ...previous, [name]: value }));
+  const updateFilter = (name: keyof typeof initialFilters, value: string) => setFilters(previous => ({ ...previous, [name]: value }));
 
   return <div className="advanced-stack">
     <section className="panel">

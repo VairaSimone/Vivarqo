@@ -5,12 +5,12 @@ import { Button } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const categories = [
+const categories: Array<[string, string]> = [
   ["task_due", "Scadenze attività"], ["system", "Sistema e test push"]
 ];
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
 const dateTime = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
-function fromBase64Url(value) {
+function fromBase64Url(value: string): Uint8Array {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
   const raw = atob(padded);
@@ -27,7 +27,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [unreadCount, setUnreadCount] = useState(0);
-  const [preferences, setPreferences] = useState({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
+  const [preferences, setPreferences] = useState<{inAppEnabled:boolean;pushEnabled:boolean;categories:Record<string,boolean>;quietHoursStart:string;quietHoursEnd:string}>({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
   const [devices, setDevices] = useState<AnyRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -54,7 +54,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
 
   useEffect(() => { let live = true; void load().catch(e => setError(errorMessage(e))).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
 
-  const savePreferences = async patch => {
+  const savePreferences = async (patch: Partial<typeof preferences>) => {
     setBusy(true);
     try {
       const next = { ...preferences, ...patch };
@@ -126,7 +126,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
     } catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
-  const markRead = async item => {
+  const markRead = async (item: AnyRecord) => {
     try { await apiRequest("notifications/" + item.id + "/read", { method: "PATCH", body: {} }); await load(); }
     catch (e) { onNotice(errorMessage(e), "error"); }
   };
@@ -140,7 +140,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
     catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
-  const removeDevice = async item => {
+  const removeDevice = async (item: AnyRecord) => {
     if (!(await confirmAction({ title: "Rimuovere questo dispositivo?", message: "Il browser non riceverà più notifiche push da Vivarqo su questo dispositivo.", confirmLabel: "Rimuovi dispositivo", danger: true }))) return;
     try {
       await apiRequest("push-subscriptions/" + encodeURIComponent(item.id), { method: "DELETE" });

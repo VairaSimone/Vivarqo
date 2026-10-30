@@ -75,7 +75,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
     apiRequest("tasks/" + match[1]).then(result => { setTaskEditing(result.task || result); setTaskFormOpen(true); }).catch(() => {});
   }, []);
 
-  const move = direction => {
+  const move = (direction: number) => {
     setAnchor(current => {
       const next = new Date(current);
       if (view === "week") next.setDate(next.getDate() + direction * 7);
@@ -86,7 +86,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const title = view === "week"
     ? new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.from)) + " – " + new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.to))
     : new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(anchor);
-  const saveTask = async event => {
+  const saveTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const v = readFormValues(event.currentTarget);
     const body = { title: v.title.trim(), category: v.category, dueAt: new Date(v.dueAt).toISOString(), description: v.description.trim() || null, animalId: v.animalId || null };
@@ -98,16 +98,16 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
     } catch (err) { onNotice(errorMessage(err) || "Salvataggio attività non riuscito.", "error"); }
     finally { setSaving(false); }
   };
-  const completeTask = async item => {
+  const completeTask = async (item: AnyRecord) => {
     try { await apiRequest("tasks/" + item.id + "/complete", { method: "POST", body: {} }); onNotice("Attività completata.", "success"); await loadCalendar(); }
     catch (err) { onNotice(errorMessage(err) || "Impossibile completare l’attività.", "error"); }
   };
-  const deleteTask = async item => {
+  const deleteTask = async (item: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare l’attività?", message: "“" + item.title + "” verrà eliminata definitivamente.", confirmLabel: "Elimina attività", danger: true }))) return;
     try { await apiRequest("tasks/" + item.id, { method: "DELETE" }); onNotice("Attività eliminata.", "success"); await loadCalendar(); }
     catch (err) { onNotice(errorMessage(err) || "Impossibile eliminare l’attività.", "error"); }
   };
-  const saveRule = async event => {
+  const saveRule = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const v = readFormValues(event.currentTarget);
@@ -127,14 +127,14 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
     } catch (err) { onNotice(errorMessage(err) || "Salvataggio promemoria non riuscito.", "error"); }
     finally { setSaving(false); }
   };
-  const toggleRule = async rule => {
+  const toggleRule = async (rule: AnyRecord) => {
     try {
       await apiRequest("tasks/reminder-rules/" + rule.id, { method: "PATCH", body: { isEnabled: !rule.isEnabled } });
       onNotice(rule.isEnabled ? "Promemoria disattivato." : "Promemoria riattivato.", "success");
       await loadRules(); await loadCalendar();
     } catch (err) { onNotice(errorMessage(err) || "Impossibile aggiornare il promemoria.", "error"); }
   };
-  const deleteRule = async rule => {
+  const deleteRule = async (rule: AnyRecord) => {
     if (!(await confirmAction({ title: "Terminare il promemoria ricorrente?", message: "“" + rule.title + "” verrà disattivato e le attività aperte collegate saranno archiviate.", confirmLabel: "Termina promemoria", danger: true }))) return;
     try { await apiRequest("tasks/reminder-rules/" + rule.id, { method: "DELETE" }); onNotice("Promemoria disattivato.", "success"); await loadRules(); await loadCalendar(); }
     catch (err) { onNotice(errorMessage(err) || "Impossibile disattivare il promemoria.", "error"); }
