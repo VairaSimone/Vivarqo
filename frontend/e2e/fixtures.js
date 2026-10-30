@@ -313,7 +313,11 @@ export async function mockApi(context) {
       return respond({});
     }
     if (path === "notifications/test-push" && method === "POST") return respond({ delivery: { attempted: 1, sent: 1, failed: 0 } });
-    if (path === "exports" && method === "POST") return respond({ export: { id: "export-1", status: "processing" } }, 202);
+    const importConfirm = path.match(/^imports\/([^/]+)\/confirm$/);
+    if (importConfirm && method === "POST") return respond({ importId: importConfirm[1], status: "queued", createdCount: 0, errorCount: 0 }, 202);
+    const importStatus = path.match(/^imports\/([^/]+)$/);
+    if (importStatus && method === "GET") return respond({ importId: importStatus[1], status: "completed", createdCount: 1, errorCount: 0, report: {} });
+    if (path === "exports" && method === "POST") return respond({ export: { id: "export-1", status: "pending", includeDocuments: body.includeDocuments === true }, ready: false, downloadPath: "/api/v1/exports/export-1/download" }, 202);
     if (path === "exports/export-1" && method === "GET") return respond({ export: { id: "export-1", status: "completed" }, ready: true });
     if (path.startsWith("imports") || path.startsWith("inventory/") || path.startsWith("finance/") || path.startsWith("tasks")) return respond({});
     return respond({});
