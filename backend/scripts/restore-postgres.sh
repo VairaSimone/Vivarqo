@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# The CI runner may also have an older PostgreSQL client on /usr/bin.
+# Prefer the project/server PostgreSQL 18 client when the PGDG package exists.
+if [[ -x /usr/lib/postgresql/18/bin/pg_dump ]]; then
+  PATH="/usr/lib/postgresql/18/bin:$PATH"
+  export PATH
+fi
+
 if [[ "$#" -ne 1 ]]; then
   echo "Usage: CONFIRM_RESTORE=YES DATABASE_URL=... $0 <backup.dump>" >&2
   exit 2
