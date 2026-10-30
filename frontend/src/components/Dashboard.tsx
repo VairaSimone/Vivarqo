@@ -5,8 +5,8 @@ import { Icon } from "../ui/Icon";
 
 const asArray = (data: unknown): AnyRecord[] => Array.isArray(data) ? data as AnyRecord[] : data && typeof data === "object" ? Object.values(data as AnyRecord).find(Array.isArray) as AnyRecord[] ?? [] : [];
 const value = (obj: AnyRecord | null | undefined, keys: string[], fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
-const date = (value: unknown) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
-function Button({ children, variant = "", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
+const date = (value: string | number | Date | null | undefined) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
+function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 
 export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: NavigationHandler; onRetry?: () => void }) {
  const due=asArray(data?.tasks?.dueToday??data?.dueToday);
