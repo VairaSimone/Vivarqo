@@ -44,7 +44,10 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [selectedSession, setSelectedSession] = useState<AnyRecord | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
-  const api = useCallback((path: string, options: ApiRequestOptions = {}, _actionLabel?: string) => apiRequest(path, options), []);
+  const api = useCallback(async (path: string, options: ApiRequestOptions = {}, _actionLabel?: string): Promise<AnyRecord> => {
+    const result = await apiRequest<AnyRecord>(path, options);
+    return result ?? {};
+  }, []);
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
@@ -149,7 +152,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       setCreateOpen(false); setFeedingEntries([]);
       onNotice(tab === "feedings" ? "Sessione salvata per " + body.entries.length + " animali." : "Registro creato.", "success");
       await loadRecords();
-      if (tab === "feedings" && result.session?.id) await loadSessionDetail(result.session.id);
+      if (tab === "feedings" && result?.session?.id) await loadSessionDetail(result.session.id);
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
