@@ -32,7 +32,7 @@ function QRCode({ value }) {
   const size = result.length;
   let path = "";
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (result[y][x]) path += "M" + (x + 4) + " " + (y + 4) + "h1v1h-1z";
-  return <svg className="qr-svg" role="img" aria-label="Codice QR del profilo pubblico" viewBox={"0 0 " + (size + 8) + " " + (size + 8)} shapeRendering="crispEdges"><rect x=0 y=0 width={size + 8} height={size + 8} fill="#fff"/><path d={path} fill="#14231d"/></svg>;
+  return <svg className="qr-svg" role="img" aria-label="Codice QR del profilo pubblico" viewBox={"0 0 " + (size + 8) + " " + (size + 8)} shapeRendering="crispEdges"><rect x={0} y={0} width={size + 8} height={size + 8} fill="#fff"/><path d={path} fill="#14231d"/></svg>;
 }
 function downloadQr(value, name) {
   const source = qrSvgSource(value, 12, 4);
