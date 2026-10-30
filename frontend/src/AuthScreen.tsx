@@ -112,11 +112,11 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
     <section className="auth-card">
       <div className="auth-card-head"><p className="eyebrow">{mode === "verify" ? "UN ULTIMO PASSAGGIO" : mode === "reset" ? "RECUPERO ACCOUNT" : "BENTORNATO"}</p><h2>{title}</h2><p>I tuoi registri restano privati e collegati al tuo account.</p></div>
       <form className="form-stack" onSubmit={submit}>
-        {mode === "register" && <Field label="Nome visualizzato" name="displayName" autoComplete="name" required maxLength="120"/>}
-        {["login", "register", "forgot", "resend"].includes(mode) && <Field label="Email" name="email" type="email" autoComplete="email" required maxLength="254"/>}
-        {["login", "register"].includes(mode) && <Field label="Password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 12 : 1} maxLength="128"/>}
-        {tokenRequired && <><Field label="Token ricevuto via email" name="token" value={token} onChange={event => setToken(event.target.value)} required minLength="43" maxLength="43" autoComplete="one-time-code" spellCheck="false"/>{mode === "verify" && <p className="muted">Apri il link ricevuto via email. Se il token non è compilato automaticamente, incollalo qui.</p>}</>}
-        {mode === "reset" && <><Field label="Nuova password" name="password" type="password" autoComplete="new-password" required minLength="12" maxLength="128"/><Field label="Conferma nuova password" name="confirmPassword" type="password" autoComplete="new-password" required minLength="12" maxLength="128"/></>}
+        {mode === "register" && <Field label="Nome visualizzato" name="displayName" autoComplete="name" required maxLength={120}/>}
+        {["login", "register", "forgot", "resend"].includes(mode) && <Field label="Email" name="email" type="email" autoComplete="email" required maxLength={254}/>}
+        {["login", "register"].includes(mode) && <Field label="Password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 12 : 1} maxLength={128}/>}
+        {tokenRequired && <><Field label="Token ricevuto via email" name="token" value={token} onChange={event => setToken(event.target.value)} required minLength={43} maxLength={43} autoComplete="one-time-code" spellCheck="false"/>{mode === "verify" && <p className="muted">Apri il link ricevuto via email. Se il token non è compilato automaticamente, incollalo qui.</p>}</>}
+        {mode === "reset" && <><Field label="Nuova password" name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/><Field label="Conferma nuova password" name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></>}
         {mode === "forgot" && <p className="muted">Ti invieremo le istruzioni se l’indirizzo è associato a un account.</p>}
         <Button disabled={busy}>{busy ? "Attendi…" : ({login:"Accedi",register:"Crea account",forgot:"Invia istruzioni",resend:"Invia nuovo link",verify:"Verifica email",reset:"Reimposta password"}[mode])}</Button>
       </form>
