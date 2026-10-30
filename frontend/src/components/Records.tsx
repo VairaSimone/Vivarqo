@@ -1,16 +1,24 @@
 import React from "react";
-import type { AnyRecord } from "../types";
+import type { AnyRecord, NavigationHandler } from "../types";
 import { Icon } from "../ui/Icon";
 
-const value = (obj, keys, fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
-const date = value => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
-const money = amount => { if (amount === null || amount === undefined || amount === "" || amount === "—") return "—"; const parsed = Number(amount); return Number.isFinite(parsed) ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(parsed / 100) : "—"; };
-function Button({ children, variant = "", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
+const value = (obj: AnyRecord | null | undefined, keys: string[], fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
+const date = (value: string | number | Date | null | undefined) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
+const money = (amount: string | number | null | undefined) => { if (amount === null || amount === undefined || amount === "" || amount === "—") return "—"; const parsed = Number(amount); return Number.isFinite(parsed) ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(parsed / 100) : "—"; };
+function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 
-export function Records({active,data,rows,onSearch,query,onCare,onReload,onTask,onGo,onEdit,onDelete,onMovement,onHistory,onPageChange}: { active: string; data: AnyRecord; rows: AnyRecord[]; query: string; onSearch: (query: string) => void; [key: string]: any }) {
- const titles={animali:"Schede animali",inventario:"Scorte e materiali",alimentazioni:"Storico alimentazioni",attivita:"Attività e promemoria",finanze:"Entrate e uscite",notifiche:"Centro notifiche",riproduzioni:"Riproduzioni",documenti:"Documenti e condivisioni",genetica:"Morph e genetica",peso:"Storico pesi",mute:"Storico mute",note:"Osservazioni"};
+type RecordHubProps = {
+ active: string; data: AnyRecord; rows: AnyRecord[]; query: string; onSearch: (query: string) => void;
+ onCare?: (type: string) => void; onReload?: () => void;
+ onTask?: (row: AnyRecord, status: string) => void; onGo?: NavigationHandler;
+ onEdit?: (row: AnyRecord) => void; onDelete?: (row: AnyRecord) => void;
+ onMovement?: (row: AnyRecord) => void; onHistory?: (row: AnyRecord) => void;
+ onPageChange?: (page: number) => void;
+};
+export function Records({active,data,rows,onSearch,query,onCare,onReload,onTask,onGo,onEdit,onDelete,onMovement,onHistory,onPageChange}: RecordHubProps) {
+ const titles: Record<string,string> = {animali:"Schede animali",inventario:"Scorte e materiali",alimentazioni:"Storico alimentazioni",attivita:"Attività e promemoria",finanze:"Entrate e uscite",notifiche:"Centro notifiche",riproduzioni:"Riproduzioni",documenti:"Documenti e condivisioni",genetica:"Morph e genetica",peso:"Storico pesi",mute:"Storico mute",note:"Osservazioni"};
  const shown=rows.map(r=>({raw:r,display:active==="animali"?{Nome:value(r,["name"]),Identificativo:value(r,["identifier"]),Specie:value(r,["species"]),Sesso:value(r,["sex"]),Morph:value(r,["morph"]),Stabulazione:value(r,["locationLabel"]),Stato:value(r,["status"])}:active==="inventario"?{Articolo:value(r,["name"]),Categoria:value(r,["category"]),Quantità:value(r,["quantityOnHand"]),Unità:value(r,["unit"]),Soglia:value(r,["minimumQuantity"]),Stato:r.isActive===false?"Archiviato":"Attivo",Scorte:r.minimumQuantity==null?"Soglia non impostata":Number(r.quantityOnHand)<=Number(r.minimumQuantity)?"Sotto soglia":"Adeguate"}:active==="alimentazioni"?{Data:date(value(r,["performedAt","fedAt","createdAt"])),Animale:value(r,["animalName","animalId"]),Esito:value(r,["outcome"]),Cibo:value(r,["foodType"]),Note:value(r,["notes"])}:active==="attivita"?{Attività:value(r,["title","name"]),Scadenza:date(value(r,["dueAt"])),Categoria:value(r,["category"]),Stato:value(r,["status"]),Descrizione:value(r,["description"])}:active==="finanze"?{Descrizione:value(r,["description"]),Tipo:value(r,["entryType"]),Data:date(value(r,["occurredOn"])),Importo:money(value(r,["amountCents"])),Categoria:value(r,["category"])}:active==="notifiche"?{Titolo:value(r,["title"]),Messaggio:value(r,["body"]),Data:date(value(r,["createdAt"])),Stato:r.readAt?"Letta":"Non letta"}:Object.fromEntries(Object.entries(r).filter(([k,v])=>!["userId","updatedAt","createdAt","id"].includes(k)&&["string","number","boolean"].includes(typeof v)).slice(0,6).map(([k,v])=>[k.replace(/([A-Z])/g," $1"),String(v)]))}));
- const rowActions=raw=><div className="inline-actions record-actions">
+ const rowActions=(raw:AnyRecord)=><div className="inline-actions record-actions">
    {onEdit&&<Button onClick={()=>onEdit(raw)}><Icon name="edit" size={14}/> Modifica</Button>}
    {active==="attivita"&&<Button onClick={()=>onTask(raw,"complete")}><Icon name="check" size={14}/> Completa</Button>}
    {active==="inventario"&&onHistory&&<Button onClick={()=>onHistory(raw)}>Storico</Button>}
