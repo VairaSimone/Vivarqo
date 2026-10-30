@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { AnyRecord, CommonHubProps } from "./types";
+import { errorMessage } from "./types";
 import { Button } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
@@ -51,7 +52,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
     setDevices(arrayOf(subs.subscriptions ?? subs));
   }, [page]);
 
-  useEffect(() => { let live = true; void load().catch(e => setError(e.message)).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
+  useEffect(() => { let live = true; void load().catch(e => setError(errorMessage(e))).finally(() => { if (live) setInitialLoading(false); }); return () => { live = false; }; }, [load]);
 
   const savePreferences = async patch => {
     setBusy(true);
@@ -74,7 +75,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
         quietHoursStart: saved.quietHoursStart || "", quietHoursEnd: saved.quietHoursEnd || ""
       });
       onNotice("Preferenze di notifica salvate.");
-    } catch (e) { onNotice(e.message, "error"); }
+    } catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
 
@@ -100,7 +101,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
       setPreferences(prev => ({ ...prev, pushEnabled: true }));
       onNotice("Notifiche push abilitate per questo browser.");
       await load();
-    } catch (e) { onNotice(e.message, "error"); }
+    } catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
 
@@ -122,21 +123,21 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
       setPreferences(prev => ({ ...prev, pushEnabled: false }));
       onNotice("Notifiche push disattivate.");
       await load();
-    } catch (e) { onNotice(e.message, "error"); }
+    } catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
   const markRead = async item => {
     try { await apiRequest("notifications/" + item.id + "/read", { method: "PATCH", body: {} }); await load(); }
-    catch (e) { onNotice(e.message, "error"); }
+    catch (e) { onNotice(errorMessage(e), "error"); }
   };
   const markAll = async () => {
     try { await apiRequest("notifications/read-all", { method: "POST", body: {} }); await load(); onNotice("Notifiche segnate come lette."); }
-    catch (e) { onNotice(e.message, "error"); }
+    catch (e) { onNotice(errorMessage(e), "error"); }
   };
   const testPush = async () => {
     setBusy(true);
     try { const result = await apiRequest("notifications/test-push", { method: "POST", body: {} }); onNotice("Test push richiesto. Esito: " + JSON.stringify(result.delivery || {})); await load(); }
-    catch (e) { onNotice(e.message, "error"); }
+    catch (e) { onNotice(errorMessage(e), "error"); }
     finally { setBusy(false); }
   };
   const removeDevice = async item => {
@@ -151,12 +152,12 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
         localStorage.removeItem(key);
       }
       await load(); onNotice("Dispositivo rimosso.");
-    } catch (e) { onNotice(e.message, "error"); }
+    } catch (e) { onNotice(errorMessage(e), "error"); }
   };
 
   return <div className="advanced-stack">
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">CENTRO NOTIFICHE</p><h2>Avvisi e lettura</h2><p className="subheading">{unreadCount} non lette · le preferenze si applicano al tuo account.</p></div><div className="inline-actions"><Button onClick={() => load().catch(e => setError(e.message))}>↻ Aggiorna</Button><Button disabled={!unreadCount} onClick={markAll}>Segna tutte come lette</Button></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">CENTRO NOTIFICHE</p><h2>Avvisi e lettura</h2><p className="subheading">{unreadCount} non lette · le preferenze si applicano al tuo account.</p></div><div className="inline-actions"><Button onClick={() => load().catch(e => setError(errorMessage(e)))}>↻ Aggiorna</Button><Button disabled={!unreadCount} onClick={markAll}>Segna tutte come lette</Button></div></div>
       {error && <p className="form-message" role="alert">{error}</p>}
       {initialLoading ? <p className="loading" role="status">Caricamento notifiche…</p> : notifications.length === 0 ? <div className="empty-state"><h3>Nessuna notifica</h3><p>Gli avvisi generati dal server appariranno in questa sezione.</p></div> :
         <div className="notice-list">{notifications.map(item => <article className={"notification-row " + (item.readAt ? "is-read" : "is-unread")} key={item.id}><span className="notification-dot">{item.readAt ? "✓" : "•"}</span><div className="notification-copy"><strong>{item.title}</strong><p>{item.body}</p><small>{item.category} · {dateTime(item.createdAt)}</small></div><div className="notification-actions">{item.targetPath && <a href={item.targetPath} className="text-link">Apri</a>}{!item.readAt && <Button onClick={() => markRead(item)}>Segna letta</Button>}</div></article>)}</div>}

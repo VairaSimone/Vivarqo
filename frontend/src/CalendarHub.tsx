@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { AnyRecord, CommonHubProps } from "./types";
+import { errorMessage } from "./types";
 import { Button, Field, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
@@ -50,7 +51,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       const params = new URLSearchParams({ ...range, view, includeDismissed: String(includeDismissed) });
       const response = await apiRequest("calendar?" + params.toString());
       setItems(Array.isArray(response.items) ? response.items : []);
-    } catch (err) { setError(err.message || "Impossibile caricare il calendario."); }
+    } catch (err) { setError(errorMessage(err) || "Impossibile caricare il calendario."); }
     finally { setBusy(false); }
   }, [range, view, includeDismissed]);
   const loadRules = useCallback(async () => {
@@ -64,7 +65,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       const nextAnimals = Array.isArray(animalResponse.animals) ? animalResponse.animals : [];
       setAnimals(previous => Array.from(new Map([...previous, ...nextAnimals].map(animal => [animal.id, animal])).values()));
       setAnimalsPagination(animalResponse.pagination || { page: animalsPage, pageSize: 100, total: nextAnimals.length, totalPages: 1 });
-    } catch (err) { setError(err.message || "Impossibile caricare i promemoria."); }
+    } catch (err) { setError(errorMessage(err) || "Impossibile caricare i promemoria."); }
   }, [rulePage, animalsPage]);
   useEffect(() => { void loadCalendar(); }, [loadCalendar]);
   useEffect(() => { void loadRules(); }, [loadRules]);
@@ -94,17 +95,17 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       await apiRequest(taskEditing ? "tasks/" + taskEditing.id : "tasks", { method: taskEditing ? "PATCH" : "POST", body });
       setTaskFormOpen(false); setTaskEditing(null); onNotice(taskEditing ? "Attività aggiornata." : "Attività creata.", "success");
       await loadCalendar();
-    } catch (err) { onNotice(err.message || "Salvataggio attività non riuscito.", "error"); }
+    } catch (err) { onNotice(errorMessage(err) || "Salvataggio attività non riuscito.", "error"); }
     finally { setSaving(false); }
   };
   const completeTask = async item => {
     try { await apiRequest("tasks/" + item.id + "/complete", { method: "POST", body: {} }); onNotice("Attività completata.", "success"); await loadCalendar(); }
-    catch (err) { onNotice(err.message || "Impossibile completare l’attività.", "error"); }
+    catch (err) { onNotice(errorMessage(err) || "Impossibile completare l’attività.", "error"); }
   };
   const deleteTask = async item => {
     if (!(await confirmAction({ title: "Eliminare l’attività?", message: "“" + item.title + "” verrà eliminata definitivamente.", confirmLabel: "Elimina attività", danger: true }))) return;
     try { await apiRequest("tasks/" + item.id, { method: "DELETE" }); onNotice("Attività eliminata.", "success"); await loadCalendar(); }
-    catch (err) { onNotice(err.message || "Impossibile eliminare l’attività.", "error"); }
+    catch (err) { onNotice(errorMessage(err) || "Impossibile eliminare l’attività.", "error"); }
   };
   const saveRule = async event => {
     event.preventDefault();
@@ -123,7 +124,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       setRuleForm(null); setRulePage(1);
       onNotice(ruleForm?.id ? "Promemoria ricorrente aggiornato." : "Promemoria ricorrente creato.", "success");
       await loadRules(); await loadCalendar();
-    } catch (err) { onNotice(err.message || "Salvataggio promemoria non riuscito.", "error"); }
+    } catch (err) { onNotice(errorMessage(err) || "Salvataggio promemoria non riuscito.", "error"); }
     finally { setSaving(false); }
   };
   const toggleRule = async rule => {
@@ -131,12 +132,12 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       await apiRequest("tasks/reminder-rules/" + rule.id, { method: "PATCH", body: { isEnabled: !rule.isEnabled } });
       onNotice(rule.isEnabled ? "Promemoria disattivato." : "Promemoria riattivato.", "success");
       await loadRules(); await loadCalendar();
-    } catch (err) { onNotice(err.message || "Impossibile aggiornare il promemoria.", "error"); }
+    } catch (err) { onNotice(errorMessage(err) || "Impossibile aggiornare il promemoria.", "error"); }
   };
   const deleteRule = async rule => {
     if (!(await confirmAction({ title: "Terminare il promemoria ricorrente?", message: "“" + rule.title + "” verrà disattivato e le attività aperte collegate saranno archiviate.", confirmLabel: "Termina promemoria", danger: true }))) return;
     try { await apiRequest("tasks/reminder-rules/" + rule.id, { method: "DELETE" }); onNotice("Promemoria disattivato.", "success"); await loadRules(); await loadCalendar(); }
-    catch (err) { onNotice(err.message || "Impossibile disattivare il promemoria.", "error"); }
+    catch (err) { onNotice(errorMessage(err) || "Impossibile disattivare il promemoria.", "error"); }
   };
 
   const byDay = useMemo(() => {

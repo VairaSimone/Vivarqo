@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { AnyRecord, CommonHubProps } from "./types";
+import { errorMessage } from "./types";
 import { Button, Input, Area, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest, type ApiRequestOptions } from "./api/api";
@@ -66,7 +67,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       const response = await apiRequest("feeding-sessions/" + encodeURIComponent(id));
       setSelectedSession(response.session || null);
     } catch (e) {
-      setError(e.message || "Impossibile caricare il dettaglio della sessione.");
+      setError(errorMessage(e) || "Impossibile caricare il dettaglio della sessione.");
     } finally { setSessionBusy(false); }
   }, []);
 
@@ -96,11 +97,11 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
         setPagination(response.pagination || { page, pageSize: 50, total: list.length, totalPages: 1 });
       }
     } catch (e) {
-      setError(e.message || "Impossibile caricare i registri.");
+      setError(errorMessage(e) || "Impossibile caricare i registri.");
     } finally { setBusy(false); }
   }, [animalId, tab, page, selectedSession]);
 
-  useEffect(() => { void loadAnimals().catch(e => setError(e.message)); }, [loadAnimals]);
+  useEffect(() => { void loadAnimals().catch(e => setError(errorMessage(e))); }, [loadAnimals]);
   useEffect(() => { if (initialAnimalId) { setAnimalId(initialAnimalId); setPage(1); } }, [initialAnimalId]);
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
@@ -148,7 +149,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       onNotice(tab === "feedings" ? "Sessione salvata per " + body.entries.length + " animali." : "Registro creato.", "success");
       await loadRecords();
       if (tab === "feedings" && result.session?.id) await loadSessionDetail(result.session.id);
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
   const submitEdit = async e => {
@@ -174,7 +175,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       const result = await api(path, { method: "PATCH", body }, "Modifica registro: " + TITLES[tab]);
       setEditing(null);
       onNotice("Registro aggiornato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id);
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
   const remove = async record => {
@@ -184,7 +185,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     try {
       const result = await api(endpoint, { method: "DELETE", body: {} }, "Elimina registro: " + TITLES[tab]);
       onNotice("Registro eliminato.", "success"); await loadRecords(); if (tab === "feedings" && selectedSession?.id) await loadSessionDetail(selectedSession.id);
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
   };
 
   const display = record => {

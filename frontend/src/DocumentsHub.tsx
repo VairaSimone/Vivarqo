@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { AnyRecord, CommonHubProps } from "./types";
+import { errorMessage } from "./types";
 import { Button, Field } from "./ui/FormControls";
 import { apiRequest, apiUploadDocument, downloadPrivateDocument } from "./api/api";
 import { createQrMatrix, qrSvgSource } from "./qr";
@@ -97,18 +98,18 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       setShareEnabled(Boolean(saved?.isEnabled));
     } catch (e) {
       if (e.status === 404) { setShare(null); setShareFields(["name", "species", "morph"]); setPublicDescription(""); setShareEnabled(false); }
-      else setError(e.message);
+      else setError(errorMessage(e));
     }
   }, []);
 
   const reload = useCallback(async () => {
     setBusy(true); setError("");
     try { await loadLists(); await loadShare(selectedAnimal); }
-    catch (e) { setError(e.message || "Impossibile caricare documenti e condivisioni."); }
+    catch (e) { setError(errorMessage(e) || "Impossibile caricare documenti e condivisioni."); }
     finally { setBusy(false); }
   }, [loadLists, loadShare, selectedAnimal]);
 
-  useEffect(() => { let live = true; void loadLists().catch(e => setError(e.message)).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
+  useEffect(() => { let live = true; void loadLists().catch(e => setError(errorMessage(e))).finally(() => { if (live) setListsLoaded(true); }); return () => { live = false; }; }, [loadLists]);
   useEffect(() => { void loadShare(selectedAnimal); }, [selectedAnimal, loadShare]);
 
   const upload = async e => {
@@ -123,13 +124,13 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       form.reset();
       onNotice("Documento caricato nell'archivio privato.");
       await loadLists();
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
     finally { setBusy(false); }
   };
   const removeDocument = async doc => {
     if (!(await confirmAction({ title: "Eliminare il documento?", message: "“" + doc.originalFilename + "” verrà eliminato definitivamente dall’archivio privato.", confirmLabel: "Elimina documento", danger: true }))) return;
     try { await apiRequest("documents/" + doc.id, { method: "DELETE", body: {} }); onNotice("Documento eliminato."); await loadLists(); }
-    catch (err) { onNotice(err.message, "error"); }
+    catch (err) { onNotice(errorMessage(err), "error"); }
   };
   const editDocument = doc => setEditingDocument({ ...doc });
   const saveDocumentEdit = async event => {
@@ -144,7 +145,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       setEditingDocument(null);
       onNotice("Metadati del documento aggiornati.", "success");
       await loadLists();
-    } catch (err) { onNotice(err.message || "Impossibile aggiornare il documento.", "error"); }
+    } catch (err) { onNotice(errorMessage(err) || "Impossibile aggiornare il documento.", "error"); }
     finally { setSavingDocumentEdit(false); }
   };
   const saveShare = async e => {
@@ -160,7 +161,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       setShare(saved);
       onNotice(shareEnabled ? "Profilo pubblico aggiornato e attivo." : "Impostazioni del profilo aggiornate.");
       await loadShare(selectedAnimal);
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
     finally { setBusy(false); }
   };
   const revokeShare = async () => {
@@ -171,7 +172,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       setShare(result.share || { ...share, isEnabled: false, revokedAt: new Date().toISOString() });
       setShareEnabled(false);
       onNotice("Link pubblico revocato.");
-    } catch (err) { onNotice(err.message, "error"); }
+    } catch (err) { onNotice(errorMessage(err), "error"); }
   };
   const publicUrl = shareEnabled && share?.isEnabled && share?.revokedAt == null ? (share.url || (share.slug ? window.location.origin + "/public/animals/" + share.slug : "")) : "";
   const selectedName = animals.find(a => a.id === selectedAnimal)?.name || "animale";
@@ -191,7 +192,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
         <div className="form-actions form-full"><Button variant="primary" disabled={busy || !file}>{busy ? "Attendi…" : "Carica documento"}</Button></div>
       </form>
       {!listsLoaded && documents.length === 0 ? <p className="loading" role="status">Caricamento documenti…</p> : documents.length === 0 ? <div className="empty-state"><h3>Nessun documento</h3><p>I documenti caricati compariranno qui e resteranno privati finché non li colleghi a una condivisione esplicita.</p></div> :
-        <div className="table-wrap"><table><thead><tr><th>Nome file</th><th>Categoria</th><th>Dimensione</th><th>Data</th><th>Collegamento</th><th>Azioni</th></tr></thead><tbody>{documents.map(doc => <tr key={doc.id}><td><strong>{doc.originalFilename}</strong>{doc.note && <small className="table-subtext">{doc.note}</small>}</td><td>{doc.category}</td><td>{bytes(doc.sizeBytes)}</td><td>{displayDate(doc.createdAt)}</td><td>{animals.find(a => a.id === doc.animalId)?.name || cycles.find(c => c.id === doc.cycleId)?.name || (doc.animalId ? "Animale" : doc.cycleId ? "Ciclo riproduttivo" : "—")}</td><td><div className="inline-actions"><Button onClick={() => downloadPrivateDocument(doc.id, doc.originalFilename).catch(e => onNotice(e.message, "error"))}>Scarica</Button><Button onClick={() => editDocument(doc)}>Modifica</Button><Button variant="danger" onClick={() => removeDocument(doc)}>Elimina</Button></div></td></tr>)}</tbody></table></div>}
+        <div className="table-wrap"><table><thead><tr><th>Nome file</th><th>Categoria</th><th>Dimensione</th><th>Data</th><th>Collegamento</th><th>Azioni</th></tr></thead><tbody>{documents.map(doc => <tr key={doc.id}><td><strong>{doc.originalFilename}</strong>{doc.note && <small className="table-subtext">{doc.note}</small>}</td><td>{doc.category}</td><td>{bytes(doc.sizeBytes)}</td><td>{displayDate(doc.createdAt)}</td><td>{animals.find(a => a.id === doc.animalId)?.name || cycles.find(c => c.id === doc.cycleId)?.name || (doc.animalId ? "Animale" : doc.cycleId ? "Ciclo riproduttivo" : "—")}</td><td><div className="inline-actions"><Button onClick={() => downloadPrivateDocument(doc.id, doc.originalFilename).catch(e => onNotice(errorMessage(e), "error"))}>Scarica</Button><Button onClick={() => editDocument(doc)}>Modifica</Button><Button variant="danger" onClick={() => removeDocument(doc)}>Elimina</Button></div></td></tr>)}</tbody></table></div>}
       {documentsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {documentsPagination.page || documentsPage} di {documentsPagination.totalPages} · {documentsPagination.total} documenti</span><div className="inline-actions"><Button disabled={documentsPage <= 1 || busy} onClick={() => setDocumentsPage(p => p - 1)}>← Precedente</Button><Button disabled={documentsPage >= documentsPagination.totalPages || busy} onClick={() => setDocumentsPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>
 
@@ -205,7 +206,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
         <div className="form-actions form-full"><Button variant="primary" disabled={busy || !selectedAnimal || shareFields.length === 0}>Salva condivisione</Button>{share?.id && <Button type="button" variant="danger" onClick={revokeShare}>Revoca link</Button>}</div>
       </form>
       {share && <div className="share-preview">
-        <div><span className={"pill " + (shareEnabled && share.isEnabled ? "sage" : "danger")}>{shareEnabled && share.isEnabled ? "Link attivo" : "Link disattivato"}</span><h3>QR di {selectedName}</h3><p>Il codice viene generato sul dispositivo: il link non viene inviato a un servizio QR esterno.</p>{publicUrl && <p className="share-url"><a href={publicUrl} target="_blank" rel="noopener noreferrer">{publicUrl}</a></p>}<div className="inline-actions"><Button disabled={!publicUrl || !(shareEnabled && share.isEnabled)} onClick={() => { void navigator.clipboard?.writeText(publicUrl).then(() => onNotice("Link copiato.")).catch(() => onNotice("Copia non disponibile in questo browser.", "error")); }}>Copia link</Button><Button disabled={!publicUrl || !(shareEnabled && share.isEnabled)} onClick={() => { try { downloadQr(publicUrl, selectedName.toLowerCase().replace(/[^a-z0-9]+/g, "-")); } catch (e) { onNotice(e.message, "error"); } }}>Scarica QR SVG</Button></div></div>
+        <div><span className={"pill " + (shareEnabled && share.isEnabled ? "sage" : "danger")}>{shareEnabled && share.isEnabled ? "Link attivo" : "Link disattivato"}</span><h3>QR di {selectedName}</h3><p>Il codice viene generato sul dispositivo: il link non viene inviato a un servizio QR esterno.</p>{publicUrl && <p className="share-url"><a href={publicUrl} target="_blank" rel="noopener noreferrer">{publicUrl}</a></p>}<div className="inline-actions"><Button disabled={!publicUrl || !(shareEnabled && share.isEnabled)} onClick={() => { void navigator.clipboard?.writeText(publicUrl).then(() => onNotice("Link copiato.")).catch(() => onNotice("Copia non disponibile in questo browser.", "error")); }}>Copia link</Button><Button disabled={!publicUrl || !(shareEnabled && share.isEnabled)} onClick={() => { try { downloadQr(publicUrl, selectedName.toLowerCase().replace(/[^a-z0-9]+/g, "-")); } catch (e) { onNotice(errorMessage(e), "error"); } }}>Scarica QR SVG</Button></div></div>
         <div className="qr-frame">{shareEnabled && share.isEnabled ? <QRCode value={publicUrl}/> : <div className="qr-disabled">Attiva e salva la condivisione per rendere disponibile il QR.</div>}</div>
       </div>}
     </section>
@@ -225,7 +226,7 @@ export function PublicAnimalPage({ slug }: { slug: string }) {
     setBusy(true);
     apiRequest("public/animals/" + encodeURIComponent(slug))
       .then(data => { if (current) setResult(data); })
-      .catch(e => { if (current) setError(e.message || "Profilo non disponibile."); })
+      .catch(e => { if (current) setError(errorMessage(e) || "Profilo non disponibile."); })
       .finally(() => { if (current) setBusy(false); });
     return () => { current = false; };
   }, [slug]);

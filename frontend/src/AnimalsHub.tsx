@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { AnyRecord, CommonHubProps } from "./types";
+import { errorMessage } from "./types";
 import { Button, Input, Select } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { Icon } from "./ui/Icon";
@@ -76,7 +77,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       setAnimals(arrayOf(response.animals));
       setPagination(response.pagination || { page, pageSize: 50, total: arrayOf(response.animals).length, totalPages: 1 });
     } catch (err) {
-      setError(err.message || "Impossibile caricare gli animali.");
+      setError(errorMessage(err) || "Impossibile caricare gli animali.");
     } finally { setBusy(false); }
   }, [page, debouncedQuery, status, filters]);
 
@@ -89,7 +90,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       onNotice(label, "success");
       setEditor(null); setBulkOpen(false);
       await load();
-    } catch (err) { onNotice(err.message || "Operazione non riuscita.", "error"); }
+    } catch (err) { onNotice(errorMessage(err) || "Operazione non riuscita.", "error"); }
     finally { setSaving(false); }
   };
   const submitEditor = event => {
@@ -134,7 +135,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
         const animal = response.animal || response;
         if (animal?.id) void loadAnimalHistory(animal, 1);
       })
-      .catch(error => { if (!cancelled) onNotice(error.message || "Impossibile aprire la scheda animale.", "error"); });
+      .catch(error => { if (!cancelled) onNotice(errorMessage(error) || "Impossibile aprire la scheda animale.", "error"); });
     return () => { cancelled = true; };
   }, [initialAnimalId]);
 
@@ -167,7 +168,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       setHistory({ animal, page: nextPage, items: arrayOf(response.items), pagination: response.pagination || { page: nextPage, pageSize: 50, total: arrayOf(response.items).length, truncated: false } });
     } catch (err) {
       setHistory(null);
-      onNotice(err.message || "Impossibile caricare lo storico dell'animale.", "error");
+      onNotice(errorMessage(err) || "Impossibile caricare lo storico dell'animale.", "error");
     } finally { setHistoryLoading(false); }
   };
 

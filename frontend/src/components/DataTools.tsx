@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { AnyRecord, NoticeHandler } from "../types";
+import { errorMessage } from "../types";
 import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest, apiUpload } from "../api/api";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
@@ -24,7 +25,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
       const result = await apiUpload("imports?entity=" + encodeURIComponent(entity), file);
       setPreview(result);
       onNotice("Anteprima pronta: nessun dato importato ancora.");
-    } catch (error) { onNotice(error.message, "error"); }
+    } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
   const downloadWhenReady = async id => {
@@ -34,7 +35,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
       setExportJob({ ...result.export, ready: result.ready });
       if (result.ready) window.location.assign("/api/v1/exports/" + encodeURIComponent(id) + "/download");
       else onNotice("L'esportazione non è ancora pronta. Verifica nuovamente lo stato tra poco.", "warning");
-    } catch (error) { onNotice(error.message, "error"); }
+    } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
   const exportData = async () => {
@@ -45,7 +46,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
       if (!id) throw new Error("Il server non ha restituito l'identificativo dell'esportazione.");
       setExportJob({ ...result.export, ready: false });
       onNotice("Esportazione accodata. La generazione prosegue in background.");
-    } catch (error) { onNotice(error.message, "error"); }
+    } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
   const confirmImport = async () => {
@@ -65,7 +66,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
       setPreview(null);
       setImportJob({ id, status: result.status || "queued", createdCount: 0, errorCount: result.errorCount || 0 });
       onNotice("Importazione accodata. L'elaborazione prosegue in background.");
-    } catch (error) { onNotice(error.message, "error"); }
+    } catch (error) { onNotice(errorMessage(error), "error"); }
     finally { setBusy(false); }
   };
   const statusLabel = status => ({ pending: "In attesa", queued: "In coda", processing: "In elaborazione", completed: "Completata", failed: "Non riuscita", expired: "Scaduta" }[status] || status || "Sconosciuto");

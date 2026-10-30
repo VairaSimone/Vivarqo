@@ -38,3 +38,14 @@ export function readFormValues(form: HTMLFormElement): Record<string, string> {
   }
   return values;
 }
+
+
+/** Safely extracts a message from unknown values caught by async handlers. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return "Si è verificato un errore imprevisto.";
+}
