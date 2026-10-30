@@ -30,19 +30,28 @@ async function claimImport(jobId?: string): Promise<ClaimedImport | null> {
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
   });
 
-  const rows = await prisma.$queryRawUnsafe<ClaimedImport[]>(
-    "WITH candidate AS (" +
-    " SELECT id FROM import_jobs WHERE expires_at > $1 AND attempts < $2 " +
-    " AND (status = 'queued' OR (status = 'processing' AND processing_started_at <= $3)) " +
-    " AND ($4::uuid IS NULL OR id = $4::uuid) " +
-    " ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED" +
-    ") UPDATE import_jobs AS job SET status = 'processing', processing_started_at = $1, " +
-    " attempts = job.attempts + 1, lease_token = gen_random_uuid(), last_error_code = NULL, updated_at = $1 " +
-    " FROM candidate WHERE job.id = candidate.id " +
-    " RETURNING job.id::text AS id, job.user_id::text AS \"userId\", job.entity_type AS \"entityType\", " +
-    " job.attempts AS attempts, job.lease_token::text AS \"leaseToken\"",
-    now, MAX_ATTEMPTS, staleBefore, jobId ?? null,
-  );
+  // Capacity is enforced in PostgreSQL, not per worker process. Advisory transaction
+  // locking makes the count + claim atomic across every running worker replica.
+  const rows = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-import-capacity', 0))`;
+    const activeJobs = await tx.importJob.count({
+      where: { status: "processing", processingStartedAt: { gt: staleBefore }, expiresAt: { gt: now } },
+    });
+    if (activeJobs >= 2) return [];
+    return tx.$queryRawUnsafe<ClaimedImport[]>(
+      "WITH candidate AS (" +
+      " SELECT id FROM import_jobs WHERE expires_at > $1 AND attempts < $2 " +
+      " AND (status = 'queued' OR (status = 'processing' AND processing_started_at <= $3)) " +
+      " AND ($4::uuid IS NULL OR id = $4::uuid) " +
+      " ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED" +
+      ") UPDATE import_jobs AS job SET status = 'processing', processing_started_at = $1, " +
+      " attempts = job.attempts + 1, lease_token = gen_random_uuid(), last_error_code = NULL, updated_at = $1 " +
+      " FROM candidate WHERE job.id = candidate.id " +
+      " RETURNING job.id::text AS id, job.user_id::text AS \"userId\", job.entity_type AS \"entityType\", " +
+      " job.attempts AS attempts, job.lease_token::text AS \"leaseToken\"",
+      now, MAX_ATTEMPTS, staleBefore, jobId ?? null,
+    );
+  });
   return rows[0] ?? null;
 }
 
@@ -62,19 +71,28 @@ async function claimExport(jobId?: string): Promise<ClaimedExport | null> {
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
   });
 
-  const rows = await prisma.$queryRawUnsafe<ClaimedExport[]>(
-    "WITH candidate AS (" +
-    " SELECT id FROM export_jobs WHERE expires_at > $1 AND attempts < $2 " +
-    " AND (status = 'pending' OR (status = 'processing' AND processing_started_at <= $3)) " +
-    " AND ($4::uuid IS NULL OR id = $4::uuid) " +
-    " ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED" +
-    ") UPDATE export_jobs AS job SET status = 'processing', processing_started_at = $1, " +
-    " attempts = job.attempts + 1, lease_token = gen_random_uuid(), last_error_code = NULL, updated_at = $1 " +
-    " FROM candidate WHERE job.id = candidate.id " +
-    " RETURNING job.id::text AS id, job.user_id::text AS \"userId\", job.attempts AS attempts, " +
-    " job.lease_token::text AS \"leaseToken\"",
-    now, MAX_ATTEMPTS, staleBefore, jobId ?? null,
-  );
+  // A shared capacity gate prevents a fleet of worker replicas from all
+  // launching expensive ZIP creation jobs at once.
+  const rows = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-export-capacity', 0))`;
+    const activeJobs = await tx.exportJob.count({
+      where: { status: "processing", processingStartedAt: { gt: staleBefore }, expiresAt: { gt: now } },
+    });
+    if (activeJobs >= 2) return [];
+    return tx.$queryRawUnsafe<ClaimedExport[]>(
+      "WITH candidate AS (" +
+      " SELECT id FROM export_jobs WHERE expires_at > $1 AND attempts < $2 " +
+      " AND (status = 'pending' OR (status = 'processing' AND processing_started_at <= $3)) " +
+      " AND ($4::uuid IS NULL OR id = $4::uuid) " +
+      " ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED" +
+      ") UPDATE export_jobs AS job SET status = 'processing', processing_started_at = $1, " +
+      " attempts = job.attempts + 1, lease_token = gen_random_uuid(), last_error_code = NULL, updated_at = $1 " +
+      " FROM candidate WHERE job.id = candidate.id " +
+      " RETURNING job.id::text AS id, job.user_id::text AS \"userId\", job.attempts AS attempts, " +
+      " job.lease_token::text AS \"leaseToken\"",
+      now, MAX_ATTEMPTS, staleBefore, jobId ?? null,
+    );
+  });
   return rows[0] ?? null;
 }
 
