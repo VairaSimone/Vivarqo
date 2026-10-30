@@ -82,3 +82,78 @@ jobs:
       - name: Run browser end-to-end tests
         working-directory: frontend/e2e
         run: npm test
+
+
+  real-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public
+      NODE_ENV: test
+      APP_ORIGIN: http://127.0.0.1:5173
+      API_ORIGIN: http://127.0.0.1:3000
+      CSRF_SECRET: vivarqo-ci-only-csrf-secret-not-for-production-2026
+      PRIVATE_STORAGE_PATH: ./var/private
+      VIVARQO_API_TARGET: http://127.0.0.1:3000
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: vivarqo
+          POSTGRES_USER: vivarqo
+          POSTGRES_PASSWORD: vivarqo_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vivarqo -d vivarqo"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.20.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Apply PostgreSQL migrations
+        run: pnpm db:migrate:deploy
+      - name: Seed isolated real-E2E accounts
+        run: pnpm --filter @vivarqo/api exec tsx test/seed-real-e2e.ts
+      - name: Build API
+        run: pnpm build:api
+      - name: Start real API server
+        run: |
+          nohup pnpm --filter @vivarqo/api start > "$RUNNER_TEMP/vivarqo-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/vivarqo-api.pid"
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:3000/readyz > /dev/null; then
+              echo "Vivarqo API is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/vivarqo-api.log"
+          exit 1
+      - name: Install Playwright test dependencies
+        working-directory: frontend/e2e
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: frontend/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Run browser tests against real API and PostgreSQL
+        working-directory: frontend/e2e
+        run: npx playwright test --config=playwright.real.config.js
+      - name: Show API log on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/vivarqo-api.log"

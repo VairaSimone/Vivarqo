@@ -384,7 +384,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .send({ occurredAt: "2026-10-27T10:00:00.000Z", outcome: "partial", notes: "Tip of tail retained" })
       .expect(201);
 
-    await owner.agent
+    const note = await owner.agent
       .post(`/api/v1/animals/${animal.id}/notes`)
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
@@ -406,6 +406,48 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(foreignResponse.body.code).toBe("ANIMAL_NOT_FOUND");
     expect(foreignAnimal.id).not.toBe(animal.id);
     expect(shed.body.shed.outcome).toBe("partial");
+
+    // Ownership must be checked on direct resource IDs as well as parent
+    // animal routes. A different account must not read, mutate, archive or
+    // delete any of the owner's records.
+    const foreignAnimalRead = await other.agent.get(`/api/v1/animals/${animal.id}`).expect(404);
+    expect(foreignAnimalRead.body.code).toBe("ANIMAL_NOT_FOUND");
+    await other.agent
+      .patch(`/api/v1/animals/${animal.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ notes: "cross-account write" }).expect(404);
+    await other.agent
+      .post(`/api/v1/animals/${animal.id}/archive`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({}).expect(404);
+    await other.agent
+      .delete(`/api/v1/animals/${animal.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .expect(404);
+
+    await other.agent
+      .delete(`/api/v1/weights/${weight.body.weight.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .expect(404);
+    await other.agent
+      .patch(`/api/v1/sheds/${shed.body.shed.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ outcome: "complete" }).expect(404);
+    await other.agent
+      .delete(`/api/v1/sheds/${shed.body.shed.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .expect(404);
+    await other.agent
+      .patch(`/api/v1/animal-notes/${note.body.note.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ body: "cross-account write" }).expect(404);
+    await other.agent
+      .delete(`/api/v1/animal-notes/${note.body.note.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .expect(404);
+
+    const stillOwned = await owner.agent.get(`/api/v1/animals/${animal.id}/history`).expect(200);
+    expect(stillOwned.body.items).toHaveLength(3);
   });
 
   it("refuses permanent deletion when the animal has dependent care history", async () => {

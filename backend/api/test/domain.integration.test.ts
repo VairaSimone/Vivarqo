@@ -342,4 +342,112 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(503);
     expect(noCredentials.body.code).toBe("BILLING_NOT_CONFIGURED");
   });
+
+  it("enforces account ownership for inventory, finance, documents, shares, genetic traits and preferences", async () => {
+    const owner = await account();
+    const other = await account();
+    const animal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Owner-only animal", species: "Python regius", notes: "Private owner note" },
+    });
+    const otherAnimal = await prisma.animal.create({
+      data: { userId: other.userId, name: "Other account animal", species: "Boa constrictor" },
+    });
+
+    // Inventory list, item detail, updates, stock movements and archive action.
+    const inventory = await owner.agent.post("/api/v1/inventory/items")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Owner food stock", category: "food", unit: "pcs", quantityOnHand: 2, minimumQuantity: 1 })
+      .expect(201);
+    const itemId = inventory.body.item.id as string;
+    const otherInventory = await other.agent.get("/api/v1/inventory/items?active=all").expect(200);
+    expect(otherInventory.body.items.some((item: { id: string }) => item.id === itemId)).toBe(false);
+    await other.agent.get(`/api/v1/inventory/items/${itemId}`).expect(404);
+    await other.agent.patch(`/api/v1/inventory/items/${itemId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ name: "Stolen inventory item" }).expect(404);
+    await other.agent.post(`/api/v1/inventory/items/${itemId}/movements`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ movementType: "in", quantity: 1, occurredAt: "2026-10-28T10:00:00.000Z" }).expect(404);
+    await other.agent.get(`/api/v1/inventory/items/${itemId}/movements`).expect(404);
+    await other.agent.post(`/api/v1/inventory/items/${itemId}/archive`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({}).expect(404);
+
+    // Finance collection and direct ID operations.
+    const finance = await owner.agent.post("/api/v1/finance/entries")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ entryType: "expense", occurredOn: "2026-10-20", amountCents: 990, currency: "EUR", category: "food", description: "Owner-only expense" })
+      .expect(201);
+    const financeId = finance.body.entry.id as string;
+    const otherFinance = await other.agent.get("/api/v1/finance/entries").expect(200);
+    expect(otherFinance.body.entries.some((entry: { id: string }) => entry.id === financeId)).toBe(false);
+    await other.agent.patch(`/api/v1/finance/entries/${financeId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ description: "Unauthorized edit" }).expect(404);
+    await other.agent.delete(`/api/v1/finance/entries/${financeId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf).expect(404);
+
+    // Private documents and their public-share control plane remain owner-only.
+    const upload = await owner.agent.post("/api/v1/documents")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "application/pdf")
+      .set("X-Document-Name", "owner-private.pdf")
+      .set("X-Document-Category", "records")
+      .set("X-Animal-Id", animal.id)
+      .send(pdf).expect(201);
+    const documentId = upload.body.document.id as string;
+    const otherDocuments = await other.agent.get("/api/v1/documents").expect(200);
+    expect(otherDocuments.body.documents.some((document: { id: string }) => document.id === documentId)).toBe(false);
+    await other.agent.get(`/api/v1/documents/${documentId}/download`).expect(404);
+    await other.agent.patch(`/api/v1/documents/${documentId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ note: "Unauthorized edit" }).expect(404);
+    await other.agent.delete(`/api/v1/documents/${documentId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf).expect(404);
+
+    const share = await owner.agent.post(`/api/v1/animals/${animal.id}/public-share`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ visibleFields: ["species"], isEnabled: true }).expect(201);
+    await other.agent.get(`/api/v1/animals/${animal.id}/public-share`).expect(404);
+    await other.agent.patch(`/api/v1/public-shares/${share.body.share.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ revoke: true }).expect(404);
+    const ownerShare = await owner.agent.get(`/api/v1/animals/${animal.id}/public-share`).expect(200);
+    expect(ownerShare.body.share.isEnabled).toBe(true);
+
+    // Genetic-trait records are child resources: ownership must be inherited
+    // from the parent animal, and source animals must belong to the same user.
+    const trait = await owner.agent.post(`/api/v1/animals/${animal.id}/genetic-traits`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ traitName: "Pastel", traitValue: "Visual", confidenceNote: "Owner record" }).expect(201);
+    const traitId = trait.body.trait.id as string;
+    await other.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(404);
+    await other.agent.patch(`/api/v1/genetic-traits/${traitId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ traitValue: "Overwritten" }).expect(404);
+    await other.agent.delete(`/api/v1/genetic-traits/${traitId}`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf).expect(404);
+    const invalidSource = await other.agent.post(`/api/v1/animals/${otherAnimal.id}/genetic-traits`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ traitName: "Source", traitValue: "Unknown", sourceAnimalId: animal.id }).expect(404);
+    expect(invalidSource.body.code).toBe("ANIMAL_NOT_FOUND");
+
+    // Account preferences are separate rows, never a shared global setting.
+    await owner.agent.patch("/api/v1/account/preferences")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ theme: "dark", weightUnit: "kg" }).expect(200);
+    const otherPreferences = await other.agent.get("/api/v1/account/preferences").expect(200);
+    expect(otherPreferences.body.preferences.theme).toBe("system");
+    expect(otherPreferences.body.preferences.weightUnit).toBe("g");
+
+    // The denied requests above must not have changed or removed owner's data.
+    const stillThere = await owner.agent.get(`/api/v1/inventory/items/${itemId}`).expect(200);
+    expect(Number(stillThere.body.item.quantityOnHand)).toBe(2);
+    const ownerFinance = await owner.agent.get("/api/v1/finance/entries?page=1&pageSize=100").expect(200);
+    expect(ownerFinance.body.entries.some((entry: { id: string }) => entry.id === financeId)).toBe(true);
+    await owner.agent.get(`/api/v1/documents/${documentId}/download`).expect(200);
+    const ownerTraits = await owner.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(200);
+    expect(ownerTraits.body.traits.map((item: { id: string }) => item.id)).toContain(traitId);
+  });
+
 });
