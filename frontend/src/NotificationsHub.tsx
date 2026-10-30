@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { Button } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
@@ -8,7 +9,6 @@ const categories = [
 ];
 const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
 const dateTime = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
-function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 function fromBase64Url(value) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);

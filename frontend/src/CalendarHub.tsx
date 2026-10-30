@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { Button, Field, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
 import { Icon } from "./ui/Icon";
@@ -23,16 +24,6 @@ const dateRange = (anchor, view) => {
   else { from = new Date(anchor.getFullYear(), anchor.getMonth(), 1); to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0); }
   return { from: dateKey(from), to: dateKey(to) };
 };
-function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
-  label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
-}
-function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }: FieldProps) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props}/></label>; }
-interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
-  label: string; name: string; defaultValue?: string | number; options: string[][];
-}
-function Select({ label, name, defaultValue, options, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? options[0][0]} {...props}>{options.map(([v, label]) => <option value={v} key={v}>{label}</option>)}</select></label>; }
-
 export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
   const [view, setView] = useState(() => window.matchMedia?.("(max-width: 760px)").matches ? "list" : "month");

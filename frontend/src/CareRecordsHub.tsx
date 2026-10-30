@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { Button, Input, Area, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
@@ -21,20 +22,6 @@ const TITLES = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings
 const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
 const SHED: string[][] = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
 const FEED_OUTCOME: string[][] = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
-function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
-  label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
-  min?: string | number; max?: string | number; step?: string | number;
-}
-function Input({ label, name, type = "text", defaultValue, required = false, min, max, step, placeholder, ...props }: InputProps) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder} {...props}/></label>; }
-interface AreaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "name" | "defaultValue"> {
-  label: string; name: string; defaultValue?: string | null;
-}
-function Area({ label, name, defaultValue, required = false, rows = 3, ...props }: AreaProps) { return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} required={required} rows={rows} {...props}/></label>; }
-interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
-  label: string; name: string; defaultValue?: string | number | null; options: string[][]; required?: boolean;
-}
-function Select({ label, name, defaultValue, options, required = false, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required} {...props}>{options.map(o => <option value={o[0]} key={o[0]}>{o[1]}</option>)}</select></label>; }
 const emptyFeedingEntry = animalId => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
 export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }: CommonHubProps) {

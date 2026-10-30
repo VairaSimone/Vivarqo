@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { Button, Field } from "./ui/FormControls";
 import { apiRequest, apiUploadDocument, downloadPrivateDocument } from "./api/api";
 import { createQrMatrix, qrSvgSource } from "./qr";
 import { Dialog } from "./ui/Dialog";
@@ -17,12 +18,6 @@ const bytes = value => {
 const fields = [
   ["name", "Nome"], ["species", "Specie"], ["morph", "Morph"], ["sex", "Sesso"], ["birthDate", "Data di nascita"]
 ];
-function Button({ children, variant = "secondary", ...props }) {
-  return <button className={"button " + variant} {...props}>{children}</button>;
-}
-function Field({ label, children, ...props }) {
-  return <label className="field"><span>{label}</span>{children || <input {...props}/>}</label>;
-}
 function QRCode({ value }) {
   const result = useMemo(() => {
     if (!value) return null;

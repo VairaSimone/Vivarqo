@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import type { AccountUser, NoticeHandler } from "../types";
+import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest } from "../api/api";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
 
-function Button({ children, variant = "", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-function Field({ label, ...props }) { return <label className="field"><span>{label}</span><input {...props}/></label>; }
-function SelectField({ label, children, ...props }) { return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>; }
 
 const DEFAULT_PREFERENCES = {
   weightUnit: "g",
