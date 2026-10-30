@@ -1,38 +1,38 @@
 /// <reference lib="webworker" />
 
-declare const self: ServiceWorkerGlobalScope;
+const serviceWorker = self as unknown as any;
 
 /* Static-shell cache only: never intercept API responses or authenticated files. */
 const CACHE = "vivarqo-static-v2";
 const STATIC = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 const STATIC_DESTINATIONS = new Set<RequestDestination>(["script", "style", "image", "font"]);
 
-self.addEventListener("install", (event: ExtendableEvent) => {
+serviceWorker.addEventListener("install", (event: any) => {
   // Keep the previous worker active until the user accepts an available update.
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC)));
 });
 
-self.addEventListener("message", (event: ExtendableMessageEvent) => {
+serviceWorker.addEventListener("message", (event: any) => {
   if ((event.data as { type?: string } | null)?.type === "SKIP_WAITING") {
-    void self.skipWaiting();
+    void serviceWorker.skipWaiting();
   }
 });
 
-self.addEventListener("activate", (event: ExtendableEvent) => {
+serviceWorker.addEventListener("activate", (event: any) => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
         keys.filter(key => key.startsWith("vivarqo-static-") && key !== CACHE).map(key => caches.delete(key))
       ))
-      .then(() => self.clients.claim())
+      .then(() => serviceWorker.clients.claim())
   );
 });
 
-self.addEventListener("fetch", (event: FetchEvent) => {
+serviceWorker.addEventListener("fetch", (event: any) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== serviceWorker.location.origin) return;
   if (url.pathname.startsWith("/api/") || url.pathname === "/readyz" || url.pathname === "/healthz") return;
 
   if (request.mode === "navigate") {
@@ -63,7 +63,7 @@ self.addEventListener("fetch", (event: FetchEvent) => {
 });
 
 /* Show server-sent Web Push messages while the app is closed or in the background. */
-self.addEventListener("push", (event: PushEvent) => {
+serviceWorker.addEventListener("push", (event: any) => {
   event.waitUntil((async () => {
     let payload: Record<string, unknown> = {};
     try {
@@ -80,7 +80,7 @@ self.addEventListener("push", (event: PushEvent) => {
     const safeUrl = requestedUrl.startsWith("/") && !requestedUrl.startsWith("//") ? requestedUrl : "/";
     const category = typeof payload.category === "string" ? payload.category.slice(0, 30) : "general";
 
-    await self.registration.showNotification(title, {
+    await serviceWorker.registration.showNotification(title, {
       body,
       icon: "/pwa-icon.svg",
       badge: "/pwa-icon.svg",
@@ -92,22 +92,22 @@ self.addEventListener("push", (event: PushEvent) => {
 });
 
 /* Open only same-origin relative paths from validated push payloads. */
-self.addEventListener("notificationclick", (event: NotificationEvent) => {
+serviceWorker.addEventListener("notificationclick", (event: any) => {
   event.notification.close();
   const requestedUrl = (event.notification.data as { url?: unknown } | null)?.url;
   const safeUrl = typeof requestedUrl === "string" && requestedUrl.startsWith("/") && !requestedUrl.startsWith("//")
     ? requestedUrl
     : "/";
-  const target = new URL(safeUrl, self.location.origin);
+  const target = new URL(safeUrl, serviceWorker.location.origin);
 
   event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const windows = await serviceWorker.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of windows) {
-      if (new URL(client.url).origin !== self.location.origin) continue;
+      if (new URL(client.url).origin !== serviceWorker.location.origin) continue;
       if ("navigate" in client) await client.navigate(target.href);
       await client.focus();
       return;
     }
-    if (self.clients.openWindow) await self.clients.openWindow(target.href);
+    if (serviceWorker.clients.openWindow) await serviceWorker.clients.openWindow(target.href);
   })());
 });
