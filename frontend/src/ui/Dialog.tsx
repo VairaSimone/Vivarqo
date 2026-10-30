@@ -20,7 +20,7 @@ export function Dialog({
   danger = false, size = "normal"
 }: DialogProps) {
   const titleId = useId();
-  const handleSubmit = event => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!busy) onSubmit?.(event);
   };
