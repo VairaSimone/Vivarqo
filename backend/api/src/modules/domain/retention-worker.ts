@@ -150,7 +150,9 @@ export async function cleanupExpiredPrivateData(now = new Date()): Promise<Reten
   }
 
   const expiredExports = await prisma.exportJob.findMany({
-    where: { expiresAt: { lte: now }, status: { not: "expired" } },
+    // The data worker owns active processing jobs. Only clean them after it
+    // has marked an expired/stale lease as failed.
+    where: { expiresAt: { lte: now }, status: { notIn: ["expired", "processing"] } },
     select: { id: true, userId: true, status: true, storageKey: true },
     orderBy: { expiresAt: "asc" },
     take: MAX_EXPORT_CLEANUPS_PER_RUN,
