@@ -21,7 +21,11 @@ async function claimImport(jobId?: string): Promise<ClaimedImport | null> {
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_ATTEMPTS_EXHAUSTED" },
   });
   await prisma.importJob.updateMany({
-    where: { status: { in: ["queued", "processing"] }, expiresAt: { lte: now } },
+    where: { status: "queued", expiresAt: { lte: now } },
+    data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
+  });
+  await prisma.importJob.updateMany({
+    where: { status: "processing", expiresAt: { lte: now }, processingStartedAt: { lte: staleBefore } },
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
   });
 
@@ -49,7 +53,11 @@ async function claimExport(jobId?: string): Promise<ClaimedExport | null> {
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_ATTEMPTS_EXHAUSTED" },
   });
   await prisma.exportJob.updateMany({
-    where: { status: { in: ["pending", "processing"] }, expiresAt: { lte: now } },
+    where: { status: "pending", expiresAt: { lte: now } },
+    data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
+  });
+  await prisma.exportJob.updateMany({
+    where: { status: "processing", expiresAt: { lte: now }, processingStartedAt: { lte: staleBefore } },
     data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "JOB_EXPIRED" },
   });
 

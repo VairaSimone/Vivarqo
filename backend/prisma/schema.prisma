@@ -478,27 +478,39 @@ model ImportJob {
   createdCount Int       @default(0) @map("created_count")
   skippedCount Int       @default(0) @map("skipped_count")
   errorCount   Int       @default(0) @map("error_count")
-  report       Json?     @db.JsonB
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report                 Json?     @db.JsonB
+  allowPossibleDuplicates Boolean  @default(false) @map("allow_possible_duplicates")
+  processingStartedAt    DateTime? @map("processing_started_at") @db.Timestamptz(6)
+  leaseToken             String?   @map("lease_token") @db.Uuid
+  attempts               Int       @default(0)
+  lastErrorCode          String?   @map("last_error_code") @db.VarChar(80)
+  expiresAt              DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt(sort: Desc)], map: "import_jobs_user_created_idx")
   @@index([expiresAt], map: "import_jobs_expiry_idx")
+  @@index([status, createdAt], map: "import_jobs_status_created_idx")
   @@map("import_jobs")
 }
 
 model ExportJob {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String    @map("user_id") @db.Uuid
-  status     String    @default("pending") @db.VarChar(20)
-  storageKey String?   @map("storage_key")
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status              String    @default("pending") @db.VarChar(20)
+  storageKey          String?   @map("storage_key")
+  includeDocuments    Boolean   @default(false) @map("include_documents")
+  processingStartedAt DateTime? @map("processing_started_at") @db.Timestamptz(6)
+  leaseToken          String?   @map("lease_token") @db.Uuid
+  attempts            Int       @default(0)
+  lastErrorCode       String?   @map("last_error_code") @db.VarChar(80)
+  expiresAt           DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt(sort: Desc)], map: "export_jobs_user_created_idx")
   @@index([expiresAt], map: "export_jobs_expiry_idx")
+  @@index([status, createdAt], map: "export_jobs_status_created_idx")
   @@map("export_jobs")
 }
 

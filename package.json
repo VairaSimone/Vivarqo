@@ -19,7 +19,10 @@
     "build:frontend": "pnpm --filter @vivarqo/frontend build",
     "db:backup": "bash backend/scripts/backup-postgres.sh",
     "db:restore": "bash backend/scripts/restore-postgres.sh",
-    "vapid:generate": "node backend/scripts/generate-vapid-keys.mjs"
+    "vapid:generate": "node backend/scripts/generate-vapid-keys.mjs",
+    "db:restore:drill": "bash backend/scripts/backup-restore-drill.sh",
+    "verify:stripe:test": "node backend/scripts/verify-stripe-test-mode.mjs",
+    "verify:web-push:live": "pnpm --filter @vivarqo/api exec tsx ../scripts/verify-web-push-live.ts"
   },
   "dependencies": {
     "dotenv": "^17.2.3",

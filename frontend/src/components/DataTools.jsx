@@ -78,7 +78,7 @@ export function DataTools({onNotice}) {
       try {
         const result = await apiRequest("imports/" + encodeURIComponent(importJob.id) + "?statusOnly=true");
         if (!active || !result?.status) return;
-        setImportJob(result);
+        setImportJob({ ...result, id: importJob.id });
         if (result.status === "completed") onNotice("Importazione completata: " + (result.createdCount ?? 0) + " record importati.", "success");
         if (result.status === "failed") onNotice("Importazione non riuscita. Codice: " + (result.lastErrorCode || "IMPORT_PROCESSING_FAILED"), "error");
       } catch {

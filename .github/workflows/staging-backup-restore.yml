@@ -1,0 +1,41 @@
+name: Staging backup and restore drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Create a temporary database on the staging PostgreSQL cluster, restore a dump there, verify it, and drop it"
+        required: true
+        type: choice
+        options:
+          - NO
+          - YES
+
+permissions:
+  contents: read
+
+jobs:
+  restore-drill:
+    if: ${{ inputs.confirm == 'YES' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install PostgreSQL 18 client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+      - name: Verify staging backup and restore without modifying the source database
+        run: bash backend/scripts/backup-restore-drill.sh
