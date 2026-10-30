@@ -1,3 +1,5 @@
+import type { AnyRecord } from "../types";
+
 export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | Record<string, unknown> | null;
 }
@@ -59,7 +61,15 @@ async function fetchWithCsrfRetry(url: string, init: RequestInit, headers: Heade
   return response;
 }
 
-export async function apiRequest<T = Record<string, unknown>>(path: string, options: ApiRequestOptions = {}): Promise<T | null> {
+type NonDeleteApiOptions = Omit<ApiRequestOptions, "method"> & {
+  method?: "GET" | "HEAD" | "OPTIONS" | "POST" | "PUT" | "PATCH";
+};
+type DeleteApiOptions = Omit<ApiRequestOptions, "method"> & { method: "DELETE" };
+
+export function apiRequest<T = AnyRecord>(path: string, options?: NonDeleteApiOptions): Promise<T>;
+export function apiRequest<T = AnyRecord>(path: string, options: DeleteApiOptions): Promise<T | null>;
+export function apiRequest<T = AnyRecord>(path: string, options: ApiRequestOptions): Promise<T | null>;
+export async function apiRequest<T = AnyRecord>(path: string, options: ApiRequestOptions = {}): Promise<T | null> {
   // Writes are never queued offline in the first release.
   const method = (options.method ?? "GET").toUpperCase();
   if (!SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -114,7 +124,7 @@ export async function apiRequest<T = Record<string, unknown>>(path: string, opti
   return payload as T | null;
 }
 
-export async function apiUpload<T = Record<string, unknown>>(path: string, file: File): Promise<T> {
+export async function apiUpload<T = AnyRecord>(path: string, file: File): Promise<T> {
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,
@@ -137,7 +147,7 @@ export async function apiUpload<T = Record<string, unknown>>(path: string, file:
   return payload as T;
 }
 
-export async function apiUploadDocument<T = Record<string, unknown>>(file: File, metadata: DocumentUploadMetadata): Promise<T> {
+export async function apiUploadDocument<T = AnyRecord>(file: File, metadata: DocumentUploadMetadata): Promise<T> {
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,

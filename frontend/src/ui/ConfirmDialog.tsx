@@ -10,10 +10,11 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 type ConfirmAction = (options?: ConfirmOptions) => Promise<boolean>;
+type PendingConfirmation = Required<ConfirmOptions>;
 const ConfirmContext = createContext<ConfirmAction | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
-  const [pending, setPending] = useState(null);
+  const [pending, setPending] = useState<PendingConfirmation | null>(null);
   const resolveRef = useRef<((accepted: boolean) => void) | null>(null);
   const confirm = useCallback((options?: ConfirmOptions): Promise<boolean> => new Promise<boolean>(resolve => {
     if (resolveRef.current) resolveRef.current(false);

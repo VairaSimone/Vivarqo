@@ -30,8 +30,9 @@ export type SelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "n
 export function Select({ label, name, defaultValue, options, ...props }: SelectProps) {
   return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} {...props}>
     {options.map((option) => {
-      const value = Array.isArray(option) ? option[0] : option.value;
-      const text = Array.isArray(option) ? option[1] : option.label;
+      const isObjectOption = "value" in option;
+      const value = isObjectOption ? option.value : option[0];
+      const text = isObjectOption ? option.label : option[1];
       return <option value={value} key={value}>{text}</option>;
     })}
   </select></label>;

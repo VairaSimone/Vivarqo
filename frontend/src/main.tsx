@@ -45,6 +45,9 @@ const publicProfileMatch = window.location.pathname.match(/^\/public\/animals\/(
 const screen = publicProfileMatch
   ? <PublicAnimalPage slug={decodeURIComponent(publicProfileMatch[1])} />
   : <App />;
-createRoot(document.getElementById("root")).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Elemento root non trovato: impossibile avviare Vivarqo.");
+
+createRoot(rootElement).render(
   <React.StrictMode><ConfirmProvider>{screen}</ConfirmProvider></React.StrictMode>
 );
