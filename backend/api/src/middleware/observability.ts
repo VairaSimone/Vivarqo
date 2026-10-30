@@ -48,7 +48,9 @@ export const requestMetrics: RequestHandler = (req, res, next) => {
     };
     metric.count += 1;
     metric.totalSeconds += elapsedSeconds;
-    HISTOGRAM_BOUNDS.forEach((bound, index) => { if (elapsedSeconds <= bound) metric.buckets[index] += 1; });
+    HISTOGRAM_BOUNDS.forEach((bound, index) => {
+      if (elapsedSeconds <= bound) metric.buckets[index] = (metric.buckets[index] ?? 0) + 1;
+    });
     httpMetrics.set(key, metric);
   });
   next();
