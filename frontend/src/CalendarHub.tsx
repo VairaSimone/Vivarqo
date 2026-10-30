@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
@@ -23,8 +24,14 @@ const dateRange = (anchor, view) => {
   return { from: dateKey(from), to: dateKey(to) };
 };
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props}/></label>; }
-function Select({ label, name, defaultValue, options, ...props }) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? options[0][0]} {...props}>{options.map(([v, label]) => <option value={v} key={v}>{label}</option>)}</select></label>; }
+interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
+  label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
+}
+function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }: FieldProps) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props}/></label>; }
+interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
+  label: string; name: string; defaultValue?: string | number; options: Array<[string, string]>;
+}
+function Select({ label, name, defaultValue, options, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? options[0][0]} {...props}>{options.map(([v, label]) => <option value={v} key={v}>{label}</option>)}</select></label>; }
 
 export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
@@ -89,7 +96,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
     : new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(anchor);
   const saveTask = async event => {
     event.preventDefault();
-    const v = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const v = readFormValues(event.currentTarget);
     const body = { title: v.title.trim(), category: v.category, dueAt: new Date(v.dueAt).toISOString(), description: v.description.trim() || null, animalId: v.animalId || null };
     setSaving(true);
     try {
@@ -111,7 +118,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const saveRule = async event => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const v = Object.fromEntries(form.entries());
+    const v = readFormValues(event.currentTarget);
     const body = {
       title: v.title.trim(), category: v.category, intervalDays: Number(v.intervalDays),
       nextDueAt: new Date(v.nextDueAt).toISOString(), animalId: v.animalId || null,

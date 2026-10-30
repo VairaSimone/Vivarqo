@@ -1,11 +1,11 @@
 export type NoticeKind = "success" | "error" | "warning" | "info";
 export type NoticeHandler = (message: string, kind?: NoticeKind) => void;
-export type NavigationHandler = (section: string) => void;
+export type NavigationHandler = (section: string, options?: { animalId?: string | null }) => void;
 export type AnyRecord = Record<string, any>;
 
 export interface CommonHubProps {
   onNotice?: NoticeHandler;
-  owner?: AnyRecord | null;
+  owner?: AnyRecord | string | null;
   onGo?: NavigationHandler;
   initialAnimalId?: string | null;
   initialTab?: string;
@@ -25,4 +25,12 @@ export interface InventoryFiltersState {
   active: string;
   category: string;
   lowStock: boolean;
+}
+
+export function readFormValues(form: HTMLFormElement): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of new FormData(form).entries()) {
+    if (typeof value === "string") values[key] = value.trim();
+  }
+  return values;
 }

@@ -56,7 +56,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
     setBusy(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const values = Object.fromEntries(form.entries());
+    const values = readFormValues(event.currentTarget);
     try {
       let path = "";
       let body = values;

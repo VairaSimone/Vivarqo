@@ -32,7 +32,7 @@ function QRCode({ value }) {
   const size = result.length;
   let path = "";
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (result[y][x]) path += "M" + (x + 4) + " " + (y + 4) + "h1v1h-1z";
-  return <svg className="qr-svg" role="img" aria-label="Codice QR del profilo pubblico" viewBox={"0 0 " + (size + 8) + " " + (size + 8)} shapeRendering="crispEdges"><rect x="0" y="0" width={size + 8} height={size + 8} fill="#fff"/><path d={path} fill="#14231d"/></svg>;
+  return <svg className="qr-svg" role="img" aria-label="Codice QR del profilo pubblico" viewBox={"0 0 " + (size + 8) + " " + (size + 8)} shapeRendering="crispEdges"><rect x=0 y=0 width={size + 8} height={size + 8} fill="#fff"/><path d={path} fill="#14231d"/></svg>;
 }
 function downloadQr(value, name) {
   const source = qrSvgSource(value, 12, 4);
@@ -192,7 +192,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
         {cyclesPagination.totalPages > 1 && <div className="form-full inline-actions"><span className="muted">Cicli · pagina {cyclesPagination.page}/{cyclesPagination.totalPages} ({cyclesPagination.total} totali)</span><Button type="button" disabled={cyclesPage <= 1 || busy} onClick={() => setCyclesPage(p => p - 1)}>← Precedenti</Button><Button type="button" disabled={cyclesPage >= cyclesPagination.totalPages || busy} onClick={() => setCyclesPage(p => p + 1)}>Altri cicli →</Button></div>}
         <Field label="Categoria"><select value={category} onChange={e => setCategory(e.target.value)}>{[["other","Altro"],["identity","Identificazione"],["origin","Provenienza"],["veterinary","Veterinario"],["legal","Documentazione legale"],["contract","Contratti"],["reproduction","Riproduzione"]].map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></Field>
         <Field label="File"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={e => setFile(e.target.files?.[0] || null)} required/></Field>
-        <div className="form-full"><Field label="Nota (facoltativa)"><textarea value={note} onChange={e => setNote(e.target.value)} rows="2" maxLength="10000"/></Field></div>
+        <div className="form-full"><Field label="Nota (facoltativa)"><textarea value={note} onChange={e => setNote(e.target.value)} rows=2 maxLength=10000/></Field></div>
         <div className="form-actions form-full"><Button variant="primary" disabled={busy || !file}>{busy ? "Attendi…" : "Carica documento"}</Button></div>
       </form>
       {!listsLoaded && documents.length === 0 ? <p className="loading" role="status">Caricamento documenti…</p> : documents.length === 0 ? <div className="empty-state"><h3>Nessun documento</h3><p>I documenti caricati compariranno qui e resteranno privati finché non li colleghi a una condivisione esplicita.</p></div> :
@@ -205,7 +205,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
       <form className="form-grid" onSubmit={saveShare}>
         <div className="form-full"><Field label="Animale da condividere"><select value={selectedAnimal} onChange={e => setSelectedAnimal(e.target.value)} required><option value="">Seleziona un animale</option>{animals.map(a => <option value={a.id} key={a.id}>{a.name} · {a.species}</option>)}</select></Field></div>
         <fieldset className="share-fields form-full"><legend>Campi visibili pubblicamente</legend>{fields.map(([key, label]) => <label className="check-row" key={key}><input type="checkbox" checked={shareFields.includes(key)} onChange={e => setShareFields(prev => e.target.checked ? [...prev, key] : prev.filter(x => x !== key))}/>{label}</label>)}</fieldset>
-        <div className="form-full"><Field label="Descrizione pubblica (facoltativa)"><textarea rows="3" maxLength="5000" value={publicDescription} onChange={e => setPublicDescription(e.target.value)} placeholder="Descrizione pensata per chi apre il QR."/></Field></div>
+        <div className="form-full"><Field label="Descrizione pubblica (facoltativa)"><textarea rows=3 maxLength=5000 value={publicDescription} onChange={e => setPublicDescription(e.target.value)} placeholder="Descrizione pensata per chi apre il QR."/></Field></div>
         <label className="check-row form-full"><input type="checkbox" checked={shareEnabled} onChange={e => setShareEnabled(e.target.checked)}/> Attiva il link pubblico</label>
         <div className="form-actions form-full"><Button variant="primary" disabled={busy || !selectedAnimal || shareFields.length === 0}>Salva condivisione</Button>{share?.id && <Button type="button" variant="danger" onClick={revokeShare}>Revoca link</Button>}</div>
       </form>
@@ -216,7 +216,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
     </section>
     {editingDocument && <Dialog title="Modifica documento" description="Aggiorna la categoria e la nota conservate nell’archivio privato." onClose={() => setEditingDocument(null)} onSubmit={saveDocumentEdit} submitLabel="Salva modifiche" busy={savingDocumentEdit}>
       <label className="field"><span>Categoria</span><select name="category" defaultValue={editingDocument.category || "other"} required>{[["other","Altro"],["identity","Identificazione"],["origin","Provenienza"],["veterinary","Veterinario"],["legal","Documentazione legale"],["contract","Contratti"],["reproduction","Riproduzione"]].map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
-      <label className="field form-full"><span>Nota (facoltativa)</span><textarea name="note" rows="4" maxLength="10000" defaultValue={editingDocument.note || ""}/></label>
+      <label className="field form-full"><span>Nota (facoltativa)</span><textarea name="note" rows=4 maxLength=10000 defaultValue={editingDocument.note || ""}/></label>
     </Dialog>}
   </div>;
 }

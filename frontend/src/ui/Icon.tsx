@@ -38,7 +38,7 @@ const glyphs: Record<string, ReactNode> = {
   circle: <circle cx="12" cy="12" r="9"/>
 };
 
-export interface IconProps { name?: string; size?: number; strokeWidth?: number; className?: string; title?: string; }
+export interface IconProps { name?: string; size?: number | string; strokeWidth?: number | string; className?: string; title?: string; }
 
 export function Icon({ name = "circle", size = 18, strokeWidth = 1.8, className = "", title }: IconProps) {
   return <svg className={("ui-icon " + className).trim()} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : "true"} role={title ? "img" : undefined} aria-label={title}>{title && <title>{title}</title>}{glyphs[name] || glyphs.circle}</svg>;

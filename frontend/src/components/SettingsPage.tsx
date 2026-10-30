@@ -51,7 +51,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
     setBusy(true);
     try {
       await apiRequest("account/preferences", { method: "PATCH", body: preferences });
-      const body = { displayName, locale, timezone };
+      const body: Record<string, unknown> = { displayName, locale, timezone };
       if (email !== user.email || newPassword) {
         body.email = email;
         body.currentPassword = currentPassword;

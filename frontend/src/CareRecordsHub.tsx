@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
@@ -12,7 +13,7 @@ const dtInput = value => {
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
 const nullIfBlank = value => value === "" || value === undefined ? null : value;
-const formData = e => Object.fromEntries(Array.from(new FormData(e.currentTarget).entries()).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]));
+const formData = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 const TAB_OPTIONS = [
   ["weights", "Peso"], ["sheds", "Mute"], ["notes", "Osservazioni"], ["feedings", "Alimentazioni"], ["genetics", "Genetica"]
 ];
@@ -21,9 +22,19 @@ const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nu
 const SHED = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
 const FEED_OUTCOME = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
-function Input({ label, name, type = "text", defaultValue, required = false, min, max, step, placeholder }) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder}/></label>; }
-function Area({ label, name, defaultValue, required = false, rows = 3 }) { return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} required={required} rows={rows}/></label>; }
-function Select({ label, name, defaultValue, options, required = false }) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required}>{options.map(o => <option value={o[0]} key={o[0]}>{o[1]}</option>)}</select></label>; }
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
+  label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
+  min?: string | number; max?: string | number; step?: string | number;
+}
+function Input({ label, name, type = "text", defaultValue, required = false, min, max, step, placeholder, ...props }: InputProps) { return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder} {...props}/></label>; }
+interface AreaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "name" | "defaultValue"> {
+  label: string; name: string; defaultValue?: string | null;
+}
+function Area({ label, name, defaultValue, required = false, rows = 3, ...props }: AreaProps) { return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} required={required} rows={rows} {...props}/></label>; }
+interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
+  label: string; name: string; defaultValue?: string | number | null; options: Array<[string, string]>; required?: boolean;
+}
+function Select({ label, name, defaultValue, options, required = false, ...props }: SelectProps) { return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required} {...props}>{options.map(o => <option value={o[0]} key={o[0]}>{o[1]}</option>)}</select></label>; }
 const emptyFeedingEntry = animalId => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
 export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }: CommonHubProps) {
@@ -44,7 +55,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [selectedSession, setSelectedSession] = useState(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
-  const api = useCallback((path, options) => apiRequest(path, options), []);
+  const api = useCallback((path: string, options?: RequestInit, _actionLabel?: string) => apiRequest(path, options), []);
 
   const loadAnimals = useCallback(async () => {
     const response = await apiRequest("animals?page=" + animalsPage + "&pageSize=100&status=active");
@@ -118,7 +129,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
 
   const submitNew = async e => {
     e.preventDefault(); const v = formData(e);
-    let path = "", body = {};
+    let path = "", body: Record<string, any> = {};
     if (tab === "weights") {
       path = "animals/" + animalId + "/weights";
       body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: Number(v.weightG), notes: nullIfBlank(v.notes) };

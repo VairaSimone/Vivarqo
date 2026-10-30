@@ -184,10 +184,10 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       <details className="record-filter-drawer">
         <summary>Filtri avanzati e ordinamento</summary>
         <form className="form-grid" onSubmit={applyFilters}>
-          <Input label="Specie" name="filterSpecies" value={filterDraft.species} onChange={e => setFilterDraft(current => ({ ...current, species: e.target.value }))} maxLength="160"/>
+          <Input label="Specie" name="filterSpecies" value={filterDraft.species} onChange={e => setFilterDraft(current => ({ ...current, species: e.target.value }))} maxLength=160/>
           <label className="field"><span>Sesso</span><select aria-label="Filtra per sesso" value={filterDraft.sex} onChange={e => setFilterDraft(current => ({ ...current, sex: e.target.value }))}><option value="">Tutti</option>{sexOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-          <Input label="Morph" name="filterMorph" value={filterDraft.morph} onChange={e => setFilterDraft(current => ({ ...current, morph: e.target.value }))} maxLength="200"/>
-          <Input label="Posizione / stabulazione" name="filterLocation" value={filterDraft.location} onChange={e => setFilterDraft(current => ({ ...current, location: e.target.value }))} maxLength="160"/>
+          <Input label="Morph" name="filterMorph" value={filterDraft.morph} onChange={e => setFilterDraft(current => ({ ...current, morph: e.target.value }))} maxLength=200/>
+          <Input label="Posizione / stabulazione" name="filterLocation" value={filterDraft.location} onChange={e => setFilterDraft(current => ({ ...current, location: e.target.value }))} maxLength=160/>
           <label className="field"><span>Ordina per</span><select aria-label="Ordina elenco animali" value={filterDraft.sort} onChange={e => setFilterDraft(current => ({ ...current, sort: e.target.value }))}><option value="name">Nome</option><option value="createdAt">Data di creazione</option><option value="updatedAt">Ultima attività</option></select></label>
           <div className="form-actions form-full"><Button type="button" variant="secondary" onClick={resetFilters}>Azzera filtri</Button><Button type="submit" variant="primary">Applica filtri</Button></div>
         </form>
@@ -195,20 +195,20 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       {error && <p className="form-message" role="alert">{error}</p>}
       {editor && <div className="embedded-form"><form className="form-grid" onSubmit={submitEditor} key={editor.animal?.id || "new-animal"}>
         <h3 className="form-full">{editor.animal ? "Modifica scheda" : "Nuova scheda animale"}</h3>
-        <Input label="Nome" name="name" defaultValue={editor.animal?.name} required maxLength="120"/>
-        <Input label="Specie" name="species" defaultValue={editor.animal?.species} required maxLength="160"/>
-        <Input label="Identificativo" name="identifier" defaultValue={editor.animal?.identifier} maxLength="120"/>
+        <Input label="Nome" name="name" defaultValue={editor.animal?.name} required maxLength=120/>
+        <Input label="Specie" name="species" defaultValue={editor.animal?.species} required maxLength=160/>
+        <Input label="Identificativo" name="identifier" defaultValue={editor.animal?.identifier} maxLength=120/>
         <Select label="Sesso" name="sex" defaultValue={editor.animal?.sex || "unknown"} options={sexOptions}/>
-        <Input label="Morph" name="morph" defaultValue={editor.animal?.morph} maxLength="200"/>
-        <Input label="Annotazioni genetiche dichiarate" name="geneticsNotes" defaultValue={editor.animal?.geneticsNotes} maxLength="10000"/>
+        <Input label="Morph" name="morph" defaultValue={editor.animal?.morph} maxLength=200/>
+        <Input label="Annotazioni genetiche dichiarate" name="geneticsNotes" defaultValue={editor.animal?.geneticsNotes} maxLength=10000/>
         <Input label="Data di nascita" name="birthDate" type="date" defaultValue={editor.animal?.birthDate ? String(editor.animal.birthDate).slice(0, 10) : ""}/>
         <label className="checkbox-field form-full"><input type="checkbox" name="birthDateEstimated" defaultChecked={Boolean(editor.animal?.birthDateEstimated)}/><span>La data di nascita è stimata</span></label>
         <Input label="Data di acquisizione" name="acquiredDate" type="date" defaultValue={editor.animal?.acquiredDate ? String(editor.animal.acquiredDate).slice(0, 10) : ""}/>
-        <Input label="Allevatore precedente" name="previousBreeder" defaultValue={editor.animal?.previousBreeder} maxLength="160"/>
-        <label className="field form-full"><span>Provenienza</span><textarea name="originDescription" defaultValue={editor.animal?.originDescription || ""} rows="2" maxLength="5000"/></label>
-        <Input label="Stabulazione / posizione" name="locationLabel" defaultValue={editor.animal?.locationLabel} maxLength="160"/>
+        <Input label="Allevatore precedente" name="previousBreeder" defaultValue={editor.animal?.previousBreeder} maxLength=160/>
+        <label className="field form-full"><span>Provenienza</span><textarea name="originDescription" defaultValue={editor.animal?.originDescription || ""} rows=2 maxLength=5000/></label>
+        <Input label="Stabulazione / posizione" name="locationLabel" defaultValue={editor.animal?.locationLabel} maxLength=160/>
         {editor.animal?.status !== "archived" && <Select label="Stato" name="status" defaultValue={editor.animal?.status || "active"} options={statusOptions}/>}
-        <label className="field form-full"><span>Note</span><textarea name="notes" defaultValue={editor.animal?.notes || ""} rows="3" maxLength="10000"/></label>
+        <label className="field form-full"><span>Note</span><textarea name="notes" defaultValue={editor.animal?.notes || ""} rows=3 maxLength=10000/></label>
         <div className="form-actions form-full"><Button type="button" onClick={() => setEditor(null)}>Annulla</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva scheda"}</Button></div>
       </form></div>}
       {bulkOpen && <div className="embedded-form"><form onSubmit={submitBulk}>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommonHubProps } from "./types";
+import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
 import { Dialog } from "./ui/Dialog";
 import { Icon } from "./ui/Icon";
@@ -15,23 +16,33 @@ const localDateTime = value => {
 };
 const prettyDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
 const val = (obj, key, fallback = "—") => obj?.[key] === null || obj?.[key] === undefined || obj?.[key] === "" ? fallback : obj[key];
-const readForm = e => Object.fromEntries(Array.from(new FormData(e.currentTarget).entries()).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
+const readForm = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 const isoDateTime = value => value ? new Date(value).toISOString() : null;
 const nullable = value => value === "" || value === undefined ? null : value;
 
-function Input({ label, name, type = "text", defaultValue, required = false, min, max, step, placeholder }) {
-  return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder}/></label>;
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> {
+  label: string; name: string; type?: React.HTMLInputTypeAttribute; defaultValue?: string | number | null;
 }
-function TextArea({ label, name, defaultValue, rows = 3, placeholder }) {
-  return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} rows={rows} placeholder={placeholder}/></label>;
+function Input({ label, name, type = "text", defaultValue, required = false, min, max, step, placeholder, ...props }: InputProps) {
+  return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} min={min} max={max} step={step} placeholder={placeholder} {...props}/></label>;
 }
-function Choice({ label, name, defaultValue, options, required = false }) {
-  return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required}>{options.map(o => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>;
+interface TextAreaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "name" | "defaultValue"> {
+  label: string; name: string; defaultValue?: string | null;
+}
+function TextArea({ label, name, defaultValue, rows = 3, placeholder, ...props }: TextAreaProps) {
+  return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} rows={rows} placeholder={placeholder} {...props}/></label>;
+}
+interface ChoiceProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name" | "defaultValue"> {
+  label: string; name: string; defaultValue?: string | number | null;
+  options: Array<[string, string] | { value: string; label: string }>; required?: boolean;
+}
+function Choice({ label, name, defaultValue, options, required = false, ...props }: ChoiceProps) {
+  return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} required={required} {...props}>{options.map(o => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select></label>;
 }
 function Action({ children, variant = "secondary", ...props }) {
   return <button className={"button " + variant} {...props}>{children}</button>;
 }
-function SectionTitle({ eyebrow, title, children }) {
+function SectionTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><div className="inline-actions">{children}</div></div>;
 }
 const cycleStatuses = [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
@@ -75,7 +86,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
   const [busy, setBusy] = useState(false);
   const [listsLoaded, setListsLoaded] = useState(false);
 
-  const api = useCallback(async (path, options = {}) => {
+  const api = useCallback(async (path: string, options: RequestInit = {}, _actionLabel?: string) => {
     const result = await apiRequest(path, options);
     onNotice("Modifiche salvate.");
     return result;
