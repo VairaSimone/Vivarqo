@@ -1,19 +1,19 @@
 export type NoticeKind = "success" | "error" | "warning" | "info";
 export type NoticeHandler = (message: string, kind?: NoticeKind) => void;
 export type NavigationHandler = (section: string, options?: { animalId?: string | null }) => void;
-export type AnyRecord = Record<string, any>;
+export type UnknownRecord = Record<string, unknown>;
 
 export interface CommonHubProps {
   onNotice?: NoticeHandler;
-  owner?: AnyRecord | string | null;
+  owner?: AccountUser | string | null;
   onGo?: NavigationHandler;
   initialAnimalId?: string | null;
   initialTab?: string;
   refreshKey?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface AccountUser extends AnyRecord {
+export interface AccountUser extends UnknownRecord {
   id?: string;
   email?: string;
   displayName?: string;

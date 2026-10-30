@@ -22,6 +22,10 @@ function apiError(message: string, details: Partial<ApiError> = {}): ApiError {
   return Object.assign(new Error(message), details);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function getCsrfToken({ refresh = false }: { refresh?: boolean } = {}): Promise<string> {
   if (csrfTokenInMemory && !refresh) return csrfTokenInMemory;
   const response = await fetch("/api/v1/auth/csrf", {
@@ -55,7 +59,7 @@ async function fetchWithCsrfRetry(url: string, init: RequestInit, headers: Heade
   return response;
 }
 
-export async function apiRequest<T = any>(path: string, options: ApiRequestOptions = {}): Promise<T | null> {
+export async function apiRequest<T = Record<string, unknown>>(path: string, options: ApiRequestOptions = {}): Promise<T | null> {
   // Writes are never queued offline in the first release.
   const method = (options.method ?? "GET").toUpperCase();
   if (!SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -93,18 +97,24 @@ export async function apiRequest<T = any>(path: string, options: ApiRequestOptio
   }, headers);
   const payload = response.status === 204
     ? null
-    : await response.json().catch(() => null) as any;
+    : await response.json().catch(() => null) as unknown;
 
   if (!response.ok) {
-    throw apiError(
-      payload?.message ?? payload?.error ?? "Richiesta non riuscita (HTTP " + response.status + ").",
-      { status: response.status, details: payload?.details ?? payload?.issues ?? null },
-    );
+    const errorPayload = isRecord(payload) ? payload : {};
+    const message = typeof errorPayload.message === "string"
+      ? errorPayload.message
+      : typeof errorPayload.error === "string"
+        ? errorPayload.error
+        : "Richiesta non riuscita (HTTP " + response.status + ").";
+    throw apiError(message, {
+      status: response.status,
+      details: errorPayload.details ?? errorPayload.issues ?? null,
+    });
   }
   return payload as T | null;
 }
 
-export async function apiUpload<T = any>(path: string, file: File): Promise<T> {
+export async function apiUpload<T = Record<string, unknown>>(path: string, file: File): Promise<T> {
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,
@@ -116,14 +126,18 @@ export async function apiUpload<T = any>(path: string, file: File): Promise<T> {
   const response = await fetchWithCsrfRetry(url, {
     method: "POST", credentials: "include", cache: "no-store", body: file,
   }, headers);
-  const payload = await response.json().catch(() => null) as any;
+  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw apiError(payload?.message ?? "Caricamento non riuscito (HTTP " + response.status + ").", { status: response.status });
+    const errorPayload = isRecord(payload) ? payload : {};
+    throw apiError(
+      typeof errorPayload.message === "string" ? errorPayload.message : "Caricamento non riuscito (HTTP " + response.status + ").",
+      { status: response.status },
+    );
   }
   return payload as T;
 }
 
-export async function apiUploadDocument<T = any>(file: File, metadata: DocumentUploadMetadata): Promise<T> {
+export async function apiUploadDocument<T = Record<string, unknown>>(file: File, metadata: DocumentUploadMetadata): Promise<T> {
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,
@@ -137,9 +151,13 @@ export async function apiUploadDocument<T = any>(file: File, metadata: DocumentU
   const response = await fetchWithCsrfRetry("/api/v1/documents", {
     method: "POST", credentials: "include", cache: "no-store", body: file,
   }, headers);
-  const payload = await response.json().catch(() => null) as any;
+  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw apiError(payload?.message ?? "Caricamento documento non riuscito (HTTP " + response.status + ").", { status: response.status });
+    const errorPayload = isRecord(payload) ? payload : {};
+    throw apiError(
+      typeof errorPayload.message === "string" ? errorPayload.message : "Caricamento documento non riuscito (HTTP " + response.status + ").",
+      { status: response.status },
+    );
   }
   return payload as T;
 }
