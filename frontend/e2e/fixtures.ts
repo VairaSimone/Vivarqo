@@ -1,13 +1,44 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
-export interface E2EState { [key: string]: any; }
+export type E2ERecord = Record<string, any>;
 
-const makeAnimal = (overrides = {}) => ({
+export interface E2EState {
+  authenticated: boolean;
+  failLogin: boolean;
+  failAnimalList: boolean;
+  failDocumentList: boolean;
+  failNotificationList: boolean;
+  animalListDelayMs: number;
+  documentListDelayMs: number;
+  notificationListDelayMs: number;
+  animals: E2ERecord[];
+  cycle: E2ERecord;
+  cycles: E2ERecord[];
+  clutches: E2ERecord[];
+  eggs: E2ERecord[];
+  events: E2ERecord[];
+  incubationLogs: E2ERecord[];
+  batches: E2ERecord[];
+  weights: E2ERecord[];
+  sheds: E2ERecord[];
+  notes: E2ERecord[];
+  sessions: E2ERecord[];
+  documents: E2ERecord[];
+  share: E2ERecord | null;
+  notifications: E2ERecord[];
+  unreadCount: number;
+  preferences: E2ERecord;
+  devices: E2ERecord[];
+  requests: Array<{ path: string; method: string; body: E2ERecord; query: string }>;
+  nextId: number;
+}
+
+const makeAnimal = (overrides: E2ERecord = {}): E2ERecord => ({
   id: "animal-1", name: "Naga", species: "Python regius", sex: "female", morph: "Pastel",
   status: "active", identifier: "VRQ-001", birthDate: "2022-05-12T00:00:00.000Z",
   locationLabel: "Rack 2", notes: "", ...overrides
 });
-const pagination = items => ({ page: 1, pageSize: 50, total: items.length, totalPages: 1 });
+const pagination = (items: E2ERecord[]) => ({ page: 1, pageSize: 50, total: items.length, totalPages: 1 });
 
 export async function mockApi(context: BrowserContext): Promise<E2EState> {
   const animal = makeAnimal();
@@ -22,7 +53,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     status: "incubating", incubatorLabel: "Incubatrice 1", incubationStartedAt: "2026-07-01T00:00:00.000Z",
     notes: "", _count: { eggs: 0, incubationLogs: 0 }
   };
-  const state = {
+  const state: E2EState = {
     authenticated: false, failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
     animals: [animal, secondAnimal], cycle, cycles: [cycle], clutches: [clutch], eggs: [],
     events: [], incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
@@ -33,18 +64,18 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     devices: [{ id: "device-1", userAgent: "Chromium E2E", createdAt: "2026-10-28T10:00:00.000Z" }],
     requests: [], nextId: 1
   };
-  const nextId = prefix => {
-    const collections = {
+  const nextId = (prefix: string): string => {
+    const collections: Record<string, E2ERecord[]> = {
       animal: state.animals, cycle: state.cycles, clutch: state.clutches, egg: state.eggs,
       log: state.incubationLogs, batch: state.batches, doc: state.documents,
       device: state.devices, session: state.sessions
     };
     const existing = collections[prefix] || [];
-    let id;
+    let id: string;
     do { id = prefix + "-" + String(state.nextId++); } while (existing.some(item => item.id === id));
     return id;
   };
-  const itemsResponse = (key, items) => ({ [key]: items, pagination: pagination(items) });
+  const itemsResponse = (key: string, items: E2ERecord[]) => ({ [key]: items, pagination: pagination(items) });
 
   await context.route("**/api/v1/**", async route => {
     const request = route.request();
@@ -52,12 +83,12 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     const path = url.pathname.replace(/^\/api\/v1\//, "").replace(/\/$/, "");
     const method = request.method().toUpperCase();
     const headers = request.headers();
-    let body = {};
+    let body: E2ERecord = {};
     if (headers["content-type"]?.includes("application/json")) {
-      try { body = request.postDataJSON() || {}; } catch { body = {}; }
+      try { body = (request.postDataJSON() || {}) as E2ERecord; } catch { body = {}; }
     }
     state.requests.push({ path, method, body, query: url.searchParams.toString() });
-    const respond = (payload = {}, status = 200) => route.fulfill({
+    const respond = (payload: E2ERecord = {}, status = 200) => route.fulfill({
       status, contentType: "application/json; charset=utf-8", body: JSON.stringify(payload)
     });
 
