@@ -40,7 +40,7 @@ test("browser, real API and PostgreSQL enforce account isolation", async ({ brow
     expect(ownerListResponse.status()).toBe(200);
     const ownerList = await ownerListResponse.json() as { animals: Array<{ id: string; name: string }> };
     const animal = ownerList.animals.find((item) => item.name === animalName);
-    expect(animal?.id).toBeTruthy();
+    if (!animal) throw new Error("L’animale creato dal test non è presente nella risposta del proprietario.");
 
     await signIn(otherPage, otherEmail);
     await otherPage.goto("/animals");
