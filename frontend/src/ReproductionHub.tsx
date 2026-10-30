@@ -21,7 +21,7 @@ const readForm = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.curre
 const isoDateTime = value => value ? new Date(value).toISOString() : null;
 const nullable = value => value === "" || value === undefined ? null : value;
 
-const cycleStatuses [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
+const cycleStatuses = [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
 const eventTypes = [["pairing", "Accoppiamento"], ["observation", "Osservazione"], ["ovulation", "Ovulazione"], ["gravid", "Gravidanza"], ["laying", "Deposizione"], ["live_birth", "Parto"], ["incubation_start", "Avvio incubazione"], ["hatch", "Schiusa"], ["loss", "Perdita"], ["other", "Altro"]];
 const eggStatuses = [["unknown", "Da valutare"], ["incubating", "In incubazione"], ["fertile", "Fertile"], ["infertile", "Non fertile"], ["hatched", "Schiuso"], ["lost", "Perso"], ["retained", "Trattenuto"]];
 
