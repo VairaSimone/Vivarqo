@@ -283,7 +283,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     }
     const batchAnimals = path.match(/^offspring-batches\/([^/]+)\/animals$/);
     if (batchAnimals && method === "POST") {
-      const created = (body.animals || []).map(item => makeAnimal({ ...item, id: nextId("animal") }));
+      const created = (body.animals || []).map((item: E2ERecord) => makeAnimal({ ...item, id: nextId("animal") }));
       state.animals.push(...created);
       return respond({ createdCount: created.length, animals: created });
     }
