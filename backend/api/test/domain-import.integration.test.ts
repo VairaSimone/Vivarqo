@@ -5,6 +5,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
+import { dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
 
 const enabled = process.env.RUN_DB_INTEGRATION === "true";
 const origin = "http://localhost:5173";
@@ -75,11 +76,15 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
       .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
     expect(preview.body.validRows).toBe(1);
     expect(preview.body.invalidRows).toBe(0);
-    const confirmed = await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+    const queued = await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({}).expect(200);
-    expect(confirmed.body.createdCount).toBe(1);
-    return confirmed.body.report.createdRows[0].id as string;
+      .send({}).expect(202);
+    expect(queued.body.status).toBe("queued");
+    await dispatchImportJob(preview.body.importId);
+    const completed = await owner.agent.get("/api/v1/imports/" + preview.body.importId).expect(200);
+    expect(completed.body.status).toBe("completed");
+    expect(completed.body.createdCount).toBe(1);
+    return completed.body.report.createdRows[0].id as string;
   }
 
   it("imports inventory, reproduction relations and finance through preview and atomic confirmation", async () => {
