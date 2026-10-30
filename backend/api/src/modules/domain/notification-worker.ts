@@ -15,6 +15,7 @@ export interface ReminderDispatchSummary {
   scanned: number;
   created: number;
   pushAttempted: number;
+  pushQueued: number;
   pushSent: number;
   pushFailed: number;
 }
@@ -88,7 +89,7 @@ export async function dispatchDueTaskNotifications(now = new Date()): Promise<Re
     LIMIT 100
   `;
 
-  const summary: ReminderDispatchSummary = { scanned: tasks.length, created: 0, pushAttempted: 0, pushSent: 0, pushFailed: 0 };
+  const summary: ReminderDispatchSummary = { scanned: tasks.length, created: 0, pushAttempted: 0, pushQueued: 0, pushSent: 0, pushFailed: 0 };
   for (const task of tasks) {
     const notificationId = await createDueNotification(task, now);
     if (!notificationId) continue;
@@ -107,8 +108,10 @@ export async function dispatchDueTaskNotifications(now = new Date()): Promise<Re
       body: notification.body,
       url: notification.targetPath ?? "/tasks",
       category: notification.category,
+      notificationId: notification.id,
     });
     summary.pushAttempted += delivery.attempted;
+    summary.pushQueued += delivery.queued ?? 0;
     summary.pushSent += delivery.sent;
     summary.pushFailed += delivery.failed + delivery.removed;
   }

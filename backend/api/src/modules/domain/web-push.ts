@@ -4,6 +4,7 @@ import {
   createHmac,
   createPrivateKey,
   randomBytes,
+  randomUUID,
   sign,
   timingSafeEqual,
 } from "node:crypto";
@@ -16,6 +17,8 @@ export interface PushPayload {
   body: string;
   url?: string;
   category?: string;
+  /** Internal database reference; never sent to the browser. */
+  notificationId?: string;
 }
 export interface VapidCredentials {
   publicKey: string;
@@ -32,6 +35,7 @@ export interface PushSendResult {
   sent: number;
   removed: number;
   failed: number;
+  queued?: number;
   skipped?: "disabled" | "quiet_hours" | "no_subscriptions";
 }
 
@@ -232,38 +236,32 @@ function isWithinQuietHours(now: Date, timezone: string, start: Date | null, end
 }
 
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<PushSendResult> {
-  const credentials = getVapidCredentials();
   const [preferences, user, subscriptions] = await Promise.all([
     prisma.notificationPreferences.findUnique({ where: { userId } }),
     prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
-    prisma.pushSubscription.findMany({ where: { userId }, select: { id: true, endpoint: true, p256dh: true, authSecret: true } }),
+    prisma.pushSubscription.findMany({ where: { userId }, select: { id: true } }),
   ]);
-  if (!preferences?.pushEnabled) return { attempted: 0, sent: 0, removed: 0, failed: 0, skipped: "disabled" };
+  if (!preferences?.pushEnabled) return { attempted: 0, sent: 0, removed: 0, failed: 0, queued: 0, skipped: "disabled" };
   const categoryEnabled = (preferences.categories as Record<string, unknown> | null)?.[payload.category ?? "general"];
-  if (categoryEnabled === false) return { attempted: 0, sent: 0, removed: 0, failed: 0, skipped: "disabled" };
+  if (categoryEnabled === false) return { attempted: 0, sent: 0, removed: 0, failed: 0, queued: 0, skipped: "disabled" };
   if (isWithinQuietHours(new Date(), user?.timezone ?? "Europe/Rome", preferences.quietHoursStart, preferences.quietHoursEnd)) {
-    return { attempted: 0, sent: 0, removed: 0, failed: 0, skipped: "quiet_hours" };
+    return { attempted: 0, sent: 0, removed: 0, failed: 0, queued: 0, skipped: "quiet_hours" };
   }
-  if (subscriptions.length === 0) return { attempted: 0, sent: 0, removed: 0, failed: 0, skipped: "no_subscriptions" };
+  if (subscriptions.length === 0) return { attempted: 0, sent: 0, removed: 0, failed: 0, queued: 0, skipped: "no_subscriptions" };
 
-  const result: PushSendResult = { attempted: subscriptions.length, sent: 0, removed: 0, failed: 0 };
-  for (const subscription of subscriptions) {
-    try {
-      const response = await sendWebPush(subscription, payload, credentials);
-      const status = response.status;
-      await response.body?.cancel().catch(() => undefined);
-      if (status === 404 || status === 410) {
-        await prisma.pushSubscription.deleteMany({ where: { id: subscription.id, userId } });
-        result.removed += 1;
-      } else if (status >= 200 && status < 300) {
-        await prisma.pushSubscription.updateMany({ where: { id: subscription.id, userId }, data: { lastSuccessAt: new Date() } });
-        result.sent += 1;
-      } else {
-        result.failed += 1;
-      }
-    } catch {
-      result.failed += 1;
-    }
-  }
-  return result;
+  const scheduledAt = new Date();
+  const baseKey = payload.notificationId ?? randomUUID();
+  const queued = await prisma.pushDeliveryAttempt.createMany({
+    data: subscriptions.map((subscription) => ({
+      userId,
+      notificationId: payload.notificationId ?? null,
+      pushSubscriptionId: subscription.id,
+      deliveryKey: `${baseKey}:${subscription.id}`,
+      attemptNumber: 1,
+      status: "queued",
+      scheduledAt,
+    })),
+    skipDuplicates: true,
+  });
+  return { attempted: queued.count, sent: 0, removed: 0, failed: 0, queued: queued.count };
 }

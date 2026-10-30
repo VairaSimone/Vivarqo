@@ -29,6 +29,7 @@ model User {
   notificationPreferences NotificationPreferences?
   userPreference           UserPreference?
   pushSubscriptions       PushSubscription[]
+  pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
   reproductionCycles      ReproductionCycle[]
   inventoryItems          InventoryItem[]
@@ -261,6 +262,7 @@ model PushSubscription {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   lastSuccessAt DateTime? @map("last_success_at") @db.Timestamptz(6)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryAttempts PushDeliveryAttempt[]
   @@index([userId], map: "push_subscriptions_user_idx")
   @@map("push_subscriptions")
 }
@@ -275,6 +277,7 @@ model Notification {
   readAt     DateTime? @map("read_at") @db.Timestamptz(6)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushDeliveryAttempts PushDeliveryAttempt[]
   @@index([userId, createdAt(sort: Desc)], map: "notifications_user_created_idx")
   @@index([userId, createdAt(sort: Desc)], where: { readAt: null }, map: "notifications_user_unread_idx")
   @@map("notifications")
@@ -606,4 +609,32 @@ model UserPreference {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
+}
+
+
+model PushDeliveryAttempt {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String            @map("user_id") @db.Uuid
+  notificationId     String?           @map("notification_id") @db.Uuid
+  pushSubscriptionId String?           @map("push_subscription_id") @db.Uuid
+  deliveryKey        String            @map("delivery_key") @db.VarChar(180)
+  attemptNumber      Int               @map("attempt_number")
+  status             String            @default("queued") @db.VarChar(24)
+  scheduledAt        DateTime          @default(now()) @map("scheduled_at") @db.Timestamptz(6)
+  attemptedAt        DateTime?         @map("attempted_at") @db.Timestamptz(6)
+  sentAt             DateTime?         @map("sent_at") @db.Timestamptz(6)
+  nextAttemptAt      DateTime?         @map("next_attempt_at") @db.Timestamptz(6)
+  httpStatus         Int?              @map("http_status")
+  errorCode          String?           @map("error_code") @db.VarChar(80)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification       Notification?     @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  pushSubscription   PushSubscription? @relation(fields: [pushSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@unique([deliveryKey, attemptNumber], map: "push_delivery_attempts_delivery_attempt_unique")
+  @@index([status, scheduledAt], map: "push_delivery_attempts_status_scheduled_idx")
+  @@index([userId, createdAt(sort: Desc)], map: "push_delivery_attempts_user_created_idx")
+  @@index([notificationId], map: "push_delivery_attempts_notification_idx")
+  @@map("push_delivery_attempts")
 }

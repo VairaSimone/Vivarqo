@@ -14,6 +14,7 @@ export interface RetentionCleanupSummary {
   expiredExports: number;
   expiredRateLimitBuckets: number;
   failedExportDeletes: number;
+  oldPushAttempts: number;
 }
 
 const expiredOrDeletedUser = (now: Date) => ({
@@ -129,7 +130,24 @@ export async function cleanupExpiredPrivateData(now = new Date()): Promise<Reten
     expiredExports: 0,
     expiredRateLimitBuckets,
     failedExportDeletes: 0,
+    oldPushAttempts: 0,
   };
+
+  // Delivery history is retained for 90 days and pruned in bounded batches.
+  const pushHistoryCutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  for (let batch = 0; batch < MAX_DB_CLEANUP_BATCHES_PER_RUN; batch += 1) {
+    const candidates = await prisma.pushDeliveryAttempt.findMany({
+      where: { createdAt: { lt: pushHistoryCutoff }, status: { in: ["sent", "failed", "subscription_gone"] } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+      take: DB_CLEANUP_BATCH_SIZE,
+    });
+    if (candidates.length === 0) break;
+    const removed = await prisma.pushDeliveryAttempt.deleteMany({
+      where: { id: { in: candidates.map((row) => row.id) }, createdAt: { lt: pushHistoryCutoff }, status: { in: ["sent", "failed", "subscription_gone"] } },
+    });
+    summary.oldPushAttempts += removed.count;
+  }
 
   const expiredExports = await prisma.exportJob.findMany({
     where: { expiresAt: { lte: now }, status: { not: "expired" } },
