@@ -69,7 +69,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     return result;
   }, [onNotice]);
 
-  const selectCycle = id => {
+  const selectCycle = (id: string) => {
     setCycleId(id);
     setDetailTab("events");
     setEventsPage(1); setClutchesPage(1); setBatchesPage(1);
@@ -150,26 +150,27 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
   useEffect(() => { void loadCycle(cycleId).catch(e => setError(errorMessage(e))); }, [loadCycle]);
   useEffect(() => { void loadClutch(clutchId).catch(e => setError(errorMessage(e))); }, [loadClutch]);
 
-  const submitCycle = async e => {
+  const submitCycle = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const body = {
       name: nullable(v.name), startedOn: v.startedOn, endedOn: nullable(v.endedOn),
       status: v.status, parentAAnimalId: nullable(v.parentAAnimalId), parentBAnimalId: nullable(v.parentBAnimalId), notes: nullable(v.notes)
     };
     try {
-      const editingCycle = Boolean(editCycle?.id);
-      const response = await api(editingCycle ? "reproduction-cycles/" + editCycle.id : "reproduction-cycles", {
+      const editCycleId = typeof editCycle?.id === "string" ? editCycle.id : null;
+      const editingCycle = Boolean(editCycleId);
+      const response = await api(editCycleId ? "reproduction-cycles/" + editCycleId : "reproduction-cycles", {
         method: editingCycle ? "PATCH" : "POST", body
       }, "Ciclo riproduttivo");
       
       setEditCycle(null);
       await loadLists();
-      const created = response.cycle;
+      const created = (response as AnyRecord | null)?.cycle;
       if (created?.id) { setCyclesPage(1); selectCycle(created.id); }
       await loadCycle(created?.id || cycleId);
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteCycle = async item => {
+  const deleteCycle = async (item: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare il ciclo riproduttivo?", message: "“" + (item.name || prettyDate(item.startedOn)) + "” potrebbe avere registri figli da rimuovere prima. Il server controllerà i collegamenti.", confirmLabel: "Elimina ciclo", danger: true }))) return;
     try {
       const result = await api("reproduction-cycles/" + item.id, { method: "DELETE", body: {} }, "Elimina ciclo");
@@ -185,7 +186,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       }
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const submitEvent = async e => {
+  const submitEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const body = {
       eventType: v.eventType, occurredAt: isoDateTime(v.occurredAt), animalId: nullable(v.animalId),
@@ -200,12 +201,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       setEditEvent(null); await loadCycle();
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteEvent = async item => {
+  const deleteEvent = async (item: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare l’evento?", message: "L’evento riproduttivo verrà eliminato definitivamente.", confirmLabel: "Elimina evento", danger: true }))) return;
     try { const r = await api("reproductive-events/" + item.id, { method: "DELETE", body: {} }, "Elimina evento"); await loadCycle(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const submitClutch = async e => {
+  const submitClutch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const body = {
       laidOn: v.laidOn, eggCount: Number(v.eggCount), status: v.status,
@@ -213,18 +214,19 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       notes: nullable(v.notes)
     };
     try {
-      const editingClutch = Boolean(editClutch?.id);
-      const response = await api(editingClutch ? "clutches/" + editClutch.id : "clutches", {
+      const editClutchId = typeof editClutch?.id === "string" ? editClutch.id : null;
+      const editingClutch = Boolean(editClutchId);
+      const response = await api(editClutchId ? "clutches/" + editClutchId : "clutches", {
         method: editingClutch ? "PATCH" : "POST",
         body: editingClutch ? body : { ...body, cycleId }
       }, "Covata");
       
       setEditClutch(null);
-      if (response.clutch?.id) { setClutchId(response.clutch.id); setEggsPage(1); setLogsPage(1); }
+      if ((response as AnyRecord | null)?.clutch?.id) { setClutchId((response as AnyRecord).clutch.id); setEggsPage(1); setLogsPage(1); }
       await loadCycle();
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteClutch = async item => {
+  const deleteClutch = async (item: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare la covata?", message: "Saranno interessate anche le uova e le registrazioni di incubazione. Le covate collegate a piccoli registrati non possono essere eliminate.", confirmLabel: "Elimina covata", danger: true }))) return;
     try {
       const r = await api("clutches/" + item.id, { method: "DELETE", body: {} }, "Elimina covata");
@@ -233,7 +235,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       await loadCycle();
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const addEggs = async e => {
+  const addEggs = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const count = Math.max(1, Math.min(1000, Number(v.count || 1)));
     const prefix = v.prefix || "";
@@ -246,7 +248,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       await loadClutch(); await loadCycle();
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const saveEggRow = async (egg, row) => {
+  const saveEggRow = async (egg: AnyRecord, row: HTMLTableRowElement | null) => {
     if (!row) return;
     const body = {
       code: nullable(row.querySelector('[data-egg-field="code"]')?.value?.trim()),
@@ -258,12 +260,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
       await loadClutch();
     } catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteEgg = async egg => {
+  const deleteEgg = async (egg: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare l’uovo?", message: "L’uovo “" + (egg.code || "senza codice") + "” verrà eliminato definitivamente.", confirmLabel: "Elimina uovo", danger: true }))) return;
     try { const r = await api("eggs/" + egg.id, { method: "DELETE", body: {} }, "Elimina uovo"); await loadClutch(); await loadCycle(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const addIncubationLog = async e => {
+  const addIncubationLog = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
@@ -274,7 +276,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     try { const r = await api("clutches/" + clutchId + "/incubation-logs", { method: "POST", body }, "Registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const editIncubationLog = async (e, log) => {
+  const editIncubationLog = async (e: React.FormEvent<HTMLFormElement>, log: AnyRecord) => {
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
@@ -285,32 +287,32 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     try { const r = await api("incubation-logs/" + log.id, { method: "PATCH", body }, "Modifica registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteIncubationLog = async log => {
+  const deleteIncubationLog = async (log: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare il registro di incubazione?", message: "La registrazione verrà eliminata definitivamente.", confirmLabel: "Elimina registro", danger: true }))) return;
     try { const r = await api("incubation-logs/" + log.id, { method: "DELETE", body: {} }, "Elimina registro incubazione"); await loadClutch(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const createBatch = async e => {
+  const createBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const v = readForm(e);
     const body = { cycleId, clutchId: nullable(v.clutchId), bornOn: v.bornOn, count: Number(v.count), notes: nullable(v.notes) };
     try { const r = await api("offspring-batches", { method: "POST", body }, "Registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const editBatch = async (e, batch) => {
+  const editBatch = async (e: React.FormEvent<HTMLFormElement>, batch: AnyRecord) => {
     e.preventDefault(); const v = readForm(e);
     const body = { bornOn: v.bornOn, count: Number(v.count), notes: nullable(v.notes), clutchId: nullable(v.clutchId) };
     try { const r = await api("offspring-batches/" + batch.id, { method: "PATCH", body }, "Modifica registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const deleteBatch = async batch => {
+  const deleteBatch = async (batch: AnyRecord) => {
     if (!(await confirmAction({ title: "Eliminare il registro dei piccoli?", message: "Non sarà possibile procedere se sono già state create schede animali dal lotto.", confirmLabel: "Elimina registro", danger: true }))) return;
     try { const r = await api("offspring-batches/" + batch.id, { method: "DELETE", body: {} }, "Elimina registro piccoli"); await loadCycle(); await loadLists(); }
     catch (err) { onNotice(errorMessage(err), "error"); }
   };
-  const createAnimalCards = batch => {
+  const createAnimalCards = (batch: AnyRecord) => {
     setAnimalCardsForm({ batch, prefix: "Piccolo", species: val(cycle?.parentA, "species", ""), count: String(batch.count || 1) });
   };
-  const submitAnimalCards = async event => {
+  const submitAnimalCards = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!animalCardsForm) return;
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());

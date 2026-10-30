@@ -1,4 +1,6 @@
-const ECC = {
+type QrVersion = 1 | 2 | 3 | 4 | 5 | 6;
+
+const ECC: Record<QrVersion, { data: number; ecc: number; blocks: number }> = {
   1: { data: 19, ecc: 7, blocks: 1 },
   2: { data: 34, ecc: 10, blocks: 1 },
   3: { data: 55, ecc: 15, blocks: 1 },
@@ -6,9 +8,9 @@ const ECC = {
   5: { data: 108, ecc: 26, blocks: 1 },
   6: { data: 136, ecc: 18, blocks: 2 }
 };
-const ALIGNMENT = { 1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34] };
+const ALIGNMENT: Record<QrVersion, number[]> = { 1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34] };
 
-function multiply(a, b) {
+function multiply(a: number, b: number): number {
   let result = 0;
   while (b) {
     if (b & 1) result ^= a;
@@ -18,7 +20,7 @@ function multiply(a, b) {
   }
   return result;
 }
-function generatorPolynomial(degree) {
+function generatorPolynomial(degree: number): number[] {
   let polynomial = [1];
   let root = 1;
   for (let i = 0; i < degree; i++) {
@@ -32,7 +34,7 @@ function generatorPolynomial(degree) {
   }
   return polynomial;
 }
-function errorCorrection(data, count) {
+function errorCorrection(data: number[], count: number): number[] {
   const generator = generatorPolynomial(count);
   const remainder = new Array(count).fill(0);
   for (const byte of data) {
@@ -43,10 +45,10 @@ function errorCorrection(data, count) {
   }
   return remainder;
 }
-function dataWords(bytes, version) {
+function dataWords(bytes: number[], version: QrVersion): number[] {
   const capacity = ECC[version].data * 8;
-  const bits = [];
-  const append = (value, count) => {
+  const bits: number[] = [];
+  const append = (value: number, count: number) => {
     for (let i = count - 1; i >= 0; i--) bits.push((value >>> i) & 1);
   };
   append(0b0100, 4);
@@ -66,7 +68,7 @@ function dataWords(bytes, version) {
   }
   return result;
 }
-function allCodewords(data, version) {
+function allCodewords(data: number[], version: QrVersion): number[] {
   const config = ECC[version];
   if (config.blocks === 1) return data.concat(errorCorrection(data, config.ecc));
   const dataBlocks = [data.slice(0, 68), data.slice(68, 136)];
@@ -76,7 +78,7 @@ function allCodewords(data, version) {
   for (let i = 0; i < config.ecc; i++) for (const block of eccBlocks) out.push(block[i]);
   return out;
 }
-function appendBits(bits, value, count) {
+function appendBits(bits: number[], value: number, count: number): void {
   for (let i = count - 1; i >= 0; i--) bits.push((value >>> i) & 1);
 }
 function bchFormat(value) {
@@ -87,27 +89,27 @@ function bchFormat(value) {
   }
   return ((value << 10) | remainder) ^ 0x5412;
 }
-export function createQrMatrix(value) {
+export function createQrMatrix(value: string): boolean[][] {
   const bytes = Array.from(new TextEncoder().encode(String(value)));
-  let version = 0;
-  for (let candidate = 1; candidate <= 6; candidate++) {
+  let version: QrVersion | 0 = 0;
+  for (const candidate of [1, 2, 3, 4, 5, 6] as const) {
     if (4 + 8 + bytes.length * 8 <= ECC[candidate].data * 8) {
       version = candidate;
       break;
     }
   }
-  if (!version) throw new Error("Il link è troppo lungo per essere codificato in questo QR.");
+  if (version === 0) throw new Error("Il link è troppo lungo per essere codificato in questo QR.");
   const data = dataWords(bytes, version);
   const codewords = allCodewords(data, version);
   const size = 17 + version * 4;
   const matrix = Array.from({ length: size }, () => new Array(size).fill(null));
   const functional = Array.from({ length: size }, () => new Array(size).fill(false));
-  const put = (x, y, dark) => {
+  const put = (x: number, y: number, dark: boolean) => {
     if (x < 0 || y < 0 || x >= size || y >= size) return;
     matrix[y][x] = Boolean(dark);
     functional[y][x] = true;
   };
-  const finder = (cx, cy) => {
+  const finder = (cx: number, cy: number) => {
     for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
       const distance = Math.max(Math.abs(dx), Math.abs(dy));
       put(cx + dx, cy + dy, distance !== 4 && (distance === 3 || distance <= 1));
@@ -169,7 +171,7 @@ export function createQrMatrix(value) {
   put(8, size - 8, true);
   return matrix.map(row => row.map(Boolean));
 }
-export function qrSvgSource(value, scale = 8, margin = 4) {
+export function qrSvgSource(value: string, scale = 8, margin = 4): string {
   const matrix = createQrMatrix(value);
   const size = matrix.length;
   const total = size + margin * 2;
