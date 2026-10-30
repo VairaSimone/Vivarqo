@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# The CI runner may also have an older PostgreSQL client on /usr/bin.
+# Prefer the project/server PostgreSQL 18 client when the PGDG package exists.
+if [[ -x /usr/lib/postgresql/18/bin/pg_dump ]]; then
+  PATH="/usr/lib/postgresql/18/bin:$PATH"
+  export PATH
+fi
+
 : "${DATABASE_URL:?Set DATABASE_URL to the PostgreSQL source database}"
 for command in pg_dump pg_restore psql createdb dropdb sha256sum node; do
   command -v "$command" >/dev/null 2>&1 || { echo "$command is required (install PostgreSQL client tools)." >&2; exit 127; }
