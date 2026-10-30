@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Button } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
@@ -7,8 +7,8 @@ import { useConfirmDialog } from "./ui/ConfirmDialog";
 const categories = [
   ["task_due", "Scadenze attività"], ["system", "Sistema e test push"]
 ];
-const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
-const dateTime = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
+const dateTime = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 function fromBase64Url(value) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
@@ -22,7 +22,7 @@ function isSupported() {
 
 export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<AnyRecord[]>([]);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [unreadCount, setUnreadCount] = useState(0);

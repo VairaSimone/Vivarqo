@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Input, TextArea, Choice, Action, SectionTitle } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest, type ApiRequestOptions } from "./api/api";
@@ -7,19 +7,19 @@ import { Dialog } from "./ui/Dialog";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
-const dateValue = value => value ? new Date(value).toISOString().slice(0, 10) : "";
+const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
+const dateValue = (value?: string | Date | null) => value ? new Date(value).toISOString().slice(0, 10) : "";
 const localDateTime = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
-  const pad = part => String(part).padStart(2, "0");
+  const pad = (part: number) => String(part).padStart(2, "0");
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
-const prettyDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const val = (obj, key, fallback = "—") => obj?.[key] === null || obj?.[key] === undefined || obj?.[key] === "" ? fallback : obj[key];
+const prettyDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const val = (obj: AnyRecord | null | undefined, key: string, fallback = "—") => obj?.[key] === null || obj?.[key] === undefined || obj?.[key] === "" ? fallback : obj[key];
 const readForm = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
-const isoDateTime = value => value ? new Date(value).toISOString() : null;
-const nullable = value => value === "" || value === undefined ? null : value;
+const isoDateTime = (value?: string | Date | null) => value ? new Date(value).toISOString() : null;
+const nullable = (value: unknown) => value === "" || value === undefined ? null : value;
 
 const cycleStatuses = [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
 const eventTypes = [["pairing", "Accoppiamento"], ["observation", "Osservazione"], ["ovulation", "Ovulazione"], ["gravid", "Gravidanza"], ["laying", "Deposizione"], ["live_birth", "Parto"], ["incubation_start", "Avvio incubazione"], ["hatch", "Schiusa"], ["loss", "Perdita"], ["other", "Altro"]];
@@ -27,9 +27,9 @@ const eggStatuses = [["unknown", "Da valutare"], ["incubating", "In incubazione"
 
 export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
-  const [animalCardsForm, setAnimalCardsForm] = useState(null);
+  const [animalCardsForm, setAnimalCardsForm] = useState<AnyRecord | null>(null);
   const [creatingAnimalCards, setCreatingAnimalCards] = useState(false);
-  const [cycles, setCycles] = useState([]);
+  const [cycles, setCycles] = useState<AnyRecord[]>([]);
   const [cyclesPage, setCyclesPage] = useState(1);
   const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [animals, setAnimals] = useState([]);

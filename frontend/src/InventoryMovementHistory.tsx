@@ -6,7 +6,7 @@ const dateLabel = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle:
 const money = value => value == null ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(Number(value) / 100);
 function Button({ children, variant = "secondary", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 export function InventoryMovementHistory({ item, onClose }: { item: AnyRecord; onClose: () => void }) {
-  const [movements, setMovements] = useState([]);
+  const [movements, setMovements] = useState<AnyRecord[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState(false);

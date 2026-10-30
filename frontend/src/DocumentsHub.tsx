@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Button, Field } from "./ui/FormControls";
 import { apiRequest, apiUploadDocument, downloadPrivateDocument } from "./api/api";
 import { createQrMatrix, qrSvgSource } from "./qr";
@@ -7,9 +7,9 @@ import { Dialog } from "./ui/Dialog";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
-const displayDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const bytes = value => {
+const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
+const displayDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const bytes = (value: string | number | null | undefined) => {
   const size = Number(value || 0);
   if (size < 1024) return size + " B";
   if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
@@ -29,7 +29,7 @@ function QRCode({ value }) {
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (result[y][x]) path += "M" + (x + 4) + " " + (y + 4) + "h1v1h-1z";
   return <svg className="qr-svg" role="img" aria-label="Codice QR del profilo pubblico" viewBox={"0 0 " + (size + 8) + " " + (size + 8)} shapeRendering="crispEdges"><rect x={0} y={0} width={size + 8} height={size + 8} fill="#fff"/><path d={path} fill="#14231d"/></svg>;
 }
-function downloadQr(value, name) {
+function downloadQr(value: string, name?: string) {
   const source = qrSvgSource(value, 12, 4);
   const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -45,7 +45,7 @@ function downloadQr(value, name) {
 
 export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
-  const [documents, setDocuments] = useState([]);
+  const [documents, setDocuments] = useState<AnyRecord[]>([]);
   const [documentsPage, setDocumentsPage] = useState(1);
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
@@ -56,7 +56,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const [cycles, setCycles] = useState([]);
   const [selectedAnimal, setSelectedAnimal] = useState("");
   const [selectedCycle, setSelectedCycle] = useState("");
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<AnyRecord | null>(null);
   const [category, setCategory] = useState("other");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);

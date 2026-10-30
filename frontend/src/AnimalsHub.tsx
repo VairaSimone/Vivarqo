@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Button, Input, Select } from "./ui/FormControls";
 import { apiRequest } from "./api/api";
 import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const arrayOf = value => Array.isArray(value) ? value : [];
+const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : [];
 const sexOptions = [["unknown", "Non specificato"], ["female", "Femmina"], ["male", "Maschio"]];
 const statusOptions = [["active", "Attivo"], ["sold", "Venduto"], ["transferred", "Trasferito"], ["deceased", "Deceduto"]];
 const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const cleanAnimal = raw => ({
+const cleanAnimal = (raw: AnyRecord): AnyRecord => ({
   name: String(raw.name || "").trim(),
   identifier: String(raw.identifier || "").trim() || null,
   species: String(raw.species || "").trim(),
@@ -27,7 +27,7 @@ const cleanAnimal = raw => ({
 });
 const emptyBulkRow = () => ({ name: "", identifier: "", species: "", sex: "unknown", morph: "", birthDate: "", locationLabel: "", status: "active" });
 
-function historyDescription(item) {
+function historyDescription(item: AnyRecord): string {
   const record = item?.record || {};
   if (item?.type === "feeding") return [record.outcome, record.foodType || "Altro", record.foodWeightG ? record.foodWeightG + " g" : record.foodSize, record.notes, record.session?.notes].filter(Boolean).join(" · ") || "Alimentazione registrata";
   if (item?.type === "weight") return [record.weightG != null ? record.weightG + " g" : "", record.notes].filter(Boolean).join(" · ") || "Pesata registrata";
@@ -38,7 +38,7 @@ function historyDescription(item) {
 
 export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initialAnimalId = null }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
-  const [animals, setAnimals] = useState([]);
+  const [animals, setAnimals] = useState<AnyRecord[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("active");
@@ -49,9 +49,9 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
   const [filters, setFilters] = useState(emptyFilters);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [editor, setEditor] = useState(null);
+  const [editor, setEditor] = useState<AnyRecord | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkRows, setBulkRows] = useState([emptyBulkRow()]);
+  const [bulkRows, setBulkRows] = useState<AnyRecord[]>([emptyBulkRow()]);
   const [saving, setSaving] = useState(false);
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);

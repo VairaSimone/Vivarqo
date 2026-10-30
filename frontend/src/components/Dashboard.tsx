@@ -3,15 +3,15 @@ import type { AnyRecord, NavigationHandler } from "../types";
 import { apiRequest } from "../api/api";
 import { Icon } from "../ui/Icon";
 
-const asArray = data => Array.isArray(data) ? data : Object.values(data ?? {}).find(Array.isArray) ?? [];
-const value = (obj, keys, fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
-const date = value => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
+const asArray = (data: unknown): AnyRecord[] => Array.isArray(data) ? data as AnyRecord[] : data && typeof data === "object" ? Object.values(data as AnyRecord).find(Array.isArray) as AnyRecord[] ?? [] : [];
+const value = (obj: AnyRecord | null | undefined, keys: string[], fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
+const date = (value: unknown) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
 function Button({ children, variant = "", ...props }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 
 export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: NavigationHandler; onRetry?: () => void }) {
  const due=asArray(data?.tasks?.dueToday??data?.dueToday);
  const overdue=asArray(data?.tasks?.overdue??data?.overdue);
- const [operational,setOperational]=useState({stock:[],cycles:[],feeds:[],animalCount:null,stockLoaded:false,cyclesLoaded:false,feedsLoaded:false,animalsLoaded:false});
+ const [operational,setOperational]=useState<{stock:AnyRecord[];cycles:AnyRecord[];feeds:AnyRecord[];animalCount:number|null;stockLoaded:boolean;cyclesLoaded:boolean;feedsLoaded:boolean;animalsLoaded:boolean}>({stock:[],cycles:[],feeds:[],animalCount:null,stockLoaded:false,cyclesLoaded:false,feedsLoaded:false,animalsLoaded:false});
  useEffect(()=>{
   let live=true;
   Promise.allSettled([

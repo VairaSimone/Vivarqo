@@ -1,19 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Button, Input, Area, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
-const arrayOf = value => Array.isArray(value) ? value : Object.values(value || {}).find(Array.isArray) || [];
+const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
 const fmtDate = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
 const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
-  const pad = part => String(part).padStart(2, "0");
+  const pad = (part: number) => String(part).padStart(2, "0");
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
-const nullIfBlank = value => value === "" || value === undefined ? null : value;
+const nullIfBlank = (value: unknown) => value === "" || value === undefined ? null : value;
 const formData = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 const TAB_OPTIONS = [
   ["weights", "Peso"], ["sheds", "Mute"], ["notes", "Osservazioni"], ["feedings", "Alimentazioni"], ["genetics", "Genetica"]
@@ -22,12 +22,12 @@ const TITLES = { weights: "Peso", sheds: "Mute", notes: "Osservazioni", feedings
 const CREATE_LABELS = { weights: "Nuova pesata", sheds: "Nuova muta", notes: "Nuova nota", feedings: "Nuova sessione", genetics: "Nuovo tratto genetico" };
 const SHED: string[][] = [["complete", "Completa"], ["partial", "Parziale"], ["unknown", "Non valutata"]];
 const FEED_OUTCOME: string[][] = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
-const emptyFeedingEntry = animalId => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
+const emptyFeedingEntry = (animalId: string) => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
 export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
   const [tab, setTab] = useState(TAB_OPTIONS.some(o => o[0] === initialTab) ? initialTab : "weights");
-  const [animals, setAnimals] = useState([]);
+  const [animals, setAnimals] = useState<AnyRecord[]>([]);
   const [animalId, setAnimalId] = useState(initialAnimalId || "");
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
@@ -36,7 +36,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState<AnyRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [feedingEntries, setFeedingEntries] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);

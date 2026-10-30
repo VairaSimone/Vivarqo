@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import type { CommonHubProps } from "./types";
+import type { AnyRecord, CommonHubProps } from "./types";
 import { Button, Field, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest } from "./api/api";
@@ -7,17 +7,17 @@ import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
 const CATEGORIES: string[][] = [["feeding", "Alimentazione"], ["weighing", "Peso"], ["shed_check", "Muta"], ["cleaning", "Pulizia"], ["reproduction", "Riproduzione"], ["document", "Documenti"], ["inventory", "Inventario"], ["custom", "Altro"]];
-const pad = value => String(value).padStart(2, "0");
-const dateKey = date => date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
-const toDate = value => new Date(value + "T00:00:00");
-const dateLabel = value => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+const pad = (value: number) => String(value).padStart(2, "0");
+const dateKey = (date: Date) => date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+const toDate = (value: string) => new Date(value + "T00:00:00");
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
-const mondayOf = date => { const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate()); copy.setDate(copy.getDate() - ((copy.getDay() + 6) % 7)); return copy; };
-const dateRange = (anchor, view) => {
+const mondayOf = (date: Date) => { const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate()); copy.setDate(copy.getDate() - ((copy.getDay() + 6) % 7)); return copy; };
+const dateRange = (anchor: Date, view: string) => {
   let from, to;
   if (view === "week") { from = mondayOf(anchor); to = new Date(from); to.setDate(to.getDate() + 6); }
   else if (view === "list") { from = new Date(anchor.getFullYear(), anchor.getMonth(), 1); to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0); }
@@ -28,7 +28,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const confirmAction = useConfirmDialog();
   const [view, setView] = useState(() => window.matchMedia?.("(max-width: 760px)").matches ? "list" : "month");
   const [anchor, setAnchor] = useState(() => new Date());
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<AnyRecord[]>([]);
   const [rules, setRules] = useState([]);
   const [rulePagination, setRulePagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [rulePage, setRulePage] = useState(1);
@@ -39,7 +39,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [taskFormOpen, setTaskFormOpen] = useState(false);
-  const [taskEditing, setTaskEditing] = useState(null);
+  const [taskEditing, setTaskEditing] = useState<AnyRecord | null>(null);
   const [ruleForm, setRuleForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const range = useMemo(() => dateRange(anchor, view), [anchor, view]);

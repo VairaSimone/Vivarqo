@@ -3,6 +3,10 @@ export type NoticeHandler = (message: string, kind?: NoticeKind) => void;
 export type NavigationHandler = (section: string, options?: { animalId?: string | null }) => void;
 export type UnknownRecord = Record<string, unknown>;
 
+// Dynamic payloads are kept at the API boundary until each endpoint has a generated contract.
+// Prefer domain interfaces for new feature code; do not use this for internal business logic.
+export type AnyRecord = Record<string, any>;
+
 export interface CommonHubProps {
   onNotice?: NoticeHandler;
   owner?: AccountUser | string | null;
