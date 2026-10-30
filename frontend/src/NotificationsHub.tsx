@@ -27,7 +27,7 @@ export function NotificationsHub({ onNotice = () => {}, owner }: CommonHubProps)
   const [pagination, setPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [unreadCount, setUnreadCount] = useState(0);
   const [preferences, setPreferences] = useState({ inAppEnabled: true, pushEnabled: false, categories: {}, quietHoursStart: "", quietHoursEnd: "" });
-  const [devices, setDevices] = useState([]);
+  const [devices, setDevices] = useState<AnyRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import type { NoticeHandler } from "../types";
+import type { AnyRecord, NoticeHandler } from "../types";
 import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest, apiUpload } from "../api/api";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
@@ -8,13 +8,13 @@ const date = value => { if (!value) return "—"; const parsed = new Date(value)
 
 export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
   const confirmAction = useConfirmDialog();
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<File | null>(null);
   const [entity, setEntity] = useState("animals");
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState<AnyRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [includeDocs, setIncludeDocs] = useState(false);
-  const [exportJob, setExportJob] = useState(null);
-  const [importJob, setImportJob] = useState(null);
+  const [exportJob, setExportJob] = useState<AnyRecord | null>(null);
+  const [importJob, setImportJob] = useState<AnyRecord | null>(null);
   const entities = [["animals","Animali"],["weights","Pesate"],["sheds","Mute"],["notes","Note"],["feedings","Alimentazioni"],["finance","Finanze"],["inventory","Inventario"],["reproductionCycles","Cicli riproduttivi"],["reproductiveEvents","Eventi riproduttivi"],["clutches","Covate"],["eggs","Uova"],["incubationLogs","Controlli d’incubazione"],["offspringBatches","Lotti di piccoli"]];
   const upload = async e => {
     e.preventDefault();

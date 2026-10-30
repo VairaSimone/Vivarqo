@@ -52,8 +52,8 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const [cyclesPage, setCyclesPage] = useState(1);
   const [cyclesPagination, setCyclesPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [documentsPagination, setDocumentsPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
-  const [animals, setAnimals] = useState([]);
-  const [cycles, setCycles] = useState([]);
+  const [animals, setAnimals] = useState<AnyRecord[]>([]);
+  const [cycles, setCycles] = useState<AnyRecord[]>([]);
   const [selectedAnimal, setSelectedAnimal] = useState("");
   const [selectedCycle, setSelectedCycle] = useState("");
   const [file, setFile] = useState<AnyRecord | null>(null);
@@ -61,12 +61,12 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [listsLoaded, setListsLoaded] = useState(false);
-  const [share, setShare] = useState(null);
+  const [share, setShare] = useState<AnyRecord | null>(null);
   const [shareFields, setShareFields] = useState(["name", "species", "morph"]);
   const [publicDescription, setPublicDescription] = useState("");
   const [shareEnabled, setShareEnabled] = useState(false);
   const [error, setError] = useState("");
-  const [editingDocument, setEditingDocument] = useState(null);
+  const [editingDocument, setEditingDocument] = useState<AnyRecord | null>(null);
   const [savingDocumentEdit, setSavingDocumentEdit] = useState(false);
 
   const loadLists = useCallback(async () => {
@@ -217,7 +217,7 @@ export function DocumentsHub({ onNotice = () => {}, owner }: CommonHubProps) {
 }
 
 export function PublicAnimalPage({ slug }: { slug: string }) {
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   useEffect(() => {

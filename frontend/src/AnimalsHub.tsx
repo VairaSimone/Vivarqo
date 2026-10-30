@@ -53,10 +53,10 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRows, setBulkRows] = useState<AnyRecord[]>([emptyBulkRow()]);
   const [saving, setSaving] = useState(false);
-  const [history, setHistory] = useState(null);
+  const [history, setHistory] = useState<AnyRecord | null>(null);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [upcomingTasks, setUpcomingTasks] = useState([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<AnyRecord[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 250);

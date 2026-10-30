@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { NoticeHandler } from "./types";
+import type { AnyRecord, NoticeHandler } from "./types";
 import { apiRequest } from "./api/api";
 
 const money = (cents, currency = "EUR") => {
@@ -13,7 +13,7 @@ export function FinanceSummary({ onNotice = () => {}, refreshKey = 0 }: { onNoti
   const [filters, setFilters] = useState(initialFilters);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
-  const [summary, setSummary] = useState(null);
+  const [summary, setSummary] = useState<AnyRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

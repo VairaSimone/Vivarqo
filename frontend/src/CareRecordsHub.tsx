@@ -31,15 +31,15 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   const [animalId, setAnimalId] = useState(initialAnimalId || "");
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState<AnyRecord[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, totalPages: 1 });
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<AnyRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [feedingEntries, setFeedingEntries] = useState([]);
-  const [selectedSession, setSelectedSession] = useState(null);
+  const [feedingEntries, setFeedingEntries] = useState<AnyRecord[]>([]);
+  const [selectedSession, setSelectedSession] = useState<AnyRecord | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
 
   const api = useCallback((path: string, options?: ApiRequestOptions, _actionLabel?: string) => apiRequest(path, options), []);

@@ -29,10 +29,10 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const [view, setView] = useState(() => window.matchMedia?.("(max-width: 760px)").matches ? "list" : "month");
   const [anchor, setAnchor] = useState(() => new Date());
   const [items, setItems] = useState<AnyRecord[]>([]);
-  const [rules, setRules] = useState([]);
+  const [rules, setRules] = useState<AnyRecord[]>([]);
   const [rulePagination, setRulePagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
   const [rulePage, setRulePage] = useState(1);
-  const [animals, setAnimals] = useState([]);
+  const [animals, setAnimals] = useState<AnyRecord[]>([]);
   const [animalsPage, setAnimalsPage] = useState(1);
   const [animalsPagination, setAnimalsPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [includeDismissed, setIncludeDismissed] = useState(false);
@@ -40,7 +40,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const [error, setError] = useState("");
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [taskEditing, setTaskEditing] = useState<AnyRecord | null>(null);
-  const [ruleForm, setRuleForm] = useState(null);
+  const [ruleForm, setRuleForm] = useState<AnyRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const range = useMemo(() => dateRange(anchor, view), [anchor, view]);
 

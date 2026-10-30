@@ -1,3 +1,4 @@
+import type { AnyRecord } from "./types";
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { apiRequest } from "./api/api";
@@ -15,7 +16,7 @@ function safeStripeRedirect(raw, kind) {
   } catch { return null; }
 }
 export function BillingHub({ onNotice = () => {} }: CommonHubProps) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<AnyRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const checkoutState = new URLSearchParams(window.location.search).get("checkout");
