@@ -53,10 +53,15 @@ describe.skipIf(!enabled)("Privacy retention and shared authentication rate limi
         { userId: user.id, entityType: "notes", storageKey: "database-preview-report", status: "preview", report: { notes: "active preview" }, expiresAt: future },
       ],
     });
+    const activeExportLease = randomUUID();
     await prisma.exportJob.createMany({
       data: [
         { userId: user.id, status: "completed", storageKey: null, expiresAt: past },
         { userId: user.id, status: "completed", storageKey: null, expiresAt: future },
+        {
+          userId: user.id, status: "processing", storageKey: null, leaseToken: activeExportLease,
+          processingStartedAt: now, attempts: 1, expiresAt: past,
+        },
       ],
     });
     await prisma.apiRateLimitBucket.createMany({
@@ -76,7 +81,12 @@ describe.skipIf(!enabled)("Privacy retention and shared authentication rate limi
     expect(await prisma.userSession.count({ where: { userId: user.id } })).toBe(1);
     expect(await prisma.authToken.count({ where: { userId: user.id } })).toBe(1);
     expect(await prisma.importJob.count({ where: { userId: user.id } })).toBe(1);
-    expect(await prisma.exportJob.count({ where: { userId: user.id } })).toBe(1);
+    expect(await prisma.exportJob.count({ where: { userId: user.id } })).toBe(2);
+    const activeExport = await prisma.exportJob.findFirstOrThrow({
+      where: { userId: user.id, leaseToken: activeExportLease },
+    });
+    expect(activeExport.status).toBe("processing");
+    expect(activeExport.leaseToken).toBe(activeExportLease);
     expect(await prisma.apiRateLimitBucket.count({ where: { namespace: "test-retention" } })).toBe(1);
   });
 
