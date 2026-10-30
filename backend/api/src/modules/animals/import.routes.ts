@@ -175,6 +175,65 @@ function authId(res: Response): string {
   return (res.locals.auth as AuthContext).userId;
 }
 
+export async function processQueuedAnimalImport(jobId: string, userId: string, leaseToken: string): Promise<void> {
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, userId, entityType: "animals", status: "processing", leaseToken },
+  });
+  if (!job) return;
+  const report = readReport(job.report);
+  await prisma.$transaction(async (tx) => {
+    const identifiers = report.validRows.map((row) => row.animal.identifier).filter((value): value is string => Boolean(value));
+    const existing = identifiers.length
+      ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers, mode: "insensitive" } }, select: { identifier: true } })
+      : [];
+    const existingSet = new Set(existing.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")));
+    const finalErrors = [...report.errors];
+    const animalsToCreate = report.validRows.filter((row) => {
+      const identifier = row.animal.identifier;
+      if (identifier && existingSet.has(identifier.toLocaleLowerCase("it-IT"))) {
+        finalErrors.push({ row: row.rowNumber, column: "identifier", reason: "This identifier already exists in your account at confirmation time" });
+        return false;
+      }
+      return true;
+    });
+    const createdAnimals = animalsToCreate.length
+      ? await tx.animal.createManyAndReturn({
+          data: animalsToCreate.map(({ animal: input }) => ({
+            userId, name: input.name, identifier: input.identifier ?? null, species: input.species,
+            sex: input.sex, morph: input.morph ?? null, geneticsNotes: input.geneticsNotes ?? null,
+            birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
+            birthDateEstimated: input.birthDateEstimated,
+            acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
+            originDescription: input.originDescription ?? null, previousBreeder: input.previousBreeder ?? null,
+            locationLabel: input.locationLabel ?? null, status: input.status, notes: input.notes ?? null,
+          })),
+          select: { id: true },
+        })
+      : [];
+    const createdIds = createdAnimals.map((animal) => animal.id);
+    const finalReport = {
+      ...report, importedAnimalIds: createdIds, errors: finalErrors,
+      createdCount: createdIds.length,
+      skippedCount: report.validRows.length - createdIds.length + report.errors.length,
+    };
+    await tx.auditEvent.create({
+      data: {
+        userId, action: "animal.import_confirmed", entityType: "import_job", entityId: jobId,
+        metadata: { created: createdIds.length, skipped: finalReport.skippedCount, total: report.validRows.length + report.errors.length },
+      },
+    });
+    const completed = await tx.importJob.updateMany({
+      where: { id: jobId, userId, status: "processing", leaseToken },
+      data: {
+        status: "completed", createdCount: createdIds.length, skippedCount: finalReport.skippedCount,
+        errorCount: finalErrors.length, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        report: JSON.parse(JSON.stringify(finalReport)) as never,
+      },
+    });
+    if (completed.count !== 1) throw new Error("Import processing lease was lost before commit");
+  });
+}
+
 export function createImportRouter() {
   const router = Router();
 
@@ -305,16 +364,17 @@ export function createImportRouter() {
       createdCount: job.createdCount,
       skippedCount: job.skippedCount,
       errorCount: job.errorCount,
+      attempts: job.attempts,
+      lastErrorCode: job.lastErrorCode,
       expiresAt: job.expiresAt,
-      report: job.report,
+      ...(req.query.statusOnly === "true" ? {} : { report: job.report }),
     });
   });
 
   router.post("/:id/confirm", requireSession, persistentRateLimit(30, "import-confirm"), async (req, res, next: NextFunction) => {
     const userId = authId(res);
     const id = parseUuid(req.params.id!);
-    const confirmSchema = z.object({ allowPossibleDuplicates: z.boolean().optional().default(false) }).strict();
-    const body = confirmSchema.safeParse(req.body ?? {});
+    const body = z.object({ allowPossibleDuplicates: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
     if (!body.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
     const current = await prisma.importJob.findFirst({ where: { id, userId } });
     if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
@@ -322,99 +382,22 @@ export function createImportRouter() {
     if (current.status !== "preview" || current.expiresAt <= new Date()) {
       throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
     }
-    const previousReport = readReport(current.report);
-    if (previousReport.potentialDuplicates.length > 0 && !body.data.allowPossibleDuplicates) {
+    const report = readReport(current.report);
+    if (report.potentialDuplicates.length > 0 && !body.data.allowPossibleDuplicates) {
       throw new AppError(409, "IMPORT_DUPLICATES_REQUIRE_CONFIRMATION", "Possible name/species duplicates require explicit confirmation", {
-        possibleDuplicates: previousReport.potentialDuplicates,
+        possibleDuplicates: report.potentialDuplicates,
       });
     }
-
-    const result = await prisma.$transaction(async (tx) => {
-      const claim = await tx.importJob.updateMany({
-        where: { id, userId, status: "preview", expiresAt: { gt: new Date() } },
-        data: { status: "processing" },
-      });
-      if (claim.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
-
-      const job = await tx.importJob.findFirstOrThrow({ where: { id, userId } });
-      const report = readReport(job.report);
-      const identifiers = report.validRows.map((row) => row.animal.identifier).filter((value): value is string => Boolean(value));
-      const existing = identifiers.length
-        ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers, mode: "insensitive" } }, select: { identifier: true } })
-        : [];
-      const existingSet = new Set(existing.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")));
-      const finalErrors = [...report.errors];
-      const animalsToCreate = report.validRows.filter((row) => {
-        const identifier = row.animal.identifier;
-        if (identifier && existingSet.has(identifier.toLocaleLowerCase("it-IT"))) {
-          finalErrors.push({ row: row.rowNumber, column: "identifier", reason: "This identifier already exists in your account at confirmation time" });
-          return false;
-        }
-        return true;
-      });
-
-      // One batched INSERT instead of up to 5,000 sequential INSERTs inside
-      // the transaction. The report only needs the created IDs, not row ordering.
-      const createdAnimals = animalsToCreate.length
-        ? await tx.animal.createManyAndReturn({
-            data: animalsToCreate.map(({ animal: input }) => ({
-              userId,
-              name: input.name,
-              identifier: input.identifier ?? null,
-              species: input.species,
-              sex: input.sex,
-              morph: input.morph ?? null,
-              geneticsNotes: input.geneticsNotes ?? null,
-              birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
-              birthDateEstimated: input.birthDateEstimated,
-              acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
-              originDescription: input.originDescription ?? null,
-              previousBreeder: input.previousBreeder ?? null,
-              locationLabel: input.locationLabel ?? null,
-              status: input.status,
-              notes: input.notes ?? null,
-            })),
-            select: { id: true },
-          })
-        : [];
-      const createdIds = createdAnimals.map((animal) => animal.id);
-
-      await tx.auditEvent.create({
-        data: {
-          userId,
-          action: "animal.import_confirmed",
-          entityType: "import_job",
-          entityId: id,
-          metadata: { created: createdIds.length, skipped: report.validRows.length - createdIds.length + finalErrors.length, total: report.validRows.length + report.errors.length },
-        },
-      });
-      const finalReport = {
-        ...report,
-        importedAnimalIds: createdIds,
-        errors: finalErrors,
-        createdCount: createdIds.length,
-        skippedCount: report.validRows.length - createdIds.length + report.errors.length,
-      };
-      const updated = await tx.importJob.update({
-        where: { id },
-        data: {
-          status: "completed",
-          createdCount: createdIds.length,
-          skippedCount: finalReport.skippedCount,
-          errorCount: finalErrors.length,
-          report: JSON.parse(JSON.stringify(finalReport)) as never,
-        },
-      });
-      return { job: updated, finalReport };
+    const queued = await prisma.importJob.updateMany({
+      where: { id, userId, entityType: "animals", status: "preview", expiresAt: { gt: new Date() } },
+      data: {
+        status: "queued", allowPossibleDuplicates: body.data.allowPossibleDuplicates,
+        attempts: 0, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
     });
-    res.status(200).json({
-      importId: result.job.id,
-      status: result.job.status,
-      createdCount: result.job.createdCount,
-      skippedCount: result.job.skippedCount,
-      errorCount: result.job.errorCount,
-      report: result.finalReport,
-    });
+    if (queued.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
+    res.status(202).json({ importId: id, status: "queued", createdCount: 0, skippedCount: current.errorCount, errorCount: current.errorCount });
   });
 
   return router;
