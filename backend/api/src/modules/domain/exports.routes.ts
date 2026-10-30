@@ -327,7 +327,10 @@ export function createExportRouter() {
     if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
 
     const job = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"vivarqo:export-limit:" + auth.userId}, 0))`;
+      await tx.$queryRaw`WITH lock_acquired AS MATERIALIZED (
+        SELECT pg_advisory_xact_lock(hashtextextended(${"vivarqo:export-limit:" + auth.userId}, 0))
+      )
+      SELECT TRUE AS acquired FROM lock_acquired`;
       const activeJobs = await tx.exportJob.count({
         where: { userId: auth.userId, status: { in: ["pending", "processing"] }, expiresAt: { gt: new Date() } },
       });
