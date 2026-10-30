@@ -83,7 +83,7 @@ function verifyStripeSignature(rawBody: Buffer, signatureHeader: string | undefi
   });
 }
 
-type BillingTransaction = Pick<typeof prisma, "subscription" | "stripeWebhookEvent">;
+type BillingTransaction = Pick<typeof prisma, "subscription" | "stripeWebhookEvent" | "user">;
 async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<void> {
   const object = event.data.object;
   const eventType = event.type;
@@ -99,6 +99,8 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       userId = current?.userId ?? null;
     }
     if (!userId) return;
+    const account = await tx.user.findFirst({ where: { id: userId, deletedAt: null, accountStatus: "active" }, select: { id: true } });
+    if (!account) return;
     const price = object.items && typeof object.items === "object" && "data" in object.items && Array.isArray((object.items as { data?: unknown }).data)
       ? ((object.items as { data: Array<Record<string, unknown>> }).data[0]?.price as Record<string, unknown> | undefined)?.id
       : undefined;
@@ -119,6 +121,8 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     const userRaw = typeof object.client_reference_id === "string" ? object.client_reference_id :
       typeof object.metadata?.user_id === "string" ? object.metadata.user_id : null;
     if (!userRaw || !z.string().uuid().safeParse(userRaw).success) return;
+    const account = await tx.user.findFirst({ where: { id: userRaw, deletedAt: null, accountStatus: "active" }, select: { id: true } });
+    if (!account) return;
     const customerId = stringId(object.customer);
     const subscriptionId = stringId(object.subscription);
     if (!customerId || !subscriptionId) return;

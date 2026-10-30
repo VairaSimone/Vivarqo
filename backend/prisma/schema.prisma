@@ -27,6 +27,7 @@ model User {
   reminderRules           ReminderRule[]
   tasks                   Task[]
   notificationPreferences NotificationPreferences?
+  userPreference           UserPreference?
   pushSubscriptions       PushSubscription[]
   notifications           Notification[]
   reproductionCycles      ReproductionCycle[]
@@ -588,4 +589,21 @@ model AuditEvent {
   @@index([entityType, entityId], map: "audit_events_entity_idx")
   @@index([requestId], where: raw("\"request_id\" IS NOT NULL"), map: "audit_events_request_idx")
   @@map("audit_events")
+}
+
+
+model UserPreference {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String   @unique @map("user_id") @db.Uuid
+  weightUnit          String   @default("g") @map("weight_unit") @db.VarChar(8)
+  temperatureUnit     String   @default("c") @map("temperature_unit") @db.VarChar(8)
+  dateFormat          String   @default("locale") @map("date_format") @db.VarChar(16)
+  defaultLandingPage  String   @default("today") @map("default_landing_page") @db.VarChar(40)
+  compactTables       Boolean  @default(false) @map("compact_tables")
+  theme               String   @default("system") @db.VarChar(16)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
