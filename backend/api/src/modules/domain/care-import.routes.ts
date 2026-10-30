@@ -106,6 +106,77 @@ function reportFrom(value: unknown): CareImportReport {
   return value as CareImportReport;
 }
 
+export async function processQueuedCareImport(jobId: string, userId: string, leaseToken: string): Promise<void> {
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, userId, entityType: { in: [...supportedEntities] }, status: "processing", leaseToken },
+  });
+  if (!job) return;
+  const report = reportFrom(job.report);
+  await prisma.$transaction(async (tx) => {
+    let createdCount = 0;
+    if (report.entityType === "weights") {
+      const records = report.validRows.map(({ record: value }) => {
+        const record = value as { animalId: string; measuredAt: string; weightG: number; notes?: string | null };
+        return { animalId: record.animalId, measuredAt: new Date(record.measuredAt), weightG: record.weightG, notes: record.notes ?? null };
+      });
+      if (records.length) await tx.weightMeasurement.createMany({ data: records });
+      createdCount = records.length;
+    } else if (report.entityType === "sheds") {
+      const records = report.validRows.map(({ record: value }) => {
+        const record = value as { animalId: string; occurredAt: string; outcome: "complete" | "partial" | "unknown"; notes?: string | null };
+        return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), outcome: record.outcome, notes: record.notes ?? null };
+      });
+      if (records.length) await tx.shedRecord.createMany({ data: records });
+      createdCount = records.length;
+    } else if (report.entityType === "notes") {
+      const records = report.validRows.map(({ record: value }) => {
+        const record = value as { animalId: string; occurredAt: string; title?: string | null; category: string; body: string };
+        return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), title: record.title ?? null, category: record.category, body: record.body };
+      });
+      if (records.length) await tx.animalNote.createMany({ data: records });
+      createdCount = records.length;
+    } else {
+      const byTimestamp = new Map<string, Array<{ rowNumber: number; record: Record<string, unknown> }>>();
+      for (const row of report.validRows) {
+        const timestamp = String(row.record.performedAt);
+        const rows = byTimestamp.get(timestamp) ?? [];
+        rows.push(row);
+        byTimestamp.set(timestamp, rows);
+      }
+      for (const [timestamp, rows] of byTimestamp) {
+        const session = await tx.feedingSession.create({ data: { userId, performedAt: new Date(timestamp) } });
+        const entries = rows.map(({ record: value }) => {
+          const record = value as {
+            animalId: string; outcome: "ate" | "refused" | "not_offered" | "unknown";
+            foodType?: string | null; foodSize?: string | null; foodWeightG?: number | null; notes?: string | null;
+          };
+          return {
+            sessionId: session.id, animalId: record.animalId, outcome: record.outcome,
+            foodType: record.foodType ?? null, foodSize: record.foodSize ?? null,
+            foodWeightG: record.foodWeightG ?? null, notes: record.notes ?? null,
+          };
+        });
+        if (entries.length) await tx.feedingEntry.createMany({ data: entries });
+        createdCount += entries.length;
+      }
+    }
+    const finalReport = { ...report, createdCount, skippedCount: report.errors.length, errors: report.errors };
+    await tx.auditEvent.create({
+      data: { userId, action: "care_records.imported", entityType: "import_job", entityId: jobId,
+        metadata: { entityType: report.entityType, createdCount, errorCount: report.errors.length } },
+    });
+    const completed = await tx.importJob.updateMany({
+      where: { id: jobId, userId, status: "processing", leaseToken },
+      data: {
+        status: "completed", createdCount, skippedCount: report.errors.length, errorCount: report.errors.length,
+        processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        report: JSON.parse(JSON.stringify(finalReport)) as never,
+      },
+    });
+    if (completed.count !== 1) throw new Error("Import processing lease was lost before commit");
+  });
+}
+
 export function createCareImportRouter() {
   const router = Router();
 
@@ -209,72 +280,22 @@ export function createCareImportRouter() {
   router.post("/:id/confirm", requireSession, persistentRateLimit(30, "import-confirm"), async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const jobId = routeUuid(req.params.id);
-    const current = await prisma.importJob.findFirst({ where: { id: jobId, userId: auth.userId, entityType: { in: [...supportedEntities] } } });
-    if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
-    if (current.status !== "preview" || current.expiresAt <= new Date()) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
-    const result = await prisma.$transaction(async (tx) => {
-      const claim = await tx.importJob.updateMany({
-        where: { id: jobId, userId: auth.userId, status: "preview", expiresAt: { gt: new Date() } },
-        data: { status: "processing" },
-      });
-      if (claim.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
-      const job = await tx.importJob.findFirstOrThrow({ where: { id: jobId, userId: auth.userId } });
-      const report = reportFrom(job.report);
-      let createdCount = 0;
-      if (report.entityType === "weights") {
-        const records = report.validRows.map(({ record: value }) => {
-          const record = value as { animalId: string; measuredAt: string; weightG: number; notes?: string | null };
-          return { animalId: record.animalId, measuredAt: new Date(record.measuredAt), weightG: record.weightG, notes: record.notes ?? null };
-        });
-        if (records.length) await tx.weightMeasurement.createMany({ data: records });
-        createdCount = records.length;
-      } else if (report.entityType === "sheds") {
-        const records = report.validRows.map(({ record: value }) => {
-          const record = value as { animalId: string; occurredAt: string; outcome: "complete" | "partial" | "unknown"; notes?: string | null };
-          return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), outcome: record.outcome, notes: record.notes ?? null };
-        });
-        if (records.length) await tx.shedRecord.createMany({ data: records });
-        createdCount = records.length;
-      } else if (report.entityType === "notes") {
-        const records = report.validRows.map(({ record: value }) => {
-          const record = value as { animalId: string; occurredAt: string; title?: string | null; category: string; body: string };
-          return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), title: record.title ?? null, category: record.category, body: record.body };
-        });
-        if (records.length) await tx.animalNote.createMany({ data: records });
-        createdCount = records.length;
-      } else {
-        const byTimestamp = new Map<string, Array<{ rowNumber: number; record: Record<string, unknown> }>>();
-        for (const row of report.validRows) {
-          const timestamp = String(row.record.performedAt);
-          const entries = byTimestamp.get(timestamp) ?? [];
-          entries.push(row);
-          byTimestamp.set(timestamp, entries);
-        }
-        for (const [timestamp, rows] of byTimestamp) {
-          const session = await tx.feedingSession.create({ data: { userId: auth.userId, performedAt: new Date(timestamp) } });
-          const entries = rows.map(({ record: value }) => {
-            const record = value as { animalId: string; outcome: "ate" | "refused" | "not_offered" | "unknown"; foodType?: string | null; foodSize?: string | null; foodWeightG?: number | null; notes?: string | null };
-            return {
-              sessionId: session.id, animalId: record.animalId, outcome: record.outcome,
-              foodType: record.foodType ?? null, foodSize: record.foodSize ?? null,
-              foodWeightG: record.foodWeightG ?? null, notes: record.notes ?? null,
-            };
-          });
-          if (entries.length) await tx.feedingEntry.createMany({ data: entries });
-          createdCount += entries.length;
-        }
-      }
-      const finalReport = { ...report, createdCount, skippedCount: report.errors.length, errors: report.errors };
-      const updated = await tx.importJob.update({
-        where: { id: jobId },
-        data: { status: "completed", createdCount, skippedCount: report.errors.length, errorCount: report.errors.length, report: JSON.parse(JSON.stringify(finalReport)) as never },
-      });
-      await tx.auditEvent.create({
-        data: { userId: auth.userId, action: "care_records.imported", entityType: "import_job", entityId: jobId, metadata: { entityType: report.entityType, createdCount, errorCount: report.errors.length } },
-      });
-      return updated;
+    const current = await prisma.importJob.findFirst({
+      where: { id: jobId, userId: auth.userId, entityType: { in: [...supportedEntities] } },
     });
-    res.status(200).json({ importId: result.id, entityType: result.entityType, status: result.status, createdCount: result.createdCount, skippedCount: result.skippedCount, errorCount: result.errorCount, report: result.report });
+    if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
+    if (current.status !== "preview" || current.expiresAt <= new Date()) {
+      throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
+    }
+    const queued = await prisma.importJob.updateMany({
+      where: { id: jobId, userId: auth.userId, status: "preview", expiresAt: { gt: new Date() } },
+      data: {
+        status: "queued", attempts: 0, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    if (queued.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
+    res.status(202).json({ importId: jobId, entityType: current.entityType, status: "queued", createdCount: 0, skippedCount: current.errorCount, errorCount: current.errorCount });
   });
 
   return router;
