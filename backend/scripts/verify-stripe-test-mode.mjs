@@ -71,4 +71,4 @@ if (typeof checkout.url !== "string" || !checkout.url.startsWith("https://checko
 }
 process.stdout.write("Stripe Test Mode Checkout session created: " + checkout.id + "\n");
 process.stdout.write("Complete the hosted flow with test payment details: " + checkout.url + "\n");
-process.stdout.write("After completing Checkout, rerun with STRIPE_TEST_CUSTOMER_ID=" + checkout.customer + " to test the Customer Portal.\n");
+process.stdout.write("After completing Checkout, retrieve its Test Mode customer ID (cus_...) from Stripe and rerun with STRIPE_TEST_CUSTOMER_ID=cus_... to test the Customer Portal.\n");
