@@ -161,13 +161,13 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
       const d = new Date(first); d.setDate(d.getDate() + i - offset); return d;
     });
   }, [view, range.from, anchor]);
-  const beginTask = item => {
+  const beginTask = (item: AnyRecord | null) => {
     const record = item?.record;
     setTaskEditing(record && item.type === "task" ? record : null);
     setTaskFormOpen(true);
   };
   const monthNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
-  const renderItem = item => <div className={"calendar-event event-" + item.type} key={item.type + "-" + item.id}>
+  const renderItem = (item: AnyRecord) => <div className={"calendar-event event-" + item.type} key={item.type + "-" + item.id}>
     <strong>{item.title}</strong><small>{new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.start))} · {item.animal?.name || (item.type === "reproduction" ? "Riproduzione" : item.type === "clutch" ? "Covata" : item.category)}</small>
     {item.type === "task" && <div className="inline-actions"><Button onClick={() => beginTask(item)}>Modifica</Button><Button onClick={() => void completeTask(item)}>Completa</Button><Button variant="danger" onClick={() => void deleteTask(item)}>Elimina</Button></div>}
     {item.type !== "task" && <span className="muted">{item.type === "reproduction" ? "Evento riproduttivo" : "Deposizione"}</span>}
