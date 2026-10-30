@@ -180,6 +180,114 @@ function sourceRecord(entity: Entity, values: Record<string, string>, map: Recor
   return record;
 }
 
+export async function processQueuedDomainImport(jobId: string, userId: string, leaseToken: string): Promise<void> {
+  const job = await prisma.importJob.findFirst({
+    where: { id: jobId, userId, entityType: { in: [...entities] }, status: "processing", leaseToken },
+  });
+  if (!job) return;
+  const report = readReport(job.report);
+  await prisma.$transaction(async (tx) => {
+    const createdRows: Array<{ row: number; id: string }> = [];
+    for (const row of report.validRows) {
+      const item = row.record;
+      let createdId = "";
+      switch (report.entityType) {
+        case "finance": {
+          const created = await tx.financeEntry.create({ data: {
+            userId, entryType: item.entryType as string, occurredOn: dateOnly(item.occurredOn as string),
+            amountCents: BigInt(item.amountCents as number), currency: item.currency as string,
+            category: item.category as string, description: item.description as string,
+            animalId: (item.animalId as string | null | undefined) ?? null,
+            documentId: (item.documentId as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+        case "inventory": {
+          const created = await tx.inventoryItem.create({ data: {
+            userId, name: item.name as string, category: item.category as string, unit: item.unit as string,
+            quantityOnHand: item.quantityOnHand as number, minimumQuantity: (item.minimumQuantity as number | null | undefined) ?? null,
+            notes: (item.notes as string | null | undefined) ?? null, isActive: item.isActive as boolean,
+          } });
+          if ((item.quantityOnHand as number) > 0) await tx.stockMovement.create({ data: {
+            itemId: created.id, movementType: "in", quantity: item.quantityOnHand as number,
+            occurredAt: new Date(), reference: "Import apertura", notes: "Saldo iniziale da importazione",
+          } });
+          createdId = created.id; break;
+        }
+        case "reproductionCycles": {
+          const created = await tx.reproductionCycle.create({ data: {
+            userId, name: (item.name as string | null | undefined) ?? null,
+            startedOn: dateOnly(item.startedOn as string), endedOn: item.endedOn ? dateOnly(item.endedOn as string) : null,
+            status: item.status as string, parentAAnimalId: (item.parentAAnimalId as string | null | undefined) ?? null,
+            parentBAnimalId: (item.parentBAnimalId as string | null | undefined) ?? null,
+            notes: (item.notes as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+        case "reproductiveEvents": {
+          const created = await tx.reproductiveEvent.create({ data: {
+            cycleId: item.cycleId as string, eventType: item.eventType as string, occurredAt: new Date(item.occurredAt as string),
+            animalId: (item.animalId as string | null | undefined) ?? null, details: (item.details as string | null | undefined) ?? null,
+            temperatureC: item.temperatureC === undefined ? null : item.temperatureC as number | null,
+            humidityPct: item.humidityPct === undefined ? null : item.humidityPct as number | null,
+          } });
+          createdId = created.id; break;
+        }
+        case "clutches": {
+          const created = await tx.clutch.create({ data: {
+            cycleId: item.cycleId as string, laidOn: dateOnly(item.laidOn as string), eggCount: item.eggCount as number,
+            status: item.status as string, incubatorLabel: (item.incubatorLabel as string | null | undefined) ?? null,
+            incubationStartedAt: item.incubationStartedAt ? new Date(item.incubationStartedAt as string) : null,
+            notes: (item.notes as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+        case "eggs": {
+          const created = await tx.egg.create({ data: {
+            clutchId: item.clutchId as string, code: (item.code as string | null | undefined) ?? null,
+            status: item.status as string, notes: (item.notes as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+        case "incubationLogs": {
+          const created = await tx.incubationLog.create({ data: {
+            clutchId: item.clutchId as string, recordedAt: new Date(item.recordedAt as string),
+            temperatureC: item.temperatureC === undefined ? null : item.temperatureC as number | null,
+            humidityPct: item.humidityPct === undefined ? null : item.humidityPct as number | null,
+            eventType: item.eventType as string, notes: (item.notes as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+        case "offspringBatches": {
+          const created = await tx.offspringBatch.create({ data: {
+            cycleId: item.cycleId as string, clutchId: (item.clutchId as string | null | undefined) ?? null,
+            bornOn: dateOnly(item.bornOn as string), count: item.count as number,
+            notes: (item.notes as string | null | undefined) ?? null,
+          } });
+          createdId = created.id; break;
+        }
+      }
+      createdRows.push({ row: row.rowNumber, id: createdId });
+    }
+    const finalReport = { ...report, createdRows, createdCount: createdRows.length, skippedCount: report.errors.length };
+    await tx.auditEvent.create({
+      data: {
+        userId, action: "domain_import.confirmed", entityType: "import_job", entityId: jobId,
+        metadata: { entityType: report.entityType, created: createdRows.length, errors: report.errors.length },
+      },
+    });
+    const completed = await tx.importJob.updateMany({
+      where: { id: jobId, userId, status: "processing", leaseToken },
+      data: {
+        status: "completed", createdCount: createdRows.length, skippedCount: report.errors.length,
+        errorCount: report.errors.length, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        report: JSON.parse(JSON.stringify(finalReport)) as never,
+      },
+    });
+    if (completed.count !== 1) throw new Error("Import processing lease was lost before commit");
+  });
+}
+
 export function createDomainImportRouter() {
   const router = Router();
 
@@ -311,78 +419,19 @@ export function createDomainImportRouter() {
     const current = await prisma.importJob.findFirst({ where: { id: jobId, userId: auth.userId } });
     if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
     if (!entities.includes(current.entityType as Entity)) { next(); return; }
-    if (current.status !== "preview" || current.expiresAt <= new Date()) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
-    const result = await prisma.$transaction(async (tx) => {
-      const claim = await tx.importJob.updateMany({ where: { id: jobId, userId: auth.userId, status: "preview", expiresAt: { gt: new Date() } }, data: { status: "processing" } });
-      if (claim.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
-      const job = await tx.importJob.findFirstOrThrow({ where: { id: jobId, userId: auth.userId } });
-      const report = readReport(job.report);
-      const createdRows: Array<{ row: number; id: string }> = [];
-      for (const row of report.validRows) {
-        const item = row.record;
-        let createdId = "";
-        switch (report.entityType) {
-          case "finance": {
-            const created = await tx.financeEntry.create({ data: { userId: auth.userId, entryType: item.entryType as string, occurredOn: dateOnly(item.occurredOn as string),
-              amountCents: BigInt(item.amountCents as number), currency: item.currency as string, category: item.category as string, description: item.description as string,
-              animalId: (item.animalId as string | null | undefined) ?? null, documentId: (item.documentId as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-          case "inventory": {
-            const created = await tx.inventoryItem.create({ data: { userId: auth.userId, name: item.name as string, category: item.category as string,
-              unit: item.unit as string, quantityOnHand: item.quantityOnHand as number, minimumQuantity: (item.minimumQuantity as number | null | undefined) ?? null,
-              notes: (item.notes as string | null | undefined) ?? null, isActive: item.isActive as boolean } });
-            if ((item.quantityOnHand as number) > 0) await tx.stockMovement.create({ data: { itemId: created.id, movementType: "in",
-              quantity: item.quantityOnHand as number, occurredAt: new Date(), reference: "Import apertura", notes: "Saldo iniziale da importazione" } });
-            createdId = created.id; break;
-          }
-          case "reproductionCycles": {
-            const created = await tx.reproductionCycle.create({ data: { userId: auth.userId, name: (item.name as string | null | undefined) ?? null,
-              startedOn: dateOnly(item.startedOn as string), endedOn: item.endedOn ? dateOnly(item.endedOn as string) : null, status: item.status as string,
-              parentAAnimalId: (item.parentAAnimalId as string | null | undefined) ?? null, parentBAnimalId: (item.parentBAnimalId as string | null | undefined) ?? null,
-              notes: (item.notes as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-          case "reproductiveEvents": {
-            const created = await tx.reproductiveEvent.create({ data: { cycleId: item.cycleId as string, eventType: item.eventType as string,
-              occurredAt: new Date(item.occurredAt as string), animalId: (item.animalId as string | null | undefined) ?? null, details: (item.details as string | null | undefined) ?? null,
-              temperatureC: item.temperatureC === undefined ? null : item.temperatureC as number | null, humidityPct: item.humidityPct === undefined ? null : item.humidityPct as number | null } });
-            createdId = created.id; break;
-          }
-          case "clutches": {
-            const created = await tx.clutch.create({ data: { cycleId: item.cycleId as string, laidOn: dateOnly(item.laidOn as string), eggCount: item.eggCount as number,
-              status: item.status as string, incubatorLabel: (item.incubatorLabel as string | null | undefined) ?? null,
-              incubationStartedAt: item.incubationStartedAt ? new Date(item.incubationStartedAt as string) : null, notes: (item.notes as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-          case "eggs": {
-            const created = await tx.egg.create({ data: { clutchId: item.clutchId as string, code: (item.code as string | null | undefined) ?? null,
-              status: item.status as string, notes: (item.notes as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-          case "incubationLogs": {
-            const created = await tx.incubationLog.create({ data: { clutchId: item.clutchId as string, recordedAt: new Date(item.recordedAt as string),
-              temperatureC: item.temperatureC === undefined ? null : item.temperatureC as number | null, humidityPct: item.humidityPct === undefined ? null : item.humidityPct as number | null,
-              eventType: item.eventType as string, notes: (item.notes as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-          case "offspringBatches": {
-            const created = await tx.offspringBatch.create({ data: { cycleId: item.cycleId as string, clutchId: (item.clutchId as string | null | undefined) ?? null,
-              bornOn: dateOnly(item.bornOn as string), count: item.count as number, notes: (item.notes as string | null | undefined) ?? null } });
-            createdId = created.id; break;
-          }
-        }
-        createdRows.push({ row: row.rowNumber, id: createdId });
-      }
-      await tx.auditEvent.create({ data: { userId: auth.userId, action: "domain_import.confirmed", entityType: "import_job", entityId: jobId,
-        metadata: { entityType: report.entityType, created: createdRows.length, errors: report.errors.length } } });
-      const finalReport = { ...report, createdRows, createdCount: createdRows.length, skippedCount: report.errors.length };
-      const updated = await tx.importJob.update({ where: { id: jobId }, data: { status: "completed", createdCount: createdRows.length,
-        skippedCount: report.errors.length, errorCount: report.errors.length, report: JSON.parse(JSON.stringify(finalReport)) as never } });
-      return { job: updated, report: finalReport };
+    if (current.status !== "preview" || current.expiresAt <= new Date()) {
+      throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
+    }
+    const queued = await prisma.importJob.updateMany({
+      where: { id: jobId, userId: auth.userId, entityType: current.entityType, status: "preview", expiresAt: { gt: new Date() } },
+      data: {
+        status: "queued", attempts: 0, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
     });
-    res.status(200).json({ importId: result.job.id, status: result.job.status, createdCount: result.job.createdCount,
-      skippedCount: result.job.skippedCount, errorCount: result.job.errorCount, report: result.report });
+    if (queued.count !== 1) throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import has already been confirmed or expired");
+    res.status(202).json({ importId: jobId, entityType: current.entityType, status: "queued", createdCount: 0, skippedCount: current.errorCount, errorCount: current.errorCount });
   });
+
   return router;
 }
