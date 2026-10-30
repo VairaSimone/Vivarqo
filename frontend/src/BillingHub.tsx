@@ -5,7 +5,8 @@ import { apiRequest } from "./api/api";
 import { errorMessage } from "./types";
 
 const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
-const statusLabel = (value?: string | null) => ({ active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" }[value] || value || "Nessun abbonamento");
+const STATUS_LABELS: Record<string, string> = { active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" };
+const statusLabel = (value?: string | null) => value ? STATUS_LABELS[value] || value : "Nessun abbonamento";
 function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 function safeStripeRedirect(raw: string | null | undefined, kind: "checkout" | "portal"): string | null {
   try {
