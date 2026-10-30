@@ -20,7 +20,7 @@ pnpm db:generate
 pnpm dev:api
 ```
 
-Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale esegui `pnpm dev:frontend`: Vite rende disponibile la prima interfaccia React su `http://localhost:5173` e inoltra le richieste API a `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia anche il processo dedicato ai job con `pnpm dev:worker`; in un terzo esegui `pnpm dev:frontend`: Vite rende disponibile la prima interfaccia React su `http://localhost:5173` e inoltra le richieste API a `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
 
 ```bash
 docker compose -f backend/infra/docker/compose.yaml up -d --build api
@@ -33,6 +33,12 @@ Lo schema SQL consolidato di riferimento è versionato in [`backend/database/sch
 All'avvio l'API aspetta PostgreSQL, esegue `prisma migrate deploy` e controlla tabelle, colonne, indici, vincoli nominati, trigger, funzioni ed estensione `citext`. Se lo schema SQL completo è già stato applicato manualmente ma manca la cronologia Prisma, l'app lo registra come baseline solo dopo la verifica integrale. Se trova uno schema parziale non tracciato o una migrazione già applicata ma con oggetti mancanti, interrompe l'avvio senza cancellare o sovrascrivere dati: in quel caso va fatto un backup e va corretta la deriva con una migrazione revisionata.
 
 **Il database PostgreSQL indicato in `DATABASE_URL` deve già esistere** (Compose lo crea; nei servizi gestiti va creato nel provider). L'avvio automatico crea/aggiorna lo schema dentro quel database, non crea un server PostgreSQL né un database mancante sul provider. Il comando manuale `pnpm db:migrate:deploy` resta disponibile ed è idempotente.
+
+## Processi API e worker
+
+API HTTP e job in background sono separati. In Compose il servizio `api` gestisce esclusivamente le richieste HTTP; il servizio `worker` esegue promemoria, retention, Web Push e job asincroni di import/export. Entrambi condividono PostgreSQL e lo storage privato; il worker pubblica un heartbeat PostgreSQL a scadenza breve. Le metriche Prometheus sono disponibili su `/metrics` solo quando `METRICS_BEARER_TOKEN` è configurato; inviare `Authorization: Bearer <token>`. L'endpoint non espone metriche se il token manca o non corrisponde.
+
+Configurare `SENTRY_DSN` per inviare eventi minimizzati a Sentry e `METRICS_BEARER_TOKEN` con un segreto casuale di almeno 32 caratteri. Gli eventi non includono body, query string, cookie, dati account o risposte grezze dei provider. Le metriche HTTP sono locali al processo API; conteggi delle code e worker attivi sono letti da PostgreSQL e risultano condivisi fra repliche.
 
 ## Controlli
 ```bash

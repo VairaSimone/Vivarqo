@@ -1,6 +1,7 @@
 import { prisma } from "../../db/prisma.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../logger.js";
+import { captureException } from "../../middleware/observability.js";
 
 type DueTask = {
   id: string;
@@ -131,6 +132,7 @@ export function startNotificationWorker(intervalMs = 60_000): () => void {
       if (result.created || result.pushFailed) logger.info(result, "Task reminder notification worker finished");
     } catch (error) {
       logger.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Task reminder notification worker failed");
+      captureException(error, { worker: "notifications" });
     } finally {
       workerInFlight = false;
     }

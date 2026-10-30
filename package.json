@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @vivarqo/api dev",
+    "dev:worker": "pnpm --filter @vivarqo/api exec tsx src/worker.ts",
     "dev:frontend": "pnpm --filter @vivarqo/frontend dev",
     "db:generate": "prisma generate --config backend/prisma.config.ts",
     "db:migrate:deploy": "prisma migrate deploy --config backend/prisma.config.ts",

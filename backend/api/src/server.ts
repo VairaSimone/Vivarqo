@@ -4,17 +4,9 @@ import { prisma } from "./db/prisma.js";
 import { ensureDatabaseSchema } from "./db/schema-integrity.js";
 import { createApp } from "./app.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
-import { startNotificationWorker } from "./modules/domain/notification-worker.js";
-import { startRetentionWorker } from "./modules/domain/retention-worker.js";
-import { startPushDeliveryWorker } from "./modules/domain/push-delivery-worker.js";
-import { startDataJobsWorker } from "./modules/domain/data-jobs-worker.js";
 import type { Server } from "node:http";
 
 let server: Server | undefined;
-let stopNotificationWorker: () => void = () => undefined;
-let stopRetentionWorker: () => void = () => undefined;
-let stopPushDeliveryWorker: () => void = () => undefined;
-let stopDataJobsWorker: () => void = () => undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
@@ -25,10 +17,6 @@ async function startServer(): Promise<void> {
   if (shuttingDown) return;
 
   const app = createApp();
-  stopNotificationWorker = startNotificationWorker();
-  stopRetentionWorker = startRetentionWorker();
-  stopPushDeliveryWorker = startPushDeliveryWorker();
-  stopDataJobsWorker = startDataJobsWorker();
   server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
   });
@@ -38,10 +26,6 @@ function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, "Graceful shutdown started");
-  stopNotificationWorker();
-  stopRetentionWorker();
-  stopPushDeliveryWorker();
-  stopDataJobsWorker();
 
   const forcedExit = setTimeout(() => {
     logger.error({ signal }, "Graceful shutdown timed out");

@@ -26,8 +26,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      APP_ORIGIN: http://localhost:5173
-      API_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
       PRIVATE_STORAGE_PATH: /app/var/private
     ports:
@@ -37,6 +35,28 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  worker:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+    command: ["node", "backend/api/dist/worker.js"]
+    restart: unless-stopped
+    env_file:
+      - ../../../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
+      PRIVATE_STORAGE_PATH: /app/var/private
+    volumes:
+      - vivarqo-private-data:/app/var/private
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      disable: true
 
 volumes:
   vivarqo-postgres-data:

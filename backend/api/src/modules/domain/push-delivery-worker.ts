@@ -1,4 +1,5 @@
 import { logger } from "../../logger.js";
+import { captureException } from "../../middleware/observability.js";
 import { prisma } from "../../db/prisma.js";
 import { getVapidCredentials, sendWebPush } from "./web-push.js";
 
@@ -160,6 +161,7 @@ export function startPushDeliveryWorker(): () => void {
       if (processed > 0) logger.info({ processed }, "Push delivery worker processed attempts");
     } catch (error) {
       logger.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Push delivery worker failed");
+      captureException(error, { worker: "push-delivery" });
     } finally {
       inFlight = false;
     }

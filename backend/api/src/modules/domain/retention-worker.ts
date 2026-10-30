@@ -1,5 +1,6 @@
 import { prisma } from "../../db/prisma.js";
 import { logger } from "../../logger.js";
+import { captureException } from "../../middleware/observability.js";
 import { deletePrivateObject } from "./private-storage.js";
 
 const DEFAULT_RETENTION_INTERVAL_MS = 60 * 60 * 1000;
@@ -230,6 +231,7 @@ export function startRetentionWorker(intervalMs = DEFAULT_RETENTION_INTERVAL_MS)
       logger.warn({
         errorName: error instanceof Error ? error.name : "UnknownError",
       }, "Private data retention cleanup failed");
+      captureException(error, { worker: "retention" });
     } finally {
       retentionInFlight = false;
     }

@@ -1,13 +1,14 @@
 import cors from "cors";
 import express from "express";
 import type { Express, Request, Response, NextFunction } from "express";
-import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { AppError } from "./errors/app-error.js";
 import { checkDatabaseConnection } from "./db/prisma.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { requestContext } from "./middleware/request-context.js";
+import { persistentRateLimit } from "./middleware/persistent-rate-limit.js";
+import { requestMetrics, metricsHandler } from "./middleware/observability.js";
 import { localizationMiddleware } from "./i18n/localization.js";
 import { csrfProtection } from "./modules/auth/csrf.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
@@ -44,6 +45,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Default 0 avoids trusting attacker-controlled X-Forwarded-* headers.
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
   app.use(requestContext);
+  app.use(requestMetrics);
   app.use(localizationMiddleware);
   app.use(
     helmet({
@@ -77,25 +79,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/webhooks/stripe", express.raw({ type: "application/json", limit: "1mb" }));
 
 
-  app.use(
-    "/api/v1",
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: 300,
-      standardHeaders: "draft-8",
-      legacyHeaders: false,
-      handler: (_req: Request, res: Response, _next: NextFunction) => {
-        const requestId =
-          typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
-        res.status(429).json({
-          code: "RATE_LIMITED",
-          message: "Too many requests",
-          details: null,
-          requestId,
-        });
-      },
-    }),
-  );
+  // Shared PostgreSQL counters keep the global API limit consistent across replicas.
+  app.use("/api/v1", persistentRateLimit(300, "api-global"));
 
   // Rate-limit before parsing JSON so abusive requests do not consume parser CPU and memory first.
   app.use(express.json({ limit: "1mb", strict: true }));
@@ -136,6 +121,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
       next(new AppError(503, "SERVICE_UNAVAILABLE", "Service temporarily unavailable"));
     }
   });
+
+  // Hidden unless the operator configures a strong bearer token.
+  app.get("/metrics", metricsHandler);
 
   app.use((_req, _res, next) => {
     next(new AppError(404, "NOT_FOUND", "Route not found"));

@@ -1,4 +1,5 @@
 import { logger } from "../../logger.js";
+import { captureException } from "../../middleware/observability.js";
 import { prisma } from "../../db/prisma.js";
 import { processQueuedAnimalImport } from "../animals/import.routes.js";
 import { processQueuedCareImport } from "./care-import.routes.js";
@@ -142,6 +143,7 @@ export async function dispatchImportJob(jobId?: string): Promise<boolean> {
     if (!completed) throw new Error("Import processor returned without completing the claimed job");
   } catch (error) {
     logger.warn({ importId: job.id, entityType: job.entityType, errorName: error instanceof Error ? error.name : "UnknownError" }, "Import job failed");
+    captureException(error, { worker: "data-jobs", code: "import_failed" });
     await failOrRetryImport(job);
   } finally {
     clearInterval(heartbeat);
@@ -163,6 +165,7 @@ export async function dispatchExportJob(jobId?: string): Promise<boolean> {
     if (!completed) throw new Error("Export processor returned without completing the claimed job");
   } catch (error) {
     logger.warn({ exportId: job.id, errorName: error instanceof Error ? error.name : "UnknownError" }, "Export job failed");
+    captureException(error, { worker: "data-jobs", code: "export_failed" });
     await failOrRetryExport(job);
   } finally {
     clearInterval(heartbeat);
@@ -191,6 +194,7 @@ export function startDataJobsWorker(): () => void {
       if (result.imports > 0 || result.exports > 0) logger.info(result, "Asynchronous import/export jobs processed");
     } catch (error) {
       logger.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Data jobs worker failed");
+      captureException(error, { worker: "data-jobs" });
     } finally {
       inFlight = false;
     }

@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 import { AppError } from "../errors/app-error.js";
 import { logger } from "../logger.js";
+import { captureException } from "./observability.js";
 
 type ParserError = Error & { type?: string };
 
@@ -35,7 +36,10 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
   }
 
   if (error instanceof AppError) {
-    if (error.statusCode >= 500) logger.error({ requestId, code: error.code }, "Application request failed");
+    if (error.statusCode >= 500) {
+      logger.error({ requestId, code: error.code }, "Application request failed");
+      captureException(error, { requestId, code: error.code });
+    }
     res.status(error.statusCode).json({
       code: error.code,
       message: error.message,
@@ -49,6 +53,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
     { requestId, errorName: error instanceof Error ? error.name : "UnknownError" },
     "Unhandled request error",
   );
+  captureException(error, { requestId });
   res.status(500).json({
     code: "INTERNAL_SERVER_ERROR",
     message: "An unexpected error occurred",
