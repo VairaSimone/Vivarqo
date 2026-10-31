@@ -5,6 +5,6 @@ coverage/
 .env
 .env.*
 !.env.example
-apps/api/src/generated/prisma/
+/backend/api/src/generated/prisma/
 .DS_Store
 *.log
