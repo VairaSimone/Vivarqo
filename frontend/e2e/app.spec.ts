@@ -425,3 +425,24 @@ test("le viste mobile non provocano overflow orizzontale sulle aree operative", 
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBeTruthy();
   }
 });
+
+
+test("rileva l'inglese del browser e registra l'account con la lingua corretta", async ({ browser }) => {
+  const context = await browser.newContext({ locale: "en-GB" });
+  const state = await mockApi(context);
+  const page = await context.newPage();
+  await page.goto("/");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByRole("heading", { name: "Sign in to Vivarqo" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create an account", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await page.getByLabel("Display name").fill("English breeder");
+  await page.getByLabel("Email").fill("english@example.test");
+  await page.getByLabel("Password").fill("Password-english-123!");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+
+  await expect.poll(() => state.requests.some(request => request.path === "auth/register" && request.body.locale === "en")).toBe(true);
+  await context.close();
+});

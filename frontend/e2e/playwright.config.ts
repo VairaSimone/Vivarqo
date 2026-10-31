@@ -12,6 +12,7 @@ export default defineConfig({
   workers: inCI ? 2 : undefined,
   reporter: inCI ? "github" : "list",
   use: {
+    locale: "it-IT",
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
