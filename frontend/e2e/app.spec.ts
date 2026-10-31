@@ -45,8 +45,13 @@ test("navigazione: URL e stato del browser restano sincronizzati", async ({ page
   await page.locator(".more-card").filter({ hasText: "Documenti e QR" }).click();
   await expect(page).toHaveURL(/\/documents$/);
   await page.goBack();
+  await expect(page).toHaveURL(/\/more$/);
+  await expect(page.getByRole("heading", { name: "Altro", exact: true })).toBeVisible();
+  await page.goBack();
   await expect(page).toHaveURL(/\/animals$/);
   await expect(page.getByRole("heading", { name: "Animali", exact: true }).first()).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/\/more$/);
   await page.goForward();
   await expect(page).toHaveURL(/\/documents$/);
   await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
