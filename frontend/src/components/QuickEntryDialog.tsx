@@ -168,7 +168,7 @@ export function QuickEntryDialog({
     "Registra una nota direttamente sulla scheda dell'animale.";
 
   return <Dialog title={dialogTitle} description={dialogDescription} onClose={onClose}
-    onSubmit={submit} submitLabel="Registra" busy={saving} size={kind === "feeding" ? "wide" : "normal"}>
+    onSubmit={submit} submitLabel="Registra" busy={saving || loading} size={kind === "feeding" ? "wide" : "normal"}>
     {loading ? <p className="muted form-full">Caricamento animali…</p> : loadError ? <p className="form-message form-full" role="alert">{loadError}</p> :
       animals.length === 0 ? <p className="muted form-full">Nessun animale attivo disponibile.</p> : <>
         {kind === "feeding" ? <>

@@ -57,6 +57,30 @@ test("navigazione: URL e stato del browser restano sincronizzati", async ({ page
   await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
 });
 
+test("dashboard: registra alimentazioni multi-animale e pesate da modali rapidi", async ({ page }) => {
+  await signIn(page);
+
+  await page.getByRole("button", { name: "Registra alimentazione", exact: true }).click();
+  const feedingDialog = page.getByRole("dialog");
+  await expect(feedingDialog.getByRole("heading", { name: "Nuova sessione di alimentazione" })).toBeVisible();
+  await feedingDialog.locator(".feeding-animal-option").filter({ hasText: "Naga" }).locator("input").check();
+  await feedingDialog.locator(".feeding-animal-option").filter({ hasText: "Boreal" }).locator("input").check();
+  await feedingDialog.getByRole("button", { name: "Registra", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Sessione di alimentazione registrata.");
+  expect(page.e2eState.sessions).toHaveLength(1);
+  expect(page.e2eState.sessions[0].entries).toHaveLength(2);
+
+  await page.getByRole("button", { name: "Nuova pesata", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Nuova pesata", exact: true }).click();
+  const weightDialog = page.getByRole("dialog");
+  await expect(weightDialog.getByRole("heading", { name: "Nuova pesata" })).toBeVisible();
+  await weightDialog.locator('input[name="weight"]').fill("625");
+  await weightDialog.getByRole("button", { name: "Registra", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Pesata registrata.");
+  expect(page.e2eState.weights).toHaveLength(1);
+  expect(page.e2eState.weights[0].weightG).toBe(625);
+});
+
 test("animali: crea una scheda e gestisce un modulo lungo su viewport stretti", async ({ page }) => {
   await signIn(page);
   await page.goto("/animals");
