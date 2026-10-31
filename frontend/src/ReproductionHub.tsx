@@ -21,12 +21,17 @@ const val = (obj: AnyRecord | null | undefined, key: string, fallback = "—") =
 const readForm = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 const isoDateTime = (value?: string | Date | null) => value ? new Date(value).toISOString() : null;
 const nullable = (value: unknown) => value === "" || value === undefined ? null : value;
+const toCelsius = (value: string | number, unit: "C" | "F") => unit === "F" ? (Number(value) - 32) * 5 / 9 : Number(value);
+const fromCelsius = (value: number | string | null | undefined, unit: "C" | "F") =>
+  value == null ? "" : unit === "F" ? Number(value) * 9 / 5 + 32 : Number(value);
+const temperatureText = (value: number | string | null | undefined, unit: "C" | "F") =>
+  value == null ? "—" : fromCelsius(value, unit).toLocaleString("it-IT", { maximumFractionDigits: 2 }) + " °" + unit;
 
 const cycleStatuses = [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
 const eventTypes = [["pairing", "Accoppiamento"], ["observation", "Osservazione"], ["ovulation", "Ovulazione"], ["gravid", "Gravidanza"], ["laying", "Deposizione"], ["live_birth", "Parto"], ["incubation_start", "Avvio incubazione"], ["hatch", "Schiusa"], ["loss", "Perdita"], ["other", "Altro"]];
 const eggStatuses = [["unknown", "Da valutare"], ["incubating", "In incubazione"], ["fertile", "Fertile"], ["infertile", "Non fertile"], ["hatched", "Schiuso"], ["lost", "Perso"], ["retained", "Trattenuto"]];
 
-export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) {
+export function ReproductionHub({ onNotice = () => {}, owner, temperatureUnit = "C" }: CommonHubProps & { temperatureUnit?: "C" | "F" }) {
   const confirmAction = useConfirmDialog();
   const [animalCardsForm, setAnimalCardsForm] = useState<AnyRecord | null>(null);
   const [creatingAnimalCards, setCreatingAnimalCards] = useState(false);
@@ -190,7 +195,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     e.preventDefault(); const v = readForm(e);
     const body = {
       eventType: v.eventType, occurredAt: isoDateTime(v.occurredAt), animalId: nullable(v.animalId),
-      details: nullable(v.details), temperatureC: v.temperatureC === "" ? null : Number(v.temperatureC),
+      details: nullable(v.details), temperatureC: v.temperatureC === "" ? null : toCelsius(v.temperatureC, temperatureUnit),
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct)
     };
     try {
@@ -270,7 +275,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
-      temperatureC: v.temperatureC === "" ? null : Number(v.temperatureC),
+      temperatureC: v.temperatureC === "" ? null : toCelsius(v.temperatureC, temperatureUnit),
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
@@ -281,7 +286,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
     e.preventDefault(); const v = readForm(e);
     const body = {
       recordedAt: isoDateTime(v.recordedAt), eventType: v.eventType,
-      temperatureC: v.temperatureC === "" ? null : Number(v.temperatureC),
+      temperatureC: v.temperatureC === "" ? null : toCelsius(v.temperatureC, temperatureUnit),
       humidityPct: v.humidityPct === "" ? null : Number(v.humidityPct),
       notes: nullable(v.notes)
     };
@@ -385,7 +390,7 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
           <Choice label="Tipo evento" name="eventType" defaultValue={editEvent.eventType || "observation"} options={eventTypes} required/>
           <Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={localDateTime(editEvent.occurredAt)} required/>
           <Choice label="Animale coinvolto (facoltativo)" name="animalId" defaultValue={editEvent.animalId || ""} options={[["", "Nessuno"], ...animals.map(a => [a.id, a.name])]} />
-          <Input label="Temperatura °C" name="temperatureC" type="number" step={0.1} defaultValue={editEvent.temperatureC}/>
+          <Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1} defaultValue={fromCelsius(editEvent.temperatureC, temperatureUnit)}/>
           <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={editEvent.humidityPct}/>
           <div className="form-full"><TextArea label="Dettagli" name="details" defaultValue={editEvent.details}/></div>
           <div className="form-actions form-full"><Action type="button" onClick={() => setEditEvent(null)}>Annulla</Action><Action variant="primary">Salva evento</Action></div>
@@ -439,12 +444,12 @@ export function ReproductionHub({ onNotice = () => {}, owner }: CommonHubProps) 
         <div className="embedded-form"><form className="form-grid" onSubmit={addIncubationLog}>
           <Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime()} required/>
           <Input label="Evento" name="eventType" defaultValue="controllo" required/>
-          <Input label="Temperatura °C" name="temperatureC" type="number" step={0.1}/>
+          <Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1}/>
           <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1}/>
           <div className="form-full"><TextArea label="Note" name="notes"/></div>
           <div className="form-actions form-full"><Action variant="primary">Registra controllo</Action></div>
         </form></div>
-        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{log.temperatureC ?? "—"} °C · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label="Temperatura °C" name="temperatureC" type="number" step={0.1} defaultValue={log.temperatureC}/><Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
+        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{temperatureText(log.temperatureC, temperatureUnit)} · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1} defaultValue={fromCelsius(log.temperatureC, temperatureUnit)}/><Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
         {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>← Precedente</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>Successiva →</Action></div></div>}
       </section>}
 

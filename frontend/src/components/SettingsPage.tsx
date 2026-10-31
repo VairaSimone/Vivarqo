@@ -59,6 +59,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
     setBusy(true);
     try {
       await apiRequest("account/preferences", { method: "PATCH", body: preferences });
+      window.dispatchEvent(new CustomEvent("vivarqo:preferences-updated", { detail: preferences }));
       const body: Record<string, unknown> = { displayName, locale, timezone };
       if (email !== user.email || newPassword) {
         body.email = email;

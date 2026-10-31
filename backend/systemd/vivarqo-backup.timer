@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Vivarqo PostgreSQL backup schedule
+
+[Timer]
+OnCalendar=*-*-* 02:17:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=1m
+Unit=vivarqo-backup.service
+
+[Install]
+WantedBy=timers.target

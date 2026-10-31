@@ -14,6 +14,11 @@ for command in pg_dump pg_restore node sha256sum; do
 done
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
+retention_days="${BACKUP_RETENTION_DAYS:-30}"
+if [[ ! "$retention_days" =~ ^[1-9][0-9]*$ ]]; then
+  echo "BACKUP_RETENTION_DAYS must be a positive integer." >&2
+  exit 2
+fi
 umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
@@ -33,4 +38,9 @@ printf '%s  %s\n' "$checksum" "$(basename "$destination")" > "${destination}.sha
 chmod 600 "${destination}.sha256"
 trap - EXIT
 printf 'Backup completed and archive verified: %s\nSHA-256: %s\n' "$destination" "$checksum"
+# Retention runs only after the new archive and checksum were written successfully.
+# Restrict deletion to this application's verified dump naming pattern.
+while IFS= read -r -d '' old_backup; do
+  rm -f -- "$old_backup" "${old_backup}.sha256"
+done < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'vivarqo-*.dump' -mtime "+${retention_days}" -print0)
 echo "Copy the dump and checksum to encrypted storage outside the database cluster."

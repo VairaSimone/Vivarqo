@@ -10,7 +10,23 @@ Questa guida separa i controlli ripetibili in CI dalle prove che richiedono cred
 DATABASE_URL='postgresql://...' BACKUP_DIR='./backups' pnpm db:backup
 ```
 
-La copia deve essere trasferita in storage cifrato, separato dal cluster, con accessi limitati. Pianificazione, retention off-site, immutabilità e gestione chiavi devono essere configurate nell'infrastruttura: lo script non crea da solo una schedulazione o una seconda copia.
+La copia deve essere trasferita in storage cifrato, separato dal cluster, con accessi limitati. Lo script applica una retention locale tramite `BACKUP_RETENTION_DAYS`; retention off-site, immutabilità, cifratura della copia esterna e gestione chiavi restano responsabilità dell'infrastruttura.
+
+### Pianificazione systemd opzionale
+
+Sono disponibili template per un host Linux dedicato in `backend/systemd/vivarqo-backup.service` e `backend/systemd/vivarqo-backup.timer`. Prima dell'installazione, adattare `/opt/vivarqo/app`, l'utente/gruppo `vivarqo`, il percorso Node.js e `/var/backups/vivarqo`. Creare `/etc/vivarqo/backup.env` con `DATABASE_URL`, permessi `root:vivarqo` e modalità `0640`. Il ruolo DB deve poter leggere tutti i dati necessari al dump.
+
+```bash
+sudo install -m 0644 backend/systemd/vivarqo-backup.service /etc/systemd/system/
+sudo install -m 0644 backend/systemd/vivarqo-backup.timer /etc/systemd/system/
+sudo install -d -o vivarqo -g vivarqo -m 0700 /var/backups/vivarqo
+sudo systemctl daemon-reload
+sudo systemctl enable --now vivarqo-backup.timer
+sudo systemctl start vivarqo-backup.service
+sudo systemctl status vivarqo-backup.service
+```
+
+Il timer crea una copia locale giornaliera; non equivale a un backup off-site e non sostituisce un disaster-recovery drill.
 
 ## 2. Restore manuale protetto
 

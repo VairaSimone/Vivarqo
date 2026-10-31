@@ -1,0 +1,21 @@
+[Unit]
+Description=Verified Vivarqo PostgreSQL backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=vivarqo
+Group=vivarqo
+WorkingDirectory=/opt/vivarqo/app
+EnvironmentFile=/etc/vivarqo/backup.env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=BACKUP_DIR=/var/backups/vivarqo
+Environment=BACKUP_RETENTION_DAYS=30
+UMask=0077
+ExecStart=/opt/vivarqo/app/backend/scripts/backup-postgres.sh
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/vivarqo

@@ -5,6 +5,7 @@ import { Button, Input, Area, Select } from "./ui/FormControls";
 import { readFormValues } from "./types";
 import { apiRequest, type ApiRequestOptions } from "./api/api";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
+import { WeightChart } from "./components/WeightChart";
 
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
 const fmtDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
@@ -15,6 +16,13 @@ const dtInput = (value?: string | null) => {
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
 const nullIfBlank = (value: unknown) => value === "" || value === undefined ? null : value;
+const GRAMS_PER_UNIT: Record<string, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
+const fromGrams = (value: number | string, unit: string) => Number(value) / (GRAMS_PER_UNIT[unit] ?? 1);
+const toGrams = (value: number, unit: string) => value * (GRAMS_PER_UNIT[unit] ?? 1);
+const displayWeight = (value: number | string | null | undefined, unit: string) =>
+  value == null || value === "" || !Number.isFinite(Number(value))
+    ? "—"
+    : fromGrams(value, unit).toLocaleString("it-IT", { maximumFractionDigits: 2 }) + " " + unit;
 const formData = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 type CareTab = "weights" | "sheds" | "notes" | "feedings" | "genetics";
 const TAB_OPTIONS: Array<[CareTab, string]> = [
@@ -26,7 +34,7 @@ const SHED: string[][] = [["complete", "Completa"], ["partial", "Parziale"], ["u
 const FEED_OUTCOME: string[][] = [["ate", "Ha mangiato"], ["refused", "Ha rifiutato"], ["not_offered", "Non offerto"], ["unknown", "Non noto"]];
 const emptyFeedingEntry = (animalId: string) => ({ animalId, outcome: "unknown", foodType: "Altro", foodSize: "", foodWeightG: "", notes: "" });
 
-export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null }: CommonHubProps) {
+export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weights", initialAnimalId = null, weightUnit = "g" }: CommonHubProps & { weightUnit?: "g" | "kg" | "oz" | "lb" }) {
   const confirmAction = useConfirmDialog();
   const [tab, setTab] = useState<CareTab>(TAB_OPTIONS.some(o => o[0] === initialTab) ? initialTab as CareTab : "weights");
   const [animals, setAnimals] = useState<AnyRecord[]>([]);
@@ -124,7 +132,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     let path = "", body: Record<string, any> = {};
     if (tab === "weights") {
       path = "animals/" + animalId + "/weights";
-      body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: Number(v.weightG), notes: nullIfBlank(v.notes) };
+      body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: toGrams(Number(v.weightG), weightUnit), notes: nullIfBlank(v.notes) };
     } else if (tab === "sheds") {
       path = "animals/" + animalId + "/sheds";
       body = { occurredAt: new Date(v.occurredAt).toISOString(), outcome: v.outcome, notes: nullIfBlank(v.notes) };
@@ -164,7 +172,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
     let path = "", body = {};
     if (tab === "weights") {
       path = "weights/" + currentEdit.id;
-      body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: Number(v.weightG), notes: nullIfBlank(v.notes) };
+      body = { measuredAt: new Date(v.measuredAt).toISOString(), weightG: toGrams(Number(v.weightG), weightUnit), notes: nullIfBlank(v.notes) };
     } else if (tab === "sheds") {
       path = "sheds/" + currentEdit.id;
       body = { occurredAt: new Date(v.occurredAt).toISOString(), outcome: v.outcome, notes: nullIfBlank(v.notes) };
@@ -196,7 +204,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   };
 
   const display = (record: AnyRecord) => {
-    if (tab === "weights") return { Data: fmtDate(record.measuredAt), Peso: (record.weightG ?? "—") + " g", Note: record.notes || "—" };
+    if (tab === "weights") return { Data: fmtDate(record.measuredAt), Peso: displayWeight(record.weightG, weightUnit), Note: record.notes || "—" };
     if (tab === "sheds") return { Data: fmtDate(record.occurredAt), Esito: record.outcome || "—", Note: record.notes || "—" };
     if (tab === "notes") return { Data: fmtDate(record.occurredAt), Titolo: record.title || "—", Categoria: record.category, Nota: record.body };
     if (tab === "feedings") return { Data: fmtDate(record.performedAt), Animali: arrayOf(record.entries).map(entry => entry.animal?.name || animals.find(a => a.id === entry.animalId)?.name || "Animale").join(", ") || "—", Voci: arrayOf(record.entries).length, Note: record.notes || "—" };
@@ -204,6 +212,9 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   };
   const target = editing || {};
   const optionsAnimals = [["", "Nessuno"], ...animals.map(a => [a.id, a.name + " · " + a.species])];
+  const inputWeightStep = weightUnit === "kg" ? 0.001 : 0.01;
+  const inputWeightMin = inputWeightStep;
+  const inputWeightMax = 100000000 / (GRAMS_PER_UNIT[weightUnit] ?? 1);
   const openCreate = () => {
     setEditing(null);
     if (tab === "feedings") setFeedingEntries(animalId ? [emptyFeedingEntry(animalId)] : []);
@@ -224,7 +235,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       <div className="inline-actions record-tools"><Button variant="primary" onClick={openCreate} disabled={tab !== "feedings" && !animalId}>＋ {CREATE_LABELS[tab] || "Nuovo registro"}</Button>{busy && <span className="muted">Caricamento…</span>}</div>
       {createOpen && <div className="embedded-form"><form className="form-grid" onSubmit={submitNew} key={tab + "-create"}>
         <h3 className="form-full">Nuovo registro · {TITLES[tab]}</h3>
-        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Peso in grammi" name="weightG" type="number" min={0.01} max={100000000} step={0.01} required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
+        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label={"Peso (" + weightUnit + ")"} name="weightG" type="number" min={inputWeightMin} max={inputWeightMax} step={inputWeightStep} required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
         {tab === "sheds" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Select label="Esito" name="outcome" options={SHED} required/><div className="form-full"><Area label="Note" name="notes"/></div></>}
         {tab === "notes" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label="Titolo" name="title"/><Input label="Categoria" name="category" defaultValue="general" required/><div className="form-full"><Area label="Osservazione" name="body" required/></div></>}
         {tab === "feedings" && <>
@@ -251,7 +262,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       </form></div>}
       {editing && <div className="embedded-form"><form className="form-grid" onSubmit={submitEdit}>
         <h3 className="form-full">Modifica registro · {TITLES[tab]}</h3>
-        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput(target.measuredAt)} required/><Input label="Peso in grammi" name="weightG" type="number" min={0.01} max={100000000} step={0.01} defaultValue={target.weightG} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
+        {tab === "weights" && <><Input label="Data e ora" name="measuredAt" type="datetime-local" defaultValue={dtInput(target.measuredAt)} required/><Input label={"Peso (" + weightUnit + ")"} name="weightG" type="number" min={inputWeightMin} max={inputWeightMax} step={inputWeightStep} defaultValue={fromGrams(target.weightG, weightUnit)} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
         {tab === "sheds" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput(target.occurredAt)} required/><Select label="Esito" name="outcome" defaultValue={target.outcome} options={SHED} required/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
         {tab === "notes" && <><Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={dtInput(target.occurredAt)} required/><Input label="Titolo" name="title" defaultValue={target.title}/><Input label="Categoria" name="category" defaultValue={target.category} required/><div className="form-full"><Area label="Osservazione" name="body" defaultValue={target.body} required/></div></>}
         {tab === "feedings" && <><Select label="Esito" name="outcome" defaultValue={target.outcome} options={FEED_OUTCOME} required/><Input label="Tipo di alimento" name="foodType" defaultValue={target.foodType || "Altro"}/><Input label="Dimensione" name="foodSize" defaultValue={target.foodSize}/><Input label="Peso alimento (g)" name="foodWeightG" type="number" min={0.01} max={1000000} step={0.01} defaultValue={target.foodWeightG}/><div className="form-full"><Area label="Note" name="notes" defaultValue={target.notes}/></div></>}
@@ -260,6 +271,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       </form></div>}
       {!busy && records.length === 0 ? <div className="empty-state"><h3>Nessun registro trovato</h3><p>Seleziona un animale oppure crea una nuova registrazione. Non vengono generati dati dimostrativi.</p></div> :
         records.length > 0 && <div className="table-wrap"><table><thead><tr>{Object.keys(display(records[0])).map(key => <th key={key}>{key}</th>)}<th>Azioni</th></tr></thead><tbody>{records.map(record => <tr key={record.id}>{Object.entries(display(record)).map(([key, value]) => <td key={key}>{String(value)}</td>)}<td><div className="inline-actions">{tab === "feedings" ? <Button onClick={() => void loadSessionDetail(record.id)}>Dettagli sessione</Button> : <Button onClick={() => { setCreateOpen(false); setEditing(record); }}>Modifica</Button>}{tab !== "feedings" && <Button variant="danger" onClick={() => remove(record)}>Elimina</Button>}</div></td></tr>)}</tbody></table></div>}
+      {tab === "weights" && animalId && <WeightChart points={records} unit={weightUnit} />}
       {tab === "feedings" && selectedSession && <section className="embedded-form"><div className="panel-heading"><div><p className="eyebrow">DETTAGLIO SESSIONE</p><h3>{fmtDate(selectedSession.performedAt)} · {arrayOf(selectedSession.entries).length} animali</h3><p className="subheading">{selectedSession.notes || "Nessuna nota comune"}</p></div><Button onClick={() => setSelectedSession(null)}>Chiudi dettagli</Button></div>{sessionBusy ? <p className="muted">Caricamento voci…</p> : <div className="table-wrap"><table><thead><tr><th>Animale</th><th>Esito</th><th>Alimento</th><th>Dimensione/peso</th><th>Note</th><th>Azioni</th></tr></thead><tbody>{arrayOf(selectedSession.entries).map(entry => <tr key={entry.id}><td>{entry.animal?.name || animals.find(a => a.id === entry.animalId)?.name || "—"}</td><td>{FEED_OUTCOME.find(([value]) => value === entry.outcome)?.[1] || entry.outcome}</td><td>{entry.foodType || "Altro"}</td><td>{entry.foodWeightG ? entry.foodWeightG + " g" : entry.foodSize || "—"}</td><td>{entry.notes || "—"}</td><td><div className="inline-actions"><Button onClick={() => { setCreateOpen(false); setEditing(entry); }}>Modifica voce</Button><Button variant="danger" onClick={() => void remove(entry)}>Elimina voce</Button></div></td></tr>)}</tbody></table></div>}</section>}
       {pagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {currentPage} di {totalPages} · {pagination.total} registri</span><div className="inline-actions"><Button disabled={currentPage <= 1 || busy} onClick={() => setPage(p => Math.max(1, p - 1))}>← Precedente</Button><Button disabled={currentPage >= totalPages || busy} onClick={() => setPage(p => p + 1)}>Successiva →</Button></div></div>}
     </section>
