@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { PublicAnimalPage } from "./DocumentsHub";
 import { ConfirmProvider } from "./ui/ConfirmDialog";
+import { initializeLocalization } from "./i18n";
 import "./styles.css";
+
+initializeLocalization();
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   let refreshing = false;

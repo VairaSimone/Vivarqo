@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord } from "./types";
 import { apiRequest } from "./api/api";
 import { errorMessage } from "./types";
 
-const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
-const money = (value: number | string | null | undefined) => value == null ? "—" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(Number(value) / 100);
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+const money = (value: number | string | null | undefined) => value == null ? "—" : new Intl.NumberFormat(getIntlLocale(), { style: "currency", currency: "EUR" }).format(Number(value) / 100);
 function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 export function InventoryMovementHistory({ item, onClose }: { item: AnyRecord; onClose: () => void }) {
   const [movements, setMovements] = useState<AnyRecord[]>([]);

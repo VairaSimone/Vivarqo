@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Input, TextArea, Choice, Action, SectionTitle } from "./ui/FormControls";
@@ -16,7 +17,7 @@ const localDateTime = (value?: string | null) => {
   const pad = (part: number) => String(part).padStart(2, "0");
   return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 };
-const prettyDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const prettyDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const val = (obj: AnyRecord | null | undefined, key: string, fallback = "—") => obj?.[key] === null || obj?.[key] === undefined || obj?.[key] === "" ? fallback : obj[key];
 const readForm = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 const isoDateTime = (value?: string | Date | null) => value ? new Date(value).toISOString() : null;
@@ -25,7 +26,7 @@ const toCelsius = (value: string | number, unit: "C" | "F") => unit === "F" ? (N
 const fromCelsius = (value: number | string | null | undefined, unit: "C" | "F") =>
   value == null ? "" : unit === "F" ? Number(value) * 9 / 5 + 32 : Number(value);
 const temperatureText = (value: number | string | null | undefined, unit: "C" | "F") =>
-  value == null ? "—" : fromCelsius(value, unit).toLocaleString("it-IT", { maximumFractionDigits: 2 }) + " °" + unit;
+  value == null ? "—" : fromCelsius(value, unit).toLocaleString(getIntlLocale(), { maximumFractionDigits: 2 }) + " °" + unit;
 
 const cycleStatuses = [["planned", "Pianificato"], ["active", "In corso"], ["completed", "Completato"], ["cancelled", "Annullato"]];
 const eventTypes = [["pairing", "Accoppiamento"], ["observation", "Osservazione"], ["ovulation", "Ovulazione"], ["gravid", "Gravidanza"], ["laying", "Deposizione"], ["live_birth", "Parto"], ["incubation_start", "Avvio incubazione"], ["hatch", "Schiusa"], ["loss", "Perdita"], ["other", "Altro"]];

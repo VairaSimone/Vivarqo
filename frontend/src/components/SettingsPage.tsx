@@ -4,6 +4,7 @@ import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest } from "../api/api";
 import { errorMessage } from "../types";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
+import { getLocale, setLocale as applyLocale } from "../i18n";
 
 
 type UserPreferences = {
@@ -27,7 +28,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: NoticeHandler }) {
   const confirmAction = useConfirmDialog();
   const [displayName, setName] = useState(user.displayName || "");
-  const [locale, setLocale] = useState(user.locale || "it");
+  const [locale, setLocaleChoice] = useState<"it" | "en">(user.locale === "en" ? "en" : user.locale === "it" ? "it" : getLocale());
   const [timezone, setTimezone] = useState(user.timezone || "Europe/Rome");
   const [currentPassword, setCurrent] = useState("");
   const [newPassword, setNew] = useState("");
@@ -67,6 +68,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
         if (newPassword) body.newPassword = newPassword;
       }
       const result = await apiRequest("account", { method: "PATCH", body });
+      applyLocale(locale);
       onNotice(result.message || "Impostazioni e preferenze aggiornate.");
       setCurrent("");
       setNew("");
@@ -109,9 +111,10 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
     <form className="form-grid" onSubmit={save}>
       <Field label="Nome visualizzato" value={displayName} onChange={(event) => setName(event.target.value)} required maxLength={120}/>
       <Field label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/>
-      <SelectField label="Lingua" value={locale} onChange={(event) => setLocale(event.target.value)}>
+      <SelectField label="Lingua" value={locale} onChange={(event) => setLocaleChoice(event.target.value === "en" ? "en" : "it")}>
         <option value="it">Italiano</option><option value="en">English</option>
       </SelectField>
+      <p className="muted form-full">La lingua del browser viene rilevata automaticamente al primo accesso. Puoi cambiarla qui: la scelta verrà salvata nel tuo account.</p>
       <Field label="Fuso orario IANA" value={timezone} onChange={(event) => setTimezone(event.target.value)} required/>
       <div className="form-full"><h3>Preferenze di visualizzazione</h3></div>
       <SelectField label="Unità di peso" value={preferences.weightUnit} onChange={(event) => updatePreference("weightUnit", event.target.value)}>

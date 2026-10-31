@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button, Field } from "./ui/FormControls";
@@ -9,7 +10,7 @@ import { Icon } from "./ui/Icon";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
-const displayDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const displayDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const bytes = (value: string | number | null | undefined) => {
   const size = Number(value || 0);
   if (size < 1024) return size + " B";
@@ -235,6 +236,6 @@ export function PublicAnimalPage({ slug }: { slug: string }) {
   return <main className="public-profile-wrap"><section className="public-profile">
     <a className="brand" href="/" aria-label="Vivarqo"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a>
     {busy ? <p className="loading">Caricamento profilo pubblico…</p> : error || !result ? <div className="empty-state"><h1>Profilo non disponibile</h1><p>{error || "Questo link potrebbe essere stato revocato o non esistere."}</p></div> :
-      <><p className="eyebrow">PROFILO ANIMALE CONDIVISO</p><h1>{animal.name || "Animale"}</h1><p className="public-species">{animal.species || ""}</p>{result.description && <p className="public-description">{result.description}</p>}<dl className="public-fields">{allowed.filter(([key]) => key !== "name" && key !== "species").map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{animal[key] ? (key === "birthDate" ? new Intl.DateTimeFormat("it-IT", { dateStyle: "long" }).format(new Date(animal[key])) : String(animal[key])) : "Non indicato"}</dd></div>)}</dl><p className="tiny">Questo profilo mostra esclusivamente i campi selezionati dall'allevatore per la condivisione pubblica.</p></>}
+      <><p className="eyebrow">PROFILO ANIMALE CONDIVISO</p><h1>{animal.name || "Animale"}</h1><p className="public-species">{animal.species || ""}</p>{result.description && <p className="public-description">{result.description}</p>}<dl className="public-fields">{allowed.filter(([key]) => key !== "name" && key !== "species").map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{animal[key] ? (key === "birthDate" ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "long" }).format(new Date(animal[key])) : String(animal[key])) : "Non indicato"}</dd></div>)}</dl><p className="tiny">Questo profilo mostra esclusivamente i campi selezionati dall'allevatore per la condivisione pubblica.</p></>}
   </section></main>;
 }

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { getIntlLocale } from "../i18n";
 import type { AnyRecord, NoticeHandler } from "../types";
 import { errorMessage } from "../types";
 import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest, apiUpload } from "../api/api";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
 
-const date = (value?: string | Date | null) => { if (!value) return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
+const date = (value?: string | Date | null) => { if (!value) return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? "—" : new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(parsed); };
 
 export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
   const confirmAction = useConfirmDialog();

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { apiRequest } from "./api/api";
 import { readFormValues, errorMessage } from "./types";
+import { getLocale } from "./i18n";
 import type { NoticeKind } from "./types";
 
 const currentUrl = () => new URL(window.location.href);
@@ -64,7 +65,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
       let path = "";
       let body = values;
       if (mode === "login") path = "auth/login";
-      else if (mode === "register") path = "auth/register";
+      else if (mode === "register") { path = "auth/register"; body = { ...values, locale: getLocale() }; }
       else if (mode === "forgot") path = "auth/forgot-password";
       else if (mode === "resend") path = "auth/resend-verification";
       else if (mode === "verify") { path = "auth/verify-email"; body = { token: values.token.trim() }; }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button, Input, Area, Select } from "./ui/FormControls";
@@ -8,7 +9,7 @@ import { useConfirmDialog } from "./ui/ConfirmDialog";
 import { WeightChart } from "./components/WeightChart";
 
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
-const fmtDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const fmtDate = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
@@ -22,7 +23,7 @@ const toGrams = (value: number, unit: string) => value * (GRAMS_PER_UNIT[unit] ?
 const displayWeight = (value: number | string | null | undefined, unit: string) =>
   value == null || value === "" || !Number.isFinite(Number(value))
     ? "—"
-    : fromGrams(value, unit).toLocaleString("it-IT", { maximumFractionDigits: 2 }) + " " + unit;
+    : fromGrams(value, unit).toLocaleString(getIntlLocale(), { maximumFractionDigits: 2 }) + " " + unit;
 const formData = (e: React.FormEvent<HTMLFormElement>) => readFormValues(e.currentTarget);
 type CareTab = "weights" | "sheds" | "notes" | "feedings" | "genetics";
 const TAB_OPTIONS: Array<[CareTab, string]> = [

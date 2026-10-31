@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, NoticeHandler } from "./types";
 import { apiRequest } from "./api/api";
 import { errorMessage } from "./types";
@@ -6,7 +7,7 @@ import { errorMessage } from "./types";
 const money = (cents: number | string | null | undefined, currency = "EUR") => {
   const amount = Number(cents);
   if (!Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(amount / 100);
+  return new Intl.NumberFormat(getIntlLocale(), { style: "currency", currency }).format(amount / 100);
 };
 const initialFilters = { from: "", to: "" };
 

@@ -1,4 +1,5 @@
 import type { AnyRecord } from "../types";
+import { getLocale } from "../i18n";
 
 export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | Record<string, unknown> | null;
@@ -20,6 +21,10 @@ export interface ApiError extends Error {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 let csrfTokenInMemory: string | null = null;
 
+function languagePreference(): string {
+  return getLocale() === "en" ? "en-GB,en;q=0.9,it;q=0.8" : "it-IT,it;q=0.9,en;q=0.8";
+}
+
 function apiError(message: string, details: Partial<ApiError> = {}): ApiError {
   return Object.assign(new Error(message), details);
 }
@@ -34,7 +39,7 @@ export async function getCsrfToken({ refresh = false }: { refresh?: boolean } = 
     method: "GET",
     credentials: "include",
     cache: "no-store",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "Accept-Language": languagePreference() },
   });
   const payload = await response.json().catch(() => null) as { csrfToken?: unknown; message?: string } | null;
   if (!response.ok || typeof payload?.csrfToken !== "string") {
@@ -80,6 +85,7 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
   }
 
   const headers = new Headers(options.headers);
+  headers.set("Accept-Language", languagePreference());
   let body = options.body;
   if (!SAFE_METHODS.has(method) && !path.includes("/webhooks/stripe")) {
     headers.set("X-CSRF-Token", await getCsrfToken());
@@ -128,6 +134,7 @@ export async function apiUpload<T = AnyRecord>(path: string, file: File): Promis
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,
+    "Accept-Language": languagePreference(),
     "Content-Type": file.name.toLowerCase().endsWith(".xlsx")
       ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       : "text/csv; charset=utf-8",
@@ -151,6 +158,7 @@ export async function apiUploadDocument<T = AnyRecord>(file: File, metadata: Doc
   const csrf = await getCsrfToken();
   const headers = new Headers({
     "X-CSRF-Token": csrf,
+    "Accept-Language": languagePreference(),
     "Content-Type": file.type || "application/octet-stream",
     "X-Document-Name": file.name,
     "X-Document-Category": metadata.category || "other",
@@ -175,7 +183,7 @@ export async function apiUploadDocument<T = AnyRecord>(file: File, metadata: Doc
 export async function downloadPrivateDocument(id: string, filename: string): Promise<void> {
   const response = await fetch("/api/v1/documents/" + encodeURIComponent(id) + "/download", {
     method: "GET", credentials: "include", cache: "no-store",
-    headers: { Accept: "application/octet-stream" },
+    headers: { Accept: "application/octet-stream", "Accept-Language": languagePreference() },
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { message?: string } | null;

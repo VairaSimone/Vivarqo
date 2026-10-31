@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button, Input, Select } from "./ui/FormControls";
@@ -9,7 +10,7 @@ import { useConfirmDialog } from "./ui/ConfirmDialog";
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : [];
 const sexOptions = [["unknown", "Non specificato"], ["female", "Femmina"], ["male", "Maschio"]];
 const statusOptions = [["active", "Attivo"], ["sold", "Venduto"], ["transferred", "Trasferito"], ["deceased", "Deceduto"]];
-const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const cleanAnimal = (raw: AnyRecord): AnyRecord => ({
   name: String(raw.name || "").trim(),
   identifier: String(raw.identifier || "").trim() || null,
@@ -108,7 +109,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
     if (!animalsToCreate.length) return onNotice("Inserisci almeno un animale.", "error");
     const invalid = animalsToCreate.findIndex(animal => !animal.name || !animal.species);
     if (invalid >= 0) return onNotice("Ogni riga compilata deve avere nome e specie.", "error");
-    const ids = animalsToCreate.map(animal => animal.identifier?.toLocaleLowerCase("it-IT")).filter(Boolean);
+    const ids = animalsToCreate.map(animal => animal.identifier?.toLocaleLowerCase(getIntlLocale())).filter(Boolean);
     if (new Set(ids).size !== ids.length) return onNotice("Ci sono identificativi duplicati nel gruppo.", "error");
     void run(animalsToCreate.length + " animali creati.", () =>
       apiRequest("animals/bulk", { method: "POST", body: { animals: animalsToCreate } })
@@ -225,7 +226,7 @@ export function AnimalsHub({ owner, onNotice = () => {}, onGo = () => {}, initia
       </form></div>}
       {busy ? <div className="loading">Caricamento animali…</div> : animals.length === 0 ? <div className="empty-state"><h3>Nessun animale in questa vista</h3><p>Crea una scheda oppure modifica il filtro di stato.</p></div> :
       <div className="animal-grid">{animals.map(animal => <article className="animal-card" key={animal.id}>
-       <div className="animal-card-top"><span className="animal-avatar" aria-hidden="true">{String(animal.name||"?").slice(0,1).toLocaleUpperCase("it-IT")}</span><div className="animal-title-block"><h3>{animal.name}</h3><p>{animal.species}{animal.identifier ? " · "+animal.identifier : ""}</p></div><span className={"pill "+(animal.status==="active"?"sage":"")}>{animal.status==="archived"?"Archiviato":animal.status==="active"||!animal.status?"Attivo":animal.status==="sold"?"Venduto":animal.status==="transferred"?"Trasferito":animal.status==="deceased"?"Deceduto":animal.status}</span></div>
+       <div className="animal-card-top"><span className="animal-avatar" aria-hidden="true">{String(animal.name||"?").slice(0,1).toLocaleUpperCase(getIntlLocale())}</span><div className="animal-title-block"><h3>{animal.name}</h3><p>{animal.species}{animal.identifier ? " · "+animal.identifier : ""}</p></div><span className={"pill "+(animal.status==="active"?"sage":"")}>{animal.status==="archived"?"Archiviato":animal.status==="active"||!animal.status?"Attivo":animal.status==="sold"?"Venduto":animal.status==="transferred"?"Trasferito":animal.status==="deceased"?"Deceduto":animal.status}</span></div>
        <dl className="animal-facts"><div><dt>Sesso</dt><dd>{sexOptions.find(([key])=>key===animal.sex)?.[1]||"Non specificato"}</dd></div><div><dt>Morph</dt><dd>{animal.morph||"—"}</dd></div><div><dt>Nascita</dt><dd>{dateLabel(animal.birthDate)}{animal.birthDateEstimated ? " · stimata" : ""}</dd></div><div><dt>Stabulazione</dt><dd>{animal.locationLabel||"—"}</dd></div></dl>
        <div className="animal-card-actions"><Button variant="primary" onClick={()=>onGo("animali",{animalId:animal.id})}><Icon name="animals" size={16}/> Apri scheda</Button><Button onClick={()=>{setEditor({animal});setBulkOpen(false);}}>Modifica</Button><details className="animal-more-actions"><summary>Altro</summary><div>{animal.status==="archived"?<Button variant="primary" onClick={()=>restore(animal)}>Ripristina</Button>:<Button onClick={()=>archive(animal)}>Archivia</Button>}<Button variant="danger" onClick={()=>remove(animal)}>Elimina</Button></div></details></div>
       </article>)}</div>}

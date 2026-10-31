@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button } from "./ui/FormControls";
@@ -9,7 +10,7 @@ const categories: Array<[string, string]> = [
   ["task_due", "Scadenze attività"], ["system", "Sistema e test push"]
 ];
 const arrayOf = (value: unknown): AnyRecord[] => Array.isArray(value) ? value as AnyRecord[] : value && typeof value === "object" ? Object.values(value as AnyRecord).find(Array.isArray) as AnyRecord[] || [] : [];
-const dateTime = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+const dateTime = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);

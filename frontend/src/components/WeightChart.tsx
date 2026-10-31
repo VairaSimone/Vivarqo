@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { getIntlLocale } from "../i18n";
 
 export type WeightPoint = {
   id?: string;
@@ -20,11 +21,11 @@ const GRAMS_PER_UNIT: Record<string, number> = {
 };
 
 function formatWeight(value: number, unit: string): string {
-  return value.toLocaleString("it-IT", { maximumFractionDigits: 2 }) + " " + unit;
+  return value.toLocaleString(getIntlLocale(), { maximumFractionDigits: 2 }) + " " + unit;
 }
 
 function formatDate(value: Date): string {
-  return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short" }).format(value);
+  return new Intl.DateTimeFormat(getIntlLocale(), { day: "2-digit", month: "short" }).format(value);
 }
 
 export function WeightChart({ points, unit = "g" }: { points: WeightPoint[]; unit?: "g" | "kg" | "oz" | "lb" }) {
@@ -72,7 +73,7 @@ export function WeightChart({ points, unit = "g" }: { points: WeightPoint[]; uni
                       <g key={tick}>
                         <line x1={left} x2={720 - right} y1={position} y2={position} stroke="var(--line, #d8e3de)" strokeDasharray="4 4" />
                         <text x={left - 8} y={position + 4} textAnchor="end" fill="currentColor" fontSize="11">
-                          {value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                          {value.toLocaleString(getIntlLocale(), { maximumFractionDigits: 2 })}
                         </text>
                       </g>
                     );

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { getIntlLocale } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button, Field, Select } from "./ui/FormControls";
@@ -11,7 +12,7 @@ const CATEGORIES: string[][] = [["feeding", "Alimentazione"], ["weighing", "Peso
 const pad = (value: number) => String(value).padStart(2, "0");
 const dateKey = (date: Date) => date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
 const toDate = (value: string) => new Date(value + "T00:00:00");
-const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
 const dtInput = (value?: string | null) => {
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
@@ -84,8 +85,8 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
     });
   };
   const title = view === "week"
-    ? new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.from)) + " – " + new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.to))
-    : new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(anchor);
+    ? new Intl.DateTimeFormat(getIntlLocale(), { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.from)) + " – " + new Intl.DateTimeFormat(getIntlLocale(), { day: "numeric", month: "long", year: "numeric" }).format(toDate(range.to))
+    : new Intl.DateTimeFormat(getIntlLocale(), { month: "long", year: "numeric" }).format(anchor);
   const saveTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const v = readFormValues(event.currentTarget);
@@ -168,7 +169,7 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   };
   const monthNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
   const renderItem = (item: AnyRecord) => <div className={"calendar-event event-" + item.type} key={item.type + "-" + item.id}>
-    <strong>{item.title}</strong><small>{new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.start))} · {item.animal?.name || (item.type === "reproduction" ? "Riproduzione" : item.type === "clutch" ? "Covata" : item.category)}</small>
+    <strong>{item.title}</strong><small>{new Intl.DateTimeFormat(getIntlLocale(), { hour: "2-digit", minute: "2-digit" }).format(new Date(item.start))} · {item.animal?.name || (item.type === "reproduction" ? "Riproduzione" : item.type === "clutch" ? "Covata" : item.category)}</small>
     {item.type === "task" && <div className="inline-actions"><Button onClick={() => beginTask(item)}>Modifica</Button><Button onClick={() => void completeTask(item)}>Completa</Button><Button variant="danger" onClick={() => void deleteTask(item)}>Elimina</Button></div>}
     {item.type !== "task" && <span className="muted">{item.type === "reproduction" ? "Evento riproduttivo" : "Deposizione"}</span>}
   </div>;

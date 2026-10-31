@@ -1,10 +1,11 @@
 import type { AnyRecord } from "./types";
+import { getIntlLocale } from "./i18n";
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { apiRequest } from "./api/api";
 import { errorMessage } from "./types";
 
-const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(new Date(value)) : "—";
+const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const STATUS_LABELS: Record<string, string> = { active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" };
 const statusLabel = (value?: string | null) => value ? STATUS_LABELS[value] || value : "Nessun abbonamento";
 function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }

@@ -1,10 +1,11 @@
 import React from "react";
+import { getIntlLocale } from "../i18n";
 import type { AnyRecord, NavigationHandler } from "../types";
 import { Icon } from "../ui/Icon";
 
 const value = (obj: AnyRecord | null | undefined, keys: string[], fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
-const date = (value: string | number | Date | null | undefined) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(parsed); };
-const money = (amount: string | number | null | undefined) => { if (amount === null || amount === undefined || amount === "" || amount === "—") return "—"; const parsed = Number(amount); return Number.isFinite(parsed) ? new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(parsed / 100) : "—"; };
+const date = (value: string | number | Date | null | undefined) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(parsed); };
+const money = (amount: string | number | null | undefined) => { if (amount === null || amount === undefined || amount === "" || amount === "—") return "—"; const parsed = Number(amount); return Number.isFinite(parsed) ? new Intl.NumberFormat(getIntlLocale(), { style: "currency", currency: "EUR" }).format(parsed / 100) : "—"; };
 function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 
 type RecordHubProps = {
