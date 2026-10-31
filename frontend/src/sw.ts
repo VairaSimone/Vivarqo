@@ -13,6 +13,7 @@ serviceWorker.addEventListener("install", (event: any) => {
 });
 
 serviceWorker.addEventListener("message", (event: any) => {
+  if (event.origin !== serviceWorker.location.origin) return;
   if ((event.data as { type?: string } | null)?.type === "SKIP_WAITING") {
     void serviceWorker.skipWaiting();
   }
