@@ -112,13 +112,13 @@ test("registri: aggiunge una pesata, la modifica e chiede conferma prima di elim
   await signIn(page);
   await page.goto("/care/weights");
   await page.getByRole("button", { name: /Nuova pesata/ }).click();
-  await page.getByLabel("Peso in grammi").fill("342.5");
+  await page.getByLabel("Peso (g)").fill("342.5");
   await page.locator(".embedded-form form").getByRole("button", { name: "Salva", exact: true }).click();
   await expect.poll(() => page.e2eState.weights.length).toBe(1);
-  await expect(page.getByText("342.5 g")).toBeVisible();
+  await expect(page.getByText("342,5 g")).toBeVisible();
 
   await page.getByRole("button", { name: "Modifica", exact: true }).click();
-  await page.getByLabel("Peso in grammi").last().fill("350");
+  await page.getByLabel("Peso (g)").last().fill("350");
   await page.locator(".embedded-form form").getByRole("button", { name: "Salva modifiche" }).click();
   await expect.poll(() => page.e2eState.weights[0]?.weightG).toBe(350);
 
@@ -287,7 +287,7 @@ test("riproduzione: traccia uova, controlli d'incubazione e piccoli", async ({ p
   await page.getByLabel("Umidità %").fill("80");
   await page.getByRole("button", { name: "Registra controllo", exact: true }).click();
   await expect.poll(() => page.e2eState.incubationLogs.length).toBe(1);
-  await expect(page.getByText("30.5 °C")).toBeVisible();
+  await expect(page.getByText("30,5 °C")).toBeVisible();
 
   const logRow = page.locator(".log-row").filter({ hasText: "controllo" });
   await logRow.locator("details summary").click();
