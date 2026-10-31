@@ -1033,6 +1033,10 @@ export function initializeLocalization(): void {
   if (observer) observer.disconnect();
   observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
+      if (mutation.type === "characterData" && mutation.target instanceof Text) {
+        translateText(mutation.target);
+        continue;
+      }
       if (mutation.type === "attributes" && mutation.target instanceof Element) {
         translateAttributes(mutation.target);
       }
@@ -1042,6 +1046,7 @@ export function initializeLocalization(): void {
   observer.observe(document.body, {
     subtree: true,
     childList: true,
+    characterData: true,
     attributes: true,
     attributeFilter: [...attributeNames],
   });
