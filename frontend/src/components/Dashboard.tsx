@@ -3,13 +3,14 @@ import { getIntlLocale } from "../i18n";
 import type { AnyRecord, NavigationHandler } from "../types";
 import { apiRequest } from "../api/api";
 import { Icon } from "../ui/Icon";
+import type { QuickEntryKind } from "./QuickEntryDialog";
 
 const asArray = (data: unknown): AnyRecord[] => Array.isArray(data) ? data as AnyRecord[] : data && typeof data === "object" ? Object.values(data as AnyRecord).find(Array.isArray) as AnyRecord[] ?? [] : [];
 const value = (obj: AnyRecord | null | undefined, keys: string[], fallback = "—") => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== "") return obj[key]; return fallback; };
 const date = (value: string | number | Date | null | undefined) => { if (!value || value === "—") return "—"; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? String(value) : new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(parsed); };
 function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
 
-export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: NavigationHandler; onRetry?: () => void }) {
+export function Dashboard({data,onGo,onRetry,onQuickEntry,refreshKey=0}: { data: AnyRecord; onGo: NavigationHandler; onRetry?: () => void; onQuickEntry: (kind: QuickEntryKind) => void; refreshKey?: number }) {
  const due=asArray(data?.tasks?.dueToday??data?.dueToday);
  const overdue=asArray(data?.tasks?.overdue??data?.overdue);
  const [operational,setOperational]=useState<{stock:AnyRecord[];cycles:AnyRecord[];feeds:AnyRecord[];stockLoaded:boolean;cyclesLoaded:boolean;feedsLoaded:boolean}>({stock:[],cycles:[],feeds:[],stockLoaded:false,cyclesLoaded:false,feedsLoaded:false});
@@ -34,7 +35,7 @@ export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: Navigati
    });
   });
   return ()=>{live=false;};
- },[]);
+ },[refreshKey]);
  const recent=operational.feeds;
  const taskAnimalNames=[...overdue,...due].map(task=>task.animal?.name||task.animalName).filter(Boolean);
  const animalsToCheck=[...new Set(taskAnimalNames)];
@@ -53,7 +54,13 @@ export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: Navigati
     {due.length+overdue.length===0?<div className="dashboard-empty"><span className="status-mark">✓</span><div><strong>Nessuna scadenza segnalata</strong><p>Non risultano attività in ritardo o in scadenza nei dati restituiti dal server.</p></div></div>:<div className="task-list">{[...overdue,...due].slice(0,10).map((task,i)=><article className="task-row" key={task.id||i}><span className={"task-bullet "+(i<overdue.length?"is-overdue":"")}>{i<overdue.length?"!":"•"}</span><div><strong>{value(task,["title","name"],"Attività")}</strong><small>{task.animal?.name||value(task,["description"],"Promemoria")} · {date(value(task,["dueAt","scheduledAt"]))}</small></div><span className={"pill "+(i<overdue.length?"danger":"sage")}>{i<overdue.length?"In ritardo":"Oggi"}</span></article>)}</div>}
     {animalsToCheck.length>0&&<div className="dashboard-inline-note"><strong>Animali collegati alle scadenze</strong><div className="tag-list">{animalsToCheck.slice(0,8).map(name=><span className="data-tag" key={name}>{name}</span>)}</div></div>}
    </section>
-   <section className="panel dashboard-actions"><p className="eyebrow">AZIONI FREQUENTI</p><h2>Registra in pochi passaggi</h2><div className="dashboard-action-grid">{[["plus","Nuovo animale","animali"],["feeding","Registra alimentazione","alimentazioni"],["weight","Peso, muta o nota","cure"],["task","Nuova attività","attivita"]].map(([icon,label,id])=><button className="dashboard-action" key={id} onClick={()=>onGo(id)}><span><Icon name={icon} size={18}/></span><strong>{label}</strong><b aria-hidden="true"><Icon name="external" size={14}/></b></button>)}</div><div className="dashboard-inline-links"><button onClick={()=>onGo("inventario")}>Apri inventario</button><button onClick={()=>onGo("riproduzioni")}>Apri riproduzioni</button></div></section>
+   <section className="panel dashboard-actions"><p className="eyebrow">AZIONI FREQUENTI</p><h2>Registra in pochi passaggi</h2><div className="dashboard-action-grid">
+     <button className="dashboard-action" onClick={()=>onGo("animali")}><span><Icon name="plus" size={18}/></span><strong>Nuovo animale</strong><b aria-hidden="true"><Icon name="external" size={14}/></b></button>
+     <button className="dashboard-action" onClick={()=>onQuickEntry("feeding")}><span><Icon name="feeding" size={18}/></span><strong>Registra alimentazione</strong><b aria-hidden="true"><Icon name="plus" size={14}/></b></button>
+     <button className="dashboard-action" onClick={()=>onQuickEntry("weight")}><span><Icon name="weight" size={18}/></span><strong>Nuova pesata</strong><b aria-hidden="true"><Icon name="plus" size={14}/></b></button>
+     <button className="dashboard-action" onClick={()=>onQuickEntry("note")}><span><Icon name="note" size={18}/></span><strong>Nuova nota</strong><b aria-hidden="true"><Icon name="plus" size={14}/></b></button>
+     <button className="dashboard-action" onClick={()=>onGo("attivita")}><span><Icon name="task" size={18}/></span><strong>Nuova attività</strong><b aria-hidden="true"><Icon name="external" size={14}/></b></button>
+    </div><div className="dashboard-inline-links"><button onClick={()=>onGo("inventario")}>Apri inventario</button><button onClick={()=>onGo("riproduzioni")}>Apri riproduzioni</button></div></section>
   </div>
   <div className="dashboard-ops-grid">
    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ANIMALI</p><h2>Chi richiede attenzione</h2></div><Button variant="quiet" onClick={()=>onGo("animali")}>Apri elenco ↗</Button></div>
