@@ -444,3 +444,7 @@ body,.main-content{background:var(--canvas);color:var(--ink)}
 :root[data-theme="dark"] .public-fields>div{background:#223633}
 :root[data-theme="dark"] .animal-more-actions>div{background:var(--paper);border-color:var(--line)}
 :root[data-theme="dark"] .sidebar-note p,:root[data-theme="dark"] .page-footer,:root[data-theme="dark"] .subheading,:root[data-theme="dark"] .muted{color:var(--muted)}
+
+/* Ensure primary actions use the same teal tone as the refreshed design tokens. */
+.button.primary,.button:not(.secondary):not(.quiet):not(.danger){background:var(--green);border-color:var(--green);box-shadow:0 4px 10px rgb(15 118 110 / 14%)}
+.button:hover:not(:disabled){background:var(--green-dark);border-color:var(--green-dark)}

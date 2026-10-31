@@ -12,29 +12,25 @@ function Button({ children, variant = "", ...props }: React.ButtonHTMLAttributes
 export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: NavigationHandler; onRetry?: () => void }) {
  const due=asArray(data?.tasks?.dueToday??data?.dueToday);
  const overdue=asArray(data?.tasks?.overdue??data?.overdue);
- const [operational,setOperational]=useState<{stock:AnyRecord[];cycles:AnyRecord[];feeds:AnyRecord[];animalCount:number|null;stockLoaded:boolean;cyclesLoaded:boolean;feedsLoaded:boolean;animalsLoaded:boolean}>({stock:[],cycles:[],feeds:[],animalCount:null,stockLoaded:false,cyclesLoaded:false,feedsLoaded:false,animalsLoaded:false});
+ const [operational,setOperational]=useState<{stock:AnyRecord[];cycles:AnyRecord[];feeds:AnyRecord[];stockLoaded:boolean;cyclesLoaded:boolean;feedsLoaded:boolean}>({stock:[],cycles:[],feeds:[],stockLoaded:false,cyclesLoaded:false,feedsLoaded:false});
  useEffect(()=>{
   let live=true;
   Promise.allSettled([
    apiRequest("inventory/items?page=1&pageSize=8&active=true&lowStock=true"),
    apiRequest("reproduction-cycles?page=1&pageSize=8"),
-   apiRequest("feeding-sessions?page=1&pageSize=5"),
-   apiRequest("animals?page=1&pageSize=1&status=all")
-  ]).then(([stockResult,cyclesResult,feedsResult,animalsResult])=>{
+   apiRequest("feeding-sessions?page=1&pageSize=5")
+  ]).then(([stockResult,cyclesResult,feedsResult])=>{
    if(!live)return;
    const inventory=stockResult.status==="fulfilled"?asArray(stockResult.value):[];
    const cycles=cyclesResult.status==="fulfilled"?asArray(cyclesResult.value):[];
    const feeds=feedsResult.status==="fulfilled"?asArray(feedsResult.value):[];
-   const animalResponse=animalsResult.status==="fulfilled"?animalsResult.value:null;
    setOperational({
     stock:inventory.filter(item=>item.isActive!==false&&item.minimumQuantity!=null&&Number(item.quantityOnHand)<=Number(item.minimumQuantity)),
     cycles:cycles.filter(item=>["active","planned"].includes(item.status)).slice(0,5),
     feeds,
-    animalCount:animalResponse?.pagination?.total??null,
     stockLoaded:stockResult.status==="fulfilled",
     cyclesLoaded:cyclesResult.status==="fulfilled",
-    feedsLoaded:feedsResult.status==="fulfilled",
-    animalsLoaded:animalsResult.status==="fulfilled"
+    feedsLoaded:feedsResult.status==="fulfilled"
    });
   });
   return ()=>{live=false;};
