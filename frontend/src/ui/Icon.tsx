@@ -32,6 +32,7 @@ const glyphs: Record<string, ReactNode> = {
   back: <><path d="M19 12H5M12 19l-7-7 7-7"/></>,
   next: <><path d="M5 12h14M12 5l7 7-7 7"/></>,
   weight: <><path d="M5 7h14l2 14H3L5 7Z"/><path d="M9 7a3 3 0 0 1 6 0M12 12l2 3"/></>,
+  note: <><path d="M6 3h8l4 4v14H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M8 12h8M8 16h8"/></>,
   task: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 10h2M8 15h8"/></>,
   book: <><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></>,
   snake: <><path d="M5 6c0-2 2-3 4-2 2 1 1 3 3 4s5 0 6 2-1 4-3 4H9c-2 0-4 1-4 3s2 3 4 3 4-1 4-3"/><path d="M8 6h.01M16 11h.01"/></>,
