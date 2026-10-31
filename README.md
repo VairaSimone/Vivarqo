@@ -69,6 +69,7 @@ Le rotte implementate in questo incremento sono:
 | POST | /api/v1/auth/forgot-password | Richiede il reset password |
 | POST | /api/v1/auth/reset-password | Consuma il token e cambia password |
 | GET | /api/v1/auth/me | Restituisce il profilo autenticato |
+| DELETE | /api/v1/account | Avvia la cancellazione dell'account dopo verifica della password e conferma esplicita `DELETE` |
 | PATCH | /api/v1/account | Modifica nome, lingua, fuso orario, email o password |
 
 Prima di ogni richiesta mutativa, il client deve chiamare GET /api/v1/auth/csrf e mandare il valore restituito come header X-CSRF-Token, oltre al cookie inviato automaticamente. Usa credentials: include nelle fetch browser. Non salvare session token in localStorage: la sessione è un cookie HttpOnly e nel database ne è conservato solo l'hash. Il token CSRF va tenuto in memoria e rinnovato quando scade.
@@ -221,14 +222,17 @@ Le rotte private richiedono una sessione valida e il token CSRF per le richieste
 | Metodo | Endpoint | Funzione |
 |---|---|---|
 | GET / POST | `/api/v1/reproduction-cycles` | Lista paginata e creazione cicli |
-| GET / PATCH | `/api/v1/reproduction-cycles/:id` | Scheda e modifica ciclo |
+| GET / PATCH / DELETE | `/api/v1/reproduction-cycles/:id` | Scheda, modifica ed eliminazione ciclo |
 | GET / POST | `/api/v1/reproduction-cycles/:id/events` | Cronologia e inserimento eventi |
+| PATCH / DELETE | `/api/v1/reproductive-events/:id` | Modifica o elimina un evento |
 | POST | `/api/v1/clutches` | Registra una covata |
-| GET / PATCH | `/api/v1/clutches/:id` | Scheda e modifica covata |
+| GET / PATCH / DELETE | `/api/v1/clutches/:id` | Scheda, modifica ed eliminazione covata |
 | GET / POST | `/api/v1/clutches/:id/eggs` | Consulta e inserisce uova |
-| PATCH | `/api/v1/eggs/:id` | Modifica un uovo |
+| PATCH / DELETE | `/api/v1/eggs/:id` | Modifica o elimina un uovo |
 | GET / POST | `/api/v1/clutches/:id/incubation-logs` | Storico delle misurazioni d’incubazione |
+| PATCH / DELETE | `/api/v1/incubation-logs/:id` | Modifica o elimina una misurazione |
 | GET / POST | `/api/v1/offspring-batches` | Lista e creazione gruppi di nascita |
+| PATCH / DELETE | `/api/v1/offspring-batches/:id` | Modifica o elimina un gruppo di nascita |
 | POST | `/api/v1/offspring-batches/:id/animals` | Crea schede individuali collegate al gruppo |
 
 I genitori devono appartenere all’account. Anche ciclo, covata, uova, incubazione e gruppi di nascita sono letti e modificati controllando la proprietà tramite le relazioni.
@@ -251,7 +255,7 @@ Le quantità supportano tre decimali. Entrate e uscite sono variazioni positive;
 
 In sviluppo e test i file vengono salvati in `PRIVATE_STORAGE_PATH`. In produzione il backend richiede storage S3 configurato tramite `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` e, se necessario, `S3_ENDPOINT`. Il Compose locale monta un volume persistente privato.
 
-Per condividere una scheda: `POST /api/v1/animals/:id/public-share`, quindi modificare o revocare con `PATCH /api/v1/public-shares/:id`. La pagina pubblica è `GET /api/v1/public/animals/:slug`. Lo slug è casuale e non prevedibile; la pagina è disattivata di default e restituisce esclusivamente i campi presenti nella allowlist `name`, `species`, `morph`, `sex`, `birthDate`. Note, posizione, peso, alimentazioni, documenti e dati dell’account non sono pubblicati. L’API restituisce l’URL da usare anche per generare un QR; il codice QR grafico e l’interfaccia di gestione restano da implementare.
+Per condividere una scheda: `POST /api/v1/animals/:id/public-share`, quindi modificare o revocare con `PATCH /api/v1/public-shares/:id`. La pagina pubblica è `GET /api/v1/public/animals/:slug`. Lo slug è casuale e non prevedibile; la pagina è disattivata di default e restituisce esclusivamente i campi presenti nella allowlist `name`, `species`, `morph`, `sex`, `birthDate`. Note, posizione, peso, alimentazioni, documenti e dati dell’account non sono pubblicati. L’interfaccia permette di selezionare i campi pubblici, attivare o revocare la condivisione, copiare il link e generare localmente un QR SVG scaricabile. Il QR non viene affidato a un servizio esterno.
 
 ### Registro economico
 
@@ -332,7 +336,7 @@ Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HT
 
 Le preferenze di unità e visualizzazione sono memorizzate lato server. Dalle impostazioni è possibile richiedere la cancellazione dell'account con password e conferma esplicita; in presenza di un abbonamento attivo il backend ne richiede prima la cancellazione a Stripe. Le consegne push sono accodate in PostgreSQL e hanno storico persistente con retry; lo storico viene conservato per 90 giorni.
 
-Nota tecnica: lo scheduler delle push usa attualmente un outbox/worker PostgreSQL nativo; il passaggio a pg-boss e lo spostamento degli export/import in coda restano da completare.
+Nota tecnica: le notifiche push e i job di importazione/esportazione usano worker PostgreSQL nativi con claim atomico, lease e retry. `pg-boss` non è attualmente una dipendenza richiesta dall'architettura.
 
 
 ## Documentazione legale e privacy
