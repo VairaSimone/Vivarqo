@@ -46,13 +46,12 @@ export function Dashboard({data,onGo,onRetry}: { data: AnyRecord; onGo: Navigati
  const dueCount=data?.counts?.dueToday??data?.dueTodayCount??due.length;
  const overdueCount=data?.counts?.overdue??data?.overdueCount??overdue.length;
  const stat=[
-  ["Animali registrati",operational.animalCount??"—",operational.animalsLoaded?"Schede nel tuo account":"Conteggio non disponibile"],
   ["Da fare oggi",dueCount,"Attività in scadenza"],
-  ["In ritardo",overdueCount,"Da verificare"],
+  ["In ritardo",overdueCount,"Da recuperare"],
   ["Pasti recenti",operational.feedsLoaded?recent.length:"—","Ultime sessioni registrate"]
  ];
  return <div className="operational-dashboard">
-  <div className="stats-grid">{stat.map(([label,val,caption],i)=><article className={"stat-card tone-"+i} key={label}><span>{label}</span><strong>{val}</strong><small>{caption}</small></article>)}</div>
+  <div className="dashboard-summary">{stat.map(([label,val,caption],i)=><article className={"stat-card tone-"+i} key={label}><span>{label}</span><strong>{val}</strong><small>{caption}</small></article>)}</div>
   <div className="dashboard-grid">
    <section className="panel dashboard-focus"><div className="panel-heading"><div><p className="eyebrow">PRIORITÀ</p><h2>Da fare e da recuperare</h2><p className="subheading">Prima le scadenze superate, poi quelle di oggi.</p></div><Button variant="quiet" onClick={()=>onGo("attivita")}>Calendario ↗</Button></div>
     {due.length+overdue.length===0?<div className="dashboard-empty"><span className="status-mark">✓</span><div><strong>Nessuna scadenza segnalata</strong><p>Non risultano attività in ritardo o in scadenza nei dati restituiti dal server.</p></div></div>:<div className="task-list">{[...overdue,...due].slice(0,10).map((task,i)=><article className="task-row" key={task.id||i}><span className={"task-bullet "+(i<overdue.length?"is-overdue":"")}>{i<overdue.length?"!":"•"}</span><div><strong>{value(task,["title","name"],"Attività")}</strong><small>{task.animal?.name||value(task,["description"],"Promemoria")} · {date(value(task,["dueAt","scheduledAt"]))}</small></div><span className={"pill "+(i<overdue.length?"danger":"sage")}>{i<overdue.length?"In ritardo":"Oggi"}</span></article>)}</div>}
