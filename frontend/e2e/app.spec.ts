@@ -40,9 +40,9 @@ test("navigazione: URL e stato del browser restano sincronizzati", async ({ page
   }
   await page.locator(".nav-item").filter({ hasText: "Animali" }).click();
   await expect(page).toHaveURL(/\/animals$/);
-  const group = page.locator(".nav-group").filter({ hasText: "Allevamento" });
-  await group.locator("summary").click();
-  await group.locator(".nav-item").filter({ hasText: "Documenti e QR" }).click();
+  await expect(page.locator(".nav-primary .nav-item")).toHaveCount(4);
+  await page.locator(".nav-secondary").getByRole("button", { name: "Altro" }).click();
+  await page.locator(".more-card").filter({ hasText: "Documenti e QR" }).click();
   await expect(page).toHaveURL(/\/documents$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/animals$/);
