@@ -2,8 +2,9 @@ import React, { useMemo } from "react";
 
 export type WeightPoint = {
   id?: string;
-  measuredAt: string | Date;
-  weightG: number | string;
+  measuredAt?: string | Date;
+  weightG?: number | string;
+  [key: string]: unknown;
 };
 
 type ChartPoint = {
@@ -28,7 +29,7 @@ function formatDate(value: Date): string {
 
 export function WeightChart({ points, unit = "g" }: { points: WeightPoint[]; unit?: "g" | "kg" | "oz" | "lb" }) {
   const data = useMemo<ChartPoint[]>(() => points
-    .map((point) => ({ date: new Date(point.measuredAt), weight: Number(point.weightG) / (GRAMS_PER_UNIT[unit] ?? 1) }))
+    .map((point) => ({ date: new Date(point.measuredAt ?? ""), weight: Number(point.weightG) / (GRAMS_PER_UNIT[unit] ?? 1) }))
     .filter((point) => !Number.isNaN(point.date.getTime()) && Number.isFinite(point.weight) && point.weight > 0)
     .sort((a, b) => a.date.getTime() - b.date.getTime()), [points, unit]);
 
