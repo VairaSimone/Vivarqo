@@ -237,6 +237,40 @@ paths:
           description: Modifica email in attesa di verifica.
         '400':
           $ref: '#/components/responses/Error'
+    delete:
+      tags: [Account]
+      summary: Elimina l'account dopo verifica della password e conferma esplicita
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [currentPassword, confirmation]
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                confirmation:
+                  type: string
+                  const: DELETE
+      responses:
+        '204':
+          description: Account eliminato e cookie di sessione revocato.
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '503':
+          description: Cancellazione non completata per indisponibilità del provider pagamenti o dello storage privato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/animals:
     get:
       tags: [Animals]
