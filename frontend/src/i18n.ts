@@ -848,7 +848,7 @@ const translations: Record<string, string> = {
   "Animale ripristinato.": "Animal restored.",
   "Animale eliminato.": "Animal deleted.",
   "Impossibile caricare lo storico dell'animale.": "Could not load the animal history.",
-  "Richieste non riuscite": "Failed requests"
+  "Richieste non riuscite": "Failed requests",
   "Movimento di magazzino ·": "Inventory movement ·",
   "Nascita": "Birth",
   "Modifica scheda": "Edit profile",
