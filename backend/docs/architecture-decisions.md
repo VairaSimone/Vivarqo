@@ -75,3 +75,19 @@
 - La generazione ZIP resta in streaming e viene eseguita fuori dalla richiesta HTTP, con file temporanei e storage privato.
 - CI configurata per un backup/restore drill su database temporaneo; workflow manuale staging con database temporaneo separato.
 - Le chiamate live Stripe e Web Push sono opt-in, con account e sottoscrizioni di test, e non vengono eseguite automaticamente.
+
+
+## Stato corrente dopo la revisione — 31 ottobre 2026
+
+Questa sezione prevale sulle osservazioni storiche degli incrementi precedenti quando descrivono funzionalità successivamente completate.
+
+- **Preferenze account:** `user_preferences` persiste unità di peso/temperatura, formato data, landing page, densità delle tabelle e tema. `GET/PATCH /api/v1/account/preferences` è autenticata e isolata per account.
+- **Cancellazione account:** `DELETE /api/v1/account` richiede password corrente e conferma letterale `DELETE`. Prima di rimuovere i dati tenta di annullare l'abbonamento Stripe; rimuove gli oggetti privati, cancella i dati applicativi e anonimizza l'utente come tombstone. Il flusso è sincrono nella richiesta HTTP: la gestione di account con moltissimi allegati resta da validare in staging e può richiedere un job di cancellazione durevole.
+- **Web Push:** i tentativi sono persistiti in `push_delivery_attempts`; un worker PostgreSQL usa claim con `SKIP LOCKED`, lease recuperabili e retry. Lo storico privato è disponibile via `GET /api/v1/push-delivery-attempts` e ha retention di 90 giorni. Non viene usato pg-boss.
+- **Import/export:** le richieste usano `import_jobs` ed `export_jobs`, restituiscono `202 Accepted` e sono processate da worker PostgreSQL separati dall'API HTTP. Il claim è atomico, usa lease e fencing token, recupera i job abbandonati e limita i tentativi. L'export crea ZIP/CSV in streaming su file temporanei privati.
+- **Import supportati:** oltre ad animali e registri di cura, CSV/XLSX supporta finanze, inventario e le entità riproduttive (cicli, eventi, covate, uova, registri d'incubazione e gruppi di piccoli). Le relazioni sono risolte nell'ambito del solo account autenticato.
+- **Frontend e PWA:** le sorgenti applicative in `main` sono TypeScript/TSX. Il QR è generato sul dispositivo ed esportato come SVG. Il service worker conserva asset statici ma non accoda mutazioni offline e non memorizza risposte private API.
+- **OpenAPI e monitoraggio:** `docs/openapi.yaml` è una specifica iniziale e richiede ancora completamento/verifica automatica rispetto a tutte le route. Non c'è un'integrazione Sentry attiva in `main`; per questo la variabile `SENTRY_DSN` non è inclusa nella configurazione di esempio.
+- **Verifiche esterne ancora necessarie:** prova Stripe Test Mode con credenziali reali di test, prova Web Push su browser/dispositivo reale, restore drill su staging, verifica delle regioni e dei contratti dei provider, revisione legale delle informative e dei termini. Queste verifiche non possono essere dedotte dai test automatici.
+
+Le informative in `docs/legal/` sono bozze con campi da completare, non contenuti dimostrativi destinati agli utenti. Le credenziali e gli account `@vivarqo.test` presenti nel seed E2E sono limitati alla CI e non sono dati precaricati nell'applicazione.
