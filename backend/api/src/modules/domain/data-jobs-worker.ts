@@ -33,7 +33,7 @@ async function claimImport(jobId?: string): Promise<ClaimedImport | null> {
   // Capacity is enforced in PostgreSQL, not per worker process. Advisory transaction
   // locking makes the count + claim atomic across every running worker replica.
   const rows = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-import-capacity', 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-import-capacity', 0))`;
     const activeJobs = await tx.importJob.count({
       where: { status: "processing", processingStartedAt: { gt: staleBefore }, expiresAt: { gt: now } },
     });
@@ -74,7 +74,7 @@ async function claimExport(jobId?: string): Promise<ClaimedExport | null> {
   // A shared capacity gate prevents a fleet of worker replicas from all
   // launching expensive ZIP creation jobs at once.
   const rows = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-export-capacity', 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('vivarqo:global-export-capacity', 0))`;
     const activeJobs = await tx.exportJob.count({
       where: { status: "processing", processingStartedAt: { gt: staleBefore }, expiresAt: { gt: now } },
     });
