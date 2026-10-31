@@ -48,6 +48,7 @@ const environmentSchema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  SENTRY_DSN: z.string().url().optional(),
   METRICS_BEARER_TOKEN: z.string().min(32).optional(),
   PRIVATE_STORAGE_PATH: z.string().min(1).default("./var/private"),
 });
