@@ -7,6 +7,7 @@ self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC)));
 });
 self.addEventListener("message", event => {
+  if (event.origin !== self.location.origin) return;
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 self.addEventListener("activate", event => {
