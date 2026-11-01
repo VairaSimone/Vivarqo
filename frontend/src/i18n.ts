@@ -47,7 +47,7 @@ export function getIntlLocale(): string {
  * names, notes, descriptions and other account data are never machine-
  * translated or modified.
  */
-const translations: Record<string, string> = {
+export const translations: Record<string, string> = {
   "Nuova sessione di alimentazione": "New feeding session",
   "Registra una pesata senza lasciare la dashboard.": "Record a weigh-in without leaving the dashboard.",
   "Registra una nota direttamente sulla scheda dell'animale.": "Add a note directly to the animal profile.",
@@ -997,16 +997,36 @@ const translations: Record<string, string> = {
   "Caricamento riepilogo…": "Loading summary…",
   "Revoca tutte le sessioni": "Revoke all sessions",
   "＋ Installa la PWA": "＋ Install the PWA",
+  "Verifica della sessione…": "Checking your session…",
+  "Non riesco a verificare la sessione al momento.": "Unable to verify your session right now.",
+  "Controlla la connessione e riprova. Non ti abbiamo disconnesso.": "Check your connection and try again. You have not been signed out.",
+  "Stato": "Status",
+  "Osservazioni": "Notes",
+  "Record": "Record",
 };
 
 function normalize(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-/** Translate application-owned strings during React render. */
+const translatedEnglishValues = new Set(
+  Object.values(translations).map(value => normalize(value))
+);
+
+/** True when an application-owned Italian source string has an English entry. */
+export function hasTranslation(value: string): boolean {
+  return Object.prototype.hasOwnProperty.call(translations, normalize(value));
+}
+
+/** Translate application-owned strings during React render. Missing keys stay visible in English. */
 export function t(value: string): string {
   if (activeLocale === "it") return value;
-  return translations[normalize(value)] ?? value;
+  const key = normalize(value);
+  const translated = translations[key];
+  if (translated !== undefined) return translated;
+  // Components may pass an already translated label through t() more than once.
+  if (translatedEnglishValues.has(key)) return value;
+  return "⟦Missing translation: " + value + "⟧";
 }
 
 
