@@ -27,73 +27,10 @@ import { errorMessage } from "./types";
 import { readFormValues } from "./types";
 import { getIntlLocale, getLocale, setLocale, t } from "./i18n";
 import { AppShell } from "./app/AppShell";
+import { API, DESCRIPTIONS, NAV, NAV_GROUPS, NAV_MORE_GROUPS, TITLES } from "./app/navigation";
+import { useAppNavigation } from "./app/useAppNavigation";
+import { useAppPreferences } from "./app/useAppPreferences";
 
-const NAV = [
-  ["oggi","Oggi","home","Panoramica e attività in scadenza"],
-  ["animali","Animali","animals","Anagrafica e schede individuali"],
-  ["alimentazioni","Alimentazioni","feeding","Sessioni e storico dei pasti"],
-  ["cure","Peso, mute e note","care","Registri di cura e osservazioni"],
-  ["attivita","Attività e calendario","calendar","Promemoria, attività e scadenze"],
-  ["riproduzioni","Riproduzioni","reproduction","Cicli, covate, uova e piccoli"],
-  ["inventario","Inventario","inventory","Scorte, movimenti e soglie"],
-  ["documenti","Documenti e QR","documents","Documenti e condivisioni pubbliche"],
-  ["genetica","Morph e genetica","genetics","Tratti genetici e storico"],
-  ["finanze","Registro economico","finance","Entrate e uscite gestionali"],
-  ["notifiche","Notifiche","notifications","Avvisi e preferenze push"],
-  ["dati","Importa ed esporta","data","Portabilità dei tuoi dati"],
-  ["abbonamento","Abbonamento","billing","Stato e gestione del piano"],
-  ["guide","Guide e tutorial","guide","Guide dettagliate sito e PWA"],
-  ["impostazioni","Impostazioni","settings","Profilo, lingua e sicurezza"]
-];
-
-const NAV_GROUPS = [
-  { id: "quotidianita", label: "Quotidianità", items: ["oggi", "animali", "alimentazioni", "cure", "attivita"] },
-  { id: "allevamento", label: "Allevamento", items: ["riproduzioni", "genetica", "documenti"] },
-  { id: "gestione", label: "Gestione", items: ["inventario", "finanze"] },
-  { id: "account", label: "Account", items: ["notifiche", "dati", "abbonamento", "impostazioni", "guide"] }
-];
-const NAV_PRIMARY = ["oggi", "animali", "alimentazioni", "attivita"];
-const NAV_MORE_GROUPS = NAV_GROUPS.map(group => ({ ...group, items: group.items.filter(id => !NAV_PRIMARY.includes(id)) })).filter(group => group.items.length > 0);
-const API: Record<string, string> = {
-  oggi: "home/today", animali:"animals?page=1&pageSize=50", alimentazioni:"feeding-sessions?page=1&pageSize=50",
-  peso:"weights?page=1&pageSize=50", mute:"sheds?page=1&pageSize=50", note:"notes?page=1&pageSize=50",
-  attivita:"tasks?page=1&pageSize=50", riproduzioni:"reproduction-cycles?page=1&pageSize=100",
-  inventario:"inventory/items?page=1&pageSize=50", documenti:"documents?page=1&pageSize=50",
-  genetica:"genetic-traits", finanze:"finance/entries?page=1&pageSize=50", notifiche:"notifications?page=1&pageSize=50",
-  abbonamento:"billing/subscription"
-};
-const TITLES: Record<string, string> = Object.fromEntries([...NAV.map(([id,label])=>[id,label]), ["peso","Peso"], ["mute","Mute"], ["note","Note"], ["altro","Altro"]]);
-const DESCRIPTIONS: Record<string, string> = Object.fromEntries([...NAV.map(([id,label,icon,description])=>[id,description]), ["peso","Registra e consulta le pesate degli animali."], ["mute","Annota le mute e il loro esito."], ["note","Consulta e aggiungi osservazioni alle schede." ]]);
-const SECTION_PATHS: Record<string, string> = {
-  oggi: "/", animali: "/animals", alimentazioni: "/feeding", cure: "/care",
-  peso: "/care/weights", mute: "/care/sheds", note: "/care/notes",
-  attivita: "/calendar", riproduzioni: "/reproduction", inventario: "/inventory",
-  documenti: "/documents", genetica: "/genetics", finanze: "/finances",
-  notifiche: "/notifications", dati: "/data", abbonamento: "/billing",
-  guide: "/guide", impostazioni: "/settings", altro: "/more"
-};
-function initialSectionFromPath(pathname: string): string {
-  let path = String(pathname || "/");
-  while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
-  if (/^\/tasks(?:\/[^/]+)?$/.test(path)) return "attivita";
-  if (path.startsWith("/animals/")) return "animali";
-  if (path === "/settings/notifications" || path === "/notifications") return "notifiche";
-  const routes: Record<string, string> = {
-    "/": "oggi", "/animals": "animali", "/feeding": "alimentazioni", "/care": "cure",
-    "/care/weights": "peso", "/care/sheds": "mute", "/care/notes": "note",
-    "/calendar": "attivita", "/tasks": "attivita", "/reproduction": "riproduzioni",
-    "/inventory": "inventario", "/documents": "documenti", "/genetics": "genetica",
-    "/finances": "finanze", "/data": "dati", "/billing": "abbonamento",
-    "/guide": "guide", "/settings": "impostazioni", "/more": "altro"
-  };
-  return routes[path] || "oggi";
-}
-function animalIdFromLocation(): string | null {
-  const queryId = new URLSearchParams(window.location.search).get("animal");
-  if (queryId) return queryId;
-  const match = window.location.pathname.match(/^\/animals\/([^/]+)\/?$/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
 const asArray = (data: unknown): AnyRecord[] => Array.isArray(data) ? data as AnyRecord[] : data && typeof data === "object" ? Object.values(data as AnyRecord).find(Array.isArray) as AnyRecord[] ?? [] : [];
 const value = (obj: AnyRecord | null | undefined, keys: string[], fallback="—") => { for (const k of keys) if (obj?.[k] !== undefined && obj?.[k] !== null && obj?.[k] !== "") return obj[k]; return fallback; };
 const date = (v: string | number | Date | null | undefined) => { if (!v || v==="—") return "—"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):new Intl.DateTimeFormat(getIntlLocale(),{dateStyle:"medium"}).format(d); };
@@ -130,72 +67,32 @@ type NoticeState = { text: string; kind: NoticeKind };
 
 function App() {
 const [,setLocaleVersion]=useState(0);
-const [user,setUser]=useState<AccountUser|null>(null),[active,setActive]=useState(()=>initialSectionFromPath(window.location.pathname)),[data,setData]=useState<AnyRecord|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState<NoticeState|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<ModalForm|null>(null),[installEvent,setInstallEvent]=useState<BeforeInstallPromptEvent|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
+const [user,setUser]=useState<AccountUser|null>(null),[data,setData]=useState<AnyRecord|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState<NoticeState|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<ModalForm|null>(null),[installEvent,setInstallEvent]=useState<BeforeInstallPromptEvent|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
  const [inventoryFilters,setInventoryFilters]=useState<InventoryFiltersState>({active:"true",category:"",lowStock:false});
  const [financeRefreshKey,setFinanceRefreshKey]=useState(0);
- const [targetAnimalId,setTargetAnimalId]=useState<string|null>(()=>animalIdFromLocation());
- const [measurementPreferences,setMeasurementPreferences]=useState<{weightUnit:"g"|"kg"|"oz"|"lb";temperatureUnit:"C"|"F"}>({weightUnit:"g",temperatureUnit:"C"});
- const [themePreference,setThemePreference]=useState<"system"|"light"|"dark">("system");
  const [quickEntryKind,setQuickEntryKind]=useState<QuickEntryKind|null>(null);
  const [dashboardRefreshKey,setDashboardRefreshKey]=useState(0);
  const confirmAction=useConfirmDialog();
  const noticeTimer=useRef<number | null>(null);
+ const resetNavigationState=useCallback(()=>{setQuery("");setModal(null);setHistoryItem(null);},[]);
+ const {active,targetAnimalId,go}=useAppNavigation(resetNavigationState);
+ const {measurementPreferences}=useAppPreferences(user);
  useEffect(()=>{const onLocaleChange=(event:Event)=>{setLocaleVersion(version=>version+1);const locale=(event as CustomEvent<"it"|"en">).detail;setUser(current=>current?{...current,locale}:current);};window.addEventListener("vivarqo:locale-change",onLocaleChange);return()=>window.removeEventListener("vivarqo:locale-change",onLocaleChange);},[]);
  const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text:t(text),kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
  useEffect(()=>{const onInstall=(event:Event)=>{event.preventDefault();setInstallEvent(event as BeforeInstallPromptEvent);};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
- useEffect(()=>{const syncLocation=()=>{setActive(initialSectionFromPath(window.location.pathname));setTargetAnimalId(animalIdFromLocation());setQuery("");setModal(null);setHistoryItem(null);};window.addEventListener("popstate",syncLocation);return()=>window.removeEventListener("popstate",syncLocation);},[]);
  useEffect(()=>{const onUpdateReady=(event: Event)=>setPwaUpdateRegistration((event as CustomEvent<{registration?: ServiceWorkerRegistration}>).detail?.registration??null);window.addEventListener("vivarqo:pwa-update-ready",onUpdateReady);return()=>window.removeEventListener("vivarqo:pwa-update-ready",onUpdateReady);},[]);
  const loadMe=useCallback(async()=>{try{const r=await apiRequest("auth/me");const accountUser=(r.user??r) as AccountUser;setUser(accountUser);if(accountUser.locale==="it"||accountUser.locale==="en")setLocale(accountUser.locale);return true;}catch(e){setUser(null);return false;}},[]);
  useEffect(()=>{void loadMe();},[loadMe]);
- useEffect(()=>{
-   let active=true;
-   const applyPreferences=(value?:AnyRecord)=>{
-     const prefs=value??{};
-     const candidate=String(prefs.weightUnit??"g");
-     const weightUnit=(["g","kg","oz","lb"].includes(candidate)?candidate:"g") as "g"|"kg"|"oz"|"lb";
-     const temperatureUnit=String(prefs.temperatureUnit??"c").toLowerCase()==="f"?"F":"C";
-     setMeasurementPreferences({weightUnit,temperatureUnit});
-     const theme=String(prefs.theme??"system");
-     setThemePreference(theme==="dark"||theme==="light"?theme:"system");
-   };
-   const loadPreferences=async()=>{
-     if(!user){applyPreferences();return;}
-     try{
-       const response=await apiRequest<AnyRecord>("account/preferences");
-       if(active)applyPreferences(response.preferences);
-     }catch{
-       if(active)applyPreferences();
-     }
-   };
-   const onPreferencesUpdated=(event:Event)=>{
-     const detail=(event as CustomEvent<AnyRecord>).detail;
-     if(detail&&typeof detail==="object")applyPreferences(detail);
-   };
-   void loadPreferences();
-   window.addEventListener("vivarqo:preferences-updated",onPreferencesUpdated);
-   return()=>{active=false;window.removeEventListener("vivarqo:preferences-updated",onPreferencesUpdated);};
- },[user?.id]);
- useEffect(()=>{
-   const media=window.matchMedia("(prefers-color-scheme: dark)");
-   const applyTheme=()=>{
-     const resolved=themePreference==="system"?(media.matches?"dark":"light"):themePreference;
-     document.documentElement.dataset.theme=resolved;
-     document.documentElement.style.colorScheme=resolved;
-   };
-   applyTheme();
-   if(themePreference==="system")media.addEventListener("change",applyTheme);
-   return()=>media.removeEventListener("change",applyTheme);
- },[themePreference]);
+
  const loadData=useCallback(async(section: string=active)=>{setData(null);if(["guide-sito","guide-pwa","altro","riproduzioni","documenti","notifiche","alimentazioni","genetica","cure","peso","mute","note","animali","attivita","abbonamento"].includes(section)){setData({});return;}const basePath=API[section];if(!basePath){setData({});return;}const page=listPages[section]||1;const [pathname,queryString=""] = basePath.split("?");const params=new URLSearchParams(queryString);if(params.has("page"))params.set("page",String(page));if(section==="inventario"){params.set("active",inventoryFilters.active);if(inventoryFilters.category)params.set("category",inventoryFilters.category);else params.delete("category");if(inventoryFilters.lowStock)params.set("lowStock","true");else params.delete("lowStock");}if(query.trim()&&["inventario","finanze","alimentazioni","attivita"].includes(section))params.set("q",query.trim());else params.delete("q");const path=pathname+(params.size?"?"+params.toString():"");setBusy(true);try{const result=await apiRequest(path);setData(result);}catch(e){if(typeof e==="object" && e!==null && "status" in e && e.status===401){setUser(null);}setData({__error:errorMessage(e)});}finally{setBusy(false);}},[active,listPages,inventoryFilters,query]);
  useEffect(()=>{if(!user)return;const timer=window.setTimeout(()=>void loadData(active),query.trim()?280:0);return()=>window.clearTimeout(timer);},[user,active,loadData,query]);
- const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);setActive("oggi");showNotice("Hai terminato la sessione.");};
+ const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);go("oggi");showNotice("Hai terminato la sessione.");};
  const updateLocale=useCallback(async(nextLocale:"it"|"en")=>{
    const previous=getLocale();
    setLocale(nextLocale);
    try{await apiRequest("account",{method:"PATCH",body:{locale:nextLocale}});}
    catch(error){setLocale(previous);showNotice(errorMessage(error),"error");}
  },[showNotice]);
- const go=(id: string, options: {animalId?: string | null}={})=>{const animalId=options?.animalId||null;const basePath=id==="animali"&&animalId?"/animals/"+encodeURIComponent(animalId):(SECTION_PATHS[id]||"/");const nextPath=animalId&&id!=="animali"?basePath+"?animal="+encodeURIComponent(animalId):basePath;if(window.location.pathname+window.location.search!==nextPath)window.history.pushState({section:id},"",nextPath);setActive(id);setTargetAnimalId(animalId);setQuery("");setModal(null);setHistoryItem(null);if(window.innerWidth<900)document.querySelector(".sidebar")?.classList.remove("sidebar--open");};
  const updateInventoryFilter=(name:keyof InventoryFiltersState,value:string|boolean)=>{setInventoryFilters(current=>name==="lowStock"?{...current,lowStock:Boolean(value)}:{...current,[name]:String(value)});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const resetInventoryFilters=()=>{setInventoryFilters({active:"true",category:"",lowStock:false});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const updateRecordSearch=(next:string)=>{setQuery(next);setListPages(current=>({...current,[active]:1}));};
