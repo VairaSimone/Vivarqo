@@ -467,7 +467,7 @@ test("documenti e notifiche distinguono caricamento, vuoto ed errore API", async
 test("le viste mobile non provocano overflow orizzontale sulle aree operative", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chromium", "Controllo di viewport previsto sul progetto mobile.");
   await signIn(page);
-  for (const path of ["/animals", "/care/weights", "/documents", "/reproduction", "/notifications"]) {
+  for (const path of ["/animals", "/care/weights", "/documents", "/reproduction", "/notifications", "/inventory", "/finances", "/billing", "/data", "/settings", "/more", "/calendar", "/feeding", "/guide"]) {
     await page.goto(path);
     await page.locator(".page-wrap").waitFor();
     await expect.poll(async () => page.evaluate(() => {
