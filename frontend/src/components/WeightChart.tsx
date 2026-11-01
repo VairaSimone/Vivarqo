@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { getIntlLocale } from "../i18n";
+import { getIntlLocale, t } from "../i18n";
 
 export type WeightPoint = {
   id?: string;
@@ -35,10 +35,10 @@ export function WeightChart({ points, unit = "g" }: { points: WeightPoint[]; uni
     .sort((a, b) => a.date.getTime() - b.date.getTime()), [points, unit]);
 
   return (
-    <section className="panel weight-chart-panel" aria-label="Andamento del peso">
+    <section className="panel weight-chart-panel" aria-label={t("Andamento del peso")}>
       <div className="panel-heading">
         <div>
-          <h3>Andamento del peso</h3>
+          <h3>{t("Andamento del peso")}</h3>
           <p className="subheading">Storico delle pesate registrate · unità {unit}</p>
         </div>
       </div>
@@ -49,10 +49,10 @@ export function WeightChart({ points, unit = "g" }: { points: WeightPoint[]; uni
           <svg
             viewBox="0 0 720 250"
             role="img"
-            aria-label="Grafico dell'andamento del peso nel tempo"
+            aria-label={t("Grafico dell'andamento del peso nel tempo")}
             style={{ display: "block", width: "100%", height: "auto", overflow: "visible" }}
           >
-            <title>Andamento del peso</title>
+            <title>{t("Andamento del peso")}</title>
             {(() => {
               const left = 62, right = 18, top = 14, bottom = 38;
               const width = 720 - left - right, height = 250 - top - bottom;
