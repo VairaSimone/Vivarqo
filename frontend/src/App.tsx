@@ -34,6 +34,21 @@ function Notice({ notice }: { notice: { text: string; kind?: string } | null }) 
     : null;
 }
 
+function SessionChecking({ hasError, onRetry }: { hasError: boolean; onRetry: () => void }) {
+  return <main className="auth-wrap">
+    <section className="auth-card session-checking" aria-labelledby="session-checking-title">
+      <p className="eyebrow">{t("VIVARQO")}</p>
+      <h2 id="session-checking-title">{t("Verifica della sessione…")}</h2>
+      {!hasError && <div className="loading" role="status"><span className="spinner"/>{t("Verifica della sessione…")}</div>}
+      {hasError && <>
+        <p className="form-message error-text" role="alert">{t("Non riesco a verificare la sessione al momento.")}</p>
+        <p>{t("Controlla la connessione e riprova. Non ti abbiamo disconnesso.")}</p>
+        <Button onClick={onRetry}>{t("Riprova")}</Button>
+      </>}
+    </section>
+  </main>;
+}
+
 function App() {
   // Subscribing at the root rerenders all translated application components on locale changes.
   useLocale();
@@ -53,7 +68,7 @@ function App() {
   const { online, pwaUpdateRegistration, installApp, clearPwaUpdate } =
     useAppPlatform(notifyInstallUnavailable);
 
-  const { user, setUser, loadMe, handleUnauthorized, updateLocale, syncLocale } = session;
+  const { user, loadMe, handleUnauthorized, endSession, sessionStatus, sessionError, updateLocale, syncLocale } = session;
   const confirmAction = useConfirmDialog();
   const { active, targetAnimalId, go } = useAppNavigation(resetNavigationState);
   const { measurementPreferences } = useAppPreferences(user);
@@ -82,7 +97,7 @@ function App() {
     } catch {
       // The local session must still be cleared when the server is unreachable.
     }
-    setUser(null);
+    endSession();
     clearData();
     go("oggi");
     showNotice("Hai terminato la sessione.");
@@ -95,7 +110,13 @@ function App() {
   );
   const authFlowPath = /^\/(verify-email|reset-password)\/?$/.test(window.location.pathname);
 
-  if (!user || authFlowPath) {
+  if (authFlowPath) {
+    return <><AuthFlowScreen onLogin={loadMe} /><Notice notice={notice} /></>;
+  }
+  if (sessionStatus === "checking") {
+    return <SessionChecking hasError={Boolean(sessionError)} onRetry={() => void loadMe()}/>;
+  }
+  if (sessionStatus === "unauthenticated" || !user) {
     return <><AuthFlowScreen onLogin={loadMe} /><Notice notice={notice} /></>;
   }
 
