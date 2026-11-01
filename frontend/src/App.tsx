@@ -59,7 +59,7 @@ const [user,setUser]=useState<AccountUser|null>(null),[notice,setNotice]=useStat
  const handleUnauthorized=useCallback(()=>setUser(null),[]);
  const {data,busy,rows,loadData,clearData}=useAppData({user,active,query,listPages,inventoryFilters,onUnauthorized:handleUnauthorized});
  useEffect(()=>{const onLocaleChange=(event:Event)=>{setLocaleVersion(version=>version+1);const locale=(event as CustomEvent<"it"|"en">).detail;setUser(current=>current?{...current,locale}:current);};window.addEventListener("vivarqo:locale-change",onLocaleChange);return()=>window.removeEventListener("vivarqo:locale-change",onLocaleChange);},[]);
- const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text:t(text),kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
+ const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text,kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
  const {
    updateInventoryFilter,resetInventoryFilters,updateRecordSearch,saveEntity,
    addInventory,addFinance,openEditRecord,deleteRecord,createInventoryMovement,

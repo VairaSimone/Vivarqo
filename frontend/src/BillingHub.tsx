@@ -7,8 +7,8 @@ import { errorMessage } from "./types";
 
 const dateLabel = (value?: string | Date | null) => value ? new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: "medium" }).format(new Date(value)) : "—";
 const STATUS_LABELS: Record<string, string> = { active: "Attivo", trialing: "Periodo di prova", incomplete: "Incompleto", processing: "In elaborazione", pending_cancellation: "Cancellazione a fine periodo", canceled: "Annullato", paused: "In pausa", past_due: "Pagamento in ritardo", unpaid: "Non pagato" };
-const statusLabel = (value?: string | null) => value ? STATUS_LABELS[value] || value : "Nessun abbonamento";
-function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{children}</button>; }
+const statusLabel = (value?: string | null) => t(value ? STATUS_LABELS[value] || value : "Nessun abbonamento");
+function Button({ children, variant = "secondary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) { return <button className={"button " + variant} {...props}>{typeof children === "string" ? t(children) : children}</button>; }
 function safeStripeRedirect(raw: string | null | undefined, kind: "checkout" | "portal"): string | null {
   try {
     if (!raw) return null;
@@ -53,7 +53,7 @@ export function BillingHub({ onNotice = () => {} }: CommonHubProps) {
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">{t("PIANO E PAGAMENTI")}</p><h2>{t("Il tuo abbonamento")}</h2><p className="subheading">{t("I pagamenti vengono gestiti da Stripe; Vivarqo non raccoglie i dati completi della carta.")}</p></div><Button onClick={() => void load()} disabled={busy}>{t("↻ Aggiorna stato")}</Button></div>
       {busy && !data ? <div className="loading">{t("Caricamento abbonamento…")}</div> : <>
-        <div className="stats-grid"><article className="stat-card tone-0"><span>{t("Stato")}</span><strong>{statusLabel(subscription?.status)}</strong><small>{paid ? "Funzioni del piano a pagamento abilitate" : "Funzioni a pagamento non abilitate"}</small></article><article className="stat-card tone-1"><span>{t("Periodo dal")}</span><strong>{dateLabel(subscription?.currentPeriodStart)}</strong><small>{t("Inizio periodo corrente")}</small></article><article className="stat-card tone-2"><span>{t("Periodo fino al")}</span><strong>{dateLabel(subscription?.currentPeriodEnd)}</strong><small>{subscription?.cancelAtPeriodEnd ? "Annullamento programmato" : "Fine periodo corrente"}</small></article></div>
+        <div className="stats-grid"><article className="stat-card tone-0"><span>{t("Stato")}</span><strong>{statusLabel(subscription?.status)}</strong><small>{t(paid ? "Funzioni del piano a pagamento abilitate" : "Funzioni a pagamento non abilitate")}</small></article><article className="stat-card tone-1"><span>{t("Periodo dal")}</span><strong>{dateLabel(subscription?.currentPeriodStart)}</strong><small>{t("Inizio periodo corrente")}</small></article><article className="stat-card tone-2"><span>{t("Periodo fino al")}</span><strong>{dateLabel(subscription?.currentPeriodEnd)}</strong><small>{t(subscription?.cancelAtPeriodEnd ? "Annullamento programmato" : "Fine periodo corrente")}</small></article></div>
         {!data?.configured && <div className="notice warning">{t("Il pagamento non è configurato completamente sul server. Imposta chiavi Stripe, prezzo e segreto webhook in ambiente; i pulsanti di pagamento resteranno disabilitati.")}</div>}
         <div className="inline-actions">
           <Button variant="primary" disabled={busy || !data?.configured || paid} onClick={() => void go("checkout")}>{t("Attiva / acquista abbonamento")}</Button>

@@ -71,7 +71,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
     finally { setBusy(false); }
   };
   const statusLabels: Record<string, string> = { pending: "In attesa", queued: "In coda", processing: "In elaborazione", completed: "Completata", failed: "Non riuscita", expired: "Scaduta" };
-  const statusLabel = (status: string) => statusLabels[status] || status || "Sconosciuto";
+  const statusLabel = (status: string) => t(statusLabels[status] || status || "Sconosciuto");
 
   useEffect(() => {
     if (!importJob?.id || ["completed", "failed", "expired"].includes(importJob.status)) return undefined;
