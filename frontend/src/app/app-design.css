@@ -351,3 +351,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .app-shell--modern .notification-row,.app-shell--modern .device-row{max-width:100%;min-width:0}
   .app-shell--modern .share-fields{grid-template-columns:1fr}
 }
+
+
+/* Care tabs stay inside the panel on narrow screens; the tab strip scrolls, the page does not. */
+.app-shell--modern .advanced-stack{width:100%;max-width:100%;min-width:0}
+.app-shell--modern .advanced-stack>*{min-width:0;max-width:100%}
+.app-shell--modern .tab-strip{display:flex;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-width:thin}
+.app-shell--modern .tab-strip .tab-button{flex:0 0 auto;white-space:nowrap}
+.app-shell--modern .weight-chart-panel{width:100%;max-width:100%;min-width:0;overflow:hidden}
+.app-shell--modern .weight-chart-panel svg{display:block;width:100%;max-width:100%;height:auto}
