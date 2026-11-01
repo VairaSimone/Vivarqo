@@ -530,7 +530,7 @@ test("impostazioni: il cambio lingua nell'header aggiorna la scelta del modulo",
   await page.goto("/settings");
 
   await page.locator(".app-language-control select").selectOption("en");
-  const settingsLanguage = page.getByLabel("Language");
+  const settingsLanguage = page.locator(".settings-panel select").first();
   await expect(settingsLanguage).toHaveValue("en");
 
   await page.getByRole("button", { name: "Save settings", exact: true }).click();
@@ -539,17 +539,24 @@ test("impostazioni: il cambio lingua nell'header aggiorna la scelta del modulo",
   )).toBe(true);
 });
 
-test("registri inventario: titoli, colonne e stati sono tradotti in inglese", async ({ page }) => {
+test("registri inventario: titoli, colonne e stati sono tradotti in inglese", async ({ page }, testInfo) => {
   await signIn(page);
   await page.locator(".app-language-control select").selectOption("en");
   await page.goto("/inventory");
 
-  const table = page.locator(".records-panel table");
   await expect(page.locator(".records-panel h2")).toHaveText("Stock and supplies");
-  await expect(table.getByRole("columnheader", { name: "Status" })).toBeVisible();
-  await expect(table.getByRole("columnheader", { name: "Stock" })).toBeVisible();
-  await expect(table.getByRole("cell", { name: "Active" })).toBeVisible();
-  await expect(table.getByRole("cell", { name: "Sufficient" })).toBeVisible();
+  if (testInfo.project.name === "mobile-chromium") {
+    const card = page.locator(".record-mobile-card").first();
+    await expect(card.locator(".pill")).toHaveText("Active");
+    await expect(card.locator("dt", { hasText: "Stock" })).toBeVisible();
+    await expect(card.locator("dd", { hasText: "Sufficient" })).toBeVisible();
+  } else {
+    const table = page.locator(".records-panel table");
+    await expect(table.getByRole("columnheader", { name: "Status" })).toBeVisible();
+    await expect(table.getByRole("columnheader", { name: "Stock" })).toBeVisible();
+    await expect(table.getByRole("cell", { name: "Active" })).toBeVisible();
+    await expect(table.getByRole("cell", { name: "Sufficient" })).toBeVisible();
+  }
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
 });
 
