@@ -25,7 +25,7 @@ import { useRef } from "react";
 import type { AnyRecord, AccountUser, InventoryFiltersState, NoticeKind } from "./types";
 import { errorMessage } from "./types";
 import { readFormValues } from "./types";
-import { getIntlLocale, setLocale } from "./i18n";
+import { getIntlLocale, getLocale, setLocale } from "./i18n";
 import { AppShell } from "./app/AppShell";
 
 const NAV = [
@@ -189,6 +189,12 @@ const [user,setUser]=useState<AccountUser|null>(null),[active,setActive]=useStat
  const loadData=useCallback(async(section: string=active)=>{setData(null);if(["guide-sito","guide-pwa","altro","riproduzioni","documenti","notifiche","alimentazioni","genetica","cure","peso","mute","note","animali","attivita","abbonamento"].includes(section)){setData({});return;}const basePath=API[section];if(!basePath){setData({});return;}const page=listPages[section]||1;const [pathname,queryString=""] = basePath.split("?");const params=new URLSearchParams(queryString);if(params.has("page"))params.set("page",String(page));if(section==="inventario"){params.set("active",inventoryFilters.active);if(inventoryFilters.category)params.set("category",inventoryFilters.category);else params.delete("category");if(inventoryFilters.lowStock)params.set("lowStock","true");else params.delete("lowStock");}if(query.trim()&&["inventario","finanze","alimentazioni","attivita"].includes(section))params.set("q",query.trim());else params.delete("q");const path=pathname+(params.size?"?"+params.toString():"");setBusy(true);try{const result=await apiRequest(path);setData(result);}catch(e){if(typeof e==="object" && e!==null && "status" in e && e.status===401){setUser(null);}setData({__error:errorMessage(e)});}finally{setBusy(false);}},[active,listPages,inventoryFilters,query]);
  useEffect(()=>{if(!user)return;const timer=window.setTimeout(()=>void loadData(active),query.trim()?280:0);return()=>window.clearTimeout(timer);},[user,active,loadData,query]);
  const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);setActive("oggi");showNotice("Hai terminato la sessione.");};
+ const updateLocale=useCallback(async(nextLocale:"it"|"en")=>{
+   const previous=getLocale();
+   setLocale(nextLocale);
+   try{await apiRequest("account",{method:"PATCH",body:{locale:nextLocale}});}
+   catch(error){setLocale(previous);showNotice(errorMessage(error),"error");}
+ },[showNotice]);
  const go=(id: string, options: {animalId?: string | null}={})=>{const animalId=options?.animalId||null;const basePath=id==="animali"&&animalId?"/animals/"+encodeURIComponent(animalId):(SECTION_PATHS[id]||"/");const nextPath=animalId&&id!=="animali"?basePath+"?animal="+encodeURIComponent(animalId):basePath;if(window.location.pathname+window.location.search!==nextPath)window.history.pushState({section:id},"",nextPath);setActive(id);setTargetAnimalId(animalId);setQuery("");setModal(null);setHistoryItem(null);if(window.innerWidth<900)document.querySelector(".sidebar")?.classList.remove("sidebar--open");};
  const updateInventoryFilter=(name:keyof InventoryFiltersState,value:string|boolean)=>{setInventoryFilters(current=>name==="lowStock"?{...current,lowStock:Boolean(value)}:{...current,[name]:String(value)});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const resetInventoryFilters=()=>{setInventoryFilters({active:"true",category:"",lowStock:false});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
@@ -230,13 +236,14 @@ const actionButton: [string, () => void] | null = active==="inventario"?["＋ Nu
     title={headerTitle}
     nav={NAV.map(([id, label, icon, description]) => ({ id, label, icon, description }))}
     groups={NAV_GROUPS}
-    mobileItems={["oggi", "animali", "riproduzioni", "attivita", "altro"]}
+    mobileItems={["oggi", "animali", "alimentazioni", "riproduzioni", "altro"]}
     user={user}
     online={online}
     onNavigate={go}
     onInstall={doInstall}
     onLogout={logout}
     onSettings={() => go("impostazioni")}
+    onLocaleChange={updateLocale}
   >
     <div className="page-wrap"><Notice notice={notice}/>{pwaUpdateRegistration&&<div className="notice pwa-update-notice" role="status"><span>È disponibile una nuova versione di Vivarqo.</span><Button variant="secondary" onClick={()=>{const waiting=pwaUpdateRegistration.waiting;if(waiting)waiting.postMessage({type:"SKIP_WAITING"});else setPwaUpdateRegistration(null);}}>Aggiorna ora</Button></div>}{!online&&<div className="notice warning">Sei offline. Per leggere o modificare i dati devi ripristinare la connessione; Vivarqo non salva modifiche offline.</div>}
  <section className="page-heading"><div><p className="eyebrow">GESTIONE ALLEVAMENTO · {new Intl.DateTimeFormat(getIntlLocale(),{weekday:"long",day:"numeric",month:"long"}).format(new Date())}</p><h1><span className="page-heading-icon"><Icon name={NAV.find(item=>item[0]===active)?.[2]||"home"} size={24}/></span>{active==="oggi"?"Il tuo allevamento, sotto controllo.":headerTitle}</h1><p>{active==="altro"?"Tutte le funzioni, organizzate per area.":DESCRIPTIONS[active]||"Una guida pratica per gestire il tuo allevamento."}</p></div><div className="heading-actions">{actionButton&&<Button onClick={actionButton[1]}>{actionButton[0]}</Button>}{active==="guide-pwa"&&<Button onClick={doInstall}>Installa la PWA</Button>}</div></section>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { AccountUser } from "../types";
-import { getLocale, setLocale } from "../i18n";
+import { getLocale } from "../i18n";
 import { Icon } from "../ui/Icon";
 
 export type NavigationItem = { id: string; label: string; icon: string; description: string };
@@ -10,7 +10,7 @@ type AppShellProps = {
   active: string; title: string; nav: NavigationItem[]; groups: NavigationGroup[];
   mobileItems: string[]; user: AccountUser; online: boolean;
   onNavigate: (id: string) => void; onInstall: () => void; onLogout: () => void;
-  onSettings: () => void; children: ReactNode;
+  onSettings: () => void; onLocaleChange: (locale: "it" | "en") => void; children: ReactNode;
 };
 function Brand() {
   return <div className="app-brand" aria-label="Vivarqo">
@@ -18,7 +18,7 @@ function Brand() {
     <span className="app-brand-name">vivarqo<span>.</span></span>
   </div>;
 }
-export function AppShell({ active, title, nav, groups, mobileItems, user, online, onNavigate, onInstall, onLogout, onSettings, children }: AppShellProps) {
+export function AppShell({ active, title, nav, groups, mobileItems, user, online, onNavigate, onInstall, onLogout, onSettings, onLocaleChange, children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [locale, setCurrentLocale] = useState(getLocale());
   const initials = String(user.displayName || user.email || "V").trim().slice(0, 1).toUpperCase();
@@ -79,7 +79,7 @@ export function AppShell({ active, title, nav, groups, mobileItems, user, online
         <div className="topbar-right app-topbar-actions">
           <span className={"app-connection" + (online ? " is-online" : " is-offline")}><span className="app-connection-dot" />{online ? "Online" : "Offline"}</span>
           <label className="app-language-control"><Icon name="globe" size={16} />
-            <select aria-label="Lingua dell'interfaccia" value={locale} onChange={event => setLocale(event.target.value)}>
+            <select aria-label="Lingua dell'interfaccia" value={locale} onChange={event => onLocaleChange(event.target.value === "en" ? "en" : "it")}>
               <option value="it">IT</option><option value="en">EN</option>
             </select>
           </label>
