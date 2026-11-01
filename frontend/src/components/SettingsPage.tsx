@@ -40,6 +40,11 @@ export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: Accoun
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Keep the form choice aligned with the header's account-level selector.
+  useEffect(() => {
+    setLocaleChoice(user.locale === "en" ? "en" : user.locale === "it" ? "it" : getLocale());
+  }, [user.locale]);
+
   useEffect(() => {
     let active = true;
     apiRequest("account/preferences")
