@@ -21,13 +21,11 @@ export interface ApiError extends Error {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 let csrfTokenInMemory: string | null = null;
 
-type ApiCacheEntry = { expiresAt: number; value: unknown };
-const apiResponseCache = new Map<string, ApiCacheEntry>();
-const API_CACHE_TTL_MS = 6_000;
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
-/** Clear GET responses after writes and account transitions. */
+/** Clear concurrent GET request sharing after writes and account transitions. */
 export function invalidateApiCache(): void {
-  apiResponseCache.clear();
+  inFlightGetRequests.clear();
 }
 
 function languagePreference(): string {
@@ -84,7 +82,6 @@ export function apiRequest<T = AnyRecord>(path: string, options?: NonDeleteApiOp
 export function apiRequest<T = AnyRecord>(path: string, options: DeleteApiOptions): Promise<T | null>;
 export function apiRequest<T = AnyRecord>(path: string, options: ApiRequestOptions): Promise<T | null>;
 export async function apiRequest<T = AnyRecord>(path: string, options: ApiRequestOptions = {}): Promise<T | null> {
-  // Writes are never queued offline in the first release.
   const method = (options.method ?? "GET").toUpperCase();
   if (!SAFE_METHODS.has(method) && typeof navigator !== "undefined" && navigator.onLine === false) {
     throw apiError("Serve una connessione a Internet per modificare i dati. La modifica non è stata salvata.", {
@@ -93,8 +90,9 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
     });
   }
 
+  const language = languagePreference();
   const headers = new Headers(options.headers);
-  headers.set("Accept-Language", languagePreference());
+  headers.set("Accept-Language", language);
   let body = options.body;
   if (!SAFE_METHODS.has(method) && !path.includes("/webhooks/stripe")) {
     headers.set("X-CSRF-Token", await getCsrfToken());
@@ -112,42 +110,53 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
     body = JSON.stringify(body);
   }
 
-  const url = path.startsWith("/api/") ? path : "/api/v1/" + path.replace(/^\//, "");
-  const cacheable = method === "GET" && options.cache !== "reload";
-  if (cacheable) {
-    const cached = apiResponseCache.get(url);
-    if (cached && cached.expiresAt > Date.now()) return cached.value as T;
-    if (cached) apiResponseCache.delete(url);
-  }
-  const response = await fetchWithCsrfRetry(url, {
-    ...options,
-    method,
-    body: body as BodyInit | null | undefined,
-    credentials: "include",
-    cache: "no-store",
-  }, headers);
-  const payload = response.status === 204
-    ? null
-    : await response.json().catch(() => null) as unknown;
+  const url = path.startsWith("/api/") ? path : "/api/v1/" + path.replace(/^\\//, "");
+  const execute = async (): Promise<T | null> => {
+    const response = await fetchWithCsrfRetry(url, {
+      ...options,
+      method,
+      body: body as BodyInit | null | undefined,
+      credentials: "include",
+      cache: "no-store",
+    }, headers);
+    const payload = response.status === 204
+      ? null
+      : await response.json().catch(() => null) as unknown;
 
-  if (response.status === 401) invalidateApiCache();
-  if (response.ok && cacheable) {
-    apiResponseCache.set(url, { expiresAt: Date.now() + API_CACHE_TTL_MS, value: payload });
+    if (response.status === 401 || (response.ok && !SAFE_METHODS.has(method))) {
+      invalidateApiCache();
+    }
+    if (!response.ok) {
+      const errorPayload = isRecord(payload) ? payload : {};
+      const message = typeof errorPayload.message === "string"
+        ? errorPayload.message
+        : typeof errorPayload.error === "string"
+          ? errorPayload.error
+          : "Richiesta non riuscita (HTTP " + response.status + ").";
+      throw apiError(message, {
+        status: response.status,
+        details: errorPayload.details ?? errorPayload.issues ?? null,
+      });
+    }
+    return payload as T | null;
+  };
+
+  if (method !== "GET") return execute();
+
+  // Only simultaneous reads share a request. The next read always refetches.
+  const requestKey = url + "|" + language;
+  const current = inFlightGetRequests.get(requestKey);
+  if (current) return current as Promise<T | null>;
+
+  const pending = execute();
+  inFlightGetRequests.set(requestKey, pending);
+  try {
+    return await pending;
+  } finally {
+    if (inFlightGetRequests.get(requestKey) === pending) {
+      inFlightGetRequests.delete(requestKey);
+    }
   }
-  if (response.ok && !SAFE_METHODS.has(method)) invalidateApiCache();
-  if (!response.ok) {
-    const errorPayload = isRecord(payload) ? payload : {};
-    const message = typeof errorPayload.message === "string"
-      ? errorPayload.message
-      : typeof errorPayload.error === "string"
-        ? errorPayload.error
-        : "Richiesta non riuscita (HTTP " + response.status + ").";
-    throw apiError(message, {
-      status: response.status,
-      details: errorPayload.details ?? errorPayload.issues ?? null,
-    });
-  }
-  return payload as T | null;
 }
 
 export async function apiUpload<T = AnyRecord>(path: string, file: File): Promise<T> {
