@@ -119,7 +119,9 @@ export function AppShell({ active, title, nav, groups, mobileItems, user, online
     </main>
     <nav className="mobile-nav app-mobile-nav" aria-label="Navigazione rapida">
       {mobileItems.map(id => {
-        const item = nav.find(entry => entry.id === id);
+        const item = nav.find(entry => entry.id === id) ?? (id === "altro" ? {
+          id: "altro", label: "Altro", icon: "more", description: "Altri moduli e impostazioni"
+        } : undefined);
         if (!item) return null;
         const selected = id === "altro" ? isMoreActive : active === id;
         return <button type="button" key={id} className={selected ? "active" : ""} aria-current={selected ? "page" : undefined} onClick={() => navigate(id)}>

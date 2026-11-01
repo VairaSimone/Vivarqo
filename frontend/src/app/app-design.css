@@ -324,3 +324,30 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .app-shell--modern .record-filter-drawer{margin:0 15px 14px}
 .app-shell--modern .embedded-form{margin:12px 14px;padding:13px}
 }
+
+
+/* Narrow viewport safeguards for dense operational screens. */
+.app-shell--modern .app-content,.app-shell--modern .main-content,.app-shell--modern .page-wrap{min-width:0;max-width:100%}
+.app-shell--modern .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%}
+.app-shell--modern .calendar-grid>*{min-width:0;max-width:100%}
+.app-shell--modern .calendar-day-items{min-width:0;overflow:hidden}
+.app-shell--modern .calendar-event{min-width:0;overflow:hidden;overflow-wrap:anywhere}
+.app-shell--modern .cycle-grid,.app-shell--modern .clutch-grid{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+.app-shell--modern .cycle-card,.app-shell--modern .clutch-card,.app-shell--modern .share-preview,.app-shell--modern .public-profile{min-width:0;max-width:100%}
+.app-shell--modern .reproduction-detail-tabs{max-width:100%;min-width:0}
+.app-shell--modern .share-fields,.app-shell--modern .category-grid{min-width:0}
+.app-shell--modern .share-fields>*{min-width:0}
+.app-shell--modern .preference-row{min-width:0}
+.app-shell--modern .preference-row>span{min-width:0;overflow-wrap:anywhere}
+.app-shell--modern .notification-copy{min-width:0;overflow-wrap:anywhere}
+.app-shell--modern .device-row>div{min-width:0;overflow-wrap:anywhere}
+.app-shell--modern .table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.app-shell--modern .embedded-form,.app-shell--modern .panel,.app-shell--modern .records-panel{min-width:0;max-width:100%}
+@media(max-width:760px){
+  .app-shell--modern .cycle-grid,.app-shell--modern .clutch-grid{grid-template-columns:1fr}
+  .app-shell--modern .calendar-day-items{display:grid;gap:2px}
+  .app-shell--modern .calendar-event{padding:3px 4px}
+  .app-shell--modern .calendar-event strong{white-space:normal;overflow-wrap:anywhere}
+  .app-shell--modern .notification-row,.app-shell--modern .device-row{max-width:100%;min-width:0}
+  .app-shell--modern .share-fields{grid-template-columns:1fr}
+}
