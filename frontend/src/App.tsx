@@ -27,11 +27,11 @@ import { errorMessage } from "./types";
 import { readFormValues } from "./types";
 import { getIntlLocale, getLocale, setLocale, t } from "./i18n";
 import { AppShell } from "./app/AppShell";
-import { API, DESCRIPTIONS, NAV, NAV_GROUPS, NAV_MORE_GROUPS, TITLES } from "./app/navigation";
+import { DESCRIPTIONS, NAV, NAV_GROUPS, NAV_MORE_GROUPS, TITLES } from "./app/navigation";
+import { useAppData } from "./app/useAppData";
 import { useAppNavigation } from "./app/useAppNavigation";
 import { useAppPreferences } from "./app/useAppPreferences";
 
-const asArray = (data: unknown): AnyRecord[] => Array.isArray(data) ? data as AnyRecord[] : data && typeof data === "object" ? Object.values(data as AnyRecord).find(Array.isArray) as AnyRecord[] ?? [] : [];
 const value = (obj: AnyRecord | null | undefined, keys: string[], fallback="—") => { for (const k of keys) if (obj?.[k] !== undefined && obj?.[k] !== null && obj?.[k] !== "") return obj[k]; return fallback; };
 const date = (v: string | number | Date | null | undefined) => { if (!v || v==="—") return "—"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):new Intl.DateTimeFormat(getIntlLocale(),{dateStyle:"medium"}).format(d); };
 const localDateTime = (v?: string | Date | null) => { const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime()))return ""; const p=(n:number)=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes()); };
@@ -67,7 +67,7 @@ type NoticeState = { text: string; kind: NoticeKind };
 
 function App() {
 const [,setLocaleVersion]=useState(0);
-const [user,setUser]=useState<AccountUser|null>(null),[data,setData]=useState<AnyRecord|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState<NoticeState|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<ModalForm|null>(null),[installEvent,setInstallEvent]=useState<BeforeInstallPromptEvent|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
+const [user,setUser]=useState<AccountUser|null>(null),[notice,setNotice]=useState<NoticeState|null>(null),[query,setQuery]=useState(""),[modal,setModal]=useState<ModalForm|null>(null),[installEvent,setInstallEvent]=useState<BeforeInstallPromptEvent|null>(null),[online,setOnline]=useState(navigator.onLine),[listPages,setListPages]=useState<Record<string,number>>({}),[historyItem,setHistoryItem]=useState<AnyRecord|null>(null),[pwaUpdateRegistration,setPwaUpdateRegistration]=useState<ServiceWorkerRegistration|null>(null);
  const [inventoryFilters,setInventoryFilters]=useState<InventoryFiltersState>({active:"true",category:"",lowStock:false});
  const [financeRefreshKey,setFinanceRefreshKey]=useState(0);
  const [quickEntryKind,setQuickEntryKind]=useState<QuickEntryKind|null>(null);
@@ -77,6 +77,8 @@ const [user,setUser]=useState<AccountUser|null>(null),[data,setData]=useState<An
  const resetNavigationState=useCallback(()=>{setQuery("");setModal(null);setHistoryItem(null);},[]);
  const {active,targetAnimalId,go}=useAppNavigation(resetNavigationState);
  const {measurementPreferences}=useAppPreferences(user);
+ const handleUnauthorized=useCallback(()=>setUser(null),[]);
+ const {data,busy,rows,loadData,clearData}=useAppData({user,active,query,listPages,inventoryFilters,onUnauthorized:handleUnauthorized});
  useEffect(()=>{const onLocaleChange=(event:Event)=>{setLocaleVersion(version=>version+1);const locale=(event as CustomEvent<"it"|"en">).detail;setUser(current=>current?{...current,locale}:current);};window.addEventListener("vivarqo:locale-change",onLocaleChange);return()=>window.removeEventListener("vivarqo:locale-change",onLocaleChange);},[]);
  const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text:t(text),kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
  useEffect(()=>{const onInstall=(event:Event)=>{event.preventDefault();setInstallEvent(event as BeforeInstallPromptEvent);};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
@@ -84,9 +86,8 @@ const [user,setUser]=useState<AccountUser|null>(null),[data,setData]=useState<An
  const loadMe=useCallback(async()=>{try{const r=await apiRequest("auth/me");const accountUser=(r.user??r) as AccountUser;setUser(accountUser);if(accountUser.locale==="it"||accountUser.locale==="en")setLocale(accountUser.locale);return true;}catch(e){setUser(null);return false;}},[]);
  useEffect(()=>{void loadMe();},[loadMe]);
 
- const loadData=useCallback(async(section: string=active)=>{setData(null);if(["guide-sito","guide-pwa","altro","riproduzioni","documenti","notifiche","alimentazioni","genetica","cure","peso","mute","note","animali","attivita","abbonamento"].includes(section)){setData({});return;}const basePath=API[section];if(!basePath){setData({});return;}const page=listPages[section]||1;const [pathname,queryString=""] = basePath.split("?");const params=new URLSearchParams(queryString);if(params.has("page"))params.set("page",String(page));if(section==="inventario"){params.set("active",inventoryFilters.active);if(inventoryFilters.category)params.set("category",inventoryFilters.category);else params.delete("category");if(inventoryFilters.lowStock)params.set("lowStock","true");else params.delete("lowStock");}if(query.trim()&&["inventario","finanze","alimentazioni","attivita"].includes(section))params.set("q",query.trim());else params.delete("q");const path=pathname+(params.size?"?"+params.toString():"");setBusy(true);try{const result=await apiRequest(path);setData(result);}catch(e){if(typeof e==="object" && e!==null && "status" in e && e.status===401){setUser(null);}setData({__error:errorMessage(e)});}finally{setBusy(false);}},[active,listPages,inventoryFilters,query]);
- useEffect(()=>{if(!user)return;const timer=window.setTimeout(()=>void loadData(active),query.trim()?280:0);return()=>window.clearTimeout(timer);},[user,active,loadData,query]);
- const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);setData(null);go("oggi");showNotice("Hai terminato la sessione.");};
+ 
+ const logout=async()=>{try{await apiRequest("auth/logout",{method:"POST",body:{}});}catch{}setUser(null);clearData();go("oggi");showNotice("Hai terminato la sessione.");};
  const updateLocale=useCallback(async(nextLocale:"it"|"en")=>{
    const previous=getLocale();
    setLocale(nextLocale);
@@ -96,7 +97,6 @@ const [user,setUser]=useState<AccountUser|null>(null),[data,setData]=useState<An
  const updateInventoryFilter=(name:keyof InventoryFiltersState,value:string|boolean)=>{setInventoryFilters(current=>name==="lowStock"?{...current,lowStock:Boolean(value)}:{...current,[name]:String(value)});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const resetInventoryFilters=()=>{setInventoryFilters({active:"true",category:"",lowStock:false});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
  const updateRecordSearch=(next:string)=>{setQuery(next);setListPages(current=>({...current,[active]:1}));};
- const rows=useMemo(()=>asArray(data),[data]);
  const saveEntity=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const raw=readFormValues(e.currentTarget);const currentModal=modal;if(!currentModal)return;const {endpoint,method="POST",transform}=currentModal;try{await apiRequest(endpoint,{method,body:transform?transform(raw):raw});setModal(null);showNotice("Modifiche salvate.");if(active==="finanze")setFinanceRefreshKey(key=>key+1);await loadData(active);}catch(err){showNotice(errorMessage(err),"error");}};
  const addAnimal=()=>setModal({title:"Nuovo animale",endpoint:"animals",fields:[["name","Nome","text"],["identifier","Identificativo (facoltativo)","text"],["species","Specie","text"],["sex","Sesso","select"],["morph","Morph","text"],["birthDate","Data di nascita","date"],["locationLabel","Stabulazione / posizione","text"],["notes","Note","textarea"]],transform:v=>({...v,identifier:v.identifier||null,morph:v.morph||null,birthDate:v.birthDate||null,locationLabel:v.locationLabel||null,notes:v.notes||null})});
  const addInventory=()=>setModal({title:"Nuovo articolo",endpoint:"inventory/items",fields:[["name","Nome","text"],["category","Categoria","select"],["unit","Unità","text"],["quantityOnHand","Quantità iniziale","number"],["minimumQuantity","Soglia minima","number"],["notes","Note","textarea"]],transform:v=>({...v,quantityOnHand:Number(v.quantityOnHand||0),minimumQuantity:v.minimumQuantity===""?null:Number(v.minimumQuantity),notes:v.notes||null})});
