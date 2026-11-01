@@ -451,7 +451,23 @@ test("le viste mobile non provocano overflow orizzontale sulle aree operative", 
   for (const path of ["/animals", "/care/weights", "/documents", "/reproduction", "/notifications"]) {
     await page.goto(path);
     await page.locator(".page-wrap").waitFor();
-    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2)).toBeTruthy();
+    await expect.poll(async () => page.evaluate(() => {
+      const viewportWidth = document.documentElement.clientWidth;
+      const scrollWidth = document.documentElement.scrollWidth;
+      const offenders = Array.from(document.querySelectorAll("body *"))
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          return {
+            tag: element.tagName.toLowerCase(),
+            className: typeof element.className === "string" ? element.className : "",
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+          };
+        })
+        .filter(element => element.right > viewportWidth + 2)
+        .slice(0, 8);
+      return { fits: scrollWidth <= viewportWidth + 2, viewportWidth, scrollWidth, offenders };
+    }), { message: "Overflow orizzontale nella vista mobile " + path }).toMatchObject({ fits: true });
   }
 });
 
