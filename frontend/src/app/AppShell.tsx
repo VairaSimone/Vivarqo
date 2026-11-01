@@ -75,10 +75,10 @@ export function AppShell({ active, title, nav, groups, mobileItems, user, online
             <h2 className="app-nav-label" id={"nav-group-" + group.id}>{t(group.label)}</h2>
             {items.map(item => <button type="button" key={item.id}
               className={"app-nav-item nav-item" + (active === item.id ? " is-active active" : "")}
-              aria-current={active === item.id ? "page" : undefined} title={item.description}
+              aria-current={active === item.id ? "page" : undefined} title={t(item.description)}
               onClick={() => navigate(item.id)}>
               <span className="app-nav-icon"><Icon name={item.icon} size={18} /></span>
-              <span className="app-nav-text">{item.label}</span>
+              <span className="app-nav-text">{t(item.label)}</span>
               {active === item.id && <span className="app-nav-indicator" aria-hidden="true" />}
             </button>)}
           </section>;
@@ -125,7 +125,7 @@ export function AppShell({ active, title, nav, groups, mobileItems, user, online
         if (!item) return null;
         const selected = id === "altro" ? isMoreActive : active === id;
         return <button type="button" key={id} className={selected ? "active" : ""} aria-current={selected ? "page" : undefined} onClick={() => navigate(id)}>
-          <span className="app-mobile-icon"><Icon name={item.icon} size={20} /></span><span>{id === "alimentazioni" ? "Pasti" : item.label}</span>
+          <span className="app-mobile-icon"><Icon name={item.icon} size={20} /></span><span>{t(id === "alimentazioni" ? "Pasti" : item.label)}</span>
         </button>;
       })}
     </nav>
