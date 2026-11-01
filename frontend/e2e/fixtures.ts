@@ -113,6 +113,13 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     if (path === "home/today" && method === "GET") return respond({ tasks: { dueToday: [], overdue: [] }, counts: { dueToday: 0, overdue: 0 }, recentEvents: [] });
     if (path.startsWith("billing/") && method === "GET") return respond({ subscription: { status: "active", plan: "BREEDER" } });
 
+    if (path === "inventory/items" && method === "GET") {
+      return respond(itemsResponse("items", [{
+        id: "inventory-1", name: "Ratto", category: "food", quantityOnHand: 8,
+        unit: "pezzi", minimumQuantity: 5, isActive: true
+      }]));
+    }
+
     if (path === "animals" && method === "GET") {
       if (state.animalListDelayMs) await new Promise(resolve => setTimeout(resolve, state.animalListDelayMs));
       if (state.failAnimalList) return respond({ message: "Errore caricamento animali E2E." }, 503);
