@@ -5,6 +5,7 @@ import { PublicAnimalPage } from "./DocumentsHub";
 import { ConfirmProvider } from "./ui/ConfirmDialog";
 import { initializeLocalization } from "./i18n";
 import "./styles.css";
+import "./app/app-design.css";
 
 initializeLocalization();
 

@@ -36,6 +36,10 @@ const glyphs: Record<string, ReactNode> = {
   task: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 10h2M8 15h8"/></>,
   book: <><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22Z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/></>,
   snake: <><path d="M5 6c0-2 2-3 4-2 2 1 1 3 3 4s5 0 6 2-1 4-3 4H9c-2 0-4 1-4 3s2 3 4 3 4-1 4-3"/><path d="M8 6h.01M16 11h.01"/></>,
+  leaf: <><path d="M20 4c-8 0-14 3-14 10a6 6 0 0 0 6 6c7 0 8-7 8-16Z"/><path d="M4 21c3-5 7-8 12-11"/></>,
+  globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></>,
+  download: <><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19v2h16v-2"/></>,
+  "log-out": <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></>,
   circle: <circle cx="12" cy="12" r="9"/>
 };
 

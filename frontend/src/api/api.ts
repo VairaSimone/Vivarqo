@@ -21,6 +21,15 @@ export interface ApiError extends Error {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 let csrfTokenInMemory: string | null = null;
 
+type ApiCacheEntry = { expiresAt: number; value: unknown };
+const apiResponseCache = new Map<string, ApiCacheEntry>();
+const API_CACHE_TTL_MS = 6_000;
+
+/** Clear GET responses after writes and account transitions. */
+export function invalidateApiCache(): void {
+  apiResponseCache.clear();
+}
+
 function languagePreference(): string {
   return getLocale() === "en" ? "en-GB,en;q=0.9,it;q=0.8" : "it-IT,it;q=0.9,en;q=0.8";
 }
@@ -104,6 +113,12 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
   }
 
   const url = path.startsWith("/api/") ? path : "/api/v1/" + path.replace(/^\//, "");
+  const cacheable = method === "GET" && options.cache !== "reload";
+  if (cacheable) {
+    const cached = apiResponseCache.get(url);
+    if (cached && cached.expiresAt > Date.now()) return cached.value as T;
+    if (cached) apiResponseCache.delete(url);
+  }
   const response = await fetchWithCsrfRetry(url, {
     ...options,
     method,
@@ -115,6 +130,11 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
     ? null
     : await response.json().catch(() => null) as unknown;
 
+  if (response.status === 401) invalidateApiCache();
+  if (response.ok && cacheable) {
+    apiResponseCache.set(url, { expiresAt: Date.now() + API_CACHE_TTL_MS, value: payload });
+  }
+  if (response.ok && !SAFE_METHODS.has(method)) invalidateApiCache();
   if (!response.ok) {
     const errorPayload = isRecord(payload) ? payload : {};
     const message = typeof errorPayload.message === "string"
@@ -151,6 +171,7 @@ export async function apiUpload<T = AnyRecord>(path: string, file: File): Promis
       { status: response.status },
     );
   }
+  invalidateApiCache();
   return payload as T;
 }
 
@@ -177,6 +198,7 @@ export async function apiUploadDocument<T = AnyRecord>(file: File, metadata: Doc
       { status: response.status },
     );
   }
+  invalidateApiCache();
   return payload as T;
 }
 
