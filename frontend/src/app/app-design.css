@@ -142,3 +142,114 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce){
   .app-shell--modern *,.app-shell--modern *::before,.app-shell--modern *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+
+/* Feature surfaces: consistent visual treatment without changing module behavior. */
+.app-shell--modern .auth-wrap{min-height:100vh;grid-template-columns:minmax(0,1.05fr) minmax(430px,.95fr);gap:0;align-items:stretch;background:var(--canvas)}
+.app-shell--modern .auth-art{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:clamp(42px,7vw,100px);overflow:hidden;position:relative;background:radial-gradient(circle at 82% 24%,rgb(151 188 155 / 18%),transparent 28%),linear-gradient(145deg,#1d4938,#142f25);color:#f5f8f4}
+.app-shell--modern .auth-art .brand{color:#f8fbf7;align-self:flex-start;margin-bottom:auto}
+.app-shell--modern .auth-art .eyebrow{color:#b8d0bc;margin:auto 0 17px}
+.app-shell--modern .auth-art h1{max-width:620px;color:#fff;font-size:clamp(48px,5.6vw,76px);line-height:.98;letter-spacing:-3px}
+.app-shell--modern .auth-art h1 em{color:#b7d2bb;font-style:normal}
+.app-shell--modern .auth-art>p:not(.eyebrow){max-width:500px;color:#d1e0d4;font-size:15px;line-height:1.8}
+.app-shell--modern .auth-leaf{color:rgb(213 233 216 / 17%);font-size:clamp(150px,20vw,280px);line-height:.7;position:absolute;right:2%;bottom:-7%;pointer-events:none;transform:rotate(-13deg)}
+.app-shell--modern .auth-card{width:min(100% - 56px,520px);margin:auto;padding:clamp(25px,4vw,46px);border:1px solid var(--line);border-radius:19px;background:var(--paper);box-shadow:0 20px 60px rgb(30 48 40 / 7%)}
+.app-shell--modern .auth-card-head{margin-bottom:26px}
+.app-shell--modern .auth-card-head h2{margin:8px 0;color:var(--ink);font-size:28px;letter-spacing:-1px}
+.app-shell--modern .auth-card-head>p:last-child{color:var(--muted);font-size:13px;line-height:1.6}
+.app-shell--modern .form-stack{gap:16px}
+.app-shell--modern .auth-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px}
+.app-shell--modern .auth-links button,.app-shell--modern .auth-links a{color:var(--green);font-size:12px;font-weight:700}
+.app-shell--modern .auth-card .button{width:100%;min-height:46px}
+
+.app-shell--modern .calendar-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;padding:13px;margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--paper-soft)}
+.app-shell--modern .calendar-toolbar strong{color:var(--ink);font-size:14px}
+.app-shell--modern .tab-strip{display:inline-flex;gap:3px;padding:4px;border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+.app-shell--modern .tab-button{min-height:33px;padding:6px 12px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:11px;font-weight:700}
+.app-shell--modern .tab-button.active{background:var(--green-soft);color:var(--green-dark);box-shadow:inset 0 0 0 1px rgb(45 101 77 / 10%)}
+.app-shell--modern .calendar-grid{gap:6px}
+.app-shell--modern .calendar-weekdays>div{padding:7px 4px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.55px}
+.app-shell--modern .calendar-day{min-height:112px;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);transition:border-color .15s ease}
+.app-shell--modern .calendar-day:hover{border-color:#a9c7ad}
+.app-shell--modern .calendar-day>strong{display:grid;place-items:center;width:27px;height:27px;border-radius:8px;font-size:11px}
+.app-shell--modern .calendar-day.is-today>strong{background:var(--green);color:#fff}
+.app-shell--modern .calendar-day.is-outside{background:var(--paper-soft);color:#9aa59c}
+.app-shell--modern .calendar-event{max-width:100%;border:1px solid #d9e8da;border-radius:6px;background:#eef5ed;color:#315b40;padding:4px 6px}
+.app-shell--modern .calendar-event strong{display:block;font-size:10px;overflow:hidden;text-overflow:ellipsis}
+.app-shell--modern .calendar-event small{font-size:9px;color:inherit;opacity:.8}
+.app-shell--modern .calendar-event.event-reproduction{background:#f2eff7;border-color:#e0d8ed;color:#66517f}
+.app-shell--modern .calendar-event.event-clutch{background:#fbf2e5;border-color:#efdfc4;color:#8a632f}
+
+.app-shell--modern .cycle-grid,.app-shell--modern .clutch-grid{gap:12px}
+.app-shell--modern .cycle-card{border:1px solid var(--line);border-radius:13px;background:var(--paper);padding:14px;box-shadow:0 3px 13px rgb(27 48 37 / 3%)}
+.app-shell--modern .cycle-card.selected{border-color:#84ad8e;box-shadow:0 0 0 2px rgb(45 101 77 / 10%)}
+.app-shell--modern .cycle-select{display:grid;gap:7px;width:100%;padding:3px;border:0;background:transparent;color:var(--ink);text-align:left}
+.app-shell--modern .cycle-select strong{font-size:14px}
+.app-shell--modern .cycle-select span,.app-shell--modern .cycle-select small{color:var(--muted);font-size:11px;line-height:1.5}
+.app-shell--modern .reproduction-detail-tabs{display:flex;flex-wrap:wrap;gap:5px;padding:5px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.app-shell--modern .reproduction-detail-tabs .tab-button{min-height:38px}
+.app-shell--modern .clutch-card{border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+
+.app-shell--modern .notice-list{display:grid;gap:8px}
+.app-shell--modern .notification-row,.app-shell--modern .device-row,.app-shell--modern .log-row{display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--line);border-radius:11px;background:var(--paper)}
+.app-shell--modern .notification-row.is-unread{border-left:3px solid var(--green);background:linear-gradient(90deg,var(--green-soft),var(--paper) 30%)}
+.app-shell--modern .notification-dot{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:var(--green-soft);color:var(--green)}
+.app-shell--modern .notification-copy{flex:1;min-width:0}
+.app-shell--modern .notification-copy strong{color:var(--ink);font-size:12px}
+.app-shell--modern .notification-copy p{margin:5px 0;color:var(--ink-soft);font-size:12px;line-height:1.6}
+.app-shell--modern .notification-copy small,.app-shell--modern .device-row small{color:var(--muted);font-size:10px}
+.app-shell--modern .notification-actions{display:flex;align-items:center;gap:7px}
+.app-shell--modern .preference-switches{display:grid;gap:8px}
+.app-shell--modern .preference-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.app-shell--modern .preference-row span{display:grid;gap:4px}
+.app-shell--modern .preference-row strong{color:var(--ink);font-size:12px}
+.app-shell--modern .preference-row small{color:var(--muted);font-size:11px;line-height:1.5}
+.app-shell--modern .category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.app-shell--modern .category-toggle{min-height:48px}
+
+.app-shell--modern .share-preview,.app-shell--modern .qr-frame{border:1px solid var(--line);border-radius:14px;background:var(--paper-soft)}
+.app-shell--modern .share-preview{padding:16px}
+.app-shell--modern .share-url{overflow-wrap:anywhere;color:var(--green);font-size:11px;line-height:1.6}
+.app-shell--modern .qr-frame{display:grid;place-items:center;min-height:210px;padding:18px}
+.app-shell--modern .qr-svg{width:min(100%,220px);height:auto;padding:9px;border-radius:10px;background:#fff;box-shadow:0 4px 18px rgb(20 40 28 / 8%)}
+.app-shell--modern .public-profile-wrap{min-height:100vh;padding:32px 16px;background:var(--canvas)}
+.app-shell--modern .public-profile{width:min(100%,760px);margin:0 auto;padding:clamp(20px,4vw,38px);border:1px solid var(--line);border-radius:18px;background:var(--paper);box-shadow:0 18px 50px rgb(27 48 37 / 7%)}
+.app-shell--modern .public-profile h1{color:var(--ink);font-size:29px;letter-spacing:-1px}
+.app-shell--modern .public-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.app-shell--modern .public-fields>div{padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--paper-soft)}
+.app-shell--modern .public-fields dt{color:var(--muted);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.5px}
+.app-shell--modern .public-fields dd{margin:5px 0 0;color:var(--ink);font-size:13px}
+
+.app-shell--modern .settings-panel{max-width:920px}
+.app-shell--modern .security-actions{display:flex;flex-wrap:wrap;gap:9px;padding-top:20px;margin-top:22px;border-top:1px solid var(--line)}
+.app-shell--modern .danger-zone{margin-top:20px;padding:17px;border:1px solid #efd6cf;border-radius:12px;background:#fff8f5}
+.app-shell--modern .danger-zone h3{color:#9a4e3f}
+.app-shell--modern .pagination-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 0}
+.app-shell--modern .empty-state{border:1px dashed var(--line);border-radius:12px;background:var(--paper-soft)}
+.app-shell--modern .loading{color:var(--muted)}
+:root[data-theme="dark"] .app-shell--modern .cycle-card,:root[data-theme="dark"] .app-shell--modern .notification-row,:root[data-theme="dark"] .app-shell--modern .device-row,:root[data-theme="dark"] .app-shell--modern .log-row,:root[data-theme="dark"] .app-shell--modern .preference-row,:root[data-theme="dark"] .app-shell--modern .share-preview,:root[data-theme="dark"] .app-shell--modern .qr-frame{background:var(--paper);border-color:var(--line);color:var(--ink)}
+:root[data-theme="dark"] .app-shell--modern .notification-row.is-unread{background:linear-gradient(90deg,var(--green-soft),var(--paper) 45%)}
+:root[data-theme="dark"] .app-shell--modern .calendar-event{background:#284538;border-color:#496d54;color:#d7e9da}
+:root[data-theme="dark"] .app-shell--modern .calendar-event.event-reproduction{background:#393149;border-color:#665782;color:#e3d9f0}
+:root[data-theme="dark"] .app-shell--modern .calendar-event.event-clutch{background:#493c2c;border-color:#846842;color:#f2dfbd}
+@media(max-width:900px){
+  .app-shell--modern .auth-wrap{grid-template-columns:1fr}
+  .app-shell--modern .auth-art{display:none}
+  .app-shell--modern .auth-card{width:min(calc(100% - 28px),540px);margin:25px auto;padding:26px}
+  .app-shell--modern .calendar-day{min-height:90px;padding:6px}
+  .app-shell--modern .calendar-event small{display:none}
+  .app-shell--modern .notification-row{flex-wrap:wrap}
+  .app-shell--modern .notification-actions{width:100%;justify-content:flex-end}
+}
+@media(max-width:600px){
+  .app-shell--modern .calendar-toolbar{align-items:stretch}
+  .app-shell--modern .calendar-toolbar>.inline-actions{flex-wrap:wrap}
+  .app-shell--modern .calendar-grid{gap:3px}
+  .app-shell--modern .calendar-day{min-height:72px;border-radius:6px;padding:4px}
+  .app-shell--modern .calendar-day>strong{width:23px;height:23px}
+  .app-shell--modern .category-grid,.app-shell--modern .public-fields{grid-template-columns:1fr}
+  .app-shell--modern .preference-row{padding:11px}
+  .app-shell--modern .reproduction-detail-tabs{overflow-x:auto;flex-wrap:nowrap}
+  .app-shell--modern .reproduction-detail-tabs .tab-button{white-space:nowrap}
+  .app-shell--modern .dialog-form{grid-template-columns:1fr}
+}

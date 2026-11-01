@@ -41,13 +41,40 @@ export function AppShell({ active, title, nav, groups, mobileItems, user, online
       </div>
       <div className="app-sidebar-caption">IL TUO ALLEVAMENTO</div>
       <nav className="app-navigation" aria-label="Sezioni principali">
+        <div className="nav-primary app-nav-primary">
+          {["oggi", "animali", "alimentazioni", "attivita"].map(id => {
+            const item = nav.find(entry => entry.id === id);
+            if (!item) return null;
+            return <button type="button" key={id}
+              className={"app-nav-item nav-item" + (active === id ? " is-active active" : "")}
+              aria-current={active === id ? "page" : undefined} title={item.description}
+              onClick={() => navigate(id)}>
+              <span className="app-nav-icon"><Icon name={item.icon} size={18} /></span>
+              <span className="app-nav-text">{item.label}</span>
+              {active === id && <span className="app-nav-indicator" aria-hidden="true" />}
+            </button>;
+          })}
+        </div>
+        <div className="nav-secondary app-nav-secondary">
+          <button type="button"
+            className={"app-nav-item nav-item" + (active === "altro" ? " is-active active" : "")}
+            aria-current={active === "altro" ? "page" : undefined}
+            onClick={() => navigate("altro")}>
+            <span className="app-nav-icon"><Icon name="more" size={18} /></span>
+            <span className="app-nav-text">Altro</span>
+            <span className="app-nav-indicator" aria-hidden="true" />
+          </button>
+        </div>
         {groups.map(group => {
-          const items = group.items.map(id => nav.find(item => item.id === id)).filter((item): item is NavigationItem => Boolean(item));
+          const items = group.items
+            .filter(id => !["oggi", "animali", "alimentazioni", "attivita"].includes(id))
+            .map(id => nav.find(item => item.id === id))
+            .filter((item): item is NavigationItem => Boolean(item));
           if (!items.length) return null;
           return <section className="app-nav-group" key={group.id} aria-labelledby={"nav-group-" + group.id}>
             <h2 className="app-nav-label" id={"nav-group-" + group.id}>{group.label}</h2>
             {items.map(item => <button type="button" key={item.id}
-              className={"app-nav-item" + (active === item.id ? " is-active" : "")}
+              className={"app-nav-item nav-item" + (active === item.id ? " is-active active" : "")}
               aria-current={active === item.id ? "page" : undefined} title={item.description}
               onClick={() => navigate(item.id)}>
               <span className="app-nav-icon"><Icon name={item.icon} size={18} /></span>
