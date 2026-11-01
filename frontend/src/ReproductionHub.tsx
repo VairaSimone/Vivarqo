@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getIntlLocale } from "./i18n";
+import { getIntlLocale, t } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Input, TextArea, Choice, Action, SectionTitle } from "./ui/FormControls";
@@ -352,73 +352,73 @@ export function ReproductionHub({ onNotice = () => {}, owner, temperatureUnit = 
 
   return <div className="advanced-stack">
     <section className="panel">
-      <SectionTitle eyebrow="GESTIONE RIPRODUTTIVA" title="Cicli riproduttivi">
-        <Action onClick={() => setEditCycle({})}>＋ Nuovo ciclo</Action><Action onClick={() => refresh()} disabled={busy}>↻ Aggiorna</Action>
+      <SectionTitle eyebrow="GESTIONE RIPRODUTTIVA" title={t("Cicli riproduttivi")}>
+        <Action onClick={() => setEditCycle({})}>{t("＋ Nuovo ciclo")}</Action><Action onClick={() => refresh()} disabled={busy}>{t("↻ Aggiorna")}</Action>
       </SectionTitle>
-      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali caricati · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} totali)</span><div className="inline-actions"><Action disabled={animalsPage <= 1 || busy} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Action><Action disabled={animalsPage >= animalsPagination.totalPages || busy} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Action></div></div>}
+      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali caricati · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} totali)</span><div className="inline-actions"><Action disabled={animalsPage <= 1 || busy} onClick={() => setAnimalsPage(p => p - 1)}>{t("← Animali precedenti")}</Action><Action disabled={animalsPage >= animalsPagination.totalPages || busy} onClick={() => setAnimalsPage(p => p + 1)}>{t("Altri animali →")}</Action></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
-      {busy && <p className="muted">Caricamento dati riproduttivi…</p>}
-      {!listsLoaded && cycles.length === 0 ? <p className="loading" role="status">Caricamento cicli riproduttivi…</p> : cycles.length === 0 ? <div className="empty-state"><h3>Nessun ciclo registrato</h3><p>Crea un ciclo per collegare genitori, eventi, covate e piccoli.</p></div> :
+      {busy && <p className="muted">{t("Caricamento dati riproduttivi…")}</p>}
+      {!listsLoaded && cycles.length === 0 ? <p className="loading" role="status">{t("Caricamento cicli riproduttivi…")}</p> : cycles.length === 0 ? <div className="empty-state"><h3>{t("Nessun ciclo registrato")}</h3><p>{t("Crea un ciclo per collegare genitori, eventi, covate e piccoli.")}</p></div> :
         <div className="cycle-grid">{cycles.map(item => <article className={"cycle-card " + (item.id === cycleId ? "selected" : "")} key={item.id}>
           <button className="cycle-select" onClick={() => selectCycle(item.id)}><strong>{item.name || "Ciclo senza nome"}</strong><span>{prettyDate(item.startedOn)} · {val(item, "status")}</span><small>{item.parentA?.name || animals.find(a => a.id === item.parentAAnimalId)?.name || "Genitore A non assegnato"} × {item.parentB?.name || animals.find(a => a.id === item.parentBAnimalId)?.name || "Genitore B non assegnato"}</small><small>{item._count?.clutches ?? 0} covate · {item._count?.events ?? 0} eventi · {item._count?.offspringBatches ?? 0} registri piccoli</small></button>
-          <div className="inline-actions"><Action onClick={() => setEditCycle(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteCycle(item)}>Elimina</Action></div>
+          <div className="inline-actions"><Action onClick={() => setEditCycle(item)}>{t("Modifica")}</Action><Action variant="danger" onClick={() => deleteCycle(item)}>{t("Elimina")}</Action></div>
         </article>)}</div>}
-      {cyclesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {cyclesPagination.page || cyclesPage} di {cyclesPagination.totalPages} · {cyclesPagination.total} cicli</span><div className="inline-actions"><Action disabled={cyclesPage <= 1} onClick={() => setCyclesPage(p => p - 1)}>← Precedente</Action><Action disabled={cyclesPage >= cyclesPagination.totalPages} onClick={() => setCyclesPage(p => p + 1)}>Successiva →</Action></div></div>}
+      {cyclesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {cyclesPagination.page || cyclesPage} di {cyclesPagination.totalPages} · {cyclesPagination.total} cicli</span><div className="inline-actions"><Action disabled={cyclesPage <= 1} onClick={() => setCyclesPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={cyclesPage >= cyclesPagination.totalPages} onClick={() => setCyclesPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
       {editCycle && <div className="embedded-form"><form className="form-grid" onSubmit={submitCycle}>
         <h3 className="form-full">{editCycle.id ? "Modifica ciclo" : "Nuovo ciclo"}</h3>
-        <Input label="Nome del ciclo" name="name" defaultValue={cycleForForm.name} placeholder="Es. Riproduzione 2026"/>
-        <Choice label="Stato" name="status" defaultValue={cycleForForm.status || "planned"} options={cycleStatuses} required/>
-        <Input label="Data inizio" name="startedOn" type="date" defaultValue={dateValue(cycleForForm.startedOn)} required/>
-        <Input label="Data fine" name="endedOn" type="date" defaultValue={dateValue(cycleForForm.endedOn)}/>
-        <Choice label="Genitore A" name="parentAAnimalId" defaultValue={cycleForForm.parentAAnimalId || ""} options={[["", "Non assegnato"], ...animals.map(a => [a.id, a.name + " · " + a.species])]} />
-        <Choice label="Genitore B" name="parentBAnimalId" defaultValue={cycleForForm.parentBAnimalId || ""} options={[["", "Non assegnato"], ...animals.map(a => [a.id, a.name + " · " + a.species])]} />
-        <div className="form-full"><TextArea label="Note" name="notes" defaultValue={cycleForForm.notes}/></div>
-        <div className="form-actions form-full"><Action type="button" onClick={() => setEditCycle(null)}>Annulla</Action><Action variant="primary">Salva ciclo</Action></div>
+        <Input label={t("Nome del ciclo")} name="name" defaultValue={cycleForForm.name} placeholder={t("Es. Riproduzione 2026")}/>
+        <Choice label={t("Stato")} name="status" defaultValue={cycleForForm.status || "planned"} options={cycleStatuses} required/>
+        <Input label={t("Data inizio")} name="startedOn" type="date" defaultValue={dateValue(cycleForForm.startedOn)} required/>
+        <Input label={t("Data fine")} name="endedOn" type="date" defaultValue={dateValue(cycleForForm.endedOn)}/>
+        <Choice label={t("Genitore A")} name="parentAAnimalId" defaultValue={cycleForForm.parentAAnimalId || ""} options={[["", "Non assegnato"], ...animals.map(a => [a.id, a.name + " · " + a.species])]} />
+        <Choice label={t("Genitore B")} name="parentBAnimalId" defaultValue={cycleForForm.parentBAnimalId || ""} options={[["", "Non assegnato"], ...animals.map(a => [a.id, a.name + " · " + a.species])]} />
+        <div className="form-full"><TextArea label={t("Note")} name="notes" defaultValue={cycleForForm.notes}/></div>
+        <div className="form-actions form-full"><Action type="button" onClick={() => setEditCycle(null)}>{t("Annulla")}</Action><Action variant="primary">{t("Salva ciclo")}</Action></div>
       </form></div>}
     </section>
 
     {!cycle ? null : <>
-      <div className="reproduction-detail-tabs" role="tablist" aria-label="Sezioni del ciclo riproduttivo">
+      <div className="reproduction-detail-tabs" role="tablist" aria-label={t("Sezioni del ciclo riproduttivo")}>
         {[["events","Eventi e osservazioni"],["clutches","Covate, uova e incubazione"],["offspring","Piccoli e nascite"]].map(([id,label])=><button key={id} type="button" role="tab" aria-selected={detailTab===id} className={"tab-button "+(detailTab===id?"active":"")} onClick={()=>setDetailTab(id)}>{label}</button>)}
       </div>
       <section className={"panel reproduction-detail-section "+(detailTab==="events"?"":"is-hidden")}>
         <SectionTitle eyebrow="EVENTI DEL CICLO" title={cycle.name || "Dettaglio ciclo"}>
-          <Action onClick={() => setEditEvent({})}>＋ Evento</Action>
+          <Action onClick={() => setEditEvent({})}>{t("＋ Evento")}</Action>
         </SectionTitle>
         <p className="muted">Genitori: {cycle.parentA?.name || "—"} e {cycle.parentB?.name || "—"} · Periodo: {prettyDate(cycle.startedOn)} – {prettyDate(cycle.endedOn)}</p>
         {editEvent && <div className="embedded-form"><form className="form-grid" onSubmit={submitEvent}>
           <h3 className="form-full">{editEvent.id ? "Modifica evento" : "Registra evento"}</h3>
-          <Choice label="Tipo evento" name="eventType" defaultValue={editEvent.eventType || "observation"} options={eventTypes} required/>
-          <Input label="Data e ora" name="occurredAt" type="datetime-local" defaultValue={localDateTime(editEvent.occurredAt)} required/>
-          <Choice label="Animale coinvolto (facoltativo)" name="animalId" defaultValue={editEvent.animalId || ""} options={[["", "Nessuno"], ...animals.map(a => [a.id, a.name])]} />
+          <Choice label={t("Tipo evento")} name="eventType" defaultValue={editEvent.eventType || "observation"} options={eventTypes} required/>
+          <Input label={t("Data e ora")} name="occurredAt" type="datetime-local" defaultValue={localDateTime(editEvent.occurredAt)} required/>
+          <Choice label={t("Animale coinvolto (facoltativo)")} name="animalId" defaultValue={editEvent.animalId || ""} options={[["", "Nessuno"], ...animals.map(a => [a.id, a.name])]} />
           <Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1} defaultValue={fromCelsius(editEvent.temperatureC, temperatureUnit)}/>
-          <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={editEvent.humidityPct}/>
-          <div className="form-full"><TextArea label="Dettagli" name="details" defaultValue={editEvent.details}/></div>
-          <div className="form-actions form-full"><Action type="button" onClick={() => setEditEvent(null)}>Annulla</Action><Action variant="primary">Salva evento</Action></div>
+          <Input label={t("Umidità %")} name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={editEvent.humidityPct}/>
+          <div className="form-full"><TextArea label={t("Dettagli")} name="details" defaultValue={editEvent.details}/></div>
+          <div className="form-actions form-full"><Action type="button" onClick={() => setEditEvent(null)}>{t("Annulla")}</Action><Action variant="primary">{t("Salva evento")}</Action></div>
         </form></div>}
-        {events.length === 0 ? <p className="muted">Nessun evento registrato per questo ciclo.</p> : <div className="table-wrap"><table><thead><tr><th>Quando</th><th>Evento</th><th>Animale</th><th>Dettagli</th><th>Azioni</th></tr></thead><tbody>{events.map(item => <tr key={item.id}><td>{prettyDate(item.occurredAt)}</td><td>{eventTypes.find(o => o[0] === item.eventType)?.[1] || item.eventType}</td><td>{item.animal?.name || "—"}</td><td>{item.details || "—"}</td><td><div className="inline-actions"><Action onClick={() => setEditEvent(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteEvent(item)}>Elimina</Action></div></td></tr>)}</tbody></table></div>}
-      {eventsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eventsPagination.page || eventsPage} di {eventsPagination.totalPages} · {eventsPagination.total} eventi</span><div className="inline-actions"><Action disabled={eventsPage <= 1} onClick={() => setEventsPage(p => p - 1)}>← Precedente</Action><Action disabled={eventsPage >= eventsPagination.totalPages} onClick={() => setEventsPage(p => p + 1)}>Successiva →</Action></div></div>}
+        {events.length === 0 ? <p className="muted">{t("Nessun evento registrato per questo ciclo.")}</p> : <div className="table-wrap"><table><thead><tr><th>{t("Quando")}</th><th>{t("Evento")}</th><th>{t("Animale")}</th><th>{t("Dettagli")}</th><th>{t("Azioni")}</th></tr></thead><tbody>{events.map(item => <tr key={item.id}><td>{prettyDate(item.occurredAt)}</td><td>{eventTypes.find(o => o[0] === item.eventType)?.[1] || item.eventType}</td><td>{item.animal?.name || "—"}</td><td>{item.details || "—"}</td><td><div className="inline-actions"><Action onClick={() => setEditEvent(item)}>{t("Modifica")}</Action><Action variant="danger" onClick={() => deleteEvent(item)}>{t("Elimina")}</Action></div></td></tr>)}</tbody></table></div>}
+      {eventsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eventsPagination.page || eventsPage} di {eventsPagination.totalPages} · {eventsPagination.total} eventi</span><div className="inline-actions"><Action disabled={eventsPage <= 1} onClick={() => setEventsPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={eventsPage >= eventsPagination.totalPages} onClick={() => setEventsPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
       </section>
 
       <section className={"panel reproduction-detail-section "+(detailTab==="clutches"?"":"is-hidden")}>
         <SectionTitle eyebrow="DEPOSIZIONI" title="Covate">
-          <Action onClick={() => setEditClutch({})}>＋ Nuova covata</Action>
+          <Action onClick={() => setEditClutch({})}>{t("＋ Nuova covata")}</Action>
         </SectionTitle>
         {editClutch && <div className="embedded-form"><form className="form-grid" onSubmit={submitClutch}>
           <h3 className="form-full">{editClutch.id ? "Modifica covata" : "Registra covata"}</h3>
-          <Input label="Data deposizione" name="laidOn" type="date" defaultValue={dateValue(clutchForForm.laidOn)} required/>
-          <Input label="Numero uova" name="eggCount" type="number" min={0} max={10000} defaultValue={clutchForForm.eggCount ?? 1} required/>
-          <Choice label="Stato" name="status" defaultValue={clutchForForm.status || "active"} options={[["active","Attiva"],["incubating","In incubazione"],["completed","Completata"],["lost","Persa"],["archived","Archiviata"]]} required/>
-          <Input label="Incubatrice / posizione" name="incubatorLabel" defaultValue={clutchForForm.incubatorLabel}/>
-          <Input label="Inizio incubazione" name="incubationStartedAt" type="datetime-local" defaultValue={localDateTime(clutchForForm.incubationStartedAt)}/>
-          <div className="form-full"><TextArea label="Note covata" name="notes" defaultValue={clutchForForm.notes}/></div>
-          <div className="form-actions form-full"><Action type="button" onClick={() => setEditClutch(null)}>Annulla</Action><Action variant="primary">Salva covata</Action></div>
+          <Input label={t("Data deposizione")} name="laidOn" type="date" defaultValue={dateValue(clutchForForm.laidOn)} required/>
+          <Input label={t("Numero uova")} name="eggCount" type="number" min={0} max={10000} defaultValue={clutchForForm.eggCount ?? 1} required/>
+          <Choice label={t("Stato")} name="status" defaultValue={clutchForForm.status || "active"} options={[["active","Attiva"],["incubating","In incubazione"],["completed","Completata"],["lost","Persa"],["archived","Archiviata"]]} required/>
+          <Input label={t("Incubatrice / posizione")} name="incubatorLabel" defaultValue={clutchForForm.incubatorLabel}/>
+          <Input label={t("Inizio incubazione")} name="incubationStartedAt" type="datetime-local" defaultValue={localDateTime(clutchForForm.incubationStartedAt)}/>
+          <div className="form-full"><TextArea label={t("Note covata")} name="notes" defaultValue={clutchForForm.notes}/></div>
+          <div className="form-actions form-full"><Action type="button" onClick={() => setEditClutch(null)}>{t("Annulla")}</Action><Action variant="primary">{t("Salva covata")}</Action></div>
         </form></div>}
-        {clutches.length === 0 ? <p className="muted">Nessuna covata collegata a questo ciclo.</p> : <div className="clutch-grid">{clutches.map(item => <article key={item.id} className={"clutch-card " + (item.id === clutchId ? "selected" : "")}>
+        {clutches.length === 0 ? <p className="muted">{t("Nessuna covata collegata a questo ciclo.")}</p> : <div className="clutch-grid">{clutches.map(item => <article key={item.id} className={"clutch-card " + (item.id === clutchId ? "selected" : "")}>
           <button className="cycle-select" onClick={() => { setClutchId(item.id); setEggsPage(1); setLogsPage(1); }}><strong>{prettyDate(item.laidOn)} · {item.eggCount} uova</strong><span>{item.status} · {item.incubatorLabel || "Incubatrice non indicata"}</span><small>{item._count?.eggs ?? 0} uova registrate · {item._count?.incubationLogs ?? 0} controlli</small></button>
-          <div className="inline-actions"><Action onClick={() => setEditClutch(item)}>Modifica</Action><Action variant="danger" onClick={() => deleteClutch(item)}>Elimina</Action></div>
+          <div className="inline-actions"><Action onClick={() => setEditClutch(item)}>{t("Modifica")}</Action><Action variant="danger" onClick={() => deleteClutch(item)}>{t("Elimina")}</Action></div>
         </article>)}</div>}
-      {clutchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {clutchesPagination.page || clutchesPage} di {clutchesPagination.totalPages} · {clutchesPagination.total} covate</span><div className="inline-actions"><Action disabled={clutchesPage <= 1} onClick={() => setClutchesPage(p => p - 1)}>← Precedente</Action><Action disabled={clutchesPage >= clutchesPagination.totalPages} onClick={() => setClutchesPage(p => p + 1)}>Successiva →</Action></div></div>}
+      {clutchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {clutchesPagination.page || clutchesPage} di {clutchesPagination.totalPages} · {clutchesPagination.total} covate</span><div className="inline-actions"><Action disabled={clutchesPage <= 1} onClick={() => setClutchesPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={clutchesPage >= clutchesPagination.totalPages} onClick={() => setClutchesPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
       </section>
 
       {clutch && <section className={"panel reproduction-detail-section " + (detailTab === "clutches" ? "" : "is-hidden")}>
@@ -426,53 +426,53 @@ export function ReproductionHub({ onNotice = () => {}, owner, temperatureUnit = 
           <span className="muted">{eggs.length} visibili</span>
         </SectionTitle>
         <div className="embedded-form"><form className="form-grid" onSubmit={addEggs}>
-          <h3 className="form-full">Aggiungi uova in blocco</h3>
-          <Input label="Quante uova" name="count" type="number" min={1} max={1000} defaultValue="1" required/>
-          <Input label="Prefisso codice (facoltativo)" name="prefix" placeholder="Es. COVATA-A"/>
-          <Choice label="Stato iniziale" name="status" defaultValue="unknown" options={eggStatuses}/>
-          <Input label="Nota iniziale (facoltativa)" name="notes"/>
-          <div className="form-actions form-full"><Action variant="primary">Aggiungi uova</Action></div>
+          <h3 className="form-full">{t("Aggiungi uova in blocco")}</h3>
+          <Input label={t("Quante uova")} name="count" type="number" min={1} max={1000} defaultValue="1" required/>
+          <Input label={t("Prefisso codice (facoltativo)")} name="prefix" placeholder={t("Es. COVATA-A")}/>
+          <Choice label={t("Stato iniziale")} name="status" defaultValue="unknown" options={eggStatuses}/>
+          <Input label={t("Nota iniziale (facoltativa)")} name="notes"/>
+          <div className="form-actions form-full"><Action variant="primary">{t("Aggiungi uova")}</Action></div>
         </form></div>
-        {eggs.length === 0 ? <p className="muted">Nessun uovo tracciato singolarmente. Il conteggio della covata rimane separato dalle schede individuali.</p> : <div className="table-wrap"><table><thead><tr><th>Codice</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead><tbody>{eggs.map(egg => <tr key={egg.id}>
-          <td><input className="compact-input" data-egg-field="code" aria-label={"Codice uovo " + (egg.code || egg.id)} defaultValue={egg.code || ""} placeholder="Codice" onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
+        {eggs.length === 0 ? <p className="muted">{t("Nessun uovo tracciato singolarmente. Il conteggio della covata rimane separato dalle schede individuali.")}</p> : <div className="table-wrap"><table><thead><tr><th>{t("Codice")}</th><th>{t("Stato")}</th><th>{t("Note")}</th><th>{t("Azioni")}</th></tr></thead><tbody>{eggs.map(egg => <tr key={egg.id}>
+          <td><input className="compact-input" data-egg-field="code" aria-label={"Codice uovo " + (egg.code || egg.id)} defaultValue={egg.code || ""} placeholder={t("Codice")} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
           <td><select className="compact-input" data-egg-field="status" aria-label={"Stato uovo " + (egg.code || egg.id)} defaultValue={egg.status} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}>{eggStatuses.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></td>
-          <td><input className="compact-input" data-egg-field="notes" aria-label={"Note uovo " + (egg.code || egg.id)} defaultValue={egg.notes || ""} placeholder="Note" onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
-          <td><div className="inline-actions"><Action type="button" onClick={event => void saveEggRow(egg, event.currentTarget.closest("tr"))}>Salva</Action><Action type="button" variant="danger" onClick={() => deleteEgg(egg)}>Elimina</Action></div></td>
+          <td><input className="compact-input" data-egg-field="notes" aria-label={"Note uovo " + (egg.code || egg.id)} defaultValue={egg.notes || ""} placeholder={t("Note")} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveEggRow(egg, event.currentTarget.closest("tr")); } }}/></td>
+          <td><div className="inline-actions"><Action type="button" onClick={event => void saveEggRow(egg, event.currentTarget.closest("tr"))}>{t("Salva")}</Action><Action type="button" variant="danger" onClick={() => deleteEgg(egg)}>{t("Elimina")}</Action></div></td>
         </tr>)}</tbody></table></div>}
 
-        {eggsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eggsPagination.page || eggsPage} di {eggsPagination.totalPages} · {eggsPagination.total} uova</span><div className="inline-actions"><Action disabled={eggsPage <= 1} onClick={() => setEggsPage(p => p - 1)}>← Precedente</Action><Action disabled={eggsPage >= eggsPagination.totalPages} onClick={() => setEggsPage(p => p + 1)}>Successiva →</Action></div></div>}
-        <SectionTitle eyebrow="CONTROLLI AMBIENTALI" title="Registro incubazione"/>
+        {eggsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {eggsPagination.page || eggsPage} di {eggsPagination.totalPages} · {eggsPagination.total} uova</span><div className="inline-actions"><Action disabled={eggsPage <= 1} onClick={() => setEggsPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={eggsPage >= eggsPagination.totalPages} onClick={() => setEggsPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
+        <SectionTitle eyebrow="CONTROLLI AMBIENTALI" title={t("Registro incubazione")}/>
         <div className="embedded-form"><form className="form-grid" onSubmit={addIncubationLog}>
-          <Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime()} required/>
-          <Input label="Evento" name="eventType" defaultValue="controllo" required/>
+          <Input label={t("Data e ora")} name="recordedAt" type="datetime-local" defaultValue={localDateTime()} required/>
+          <Input label={t("Evento")} name="eventType" defaultValue="controllo" required/>
           <Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1}/>
-          <Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1}/>
-          <div className="form-full"><TextArea label="Note" name="notes"/></div>
-          <div className="form-actions form-full"><Action variant="primary">Registra controllo</Action></div>
+          <Input label={t("Umidità %")} name="humidityPct" type="number" min={0} max={100} step={0.1}/>
+          <div className="form-full"><TextArea label={t("Note")} name="notes"/></div>
+          <div className="form-actions form-full"><Action variant="primary">{t("Registra controllo")}</Action></div>
         </form></div>
-        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{temperatureText(log.temperatureC, temperatureUnit)} · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label="Data e ora" name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label="Evento" name="eventType" defaultValue={log.eventType} required/><Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1} defaultValue={fromCelsius(log.temperatureC, temperatureUnit)}/><Input label="Umidità %" name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={log.humidityPct}/><TextArea label="Note" name="notes" defaultValue={log.notes}/><Action variant="primary">Salva controllo</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>Elimina</Action></article>)}</div>}
-        {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>← Precedente</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>Successiva →</Action></div></div>}
+        {logs.length > 0 && <div className="log-list">{logs.map(log => <article className="log-row" key={log.id}><div><strong>{prettyDate(log.recordedAt)} · {log.eventType}</strong><p>{temperatureText(log.temperatureC, temperatureUnit)} · {log.humidityPct ?? "—"}% umidità</p><small>{log.notes || "Nessuna nota"}</small></div><details><summary>{t("Modifica")}</summary><form className="form-stack" onSubmit={e => editIncubationLog(e, log)}><Input label={t("Data e ora")} name="recordedAt" type="datetime-local" defaultValue={localDateTime(log.recordedAt)} required/><Input label={t("Evento")} name="eventType" defaultValue={log.eventType} required/><Input label={"Temperatura °" + temperatureUnit} name="temperatureC" type="number" step={0.1} defaultValue={fromCelsius(log.temperatureC, temperatureUnit)}/><Input label={t("Umidità %")} name="humidityPct" type="number" min={0} max={100} step={0.1} defaultValue={log.humidityPct}/><TextArea label={t("Note")} name="notes" defaultValue={log.notes}/><Action variant="primary">{t("Salva controllo")}</Action></form></details><Action variant="danger" onClick={() => deleteIncubationLog(log)}>{t("Elimina")}</Action></article>)}</div>}
+        {logsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {logsPagination.page || logsPage} di {logsPagination.totalPages} · {logsPagination.total} controlli</span><div className="inline-actions"><Action disabled={logsPage <= 1} onClick={() => setLogsPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={logsPage >= logsPagination.totalPages} onClick={() => setLogsPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
       </section>}
 
       <section className={"panel reproduction-detail-section "+(detailTab==="offspring"?"":"is-hidden")}>
-        <SectionTitle eyebrow="NASCITA E CRESCITA" title="Piccoli e lotti di nascita"/>
+        <SectionTitle eyebrow="NASCITA E CRESCITA" title={t("Piccoli e lotti di nascita")}/>
         <div className="embedded-form"><form className="form-grid" onSubmit={createBatch}>
-          <h3 className="form-full">Registra un lotto di piccoli</h3>
-          <Input label="Data di nascita / schiusa" name="bornOn" type="date" defaultValue={localDateTime().slice(0, 10)} required/>
-          <Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue="1" required/>
-          <Choice label="Covata di origine (facoltativa)" name="clutchId" options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn) + " · " + c.eggCount + " uova"])]}/>
-          <div className="form-full"><TextArea label="Note" name="notes"/></div>
-          <div className="form-actions form-full"><Action variant="primary">Registra lotto</Action></div>
+          <h3 className="form-full">{t("Registra un lotto di piccoli")}</h3>
+          <Input label={t("Data di nascita / schiusa")} name="bornOn" type="date" defaultValue={localDateTime().slice(0, 10)} required/>
+          <Input label={t("Numero di piccoli")} name="count" type="number" min={0} max={10000} defaultValue="1" required/>
+          <Choice label={t("Covata di origine (facoltativa)")} name="clutchId" options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn) + " · " + c.eggCount + " uova"])]}/>
+          <div className="form-full"><TextArea label={t("Note")} name="notes"/></div>
+          <div className="form-actions form-full"><Action variant="primary">{t("Registra lotto")}</Action></div>
         </form></div>
-        {cycleBatches.length === 0 ? <p className="muted">Nessun lotto di piccoli registrato per questo ciclo.</p> : <div className="log-list">{cycleBatches.map(batch => { const linkedClutch = clutches.find(c => c.id === batch.clutchId); return <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {linkedClutch ? prettyDate(linkedClutch.laidOn) : "non collegata"}</small></div><details><summary>Modifica</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label="Data di nascita" name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label="Numero di piccoli" name="count" type="number" min={0} max={10000} defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label="Note" name="notes" defaultValue={batch.notes}/><Action variant="primary">Salva lotto</Action></form></details><Action onClick={() => createAnimalCards(batch)}>Crea schede animali</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>Elimina lotto</Action></article>; })}</div>}
-        {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>← Precedente</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>Successiva →</Action></div></div>}
+        {cycleBatches.length === 0 ? <p className="muted">{t("Nessun lotto di piccoli registrato per questo ciclo.")}</p> : <div className="log-list">{cycleBatches.map(batch => { const linkedClutch = clutches.find(c => c.id === batch.clutchId); return <article className="log-row" key={batch.id}><div><strong>{prettyDate(batch.bornOn)} · {batch.count} piccoli</strong><p>{batch.notes || "Nessuna nota"}</p><small>Covata: {linkedClutch ? prettyDate(linkedClutch.laidOn) : "non collegata"}</small></div><details><summary>{t("Modifica")}</summary><form className="form-stack" onSubmit={e => editBatch(e, batch)}><Input label={t("Data di nascita")} name="bornOn" type="date" defaultValue={dateValue(batch.bornOn)} required/><Input label={t("Numero di piccoli")} name="count" type="number" min={0} max={10000} defaultValue={batch.count} required/><Choice label="Covata" name="clutchId" defaultValue={batch.clutchId || ""} options={[["", "Non collegata"], ...clutches.map(c => [c.id, prettyDate(c.laidOn)])]}/><TextArea label={t("Note")} name="notes" defaultValue={batch.notes}/><Action variant="primary">{t("Salva lotto")}</Action></form></details><Action onClick={() => createAnimalCards(batch)}>{t("Crea schede animali")}</Action><Action variant="danger" onClick={() => deleteBatch(batch)}>{t("Elimina lotto")}</Action></article>; })}</div>}
+        {batchesPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Pagina {batchesPagination.page || batchesPage} di {batchesPagination.totalPages} · {batchesPagination.total} lotti</span><div className="inline-actions"><Action disabled={batchesPage <= 1} onClick={() => setBatchesPage(p => p - 1)}>{t("← Precedente")}</Action><Action disabled={batchesPage >= batchesPagination.totalPages} onClick={() => setBatchesPage(p => p + 1)}>{t("Successiva →")}</Action></div></div>}
       </section>
     </>}
-    {animalCardsForm && <Dialog title="Crea schede dei piccoli" description={"Genera schede animale dal lotto del " + prettyDate(animalCardsForm.batch.bornOn) + "."} onClose={() => setAnimalCardsForm(null)} onSubmit={submitAnimalCards} submitLabel="Crea schede" busy={creatingAnimalCards} size="wide">
-      <label className="field"><span>Prefisso dei nomi</span><input name="prefix" defaultValue={animalCardsForm.prefix} required maxLength={100} placeholder="Es. Piccolo"/></label>
-      <label className="field"><span>Specie</span><input name="species" defaultValue={animalCardsForm.species} required maxLength={160}/></label>
-      <label className="field"><span>Numero di schede (1–500)</span><input name="count" type="number" defaultValue={animalCardsForm.count} min={1} max={500} step={1} required/></label>
-      <p className="muted form-full">I nomi verranno numerati automaticamente. Le nuove schede useranno sesso “Non specificato” e la data di nascita del lotto.</p>
+    {animalCardsForm && <Dialog title={t("Crea schede dei piccoli")} description={"Genera schede animale dal lotto del " + prettyDate(animalCardsForm.batch.bornOn) + "."} onClose={() => setAnimalCardsForm(null)} onSubmit={submitAnimalCards} submitLabel="Crea schede" busy={creatingAnimalCards} size="wide">
+      <label className="field"><span>{t("Prefisso dei nomi")}</span><input name="prefix" defaultValue={animalCardsForm.prefix} required maxLength={100} placeholder={t("Es. Piccolo")}/></label>
+      <label className="field"><span>{t("Specie")}</span><input name="species" defaultValue={animalCardsForm.species} required maxLength={160}/></label>
+      <label className="field"><span>{t("Numero di schede (1–500)")}</span><input name="count" type="number" defaultValue={animalCardsForm.count} min={1} max={500} step={1} required/></label>
+      <p className="muted form-full">{t("I nomi verranno numerati automaticamente. Le nuove schede useranno sesso “Non specificato” e la data di nascita del lotto.")}</p>
     </Dialog>}
   </div>;
 }
