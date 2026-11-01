@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getIntlLocale } from "../i18n";
+import { getIntlLocale, t } from "../i18n";
 import type { AnyRecord, NoticeHandler } from "../types";
 import { errorMessage } from "../types";
 import { Button, Field, SelectField } from "../ui/FormControls";
@@ -111,41 +111,41 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
   }, [exportJob?.id, exportJob?.status, onNotice]);
   return <div className="transfer-grid">
     <section className="panel">
-      <p className="eyebrow">IMPORT GUIDATO</p><h2>Importa dati esistenti</h2>
-      <p>Carica CSV o XLSX. Prima di confermare controlla l'anteprima e gli eventuali errori.</p>
+      <p className="eyebrow">{t("IMPORT GUIDATO")}</p><h2>{t("Importa dati esistenti")}</h2>
+      <p>{t("Carica CSV o XLSX. Prima di confermare controlla l'anteprima e gli eventuali errori.")}</p>
       <form className="form-stack" onSubmit={upload}>
-        <SelectField label="Tipo di dati" value={entity} onChange={e => { setEntity(e.target.value); setPreview(null); }}>
+        <SelectField label={t("Tipo di dati")} value={entity} onChange={e => { setEntity(e.target.value); setPreview(null); }}>
           {entities.map(([id,label]) => <option key={id} value={id}>{label}</option>)}
         </SelectField>
-        <Field label="File CSV o XLSX" type="file" accept=".csv,.xlsx" onChange={e => setFile(e.target.files?.[0] || null)} required/>
+        <Field label={t("File CSV o XLSX")} type="file" accept=".csv,.xlsx" onChange={e => setFile(e.target.files?.[0] || null)} required/>
         <Button disabled={busy}>{busy ? "Elaborazione…" : "Crea anteprima"}</Button>
       </form>
       {importJob && <div className="import-result">
-        <p>Stato importazione: <strong>{statusLabel(importJob.status)}</strong>
+        <p>{t("Stato importazione:")} <strong>{statusLabel(importJob.status)}</strong>
           {importJob.status === "completed" ? " · Record creati: " + (importJob.createdCount ?? 0) : ""}
           {importJob.status === "failed" ? " · " + (importJob.lastErrorCode || "Errore durante l'elaborazione") : ""}
         </p>
-        {["queued", "processing"].includes(importJob.status) && <p className="muted">Puoi continuare a usare Vivarqo: il server sta elaborando il file.</p>}
+        {["queued", "processing"].includes(importJob.status) && <p className="muted">{t("Puoi continuare a usare Vivarqo: il server sta elaborando il file.")}</p>}
       </div>}
       {preview && <div className="import-result">
-        <h3>Anteprima importazione</h3>
+        <h3>{t("Anteprima importazione")}</h3>
         <p>Righe totali: {preview.totalRows ?? "—"} · valide: {preview.validRows ?? "—"} · errori: {preview.invalidRows ?? "—"}</p>
-        {entity === "animals" && Array.isArray(preview.possibleDuplicates) && preview.possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({preview.possibleDuplicates.length}).</strong><p>Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.</p></div>}
+        {entity === "animals" && Array.isArray(preview.possibleDuplicates) && preview.possibleDuplicates.length > 0 && <div className="notice warning"><strong>Possibili duplicati rilevati ({preview.possibleDuplicates.length}).</strong><p>{t("Controlla le righe segnalate: la conferma richiederà un'ulteriore autorizzazione esplicita.")}</p></div>}
         {(preview.errors || []).slice(0,20).map((error: AnyRecord, index: number) => <p key={index} className="error-text">Riga {error.row}: {error.column} — {error.reason}</p>)}
-        <Button onClick={confirmImport} disabled={busy || !preview.validRows}>Conferma importazione</Button>
+        <Button onClick={confirmImport} disabled={busy || !preview.validRows}>{t("Conferma importazione")}</Button>
       </div>}
     </section>
     <section className="panel">
-      <p className="eyebrow">PORTABILITÀ</p><h2>Esporta il tuo account</h2>
-      <p>Genera un archivio privato con identificativi e relazioni. Gli archivi possono contenere dati personali.</p>
-      <label className="check-row"><input type="checkbox" checked={includeDocs} onChange={e => setIncludeDocs(e.target.checked)}/> Includi documenti e allegati</label>
-      <Button onClick={exportData} disabled={busy}>Genera e scarica archivio ZIP</Button>
+      <p className="eyebrow">{t("PORTABILITÀ")}</p><h2>{t("Esporta il tuo account")}</h2>
+      <p>{t("Genera un archivio privato con identificativi e relazioni. Gli archivi possono contenere dati personali.")}</p>
+      <label className="check-row"><input type="checkbox" checked={includeDocs} onChange={e => setIncludeDocs(e.target.checked)}/> {t("Includi documenti e allegati")}</label>
+      <Button onClick={exportData} disabled={busy}>{t("Genera e scarica archivio ZIP")}</Button>
       {exportJob && <div className="import-result">
-        <p>Stato esportazione: <strong>{statusLabel(exportJob.status)}</strong>{exportJob.expiresAt ? " · Scadenza: " + date(exportJob.expiresAt) : ""}</p>
+        <p>{t("Stato esportazione:")} <strong>{statusLabel(exportJob.status)}</strong>{exportJob.expiresAt ? " · Scadenza: " + date(exportJob.expiresAt) : ""}</p>
         <Button onClick={() => void downloadWhenReady(exportJob.id)} disabled={busy || exportJob.status === "failed"}>{exportJob.ready ? "Scarica archivio ZIP" : "Verifica stato"}</Button>
         {exportJob.status === "failed" && <p className="error-text">Esportazione non riuscita: {exportJob.lastErrorCode || "errore interno"}.</p>}
       </div>}
-      <p className="muted">Lo stato viene verificato con il backend prima di iniziare il download.</p>
+      <p className="muted">{t("Lo stato viene verificato con il backend prima di iniziare il download.")}</p>
     </section>
   </div>;
 }
