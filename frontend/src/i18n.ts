@@ -975,6 +975,10 @@ const translations: Record<string, string> = {
   "sezioni": "sections",
   "Per ogni categoria il backend carica al massimo 100 record nello storico unificato: le registrazioni più vecchie oltre tale limite potrebbero non comparire.": "For each category, the backend loads at most 100 records in the unified history; older records beyond this limit may not appear.",
   "— Seleziona un animale —": "— Select an animal —",
+  "— Seleziona un ciclo —": "— Select a breeding cycle —",
+  "Caricamento riepilogo…": "Loading summary…",
+  "Revoca tutte le sessioni": "Revoke all sessions",
+  "＋ Installa la PWA": "＋ Install the PWA",
 };
 
 function normalize(value: string): string {
@@ -988,7 +992,7 @@ export function t(value: string): string {
 }
 
 
-type OriginalValue = { source: string; output:export function setLocale(value: unknown): void {
+export function setLocale(value: unknown): void {
   const next: AppLocale = isLocale(value) ? value : detectBrowserLocale();
   activeLocale = next;
   if (typeof document !== "undefined") document.documentElement.lang = next;
