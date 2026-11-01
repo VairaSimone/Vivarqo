@@ -51,8 +51,10 @@ export function useAppData({
 }: AppDataOptions): AppDataState {
   const userKey = accountKey(user);
   const userKeyRef = useRef<string | null>(userKey);
-  // Keep the current account visible to in-flight continuations before effects run.
+  // Keep the latest render scope visible before passive effect cleanup runs.
   userKeyRef.current = userKey;
+  const requestScopeRef = useRef({ active, query, listPages, inventoryFilters });
+  requestScopeRef.current = { active, query, listPages, inventoryFilters };
 
   const requestIdRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
@@ -78,10 +80,16 @@ export function useAppData({
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    const isCurrentRequest = () =>
-      requestIdRef.current === requestId &&
-      userKeyRef.current === userKey &&
-      !controller.signal.aborted;
+    const isCurrentRequest = () => {
+      const latestScope = requestScopeRef.current;
+      return requestIdRef.current === requestId &&
+        userKeyRef.current === userKey &&
+        latestScope.active === active &&
+        latestScope.query === query &&
+        latestScope.listPages === listPages &&
+        latestScope.inventoryFilters === inventoryFilters &&
+        !controller.signal.aborted;
+    };
 
     setDataState({ owner: userKey, section, value: null });
     setBusyState(null);
