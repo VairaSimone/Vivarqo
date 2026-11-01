@@ -30,19 +30,22 @@ export function useAppSession(onNotice: NoticeHandler) {
     void loadMe();
   }, [loadMe]);
 
-  const updateLocale = useCallback(async (nextLocale: AppLocale) => {
-    const previousLocale = getLocale();
+  const syncLocale = useCallback((nextLocale: AppLocale) => {
     setLocale(nextLocale);
     setUser(current => current ? { ...current, locale: nextLocale } : current);
+  }, []);
+
+  const updateLocale = useCallback(async (nextLocale: AppLocale) => {
+    const previousLocale = getLocale();
+    syncLocale(nextLocale);
 
     try {
       await apiRequest("account", { method: "PATCH", body: { locale: nextLocale } });
     } catch (error) {
-      setLocale(previousLocale);
-      setUser(current => current ? { ...current, locale: previousLocale } : current);
+      syncLocale(previousLocale);
       onNotice(errorMessage(error), "error");
     }
-  }, [onNotice]);
+  }, [onNotice, syncLocale]);
 
-  return { user, setUser, loadMe, handleUnauthorized, updateLocale };
+  return { user, setUser, loadMe, handleUnauthorized, updateLocale, syncLocale };
 }

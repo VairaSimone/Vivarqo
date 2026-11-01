@@ -4,7 +4,7 @@ import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest } from "../api/api";
 import { errorMessage } from "../types";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
-import { getLocale, setLocale as applyLocale, t } from "../i18n";
+import { getLocale, t } from "../i18n";
 
 
 type UserPreferences = {
@@ -25,7 +25,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "system",
 };
 
-export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: NoticeHandler }) {
+export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: AccountUser; onNotice: NoticeHandler; onLocaleApplied: (locale: "it" | "en") => void }) {
   const confirmAction = useConfirmDialog();
   const [displayName, setName] = useState(user.displayName || "");
   const [locale, setLocaleChoice] = useState<"it" | "en">(user.locale === "en" ? "en" : user.locale === "it" ? "it" : getLocale());
@@ -68,7 +68,7 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
         if (newPassword) body.newPassword = newPassword;
       }
       const result = await apiRequest("account", { method: "PATCH", body });
-      applyLocale(locale);
+      onLocaleApplied(locale);
       onNotice(result.message || "Impostazioni e preferenze aggiornate.");
       setCurrent("");
       setNew("");

@@ -37,6 +37,7 @@ export interface AppPageRendererProps {
   measurementPreferences: MeasurementPreferences;
   targetAnimalId: string | null;
   onNotice: NoticeHandler;
+  onLocaleApplied: (locale: "it" | "en") => void;
   onNavigate: NavigationHandler;
   onInstall: () => void;
   onLoadData: (section?: string) => Promise<void>;
@@ -57,7 +58,7 @@ export function AppPageRenderer(props: AppPageRendererProps) {
   const {
     active, user, data, busy, rows, dataForDisplay, query, historyItem, inventoryFilters,
     financeRefreshKey, dashboardRefreshKey, measurementPreferences, targetAnimalId,
-    onNotice, onNavigate, onInstall, onLoadData, onQuickEntry,
+    onNotice, onLocaleApplied, onNavigate, onInstall, onLoadData, onQuickEntry,
     onHistoryChange, onListPageChange, onInventoryFilterChange, onInventoryFiltersReset,
     onSearch, onCare, onTask, onEdit, onDelete, onMovement
   } = props;
@@ -127,7 +128,7 @@ export function AppPageRenderer(props: AppPageRendererProps) {
     </>;
   }
   if (active === "dati") return <DataTools onNotice={onNotice}/>;
-  if (active === "impostazioni") return <SettingsPage user={user} onNotice={onNotice}/>;
+  if (active === "impostazioni") return <SettingsPage user={user} onNotice={onNotice} onLocaleApplied={onLocaleApplied}/>;
 
   return <Records active={active} data={data ?? {}} rows={dataForDisplay} onSearch={onSearch} query={query}
     onCare={onCare} onReload={() => onLoadData(active)} onTask={onTask} onGo={onNavigate}

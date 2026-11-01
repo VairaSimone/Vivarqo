@@ -53,7 +53,7 @@ function App() {
   const { online, pwaUpdateRegistration, installApp, clearPwaUpdate } =
     useAppPlatform(notifyInstallUnavailable);
 
-  const { user, setUser, loadMe, handleUnauthorized, updateLocale } = session;
+  const { user, setUser, loadMe, handleUnauthorized, updateLocale, syncLocale } = session;
   const confirmAction = useConfirmDialog();
   const { active, targetAnimalId, go } = useAppNavigation(resetNavigationState);
   const { measurementPreferences } = useAppPreferences(user);
@@ -172,6 +172,7 @@ function App() {
           measurementPreferences={measurementPreferences}
           targetAnimalId={targetAnimalId}
           onNotice={showNotice}
+          onLocaleApplied={syncLocale}
           onNavigate={go}
           onInstall={installApp}
           onLoadData={loadData}
