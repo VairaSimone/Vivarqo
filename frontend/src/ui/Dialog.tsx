@@ -17,7 +17,7 @@ export interface DialogProps {
 
 export function Dialog({
   title, description, children, onClose, onSubmit,
-  submitLabel={t("Salva")}, cancelLabel = "Annulla", busy = false,
+  submitLabel = "Salva", cancelLabel = "Annulla", busy = false,
   danger = false, size = "normal"
 }: DialogProps) {
   const titleId = useId();
@@ -34,8 +34,8 @@ export function Dialog({
       {onSubmit ? <form className="form-grid dialog-form" onSubmit={handleSubmit}>
         {children}
         <div className="form-actions form-full dialog-actions">
-          <button type="button" className="button secondary" onClick={onClose} disabled={busy}>{cancelLabel}</button>
-          <button type="submit" className={"button " + (danger ? "danger" : "primary")} disabled={busy}>{busy ? "Salvataggio…" : submitLabel}</button>
+          <button type="button" className="button secondary" onClick={onClose} disabled={busy}>{t(cancelLabel)}</button>
+          <button type="submit" className={"button " + (danger ? "danger" : "primary")} disabled={busy}>{t(busy ? "Salvataggio…" : submitLabel)}</button>
         </div>
       </form> : <div className="dialog-content">{children}</div>}
     </section>

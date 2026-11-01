@@ -1,4 +1,5 @@
 import * as React from "react";
+import { t } from "../i18n";
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string };
 
@@ -19,7 +20,7 @@ export type TextAreaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElemen
 };
 
 export function TextArea({ label, name, defaultValue, rows = 3, ...props }: TextAreaProps) {
-  return <label className="field"><span>{label}</span><textarea name={name} defaultValue={defaultValue ?? ""} rows={rows} {...props} /></label>;
+  return <label className="field"><span>{t(label)}</span><textarea name={name} defaultValue={defaultValue ?? ""} rows={rows} {...props} /></label>;
 }
 
 export type SelectOption = readonly string[] | { value: string; label: string };
@@ -28,24 +29,24 @@ export type SelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "n
 };
 
 export function Select({ label, name, defaultValue, options, ...props }: SelectProps) {
-  return <label className="field"><span>{label}</span><select name={name} defaultValue={defaultValue ?? ""} {...props}>
+  return <label className="field"><span>{t(label)}</span><select name={name} defaultValue={defaultValue ?? ""} {...props}>
     {options.map((option) => {
       const isObjectOption = "value" in option;
       const value = isObjectOption ? option.value : option[0];
       const text = isObjectOption ? option.label : option[1];
-      return <option value={value} key={value}>{text}</option>;
+      return <option value={value} key={value}>{t(text)}</option>;
     })}
   </select></label>;
 }
 
 export type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & { label: string; children?: React.ReactNode };
 export function Field({ label, children, ...props }: FieldProps) {
-  return <label className="field"><span>{label}</span>{children ?? <input {...props} />}</label>;
+  return <label className="field"><span>{t(label)}</span>{children ?? <input {...props} />}</label>;
 }
 
 export type SelectFieldProps = React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; children?: React.ReactNode };
 export function SelectField({ label, children, ...props }: SelectFieldProps) {
-  return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>;
+  return <label className="field"><span>{t(label)}</span><select {...props}>{children}</select></label>;
 }
 
 export const Area = TextArea;
@@ -53,5 +54,5 @@ export const Choice = Select;
 export const Action = Button;
 
 export function SectionTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
-  return <div className="panel-heading"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><div className="inline-actions">{children}</div></div>;
+  return <div className="panel-heading"><div><p className="eyebrow">{t(eyebrow)}</p><h2>{t(title)}</h2></div><div className="inline-actions">{children}</div></div>;
 }
