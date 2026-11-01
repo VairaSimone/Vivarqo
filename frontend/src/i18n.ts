@@ -1,6 +1,9 @@
+import { useSyncExternalStore } from "react";
+
 export type AppLocale = "it" | "en";
 
 let activeLocale: AppLocale = detectBrowserLocale();
+const localeSubscribers = new Set<() => void>();
 
 function isLocale(value: unknown): value is AppLocale {
   return value === "it" || value === "en";
@@ -19,6 +22,20 @@ export function detectBrowserLocale(): AppLocale {
 
 export function getLocale(): AppLocale {
   return activeLocale;
+}
+
+function subscribeLocale(listener: () => void): () => void {
+  localeSubscribers.add(listener);
+  return () => localeSubscribers.delete(listener);
+}
+
+function getServerLocale(): AppLocale {
+  return "it";
+}
+
+/** Subscribe React components to locale changes without mutating rendered DOM. */
+export function useLocale(): AppLocale {
+  return useSyncExternalStore(subscribeLocale, getLocale, getServerLocale);
 }
 
 export function getIntlLocale(): string {
@@ -994,10 +1011,11 @@ export function t(value: string): string {
 
 export function setLocale(value: unknown): void {
   const next: AppLocale = isLocale(value) ? value : detectBrowserLocale();
+  const changed = activeLocale !== next;
   activeLocale = next;
   if (typeof document !== "undefined") document.documentElement.lang = next;
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("vivarqo:locale-change", { detail: next }));
+  if (changed) {
+    for (const listener of [...localeSubscribers]) listener();
   }
 }
 

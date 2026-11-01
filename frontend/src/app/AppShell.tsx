@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { ReactNode } from "react";
 import type { AccountUser } from "../types";
-import { getLocale, t } from "../i18n";
+import { t, useLocale } from "../i18n";
 import { Icon } from "../ui/Icon";
 
 export type NavigationItem = { id: string; label: string; icon: string; description: string };
@@ -20,17 +20,10 @@ function Brand() {
 }
 export function AppShell({ active, title, nav, groups, mobileItems, user, online, onNavigate, onInstall, onLogout, onSettings, onLocaleChange, children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [locale, setCurrentLocale] = useState(getLocale());
+  const locale = useLocale();
   const initials = String(user.displayName || user.email || "V").trim().slice(0, 1).toUpperCase();
   const isMoreActive = active === "altro" || !mobileItems.slice(0, -1).includes(active);
-  useEffect(() => {
-    const syncLocale = (event: Event) => {
-      const next = (event as CustomEvent<"it" | "en">).detail;
-      setCurrentLocale(next === "en" ? "en" : "it");
-    };
-    window.addEventListener("vivarqo:locale-change", syncLocale);
-    return () => window.removeEventListener("vivarqo:locale-change", syncLocale);
-  }, []);
+
   const navigate = (id: string) => { setDrawerOpen(false); onNavigate(id); };
 
   return <div className="app-shell app-shell--modern">
