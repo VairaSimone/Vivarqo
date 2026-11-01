@@ -141,7 +141,9 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
     return payload as T | null;
   };
 
-  if (method !== "GET") return execute();
+  // Signal-aware reads must not share an in-flight promise: one caller aborting
+  // its request must not cancel another component's independent read.
+  if (method !== "GET" || options.signal) return execute();
 
   // Only simultaneous reads share a request. The next read always refetches.
   const requestKey = url + "|" + language;

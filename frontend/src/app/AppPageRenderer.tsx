@@ -1,17 +1,17 @@
-import type { Dispatch, SetStateAction } from "react";
-import { ReproductionHub } from "../ReproductionHub";
-import { DocumentsHub } from "../DocumentsHub";
-import { NotificationsHub } from "../NotificationsHub";
-import { CareRecordsHub } from "../CareRecordsHub";
-import { AnimalsHub } from "../AnimalsHub";
-import { BillingHub } from "../BillingHub";
-import { CalendarHub } from "../CalendarHub";
-import { InventoryMovementHistory } from "../InventoryMovementHistory";
-import { FinanceSummary } from "../FinanceSummary";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
+import type { QuickEntryKind } from "../components/QuickEntryDialog";
 import { Dashboard } from "../components/Dashboard";
-import { QuickEntryDialog, type QuickEntryKind } from "../components/QuickEntryDialog";
+const ReproductionHub = lazy(() => import("../ReproductionHub").then(module => ({ default: module.ReproductionHub })));
+const DocumentsHub = lazy(() => import("../DocumentsHub").then(module => ({ default: module.DocumentsHub })));
+const NotificationsHub = lazy(() => import("../NotificationsHub").then(module => ({ default: module.NotificationsHub })));
+const CareRecordsHub = lazy(() => import("../CareRecordsHub").then(module => ({ default: module.CareRecordsHub })));
+const AnimalsHub = lazy(() => import("../AnimalsHub").then(module => ({ default: module.AnimalsHub })));
+const BillingHub = lazy(() => import("../BillingHub").then(module => ({ default: module.BillingHub })));
+const CalendarHub = lazy(() => import("../CalendarHub").then(module => ({ default: module.CalendarHub })));
+const InventoryMovementHistory = lazy(() => import("../InventoryMovementHistory").then(module => ({ default: module.InventoryMovementHistory })));
+const FinanceSummary = lazy(() => import("../FinanceSummary").then(module => ({ default: module.FinanceSummary })));
 import { Records } from "../components/Records";
-import { DataTools } from "../components/DataTools";
+const DataTools = lazy(() => import("../components/DataTools").then(module => ({ default: module.DataTools })));
 import { SettingsPage } from "../components/SettingsPage";
 import { Tutorial } from "../components/Tutorial";
 import { InventoryFilters } from "../components/InventoryFilters";
@@ -55,6 +55,14 @@ export interface AppPageRendererProps {
 }
 
 export function AppPageRenderer(props: AppPageRendererProps) {
+  return (
+    <Suspense fallback={<div className="loading" role="status"><span className="spinner" />{t("Caricamento modulo…")}</div>}>
+      <AppPageRendererContent {...props} />
+    </Suspense>
+  );
+}
+
+function AppPageRendererContent(props: AppPageRendererProps) {
   const {
     active, user, data, busy, rows, dataForDisplay, query, historyItem, inventoryFilters,
     financeRefreshKey, dashboardRefreshKey, measurementPreferences, targetAnimalId,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "../api/api";
 import type { AccountUser, AnyRecord, InventoryFiltersState } from "../types";
 import { errorMessage } from "../types";
@@ -21,27 +21,81 @@ export interface AppDataState {
   clearData: () => void;
 }
 
+interface ScopedData {
+  owner: string | null;
+  section: string | null;
+  value: AnyRecord | null;
+}
+
+interface ScopedBusy {
+  owner: string;
+  section: string;
+}
+
+const CLIENT_ONLY_SECTIONS = new Set([
+  "guide-sito", "guide-pwa", "altro", "riproduzioni", "documenti", "notifiche",
+  "alimentazioni", "genetica", "cure", "peso", "mute", "note", "animali",
+  "attivita", "abbonamento", "dati", "impostazioni"
+]);
+
+function accountKey(user: AccountUser | null): string | null {
+  if (!user) return null;
+  if (user.id) return "id:" + user.id;
+  if (user.email) return "email:" + user.email.trim().toLowerCase();
+  return "authenticated:unknown";
+}
+
 /** Owns section data fetching, server-side filters, loading and error states. */
 export function useAppData({
   user, active, query, listPages, inventoryFilters, onUnauthorized
 }: AppDataOptions): AppDataState {
-  const [data, setData] = useState<AnyRecord | null>(null);
-  const [busy, setBusy] = useState(false);
+  const userKey = accountKey(user);
+  const userKeyRef = useRef<string | null>(userKey);
+  // Keep the current account visible to in-flight continuations before effects run.
+  userKeyRef.current = userKey;
+
+  const requestIdRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
+  const [dataState, setDataState] = useState<ScopedData>({
+    owner: null,
+    section: null,
+    value: null
+  });
+  const [busyState, setBusyState] = useState<ScopedBusy | null>(null);
+
+  const cancelPendingRequest = useCallback(() => {
+    requestIdRef.current += 1;
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+  }, []);
 
   const loadData = useCallback(async (section: string = active) => {
-    setData(null);
-    if ([
-      "guide-sito", "guide-pwa", "altro", "riproduzioni", "documenti", "notifiche",
-      "alimentazioni", "genetica", "cure", "peso", "mute", "note", "animali",
-      "attivita", "abbonamento"
-    ].includes(section)) {
-      setData({});
+    // Ignore callbacks retained by a component from a previous account session.
+    if (!userKey || userKeyRef.current !== userKey) return;
+
+    const requestId = ++requestIdRef.current;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    const isCurrentRequest = () =>
+      requestIdRef.current === requestId &&
+      userKeyRef.current === userKey &&
+      !controller.signal.aborted;
+
+    setDataState({ owner: userKey, section, value: null });
+    setBusyState(null);
+
+    if (CLIENT_ONLY_SECTIONS.has(section)) {
+      setDataState({ owner: userKey, section, value: {} });
+      if (controllerRef.current === controller) controllerRef.current = null;
       return;
     }
 
     const basePath = API[section];
     if (!basePath) {
-      setData({});
+      setDataState({ owner: userKey, section, value: {} });
+      if (controllerRef.current === controller) controllerRef.current = null;
       return;
     }
 
@@ -65,25 +119,46 @@ export function useAppData({
     }
 
     const path = pathname + (params.size ? "?" + params.toString() : "");
-    setBusy(true);
+    setBusyState({ owner: userKey, section });
+
     try {
-      const result = await apiRequest(path);
-      setData(result);
+      const result = await apiRequest(path, { signal: controller.signal });
+      if (!isCurrentRequest()) return;
+      setDataState({ owner: userKey, section, value: result });
     } catch (error) {
+      // An aborted or superseded request is expected and must never replace newer data.
+      if (!isCurrentRequest()) return;
       if (typeof error === "object" && error !== null && "status" in error && error.status === 401) {
         onUnauthorized();
       }
-      setData({ __error: errorMessage(error) });
+      setDataState({ owner: userKey, section, value: { __error: errorMessage(error) } });
     } finally {
-      setBusy(false);
+      if (isCurrentRequest()) {
+        setBusyState(null);
+        if (controllerRef.current === controller) controllerRef.current = null;
+      }
     }
-  }, [active, listPages, inventoryFilters, query, onUnauthorized]);
+  }, [active, inventoryFilters, listPages, onUnauthorized, query, userKey]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userKey) {
+      cancelPendingRequest();
+      setDataState({ owner: null, section: null, value: null });
+      setBusyState(null);
+      return undefined;
+    }
+
     const timer = window.setTimeout(() => void loadData(active), query.trim() ? 280 : 0);
-    return () => window.clearTimeout(timer);
-  }, [user, active, loadData, query]);
+    return () => {
+      window.clearTimeout(timer);
+      cancelPendingRequest();
+    };
+  }, [active, cancelPendingRequest, loadData, query, userKey]);
+
+  const data = dataState.owner === userKey && dataState.section === active
+    ? dataState.value
+    : null;
+  const busy = Boolean(userKey && busyState?.owner === userKey && busyState.section === active);
 
   const rows = useMemo(() => {
     if (Array.isArray(data)) return data as AnyRecord[];
@@ -91,6 +166,11 @@ export function useAppData({
     return Object.values(data).find(Array.isArray) as AnyRecord[] ?? [];
   }, [data]);
 
-  const clearData = useCallback(() => setData(null), []);
+  const clearData = useCallback(() => {
+    cancelPendingRequest();
+    setDataState({ owner: userKeyRef.current, section: null, value: null });
+    setBusyState(null);
+  }, [cancelPendingRequest]);
+
   return { data, busy, rows, loadData, clearData };
 }
