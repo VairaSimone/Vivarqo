@@ -11,7 +11,7 @@ export type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "name
 };
 
 export function Input({ label, name, type = "text", defaultValue = "", required = false, ...props }: InputProps) {
-  return <label className="field"><span>{label}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props} /></label>;
+  return <label className="field"><span>{t(label)}</span><input name={name} type={type} defaultValue={defaultValue ?? ""} required={required} {...props} /></label>;
 }
 
 export type TextAreaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "name" | "defaultValue"> & {

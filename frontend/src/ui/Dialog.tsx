@@ -1,4 +1,5 @@
 import React, { useId, type ReactNode, type FormEvent } from "react";
+import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 export interface DialogProps {
@@ -16,7 +17,7 @@ export interface DialogProps {
 
 export function Dialog({
   title, description, children, onClose, onSubmit,
-  submitLabel = "Salva", cancelLabel = "Annulla", busy = false,
+  submitLabel={t("Salva")}, cancelLabel = "Annulla", busy = false,
   danger = false, size = "normal"
 }: DialogProps) {
   const titleId = useId();
@@ -28,7 +29,7 @@ export function Dialog({
     <section className={"modal dialog-card " + (size === "wide" ? "dialog-card--wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="dialog-heading">
         <div><p className="eyebrow">VIVARQO</p><h2 id={titleId}>{title}</h2>{description && <p className="subheading">{description}</p>}</div>
-        <button type="button" className="close-button" onClick={onClose} aria-label="Chiudi finestra"><Icon name="close" size={19}/></button>
+        <button type="button" className="close-button" onClick={onClose} aria-label={t("Chiudi finestra")}><Icon name="close" size={19}/></button>
       </header>
       {onSubmit ? <form className="form-grid dialog-form" onSubmit={handleSubmit}>
         {children}
