@@ -28,7 +28,7 @@ export function Dialog({
   return <div className="modal-backdrop dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
     <section className={"modal dialog-card " + (size === "wide" ? "dialog-card--wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="dialog-heading">
-        <div><p className="eyebrow">VIVARQO</p><h2 id={titleId}>{title}</h2>{description && <p className="subheading">{description}</p>}</div>
+        <div><p className="eyebrow">VIVARQO</p><h2 id={titleId}>{t(title)}</h2>{description && <p className="subheading">{t(description)}</p>}</div>
         <button type="button" className="close-button" onClick={onClose} aria-label={t("Chiudi finestra")}><Icon name="close" size={19}/></button>
       </header>
       {onSubmit ? <form className="form-grid dialog-form" onSubmit={handleSubmit}>

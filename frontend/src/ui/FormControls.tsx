@@ -1,6 +1,5 @@
 import * as React from "react";
 import { t } from "../i18n";
-import { t } from "../i18n";
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string };
 
