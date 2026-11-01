@@ -1,24 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api/api";
-import { ReproductionHub } from "./ReproductionHub";
-import { DocumentsHub } from "./DocumentsHub";
-import { NotificationsHub } from "./NotificationsHub";
-import { CareRecordsHub } from "./CareRecordsHub";
 import { AuthScreen as AuthFlowScreen } from "./AuthScreen";
-import { AnimalsHub } from "./AnimalsHub";
-import { BillingHub } from "./BillingHub";
-import { CalendarHub } from "./CalendarHub";
-import { InventoryMovementHistory } from "./InventoryMovementHistory";
-import { FinanceSummary } from "./FinanceSummary";
 import { Icon } from "./ui/Icon";
-import { Dashboard } from "./components/Dashboard";
 import { QuickEntryDialog, type QuickEntryKind } from "./components/QuickEntryDialog";
-import { Records } from "./components/Records";
-import { DataTools } from "./components/DataTools";
-import { SettingsPage } from "./components/SettingsPage";
-import { Tutorial } from "./components/Tutorial";
-import { InventoryFilters } from "./components/InventoryFilters";
-import { MoreHub } from "./components/MoreHub";
+import { AppPageRenderer } from "./app/AppPageRenderer";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 import { useRef } from "react";
 import { Modal, type ModalForm } from "./app/AppModals";
@@ -26,14 +11,14 @@ import type { AnyRecord, AccountUser, InventoryFiltersState, NoticeKind } from "
 import { errorMessage } from "./types";
 import { getIntlLocale, getLocale, setLocale, t } from "./i18n";
 import { AppShell } from "./app/AppShell";
-import { NAV, NAV_GROUPS, TITLES } from "./app/navigation";
+import { DESCRIPTIONS, NAV, NAV_GROUPS, TITLES } from "./app/navigation";
 import { useAppData } from "./app/useAppData";
 import { useAppRecordActions } from "./app/useAppRecordActions";
 import { useAppNavigation } from "./app/useAppNavigation";
 import { useAppPreferences } from "./app/useAppPreferences";
 
 function Button({children,variant="",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{typeof children==="string"?t(children):children}</button>;}
-function Notice({notice}:{notice:{text:string;kind?:NoticeKind}|null}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{notice.text}</div>:null;}
+function Notice({notice}:{notice:{text:string;kind?:NoticeKind}|null}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{t(notice.text)}</div>:null;}
 
 
 
@@ -58,6 +43,7 @@ const [user,setUser]=useState<AccountUser|null>(null),[notice,setNotice]=useStat
  const {measurementPreferences}=useAppPreferences(user);
  const handleUnauthorized=useCallback(()=>setUser(null),[]);
  const {data,busy,rows,loadData,clearData}=useAppData({user,active,query,listPages,inventoryFilters,onUnauthorized:handleUnauthorized});
+ const dataForDisplay=useMemo(()=>rows.filter(row=>JSON.stringify(row).toLowerCase().includes(query.toLowerCase())),[rows,query]);
  useEffect(()=>{const onLocaleChange=(event:Event)=>{setLocaleVersion(version=>version+1);const locale=(event as CustomEvent<"it"|"en">).detail;setUser(current=>current?{...current,locale}:current);};window.addEventListener("vivarqo:locale-change",onLocaleChange);return()=>window.removeEventListener("vivarqo:locale-change",onLocaleChange);},[]);
  const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text,kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
  const {
@@ -114,7 +100,6 @@ const doInstall=async()=>{if(!installEvent){showNotice("Usa il menu Condividi de
   onSearch={updateRecordSearch} onCare={createCare} onTask={markTask} onEdit={openEditRecord}
   onDelete={deleteRecord} onMovement={createInventoryMovement}
  />
- {quickEntryKind&&<QuickEntryDialog kind={quickEntryKind} weightUnit={measurementPreferences.weightUnit} onClose={()=>setQuickEntryKind(null)} onNotice={showNotice} onSaved={()=>{setDashboardRefreshKey(key=>key+1);void loadData("oggi");}}/>}
 
  <footer className="page-footer"><span>{t("Vivarqo · Crescere con cura.")}</span><span>{t("Sessione protetta · Dati caricati dal backend")}</span></footer></div>
     {modal&&<Modal modal={modal} onClose={()=>setModal(null)} onSubmit={saveEntity}/>} {quickEntryKind&&<QuickEntryDialog kind={quickEntryKind} weightUnit={measurementPreferences.weightUnit} onClose={()=>setQuickEntryKind(null)} onNotice={showNotice} onSaved={()=>{setDashboardRefreshKey(key=>key+1);void loadData("oggi");}}/>}

@@ -20,6 +20,7 @@ import { Button } from "../ui/FormControls";
 import { t } from "../i18n";
 import type { AccountUser, AnyRecord, InventoryFiltersState, NavigationHandler, NoticeHandler } from "../types";
 import type { MeasurementPreferences } from "./useAppPreferences";
+import { NAV, NAV_MORE_GROUPS } from "./navigation";
 
 export interface AppPageRendererProps {
   active: string;
