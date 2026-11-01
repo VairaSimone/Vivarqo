@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, type FormEvent } from "react";
+import { t } from "../i18n";
 import type { AnyRecord, NoticeHandler } from "../types";
 import { errorMessage } from "../types";
 import { apiRequest } from "../api/api";
@@ -168,14 +169,14 @@ export function QuickEntryDialog({
     "Registra una nota direttamente sulla scheda dell'animale.";
 
   return <Dialog title={dialogTitle} description={dialogDescription} onClose={onClose}
-    onSubmit={submit} submitLabel="Registra" busy={saving || loading} size={kind === "feeding" ? "wide" : "normal"}>
-    {loading ? <p className="muted form-full">Caricamento animali…</p> : loadError ? <p className="form-message form-full" role="alert">{loadError}</p> :
-      animals.length === 0 ? <p className="muted form-full">Nessun animale attivo disponibile.</p> : <>
+    onSubmit={submit} submitLabel={t("Registra")} busy={saving || loading} size={kind === "feeding" ? "wide" : "normal"}>
+    {loading ? <p className="muted form-full">{t("Caricamento animali…")}</p> : loadError ? <p className="form-message form-full" role="alert">{loadError}</p> :
+      animals.length === 0 ? <p className="muted form-full">{t("Nessun animale attivo disponibile.")}</p> : <>
         {kind === "feeding" ? <>
-          <Input label="Data e ora della sessione" name="performedAt" type="datetime-local" value={occurredAt} onChange={event => setOccurredAt(event.target.value)} required />
-          <div className="form-full"><Area label="Note comuni" name="sessionNotes" value={notes} onChange={event => setNotes(event.target.value)} rows={2} /></div>
+          <Input label={t("Data e ora della sessione")} name="performedAt" type="datetime-local" value={occurredAt} onChange={event => setOccurredAt(event.target.value)} required />
+          <div className="form-full"><Area label={t("Note comuni")} name="sessionNotes" value={notes} onChange={event => setNotes(event.target.value)} rows={2} /></div>
           <fieldset className="feeding-entry-form form-full">
-            <legend>Seleziona gli animali alimentati</legend>
+            <legend>{t("Seleziona gli animali alimentati")}</legend>
             <div className="feeding-animal-picker">
               {animals.map(animal => {
                 const id = String(animal.id);
@@ -186,21 +187,21 @@ export function QuickEntryDialog({
               })}
             </div>
           </fieldset>
-          <Select label="Esito" name="outcome" options={FEED_OPTIONS as unknown as string[][]} value={outcome} onChange={event => setOutcome(event.target.value)} />
-          <Input label="Tipo di alimento" name="foodType" value={foodType} onChange={event => setFoodType(event.target.value)} placeholder="Altro" />
-          <Input label="Dimensione / quantità" name="foodSize" value={foodSize} onChange={event => setFoodSize(event.target.value)} />
-          <Input label="Peso alimento (g)" name="foodWeightG" type="number" min={0.01} max={1000000} step={0.01} value={foodWeightG} onChange={event => setFoodWeightG(event.target.value)} />
+          <Select label={t("Esito")} name="outcome" options={FEED_OPTIONS as unknown as string[][]} value={outcome} onChange={event => setOutcome(event.target.value)} />
+          <Input label={t("Tipo di alimento")} name="foodType" value={foodType} onChange={event => setFoodType(event.target.value)} placeholder={t("Altro")} />
+          <Input label={t("Dimensione / quantità")} name="foodSize" value={foodSize} onChange={event => setFoodSize(event.target.value)} />
+          <Input label={t("Peso alimento (g)")} name="foodWeightG" type="number" min={0.01} max={1000000} step={0.01} value={foodWeightG} onChange={event => setFoodWeightG(event.target.value)} />
         </> : <>
-          <Select label="Seleziona un animale" name="animalId" options={animalOptions} value={animalId} onChange={event => setAnimalId(event.target.value)} required />
+          <Select label={t("Seleziona un animale")} name="animalId" options={animalOptions} value={animalId} onChange={event => setAnimalId(event.target.value)} required />
           <Input label={kind === "weight" ? "Data e ora della pesata" : kind === "note" ? "Data e ora dell'osservazione" : "Data e ora"} name="occurredAt" type="datetime-local" value={occurredAt} onChange={event => setOccurredAt(event.target.value)} required />
           {kind === "weight" && <Input label={"Peso (" + weightUnit + ")"} name="weight" type="number" min={0.001} step="any" value={weight} onChange={event => setWeight(event.target.value)} required />}
-          {kind === "shed" && <Select label="Esito" name="outcome" options={SHED_OPTIONS as unknown as string[][]} value={outcome} onChange={event => setOutcome(event.target.value)} required />}
+          {kind === "shed" && <Select label={t("Esito")} name="outcome" options={SHED_OPTIONS as unknown as string[][]} value={outcome} onChange={event => setOutcome(event.target.value)} required />}
           {kind === "note" && <>
-            <Input label="Titolo (facoltativo)" name="title" value={title} onChange={event => setTitle(event.target.value)} />
-            <Input label="Categoria" name="category" value={category} onChange={event => setCategory(event.target.value)} required />
-            <div className="form-full"><Area label="Osservazione" name="body" value={body} onChange={event => setBody(event.target.value)} required rows={4} /></div>
+            <Input label={t("Titolo (facoltativo)")} name="title" value={title} onChange={event => setTitle(event.target.value)} />
+            <Input label={t("Categoria")} name="category" value={category} onChange={event => setCategory(event.target.value)} required />
+            <div className="form-full"><Area label={t("Osservazione")} name="body" value={body} onChange={event => setBody(event.target.value)} required rows={4} /></div>
           </>}
-          {(kind === "weight" || kind === "shed") && <div className="form-full"><Area label="Note (facoltative)" name="notes" value={notes} onChange={event => setNotes(event.target.value)} rows={3} /></div>}
+          {(kind === "weight" || kind === "shed") && <div className="form-full"><Area label={t("Note (facoltative)")} name="notes" value={notes} onChange={event => setNotes(event.target.value)} rows={3} /></div>}
         </>}
       </>}
   </Dialog>;
