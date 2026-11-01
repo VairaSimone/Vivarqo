@@ -57,6 +57,25 @@ test("navigazione: URL e stato del browser restano sincronizzati", async ({ page
   await expect(page.getByRole("heading", { name: "Documenti", exact: true })).toBeVisible();
 });
 
+
+test("la lingua scelta dall'header viene salvata e ripristinata dopo il reload", async ({ page }) => {
+  await signIn(page);
+
+  const language = page.locator(".app-language-control select");
+  await language.selectOption("en");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByText("YOUR BREEDING OPERATION", { exact: true })).toBeVisible();
+
+  await expect.poll(() => page.e2eState.requests.some(request =>
+    request.path === "account" && request.method === "PATCH" && request.body.locale === "en"
+  )).toBe(true);
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByText("YOUR BREEDING OPERATION", { exact: true })).toBeVisible();
+  await expect(page.locator(".app-language-control select")).toHaveValue("en");
+});
+
 test("dashboard: registra alimentazioni multi-animale e pesate da modali rapidi", async ({ page }) => {
   await signIn(page);
 

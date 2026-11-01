@@ -4,6 +4,7 @@ export type E2ERecord = Record<string, any>;
 
 export interface E2EState {
   authenticated: boolean;
+  accountLocale: "it" | "en";
   failLogin: boolean;
   failAnimalList: boolean;
   failDocumentList: boolean;
@@ -54,7 +55,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     notes: "", _count: { eggs: 0, incubationLogs: 0 }
   };
   const state: E2EState = {
-    authenticated: false, failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
+    authenticated: false, accountLocale: "it", failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
     animals: [animal, secondAnimal], cycle, cycles: [cycle], clutches: [clutch], eggs: [],
     events: [], incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
     share: null,
@@ -95,7 +96,7 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     if (path === "auth/csrf" && method === "GET") return respond({ csrfToken: "e2e-csrf-token" });
     if (path === "auth/me" && method === "GET") {
       return state.authenticated
-        ? respond({ user: { id: "user-1", email: "allevatore@example.test", displayName: "Allevatore E2E", locale: "it", timezone: "Europe/Rome" } })
+        ? respond({ user: { id: "user-1", email: "allevatore@example.test", displayName: "Allevatore E2E", locale: state.accountLocale, timezone: "Europe/Rome" } })
         : respond({ message: "Sessione non valida." }, 401);
     }
     if (path === "auth/login" && method === "POST") {
@@ -105,7 +106,10 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     }
     if (path === "auth/logout" && method === "POST") { state.authenticated = false; return respond({}); }
     if (path.startsWith("auth/") && method === "POST") return respond({ message: "Richiesta accettata." });
-    if (path === "account" && method === "PATCH") return respond({ message: "Impostazioni aggiornate." });
+    if (path === "account" && method === "PATCH") {
+      if (body.locale === "it" || body.locale === "en") state.accountLocale = body.locale;
+      return respond({ message: "Impostazioni aggiornate." });
+    }
     if (path === "home/today" && method === "GET") return respond({ tasks: { dueToday: [], overdue: [] }, counts: { dueToday: 0, overdue: 0 }, recentEvents: [] });
     if (path.startsWith("billing/") && method === "GET") return respond({ subscription: { status: "active", plan: "BREEDER" } });
 
