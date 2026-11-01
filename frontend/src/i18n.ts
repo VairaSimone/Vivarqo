@@ -646,7 +646,6 @@ export const translations: Record<string, string> = {
   "Temperatura": "Temperature",
   "Temperatura °": "Temperature °",
   "Umidità %": "Humidity %",
-  "Stato": "Status",
   "Periodo: tutte le registrazioni disponibili": "Period: all available entries",
   "Dal": "From",
   "Applica periodo": "Apply period",
@@ -1003,6 +1002,11 @@ export const translations: Record<string, string> = {
   "Stato": "Status",
   "Osservazioni": "Notes",
   "Record": "Record",
+  "Caricamento modulo…": "Loading module…",
+  "di": "of",
+  "Sessione protetta · Dati caricati dal backend": "Secure session · Data loaded from the backend",
+  "VIVARQO": "VIVARQO",
+  "Vivarqo · Crescere con cura.": "Vivarqo · Growing with care.",
 };
 
 function normalize(value: string): string {
