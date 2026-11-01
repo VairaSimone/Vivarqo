@@ -115,7 +115,7 @@ export function DataTools({onNotice}: { onNotice: NoticeHandler }) {
       <p>{t("Carica CSV o XLSX. Prima di confermare controlla l'anteprima e gli eventuali errori.")}</p>
       <form className="form-stack" onSubmit={upload}>
         <SelectField label={t("Tipo di dati")} value={entity} onChange={e => { setEntity(e.target.value); setPreview(null); }}>
-          {entities.map(([id,label]) => <option key={id} value={id}>{label}</option>)}
+          {entities.map(([id,label]) => <option key={id} value={id}>{t(label)}</option>)}
         </SelectField>
         <Field label={t("File CSV o XLSX")} type="file" accept=".csv,.xlsx" onChange={e => setFile(e.target.files?.[0] || null)} required/>
         <Button disabled={busy}>{busy ? "Elaborazione…" : "Crea anteprima"}</Button>
