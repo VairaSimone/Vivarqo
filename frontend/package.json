@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "build:service-worker": "tsc -p tsconfig.sw.json",
-    "build": "pnpm build:service-worker && pnpm typecheck && vite build",
+    "build": "pnpm build:service-worker && pnpm check:i18n && pnpm typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
