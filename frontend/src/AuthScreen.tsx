@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { apiRequest } from "./api/api";
 import { readFormValues, errorMessage } from "./types";
-import { getLocale } from "./i18n";
+import { getLocale, t } from "./i18n";
 import type { NoticeKind } from "./types";
 
 const currentUrl = () => new URL(window.location.href);
@@ -109,25 +109,25 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
   };
 
   return <main className="auth-wrap">
-    <div className="auth-art"><a className="brand" href="/" aria-label="Vivarqo"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a><p className="eyebrow">IL GESTIONALE PER ALLEVATORI</p><h1>Più cura.<br/><em>Meno fogli.</em></h1><p>Animali, alimentazioni, documenti e riproduzioni: tutto in un unico spazio, pensato anche per il telefono.</p><div className="auth-leaf">❧</div></div>
+    <div className="auth-art"><a className="brand" href="/" aria-label="Vivarqo"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a><p className="eyebrow">{t("IL GESTIONALE PER ALLEVATORI")}</p><h1>{t("Più cura.")}<br/><em>{t("Meno fogli.")}</em></h1><p>{t("Animali, alimentazioni, documenti e riproduzioni: tutto in un unico spazio, pensato anche per il telefono.")}</p><div className="auth-leaf">❧</div></div>
     <section className="auth-card">
-      <div className="auth-card-head"><p className="eyebrow">{mode === "verify" ? "UN ULTIMO PASSAGGIO" : mode === "reset" ? "RECUPERO ACCOUNT" : "BENTORNATO"}</p><h2>{title}</h2><p>I tuoi registri restano privati e collegati al tuo account.</p></div>
+      <div className="auth-card-head"><p className="eyebrow">{mode === "verify" ? "UN ULTIMO PASSAGGIO" : mode === "reset" ? "RECUPERO ACCOUNT" : "BENTORNATO"}</p><h2>{title}</h2><p>{t("I tuoi registri restano privati e collegati al tuo account.")}</p></div>
       <form className="form-stack" onSubmit={submit}>
-        {mode === "register" && <Field label="Nome visualizzato" name="displayName" autoComplete="name" required maxLength={120}/>}
-        {["login", "register", "forgot", "resend"].includes(mode) && <Field label="Email" name="email" type="email" autoComplete="email" required maxLength={254}/>}
+        {mode === "register" && <Field label={t("Nome visualizzato")} name="displayName" autoComplete="name" required maxLength={120}/>}
+        {["login", "register", "forgot", "resend"].includes(mode) && <Field label={t("Email")} name="email" type="email" autoComplete="email" required maxLength={254}/>}
         {["login", "register"].includes(mode) && <Field label="Password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "register" ? 12 : 1} maxLength={128}/>}
-        {tokenRequired && <><Field label="Token ricevuto via email" name="token" value={token} onChange={event => setToken(event.target.value)} required minLength={43} maxLength={43} autoComplete="one-time-code" spellCheck="false"/>{mode === "verify" && <p className="muted">Apri il link ricevuto via email. Se il token non è compilato automaticamente, incollalo qui.</p>}</>}
-        {mode === "reset" && <><Field label="Nuova password" name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/><Field label="Conferma nuova password" name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></>}
-        {mode === "forgot" && <p className="muted">Ti invieremo le istruzioni se l’indirizzo è associato a un account.</p>}
+        {tokenRequired && <><Field label={t("Token ricevuto via email")} name="token" value={token} onChange={event => setToken(event.target.value)} required minLength={43} maxLength={43} autoComplete="one-time-code" spellCheck="false"/>{mode === "verify" && <p className="muted">{t("Apri il link ricevuto via email. Se il token non è compilato automaticamente, incollalo qui.")}</p>}</>}
+        {mode === "reset" && <><Field label={t("Nuova password")} name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/><Field label={t("Conferma nuova password")} name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></>}
+        {mode === "forgot" && <p className="muted">{t("Ti invieremo le istruzioni se l’indirizzo è associato a un account.")}</p>}
         <Button disabled={busy}>{busy ? "Attendi…" : ({login:"Accedi",register:"Crea account",forgot:"Invia istruzioni",resend:"Invia nuovo link",verify:"Verifica email",reset:"Reimposta password"}[mode])}</Button>
       </form>
       {message && <p className={"form-message " + (messageKind === "success" ? "success-text" : messageKind === "error" ? "error-text" : "")} role="status">{message}</p>}
       <div className="auth-links">
-        {mode !== "login" && <button type="button" onClick={() => switchMode("login")}>Torna all’accesso</button>}
-        {mode === "login" && <><button type="button" onClick={() => switchMode("forgot")}>Password dimenticata?</button><button type="button" onClick={() => switchMode("register")}>Crea un account</button><button type="button" onClick={() => switchMode("resend")}>Reinvia verifica</button></>}
-        {mode === "register" && <button type="button" onClick={() => switchMode("resend")}>Non hai ricevuto il link?</button>}
+        {mode !== "login" && <button type="button" onClick={() => switchMode("login")}>{t("Torna all’accesso")}</button>}
+        {mode === "login" && <><button type="button" onClick={() => switchMode("forgot")}>{t("Password dimenticata?")}</button><button type="button" onClick={() => switchMode("register")}>{t("Crea un account")}</button><button type="button" onClick={() => switchMode("resend")}>{t("Reinvia verifica")}</button></>}
+        {mode === "register" && <button type="button" onClick={() => switchMode("resend")}>{t("Non hai ricevuto il link?")}</button>}
       </div>
-      <p className="tiny">Registrandoti dichiari di aver letto l’informativa privacy e le condizioni applicabili pubblicate dal gestore.</p>
+      <p className="tiny">{t("Registrandoti dichiari di aver letto l’informativa privacy e le condizioni applicabili pubblicate dal gestore.")}</p>
     </section>
   </main>;
 }
