@@ -24,18 +24,13 @@ import { useRef } from "react";
 import { Modal, type ModalForm } from "./app/AppModals";
 import type { AnyRecord, AccountUser, InventoryFiltersState, NoticeKind } from "./types";
 import { errorMessage } from "./types";
-import { readFormValues } from "./types";
 import { getIntlLocale, getLocale, setLocale, t } from "./i18n";
 import { AppShell } from "./app/AppShell";
 import { DESCRIPTIONS, NAV, NAV_GROUPS, NAV_MORE_GROUPS, TITLES } from "./app/navigation";
 import { useAppData } from "./app/useAppData";
+import { useAppRecordActions } from "./app/useAppRecordActions";
 import { useAppNavigation } from "./app/useAppNavigation";
 import { useAppPreferences } from "./app/useAppPreferences";
-
-const value = (obj: AnyRecord | null | undefined, keys: string[], fallback="—") => { for (const k of keys) if (obj?.[k] !== undefined && obj?.[k] !== null && obj?.[k] !== "") return obj[k]; return fallback; };
-const date = (v: string | number | Date | null | undefined) => { if (!v || v==="—") return "—"; const d=new Date(v); return Number.isNaN(d.getTime())?String(v):new Intl.DateTimeFormat(getIntlLocale(),{dateStyle:"medium"}).format(d); };
-const localDateTime = (v?: string | Date | null) => { const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime()))return ""; const p=(n:number)=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes()); };
-const money = (v: string | number | null | undefined) => { if (v === null || v === undefined || v === "" || v === "—") return "—"; const n = Number(v); return Number.isFinite(n) ? new Intl.NumberFormat(getIntlLocale(), { style: "currency", currency: "EUR" }).format(n / 100) : "—"; };
 
 function Button({children,variant="",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{typeof children==="string"?t(children):children}</button>;}
 function Notice({notice}:{notice:{text:string;kind?:NoticeKind}|null}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{notice.text}</div>:null;}
@@ -65,6 +60,15 @@ const [user,setUser]=useState<AccountUser|null>(null),[notice,setNotice]=useStat
  const {data,busy,rows,loadData,clearData}=useAppData({user,active,query,listPages,inventoryFilters,onUnauthorized:handleUnauthorized});
  useEffect(()=>{const onLocaleChange=(event:Event)=>{setLocaleVersion(version=>version+1);const locale=(event as CustomEvent<"it"|"en">).detail;setUser(current=>current?{...current,locale}:current);};window.addEventListener("vivarqo:locale-change",onLocaleChange);return()=>window.removeEventListener("vivarqo:locale-change",onLocaleChange);},[]);
  const showNotice=useCallback((text: string,kind: NoticeKind="info")=>{setNotice({text:t(text),kind});if(noticeTimer.current)window.clearTimeout(noticeTimer.current);noticeTimer.current=window.setTimeout(()=>setNotice(null),5000);},[]);
+ const {
+   updateInventoryFilter,resetInventoryFilters,updateRecordSearch,saveEntity,
+   addInventory,addFinance,openEditRecord,deleteRecord,createInventoryMovement,
+   markTask,createCare,actionButton
+ }=useAppRecordActions({
+   active,modal,query,inventoryFilters,setModal,setQuery,setListPages,
+   setInventoryFilters,setHistoryItem,setFinanceRefreshKey,loadData,go,
+   onNotice:showNotice,confirm:confirmAction
+ });
  useEffect(()=>{const onInstall=(event:Event)=>{event.preventDefault();setInstallEvent(event as BeforeInstallPromptEvent);};const onOnline=()=>setOnline(true);const onOffline=()=>setOnline(false);window.addEventListener("beforeinstallprompt",onInstall);window.addEventListener("online",onOnline);window.addEventListener("offline",onOffline);return()=>{window.removeEventListener("beforeinstallprompt",onInstall);window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};},[]);
  useEffect(()=>{const onUpdateReady=(event: Event)=>setPwaUpdateRegistration((event as CustomEvent<{registration?: ServiceWorkerRegistration}>).detail?.registration??null);window.addEventListener("vivarqo:pwa-update-ready",onUpdateReady);return()=>window.removeEventListener("vivarqo:pwa-update-ready",onUpdateReady);},[]);
  const loadMe=useCallback(async()=>{try{const r=await apiRequest("auth/me");const accountUser=(r.user??r) as AccountUser;setUser(accountUser);if(accountUser.locale==="it"||accountUser.locale==="en")setLocale(accountUser.locale);return true;}catch(e){setUser(null);return false;}},[]);
@@ -78,37 +82,7 @@ const [user,setUser]=useState<AccountUser|null>(null),[notice,setNotice]=useStat
    try{await apiRequest("account",{method:"PATCH",body:{locale:nextLocale}});}
    catch(error){setLocale(previous);showNotice(errorMessage(error),"error");}
  },[showNotice]);
- const updateInventoryFilter=(name:keyof InventoryFiltersState,value:string|boolean)=>{setInventoryFilters(current=>name==="lowStock"?{...current,lowStock:Boolean(value)}:{...current,[name]:String(value)});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
- const resetInventoryFilters=()=>{setInventoryFilters({active:"true",category:"",lowStock:false});setListPages(current=>({...current,inventario:1}));setHistoryItem(null);};
- const updateRecordSearch=(next:string)=>{setQuery(next);setListPages(current=>({...current,[active]:1}));};
- const saveEntity=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();const raw=readFormValues(e.currentTarget);const currentModal=modal;if(!currentModal)return;const {endpoint,method="POST",transform}=currentModal;try{await apiRequest(endpoint,{method,body:transform?transform(raw):raw});setModal(null);showNotice("Modifiche salvate.");if(active==="finanze")setFinanceRefreshKey(key=>key+1);await loadData(active);}catch(err){showNotice(errorMessage(err),"error");}};
- const addAnimal=()=>setModal({title:"Nuovo animale",endpoint:"animals",fields:[["name","Nome","text"],["identifier","Identificativo (facoltativo)","text"],["species","Specie","text"],["sex","Sesso","select"],["morph","Morph","text"],["birthDate","Data di nascita","date"],["locationLabel","Stabulazione / posizione","text"],["notes","Note","textarea"]],transform:v=>({...v,identifier:v.identifier||null,morph:v.morph||null,birthDate:v.birthDate||null,locationLabel:v.locationLabel||null,notes:v.notes||null})});
- const addInventory=()=>setModal({title:"Nuovo articolo",endpoint:"inventory/items",fields:[["name","Nome","text"],["category","Categoria","select"],["unit","Unità","text"],["quantityOnHand","Quantità iniziale","number"],["minimumQuantity","Soglia minima","number"],["notes","Note","textarea"]],transform:v=>({...v,quantityOnHand:Number(v.quantityOnHand||0),minimumQuantity:v.minimumQuantity===""?null:Number(v.minimumQuantity),notes:v.notes||null})});
- const addFinance=()=>setModal({title:"Nuova voce economica",endpoint:"finance/entries",fields:[["entryType","Tipo","select"],["occurredOn","Data","date"],["amount","Importo (€)","number"],["category","Categoria","text"],["description","Descrizione","text"]],transform:v=>({entryType:v.entryType,occurredOn:v.occurredOn,amountCents:Math.round(Number(v.amount)*100),currency:"EUR",category:v.category,description:v.description})});
- const addTask=()=>setModal({title:"Nuova attività",endpoint:"tasks",fields:[["title","Titolo","text"],["taskCategory","Categoria","select","custom"],["dueAt","Scadenza","datetime-local"],["description","Descrizione","text"]],transform:v=>({title:v.title,category:v.taskCategory,dueAt:new Date(v.dueAt).toISOString(),description:v.description||null})});
-   const openEditRecord=(row:AnyRecord)=>{if(!["animali","inventario","attivita","finanze"].includes(active))return;
-    if(active==="animali")return setModal({title:"Modifica animale",endpoint:"animals/"+row.id,method:"PATCH",fields:[["name","Nome","text",row.name],["identifier","Identificativo (facoltativo)","text",row.identifier||""],["species","Specie","text",row.species],["sex","Sesso","select",row.sex||"unknown"],["morph","Morph","text",row.morph||""],["birthDate","Data di nascita","date",row.birthDate?String(row.birthDate).slice(0,10):""],["locationLabel","Stabulazione / posizione","text",row.locationLabel||""],["notes","Note","textarea",row.notes||""]],transform:v=>({name:v.name,identifier:v.identifier||null,species:v.species,sex:v.sex,morph:v.morph||null,birthDate:v.birthDate||null,locationLabel:v.locationLabel||null,notes:v.notes||null})});
-    if(active==="inventario")return setModal({title:"Modifica articolo",endpoint:"inventory/items/"+row.id,method:"PATCH",fields:[["name","Nome","text",row.name],["category","Categoria","select",row.category],["unit","Unità","text",row.unit],["minimumQuantity","Soglia minima","number",row.minimumQuantity??""],["notes","Note","textarea",row.notes||""]],transform:v=>({name:v.name,category:v.category,unit:v.unit,minimumQuantity:v.minimumQuantity===""?null:Number(v.minimumQuantity),notes:v.notes||null})});
-    if(active==="attivita")return setModal({title:"Modifica attività",endpoint:"tasks/"+row.id,method:"PATCH",fields:[["title","Titolo","text",row.title],["taskCategory","Categoria","select",row.category||"custom"],["dueAt","Scadenza","datetime-local",row.dueAt?new Date(row.dueAt).toISOString().slice(0,16):""],["description","Descrizione","textarea",row.description||""]],transform:v=>({title:v.title,category:v.taskCategory,dueAt:new Date(v.dueAt).toISOString(),description:v.description||null})});
-    if(active==="finanze")return setModal({title:"Modifica voce economica",endpoint:"finance/entries/"+row.id,method:"PATCH",fields:[["entryType","Tipo","select",row.entryType],["occurredOn","Data","date",row.occurredOn?String(row.occurredOn).slice(0,10):""],["amount","Importo (€)","number",Number(row.amountCents||0)/100],["category","Categoria","text",row.category],["description","Descrizione","text",row.description]],transform:v=>({entryType:v.entryType,occurredOn:v.occurredOn,amountCents:Math.round(Number(v.amount)*100),category:v.category,description:v.description})});
-  };
-  const deleteRecord=async(row:AnyRecord)=>{if(!["animali","inventario","attivita","finanze"].includes(active))return;
-    const inventory=active==="inventario";
-    if(!(await confirmAction({title:inventory?"Archiviare l’articolo?":"Eliminare il record?",message:inventory?"L’articolo verrà archiviato e lo storico resterà consultabile.":"L’operazione non è reversibile. Se esistono record collegati, il server potrebbe impedirla.",confirmLabel:inventory?"Archivia articolo":"Elimina record",danger:!inventory})))return;
-    const endpoint=active==="animali"?"animals/"+row.id:inventory?"inventory/items/"+row.id+"/archive":active==="attivita"?"tasks/"+row.id:"finance/entries/"+row.id;
-    const method=inventory?"POST":"DELETE";
-    try{
-      const result=await apiRequest(endpoint,{method,body:inventory?{}:undefined});
-      showNotice(inventory?"Articolo archiviato.":"Record eliminato.");if(active==="finanze")setFinanceRefreshKey(key=>key+1);await loadData(active);
-    }catch(err){showNotice(errorMessage(err),"error");}
-  };
-  const createInventoryMovement=(row:AnyRecord)=>setModal({title:"Movimento di magazzino · "+row.name,endpoint:"inventory/items/"+row.id+"/movements",fields:[["movementType","Tipo movimento","select","in"],["quantity","Quantità","number","1"],["occurredAt","Data e ora","datetime-local",localDateTime()],["unitCostCents","Costo unitario (centesimi, facoltativo)","number",""],["reference","Riferimento (facoltativo)","text",""],["notes","Note","textarea",""]],transform:v=>({movementType:v.movementType,quantity:Number(v.quantity),occurredAt:new Date(v.occurredAt).toISOString(),unitCostCents:v.unitCostCents===""?null:Number(v.unitCostCents),reference:v.reference||null,notes:v.notes||null})});
-const actionButton: [string, () => void] | null = active==="inventario"?["＋ Nuovo articolo",addInventory]:active==="finanze"?["＋ Nuova voce",addFinance]:null;
- const dataForDisplay = useMemo(()=>rows.filter(row=>JSON.stringify(row).toLowerCase().includes(query.toLowerCase())),[rows,query]);
- const displayRecord = (r:AnyRecord)=>active==="animali"?{Nome:value(r,["name"]),Identificativo:value(r,["identifier"]),Specie:value(r,["species"]),Sesso:value(r,["sex"]),Morph:value(r,["morph"]),Stabulazione:value(r,["locationLabel"]),Stato:value(r,["status"])}:active==="inventario"?{Articolo:value(r,["name"]),Categoria:value(r,["category"]),Disponibile:value(r,["quantityOnHand"]),Unità:value(r,["unit"]),Soglia:value(r,["minimumQuantity"]),Stato:r.isActive===false?"Archiviato":"Attivo",Scorte:r.minimumQuantity==null?"Soglia non impostata":Number(r.quantityOnHand)<=Number(r.minimumQuantity)?"Sotto soglia":"Adeguate"}:active==="finanze"?{Descrizione:value(r,["description"]),Tipo:value(r,["entryType"]),Data:date(value(r,["occurredOn"],"—")),Importo:money(value(r,["amountCents"],"—")),Categoria:value(r,["category"])}:active==="alimentazioni"?{Data:date(value(r,["performedAt","fedAt","createdAt"])),Animale:value(r,["animalName","animalId"]),Esito:value(r,["outcome"]),Cibo:value(r,["foodType"]),Dettagli:value(r,["notes"])}:active==="attivita"?{Attività:value(r,["title","name"]),Scadenza:date(value(r,["dueAt"])),Stato:value(r,["status"]),Animale:value(r,["animalName"])}:active==="notifiche"?{Titolo:value(r,["title"]),Messaggio:value(r,["body"]),Data:date(value(r,["createdAt"])),Stato:value(r,["readAt"],"Non letta")}:Object.fromEntries(Object.entries(r).filter(([k,v])=>!["userId","updatedAt","createdAt","id"].includes(k)&&["string","number","boolean"].includes(typeof v)).slice(0,6).map(([k,v])=>[k.replace(/([A-Z])/g," $1"),String(v)]));
- const markTask=async(row:AnyRecord,status:string)=>{try{await apiRequest("tasks/"+row.id+"/complete",{method:"POST",body:{}});showNotice("Attività aggiornata.");await loadData(active);}catch(e){showNotice(errorMessage(e),"error");}};
- const createCare=async(type:string)=>{const destination=type==="weights"?"peso":type==="sheds"?"mute":"note";go(destination);showNotice("Seleziona l'animale e completa il modulo dedicato per registrare il dato.","info");};
- const doInstall=async()=>{if(!installEvent){showNotice("Usa il menu Condividi del browser e scegli “Aggiungi alla schermata Home” o “Installa app”.");return;}await installEvent.prompt();await installEvent.userChoice;setInstallEvent(null);};
+const doInstall=async()=>{if(!installEvent){showNotice("Usa il menu Condividi del browser e scegli “Aggiungi alla schermata Home” o “Installa app”.");return;}await installEvent.prompt();await installEvent.userChoice;setInstallEvent(null);};
  const headerTitle=t(active==="guide-sito"?"Tutorial per usare il sito":active==="guide-pwa"?"Tutorial per installare e usare la PWA":TITLES[active]||"Vivarqo");
  const authFlowPath = /^\/(verify-email|reset-password)\/?$/.test(window.location.pathname);if(!user || authFlowPath)return <><AuthFlowScreen onLogin={loadMe}/><Notice notice={notice}/></>;
  return (
