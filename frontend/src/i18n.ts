@@ -756,6 +756,7 @@ const translations: Record<string, string> = {
   "Tabelle compatte": "Compact tables",
   "Password attuale (richiesta per modificare email o password)": "Current password (required to change email or password)",
   "Nuova password (facoltativa)": "New password (optional)",
+  "Attendi…": "Please wait…",
   "Salvataggio…": "Saving…",
   "Revocare tutte le sessioni?": "Revoke all sessions?",
   "Dovrai effettuare nuovamente l’accesso su tutti i dispositivi.": "You will need to sign in again on all devices.",
