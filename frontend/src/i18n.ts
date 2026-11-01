@@ -965,7 +965,6 @@ const translations: Record<string, string> = {
   "Un allevamento, sotto controllo.": "Your breeding operation, under control.",
   "Registra gli eventi quando accadono. Lo storico farà il resto.": "Record events as they happen. Your history does the rest.",
   "Il mio account": "My account",
-  "Impostazioni account": "Account settings",
   "Apri impostazioni account": "Open account settings",
   "Installa app": "Install app",
   "Chiudi menu": "Close menu",
