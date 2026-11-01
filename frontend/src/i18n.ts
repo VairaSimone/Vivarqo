@@ -978,6 +978,13 @@ function normalize(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+/** Translate application-owned strings during React render. */
+export function t(value: string): string {
+  if (activeLocale === "it") return value;
+  return translations[normalize(value)] ?? value;
+}
+
+
 type OriginalValue = { source: string; output: string };
 const originalText = new WeakMap<Text, OriginalValue>();
 const originalAttributes = new WeakMap<Element, Map<string, OriginalValue>>();
