@@ -109,7 +109,6 @@ const doInstall=async()=>{if(!installEvent){showNotice("Usa il menu Condividi de
   measurementPreferences={measurementPreferences} targetAnimalId={targetAnimalId}
   onNotice={showNotice} onNavigate={go} onInstall={doInstall} onLoadData={loadData}
   onQuickEntry={setQuickEntryKind}
-  onQuickEntrySaved={()=>{setDashboardRefreshKey(key=>key+1);void loadData("oggi");}}
   onHistoryChange={setHistoryItem} onListPageChange={setListPages}
   onInventoryFilterChange={updateInventoryFilter} onInventoryFiltersReset={resetInventoryFilters}
   onSearch={updateRecordSearch} onCare={createCare} onTask={markTask} onEdit={openEditRecord}

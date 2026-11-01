@@ -40,7 +40,6 @@ export interface AppPageRendererProps {
   onInstall: () => void;
   onLoadData: (section?: string) => Promise<void>;
   onQuickEntry: Dispatch<SetStateAction<QuickEntryKind | null>>;
-  onQuickEntrySaved: () => void;
   onHistoryChange: Dispatch<SetStateAction<AnyRecord | null>>;
   onListPageChange: Dispatch<SetStateAction<Record<string, number>>>;
   onInventoryFilterChange: (name: keyof InventoryFiltersState, value: string | boolean) => void;
@@ -57,7 +56,7 @@ export function AppPageRenderer(props: AppPageRendererProps) {
   const {
     active, user, data, busy, rows, dataForDisplay, query, historyItem, inventoryFilters,
     financeRefreshKey, dashboardRefreshKey, measurementPreferences, targetAnimalId,
-    onNotice, onNavigate, onInstall, onLoadData, onQuickEntry, onQuickEntrySaved,
+    onNotice, onNavigate, onInstall, onLoadData, onQuickEntry,
     onHistoryChange, onListPageChange, onInventoryFilterChange, onInventoryFiltersReset,
     onSearch, onCare, onTask, onEdit, onDelete, onMovement
   } = props;
