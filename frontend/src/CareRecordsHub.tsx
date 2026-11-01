@@ -227,7 +227,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
   return <div className="advanced-stack">
     <section className="panel">
       <div className="panel-heading"><div><p className="eyebrow">{t("REGISTRI INDIVIDUALI")}</p><h2>{t("Storico cure e alimentazioni")}</h2><p className="subheading">{t("Sessioni alimentari multi-animale, dettagli per singola voce e paginazione dal server.")}</p></div><Button onClick={() => { void loadRecords(); if (selectedSession?.id) void loadSessionDetail(selectedSession.id); }}>{t("↻ Aggiorna")}</Button></div>
-      <div className="tab-strip" role="tablist" aria-label={t("Tipo di registro")}>{TAB_OPTIONS.map(([id, label]) => <button type="button" role="tab" aria-selected={tab === id} className={tab === id ? "tab-button active" : "tab-button"} key={id} onClick={() => changeTab(id)}>{label}</button>)}</div>
+      <div className="tab-strip" role="tablist" aria-label={t("Tipo di registro")}>{TAB_OPTIONS.map(([id, label]) => <button type="button" role="tab" aria-selected={tab === id} className={tab === id ? "tab-button active" : "tab-button"} key={id} onClick={() => changeTab(id)}>{t(label)}</button>)}</div>
       <div className="form-grid record-filter">
         <label className="field form-full"><span>{tab === "feedings" ? "Filtra sessioni per animale (facoltativo)" : "Animale"}</span><select value={animalId} onChange={e => { setAnimalId(e.target.value); setPage(1); }}><option value="">{tab === "feedings" ? "Tutti gli animali" : "Seleziona animale"}</option>{animals.map(a => <option value={a.id} key={a.id}>{a.name} · {a.species}</option>)}</select></label>
       </div>
@@ -235,7 +235,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
       {error && <p className="form-message" role="alert">{error}</p>}
       <div className="inline-actions record-tools"><Button variant="primary" onClick={openCreate} disabled={tab !== "feedings" && !animalId}>＋ {CREATE_LABELS[tab] || "Nuovo registro"}</Button>{busy && <span className="muted">{t("Caricamento…")}</span>}</div>
       {createOpen && <div className="embedded-form"><form className="form-grid" onSubmit={submitNew} key={tab + "-create"}>
-        <h3 className="form-full">Nuovo registro · {TITLES[tab]}</h3>
+        <h3 className="form-full">Nuovo registro · {t(TITLES[tab])}</h3>
         {tab === "weights" && <><Input label={t("Data e ora")} name="measuredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label={"Peso (" + weightUnit + ")"} name="weightG" type="number" min={inputWeightMin} max={inputWeightMax} step={inputWeightStep} required/><div className="form-full"><Area label={t("Note")} name="notes"/></div></>}
         {tab === "sheds" && <><Input label={t("Data e ora")} name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Select label={t("Esito")} name="outcome" options={SHED} required/><div className="form-full"><Area label={t("Note")} name="notes"/></div></>}
         {tab === "notes" && <><Input label={t("Data e ora")} name="occurredAt" type="datetime-local" defaultValue={dtInput()} required/><Input label={t("Titolo")} name="title"/><Input label={t("Categoria")} name="category" defaultValue="general" required/><div className="form-full"><Area label={t("Osservazione")} name="body" required/></div></>}
@@ -249,7 +249,7 @@ export function CareRecordsHub({ onNotice = () => {}, owner, initialTab = "weigh
           {feedingEntries.map((entry, index) => {
             const animal = animals.find(item => item.id === entry.animalId);
             return <fieldset className="feeding-entry-form form-full" key={entry.animalId}><legend>{animal?.name || "Animale selezionato"}</legend><div className="form-grid">
-              <label className="field"><span>{t("Esito")}</span><select value={entry.outcome} onChange={e => updateFeeding(entry.animalId, { outcome: e.target.value })} required>{FEED_OUTCOME.map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+              <label className="field"><span>{t("Esito")}</span><select value={entry.outcome} onChange={e => updateFeeding(entry.animalId, { outcome: e.target.value })} required>{FEED_OUTCOME.map(([value,label]) => <option value={value} key={value}>{t(label)}</option>)}</select></label>
               <label className="field"><span>{t("Tipo alimento")}</span><input value={entry.foodType} maxLength={120} onChange={e => updateFeeding(entry.animalId, { foodType: e.target.value })} placeholder={t("Altro")}/></label>
               <label className="field"><span>{t("Dimensione")}</span><input value={entry.foodSize} maxLength={120} onChange={e => updateFeeding(entry.animalId, { foodSize: e.target.value })} placeholder={t("Es. ratto medio")}/></label>
               <label className="field"><span>{t("Peso alimento (g)")}</span><input type="number" min={0.01} max={1000000} step={0.01} value={entry.foodWeightG} onChange={e => updateFeeding(entry.animalId, { foodWeightG: e.target.value })}/></label>
