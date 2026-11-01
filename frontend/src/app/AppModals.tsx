@@ -4,13 +4,13 @@ import { Dialog } from "../ui/Dialog";
 import { Field, SelectField } from "../ui/FormControls";
 import { t } from "../i18n";
 
-type ModalField = [
+export type ModalField = [
   name: string,
   label: string,
   type: "text" | "number" | "date" | "datetime-local" | "select" | "textarea",
   initial?: string | number
 ];
-type ModalForm = {
+export type ModalForm = {
   title: string;
   endpoint: string;
   method?: "POST" | "PATCH";
