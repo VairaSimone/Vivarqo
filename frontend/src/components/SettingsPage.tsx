@@ -4,7 +4,7 @@ import { Button, Field, SelectField } from "../ui/FormControls";
 import { apiRequest } from "../api/api";
 import { errorMessage } from "../types";
 import { useConfirmDialog } from "../ui/ConfirmDialog";
-import { getLocale, setLocale as applyLocale } from "../i18n";
+import { getLocale, setLocale as applyLocale, t } from "../i18n";
 
 
 type UserPreferences = {
@@ -106,36 +106,36 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
   };
 
   return <section className="panel settings-panel">
-    <p className="eyebrow">PROFILO E SICUREZZA</p>
-    <h2>Impostazioni account</h2>
+    <p className="eyebrow">{t("PROFILO E SICUREZZA")}</p>
+    <h2>{t("Impostazioni account")}</h2>
     <form className="form-grid" onSubmit={save}>
-      <Field label="Nome visualizzato" value={displayName} onChange={(event) => setName(event.target.value)} required maxLength={120}/>
-      <Field label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/>
-      <SelectField label="Lingua" value={locale} onChange={(event) => setLocaleChoice(event.target.value === "en" ? "en" : "it")}>
-        <option value="it">Italiano</option><option value="en">English</option>
+      <Field label={t("Nome visualizzato")} value={displayName} onChange={(event) => setName(event.target.value)} required maxLength={120}/>
+      <Field label={t("Email")} type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/>
+      <SelectField label={t("Lingua")} value={locale} onChange={(event) => setLocaleChoice(event.target.value === "en" ? "en" : "it")}>
+        <option value="it">{t("Italiano")}</option><option value="en">{t("English")}</option>
       </SelectField>
-      <p className="muted form-full">La lingua del browser viene rilevata automaticamente al primo accesso. Puoi cambiarla qui: la scelta verrà salvata nel tuo account.</p>
-      <Field label="Fuso orario IANA" value={timezone} onChange={(event) => setTimezone(event.target.value)} required/>
-      <div className="form-full"><h3>Preferenze di visualizzazione</h3></div>
-      <SelectField label="Unità di peso" value={preferences.weightUnit} onChange={(event) => updatePreference("weightUnit", event.target.value)}>
-        <option value="g">Grammi (g)</option><option value="kg">Chilogrammi (kg)</option><option value="oz">Once (oz)</option><option value="lb">Libbre (lb)</option>
+      <p className="muted form-full">{t("La lingua del browser viene rilevata automaticamente al primo accesso. Puoi cambiarla qui: la scelta verrà salvata nel tuo account.")}</p>
+      <Field label={t("Fuso orario IANA")} value={timezone} onChange={(event) => setTimezone(event.target.value)} required/>
+      <div className="form-full"><h3>{t("Preferenze di visualizzazione")}</h3></div>
+      <SelectField label={t("Unità di peso")} value={preferences.weightUnit} onChange={(event) => updatePreference("weightUnit", event.target.value)}>
+        <option value="g">{t("Grammi (g)")}</option><option value="kg">{t("Chilogrammi (kg)")}</option><option value="oz">{t("Once (oz)")}</option><option value="lb">{t("Libbre (lb)")}</option>
       </SelectField>
-      <SelectField label="Unità di temperatura" value={preferences.temperatureUnit} onChange={(event) => updatePreference("temperatureUnit", event.target.value)}>
-        <option value="c">Celsius (°C)</option><option value="f">Fahrenheit (°F)</option>
+      <SelectField label={t("Unità di temperatura")} value={preferences.temperatureUnit} onChange={(event) => updatePreference("temperatureUnit", event.target.value)}>
+        <option value="c">{t("Celsius (°C)")}</option><option value="f">{t("Fahrenheit (°F)")}</option>
       </SelectField>
-      <SelectField label="Formato data" value={preferences.dateFormat} onChange={(event) => updatePreference("dateFormat", event.target.value)}>
-        <option value="locale">Secondo la lingua</option><option value="dd/MM/yyyy">GG/MM/AAAA</option><option value="yyyy-MM-dd">AAAA-MM-GG</option>
+      <SelectField label={t("Formato data")} value={preferences.dateFormat} onChange={(event) => updatePreference("dateFormat", event.target.value)}>
+        <option value="locale">{t("Secondo la lingua")}</option><option value="dd/MM/yyyy">{t("GG/MM/AAAA")}</option><option value="yyyy-MM-dd">{t("AAAA-MM-GG")}</option>
       </SelectField>
-      <SelectField label="Schermata iniziale" value={preferences.defaultLandingPage} onChange={(event) => updatePreference("defaultLandingPage", event.target.value)}>
-        <option value="today">Oggi</option><option value="animals">Animali</option><option value="calendar">Calendario</option>
+      <SelectField label={t("Schermata iniziale")} value={preferences.defaultLandingPage} onChange={(event) => updatePreference("defaultLandingPage", event.target.value)}>
+        <option value="today">{t("Oggi")}</option><option value="animals">{t("Animali")}</option><option value="calendar">{t("Calendario")}</option>
       </SelectField>
-      <SelectField label="Tema" value={preferences.theme} onChange={(event) => updatePreference("theme", event.target.value)}>
-        <option value="system">Automatico</option><option value="light">Chiaro</option><option value="dark">Scuro</option>
+      <SelectField label={t("Tema")} value={preferences.theme} onChange={(event) => updatePreference("theme", event.target.value)}>
+        <option value="system">{t("Automatico")}</option><option value="light">{t("Chiaro")}</option><option value="dark">{t("Scuro")}</option>
       </SelectField>
-      <label className="field checkbox-field"><span>Tabelle compatte</span><input type="checkbox" checked={preferences.compactTables} onChange={(event) => updatePreference("compactTables", event.target.checked)}/></label>
+      <label className="field checkbox-field"><span>{t("Tabelle compatte")}</span><input type="checkbox" checked={preferences.compactTables} onChange={(event) => updatePreference("compactTables", event.target.checked)}/></label>
       <div className="form-full">
-        <Field label="Password attuale (richiesta per modificare email o password)" type="password" value={currentPassword} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password"/>
-        <Field label="Nuova password (facoltativa)" type="password" value={newPassword} onChange={(event) => setNew(event.target.value)} autoComplete="new-password" minLength={12}/>
+        <Field label={t("Password attuale (richiesta per modificare email o password)")} type="password" value={currentPassword} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password"/>
+        <Field label={t("Nuova password (facoltativa)")} type="password" value={newPassword} onChange={(event) => setNew(event.target.value)} autoComplete="new-password" minLength={12}/>
       </div>
       <div className="form-full"><Button disabled={busy || !preferencesLoaded}>{busy ? "Salvataggio…" : "Salva impostazioni"}</Button></div>
     </form>
@@ -151,9 +151,9 @@ export function SettingsPage({ user, onNotice }: { user: AccountUser; onNotice: 
     </div>
 
     <section className="danger-zone" aria-labelledby="delete-account-heading">
-      <h3 id="delete-account-heading">Eliminazione account</h3>
-      <p>La cancellazione rimuove i dati gestionali e i file privati associati. È richiesta la password attuale.</p>
-      <Field label="Password attuale" type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} autoComplete="current-password"/>
+      <h3 id="delete-account-heading">{t("Eliminazione account")}</h3>
+      <p>{t("La cancellazione rimuove i dati gestionali e i file privati associati. È richiesta la password attuale.")}</p>
+      <Field label={t("Password attuale")} type="password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} autoComplete="current-password"/>
       <Field label='Scrivi DELETE per confermare' value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off"/>
       <Button variant="danger" disabled={deleting || deleteConfirmation !== "DELETE" || !deletePassword} onClick={deleteAccount}>{deleting ? "Eliminazione…" : "Elimina definitivamente l'account"}</Button>
     </section>
