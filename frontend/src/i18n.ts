@@ -961,6 +961,18 @@ const translations: Record<string, string> = {
   "risultati": "results",
   "In coda": "Queued",
   "Sconosciuto": "Unknown",
+  "IL TUO ALLEVAMENTO": "YOUR BREEDING OPERATION",
+  "Un allevamento, sotto controllo.": "Your breeding operation, under control.",
+  "Registra gli eventi quando accadono. Lo storico farà il resto.": "Record events as they happen. Your history does the rest.",
+  "Il mio account": "My account",
+  "Impostazioni account": "Account settings",
+  "Apri impostazioni account": "Open account settings",
+  "Installa app": "Install app",
+  "Chiudi menu": "Close menu",
+  "Navigazione Vivarqo": "Vivarqo navigation",
+  "Sezioni principali": "Main sections",
+  "Navigazione rapida": "Quick navigation",
+  "Lingua dell'interfaccia": "Interface language",
 };
 
 function normalize(value: string): string {
