@@ -110,7 +110,7 @@ export async function apiRequest<T = AnyRecord>(path: string, options: ApiReques
     body = JSON.stringify(body);
   }
 
-  const url = path.startsWith("/api/") ? path : "/api/v1/" + path.replace(/^\\//, "");
+  const url = path.startsWith("/api/") ? path : "/api/v1/" + path.replace(/^\/+/, "");
   const execute = async (): Promise<T | null> => {
     const response = await fetchWithCsrfRetry(url, {
       ...options,
