@@ -510,3 +510,71 @@ test("rileva l'inglese del browser e registra l'account con la lingua corretta",
   await expect.poll(() => state.requests.some(request => request.path === "auth/register" && request.body.locale === "en")).toBe(true);
   await context.close();
 });
+
+test("sessione iniziale: un errore di rete non viene interpretato come logout", async ({ page }) => {
+  await signIn(page);
+  await page.route("**/api/v1/auth/me", route => route.abort());
+  await page.reload();
+
+  await expect(page.locator(".session-checking")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accedi a Vivarqo" })).toHaveCount(0);
+  await expect(page.getByRole("alert")).toContainText("Non riesco a verificare la sessione");
+
+  await page.unroute("**/api/v1/auth/me");
+  await page.getByRole("button", { name: "Riprova", exact: true }).click();
+  await expect(page.locator(".app-shell")).toBeVisible();
+});
+
+test("impostazioni: il cambio lingua nell'header aggiorna la scelta del modulo", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/settings");
+
+  await page.locator(".app-language-control select").selectOption("en");
+  const settingsLanguage = page.getByLabel("Language");
+  await expect(settingsLanguage).toHaveValue("en");
+
+  await page.getByRole("button", { name: "Save settings", exact: true }).click();
+  await expect.poll(() => page.e2eState.requests.some(request =>
+    request.path === "account" && request.method === "PATCH" && request.body.locale === "en"
+  )).toBe(true);
+});
+
+test("registri inventario: titoli, colonne e stati sono tradotti in inglese", async ({ page }) => {
+  await signIn(page);
+  await page.locator(".app-language-control select").selectOption("en");
+  await page.goto("/inventory");
+
+  const table = page.locator(".records-panel table");
+  await expect(page.locator(".records-panel h2")).toHaveText("Stock and supplies");
+  await expect(table.getByRole("columnheader", { name: "Status" })).toBeVisible();
+  await expect(table.getByRole("columnheader", { name: "Stock" })).toBeVisible();
+  await expect(table.getByRole("cell", { name: "Active" })).toBeVisible();
+  await expect(table.getByRole("cell", { name: "Sufficient" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+});
+
+test("dialog: focus iniziale, trap da tastiera, Escape e ripristino del focus", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/settings");
+
+  const trigger = page.getByRole("button", { name: "Revoca tutte le sessioni", exact: true });
+  await trigger.focus();
+  await trigger.click();
+
+  const dialog = page.getByRole("dialog");
+  const cancel = dialog.getByRole("button", { name: "Annulla", exact: true });
+  const close = dialog.getByRole("button", { name: "Chiudi finestra", exact: true });
+  const confirm = dialog.getByRole("button", { name: "Revoca sessioni", exact: true });
+  await expect(cancel).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(confirm).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
