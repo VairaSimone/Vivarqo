@@ -54,7 +54,7 @@ export function FinanceSummary({ onNotice = () => {}, refreshKey = 0 }: { onNoti
         <div className="form-full inline-actions"><button className="button" type="submit" disabled={busy}>{t("Applica periodo")}</button><button className="button secondary" type="button" onClick={() => { setFilters(initialFilters); void load(initialFilters); }} disabled={busy}>{t("Tutto il periodo")}</button></div>
       </form>
       {error && <p className="form-message" role="alert">{error}</p>}
-      {busy && !summary ? <p className="loading">Caricamento riepilogo…</p> : summary && <>
+      {busy && !summary ? <p className="loading">{t("Caricamento riepilogo…")}</p> : summary && <>
         <div className="stats-grid">
           <article className="stat-card tone-0"><span>{t("Entrate")}</span><strong>{money(summary.incomeCents, summary.currency)}</strong></article>
           <article className="stat-card tone-1"><span>{t("Uscite")}</span><strong>{money(summary.expenseCents, summary.currency)}</strong></article>
