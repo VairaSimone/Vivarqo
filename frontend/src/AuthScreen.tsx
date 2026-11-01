@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { apiRequest } from "./api/api";
 import { readFormValues, errorMessage } from "./types";
-import { getLocale, t } from "./i18n";
+import { getLocale, t, useLocale } from "./i18n";
 import type { NoticeKind } from "./types";
 
 const currentUrl = () => new URL(window.location.href);
@@ -32,20 +32,22 @@ function cleanFlowUrl() {
 }
 
 export function AuthScreen({ onLogin = () => window.location.assign("/") }: { onLogin?: () => void }) {
+  // Authentication can render before an account exists, so it subscribes directly to browser locale changes.
+  useLocale();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [token, setToken] = useState(() => currentUrl().searchParams.get("token") || "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<NoticeKind>("info");
   const tokenRequired = mode === "verify" || mode === "reset";
-  const title = useMemo(() => ({
+  const title = ({
     login: "Accedi a Vivarqo",
     register: "Crea il tuo account",
     forgot: "Recupera l’accesso",
     resend: "Verifica la tua email",
     verify: "Conferma l’indirizzo email",
     reset: "Scegli una nuova password"
-  }[mode] || "Accedi a Vivarqo"), [mode]);
+  }[mode] || "Accedi a Vivarqo");
 
   const switchMode = (next: AuthMode) => {
     setMode(next);
@@ -111,7 +113,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
   return <main className="auth-wrap">
     <div className="auth-art"><a className="brand" href="/" aria-label="Vivarqo"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a><p className="eyebrow">{t("IL GESTIONALE PER ALLEVATORI")}</p><h1>{t("Più cura.")}<br/><em>{t("Meno fogli.")}</em></h1><p>{t("Animali, alimentazioni, documenti e riproduzioni: tutto in un unico spazio, pensato anche per il telefono.")}</p><div className="auth-leaf">❧</div></div>
     <section className="auth-card">
-      <div className="auth-card-head"><p className="eyebrow">{mode === "verify" ? "UN ULTIMO PASSAGGIO" : mode === "reset" ? "RECUPERO ACCOUNT" : "BENTORNATO"}</p><h2>{title}</h2><p>{t("I tuoi registri restano privati e collegati al tuo account.")}</p></div>
+      <div className="auth-card-head"><p className="eyebrow">{t(mode === "verify" ? "UN ULTIMO PASSAGGIO" : mode === "reset" ? "RECUPERO ACCOUNT" : "BENTORNATO")}</p><h2>{t(title)}</h2><p>{t("I tuoi registri restano privati e collegati al tuo account.")}</p></div>
       <form className="form-stack" onSubmit={submit}>
         {mode === "register" && <Field label={t("Nome visualizzato")} name="displayName" autoComplete="name" required maxLength={120}/>}
         {["login", "register", "forgot", "resend"].includes(mode) && <Field label={t("Email")} name="email" type="email" autoComplete="email" required maxLength={254}/>}
@@ -119,7 +121,7 @@ export function AuthScreen({ onLogin = () => window.location.assign("/") }: { on
         {tokenRequired && <><Field label={t("Token ricevuto via email")} name="token" value={token} onChange={event => setToken(event.target.value)} required minLength={43} maxLength={43} autoComplete="one-time-code" spellCheck="false"/>{mode === "verify" && <p className="muted">{t("Apri il link ricevuto via email. Se il token non è compilato automaticamente, incollalo qui.")}</p>}</>}
         {mode === "reset" && <><Field label={t("Nuova password")} name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/><Field label={t("Conferma nuova password")} name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></>}
         {mode === "forgot" && <p className="muted">{t("Ti invieremo le istruzioni se l’indirizzo è associato a un account.")}</p>}
-        <Button disabled={busy}>{busy ? "Attendi…" : ({login:"Accedi",register:"Crea account",forgot:"Invia istruzioni",resend:"Invia nuovo link",verify:"Verifica email",reset:"Reimposta password"}[mode])}</Button>
+        <Button disabled={busy}>{t(busy ? "Attendi…" : ({login:"Accedi",register:"Crea account",forgot:"Invia istruzioni",resend:"Invia nuovo link",verify:"Verifica email",reset:"Reimposta password"}[mode]))}</Button>
       </form>
       {message && <p className={"form-message " + (messageKind === "success" ? "success-text" : messageKind === "error" ? "error-text" : "")} role="status">{message}</p>}
       <div className="auth-links">
