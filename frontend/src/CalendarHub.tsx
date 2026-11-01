@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getIntlLocale } from "./i18n";
+import { getIntlLocale, t } from "./i18n";
 import type { AnyRecord, CommonHubProps } from "./types";
 import { errorMessage } from "./types";
 import { Button, Field, Select } from "./ui/FormControls";
@@ -170,27 +170,27 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
   const monthNames = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
   const renderItem = (item: AnyRecord) => <div className={"calendar-event event-" + item.type} key={item.type + "-" + item.id}>
     <strong>{item.title}</strong><small>{new Intl.DateTimeFormat(getIntlLocale(), { hour: "2-digit", minute: "2-digit" }).format(new Date(item.start))} · {item.animal?.name || (item.type === "reproduction" ? "Riproduzione" : item.type === "clutch" ? "Covata" : item.category)}</small>
-    {item.type === "task" && <div className="inline-actions"><Button onClick={() => beginTask(item)}>Modifica</Button><Button onClick={() => void completeTask(item)}>Completa</Button><Button variant="danger" onClick={() => void deleteTask(item)}>Elimina</Button></div>}
+    {item.type === "task" && <div className="inline-actions"><Button onClick={() => beginTask(item)}>{t("Modifica")}</Button><Button onClick={() => void completeTask(item)}>{t("Completa")}</Button><Button variant="danger" onClick={() => void deleteTask(item)}>{t("Elimina")}</Button></div>}
     {item.type !== "task" && <span className="muted">{item.type === "reproduction" ? "Evento riproduttivo" : "Deposizione"}</span>}
   </div>;
 
   return <div className="advanced-stack">
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">PIANIFICAZIONE</p><h2>Calendario e attività</h2><p className="subheading">Scadenze, eventi riproduttivi e deposizioni letti dal backend.</p></div><div className="inline-actions"><Button variant="primary" onClick={() => beginTask(null)}>＋ Nuova attività</Button><Button onClick={() => void loadCalendar()} disabled={busy}><Icon name="refresh" size={16}/> Aggiorna</Button></div></div>
-      <div className="calendar-toolbar"><div className="inline-actions"><Button onClick={() => move(-1)} aria-label="Periodo precedente"><Icon name="back" size={16}/></Button><Button onClick={() => setAnchor(new Date())}>Oggi</Button><Button onClick={() => move(1)} aria-label="Periodo successivo"><Icon name="next" size={16}/></Button><strong>{title}</strong></div><div className="inline-actions"><div className="tab-strip">{[["month","Mese"],["week","Settimana"],["list","Elenco"]].map(([v, label]) => <button type="button" key={v} className={view === v ? "tab-button active" : "tab-button"} onClick={() => setView(v)}>{label}</button>)}</div></div></div>
-      <label className="check-row"><input type="checkbox" checked={includeDismissed} onChange={e => setIncludeDismissed(e.target.checked)}/> Includi attività archiviate nel calendario</label>
-      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali disponibili nei selettori · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} attivi)</span><div className="inline-actions"><Button disabled={animalsPage <= 1 || saving} onClick={() => setAnimalsPage(p => p - 1)}>← Animali precedenti</Button><Button disabled={animalsPage >= animalsPagination.totalPages || saving} onClick={() => setAnimalsPage(p => p + 1)}>Altri animali →</Button></div></div>}
+      <div className="panel-heading"><div><p className="eyebrow">{t("PIANIFICAZIONE")}</p><h2>{t("Calendario e attività")}</h2><p className="subheading">{t("Scadenze, eventi riproduttivi e deposizioni letti dal backend.")}</p></div><div className="inline-actions"><Button variant="primary" onClick={() => beginTask(null)}>{t("＋ Nuova attività")}</Button><Button onClick={() => void loadCalendar()} disabled={busy}><Icon name="refresh" size={16}/> {t("Aggiorna")}</Button></div></div>
+      <div className="calendar-toolbar"><div className="inline-actions"><Button onClick={() => move(-1)} aria-label={t("Periodo precedente")}><Icon name="back" size={16}/></Button><Button onClick={() => setAnchor(new Date())}>{t("Oggi")}</Button><Button onClick={() => move(1)} aria-label={t("Periodo successivo")}><Icon name="next" size={16}/></Button><strong>{title}</strong></div><div className="inline-actions"><div className="tab-strip">{[["month","Mese"],["week","Settimana"],["list","Elenco"]].map(([v, label]) => <button type="button" key={v} className={view === v ? "tab-button active" : "tab-button"} onClick={() => setView(v)}>{label}</button>)}</div></div></div>
+      <label className="check-row"><input type="checkbox" checked={includeDismissed} onChange={e => setIncludeDismissed(e.target.checked)}/> {t("Includi attività archiviate nel calendario")}</label>
+      {animalsPagination.totalPages > 1 && <div className="pagination-bar"><span className="muted">Animali disponibili nei selettori · pagina {animalsPagination.page}/{animalsPagination.totalPages} ({animalsPagination.total} attivi)</span><div className="inline-actions"><Button disabled={animalsPage <= 1 || saving} onClick={() => setAnimalsPage(p => p - 1)}>{t("← Animali precedenti")}</Button><Button disabled={animalsPage >= animalsPagination.totalPages || saving} onClick={() => setAnimalsPage(p => p + 1)}>{t("Altri animali →")}</Button></div></div>}
       {error && <p className="form-message" role="alert">{error}</p>}
       {taskFormOpen && <div className="embedded-form"><form className="form-grid" onSubmit={saveTask} key={taskEditing?.id || "new-task"}>
         <h3 className="form-full">{taskEditing ? "Modifica attività" : "Nuova attività"}</h3>
-        <Field label="Titolo" name="title" defaultValue={taskEditing?.title || ""} required maxLength={160}/>
-        <Select label="Categoria" name="category" defaultValue={taskEditing?.category || "custom"} options={CATEGORIES}/>
-        <Field label="Scadenza" name="dueAt" type="datetime-local" defaultValue={dtInput(taskEditing?.dueAt)} required/>
-        <label className="field"><span>Animale (facoltativo)</span><select name="animalId" defaultValue={taskEditing?.animalId || ""}><option value="">Nessun animale</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
-        <label className="field form-full"><span>Descrizione</span><textarea name="description" defaultValue={taskEditing?.description || ""} rows={3} maxLength={10000}/></label>
-        <div className="form-actions form-full"><Button type="button" onClick={() => { setTaskFormOpen(false); setTaskEditing(null); }}>Annulla</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva attività"}</Button></div>
+        <Field label={t("Titolo")} name="title" defaultValue={taskEditing?.title || ""} required maxLength={160}/>
+        <Select label={t("Categoria")} name="category" defaultValue={taskEditing?.category || "custom"} options={CATEGORIES}/>
+        <Field label={t("Scadenza")} name="dueAt" type="datetime-local" defaultValue={dtInput(taskEditing?.dueAt)} required/>
+        <label className="field"><span>{t("Animale (facoltativo)")}</span><select name="animalId" defaultValue={taskEditing?.animalId || ""}><option value="">{t("Nessun animale")}</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
+        <label className="field form-full"><span>{t("Descrizione")}</span><textarea name="description" defaultValue={taskEditing?.description || ""} rows={3} maxLength={10000}/></label>
+        <div className="form-actions form-full"><Button type="button" onClick={() => { setTaskFormOpen(false); setTaskEditing(null); }}>{t("Annulla")}</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva attività"}</Button></div>
       </form></div>}
-      {busy ? <div className="loading">Caricamento calendario…</div> : view === "list" ? <div className="log-list">{items.length ? items.map(renderItem) : <p className="muted">Nessun evento nell’intervallo scelto.</p>}</div> : <>
+      {busy ? <div className="loading">{t("Caricamento calendario…")}</div> : view === "list" ? <div className="log-list">{items.length ? items.map(renderItem) : <p className="muted">{t("Nessun evento nell’intervallo scelto.")}</p>}</div> : <>
         <div className="calendar-grid calendar-weekdays">{monthNames.map(name => <div key={name}>{name}</div>)}</div>
         <div className="calendar-grid">
           {visibleDays.map(day => <div className={"calendar-day " + (view === "month" && day.getMonth() !== anchor.getMonth() ? "is-outside" : "") + (dateKey(day) === dateKey(new Date()) ? " is-today" : "")} key={dateKey(day)}>
@@ -198,25 +198,25 @@ export function CalendarHub({ onNotice = () => {} }: CommonHubProps) {
           </div>)}
         </div>
       </>}
-      {items.length > 450 && <p className="notice warning">Il backend segnala un possibile troncamento dei risultati. Riduci l’intervallo o usa la vista settimanale per vedere meno eventi.</p>}
+      {items.length > 450 && <p className="notice warning">{t("Il backend segnala un possibile troncamento dei risultati. Riduci l’intervallo o usa la vista settimanale per vedere meno eventi.")}</p>}
     </section>
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">AUTOMAZIONI</p><h2>Promemoria ricorrenti</h2><p className="subheading">Crea, modifica, sospendi o riattiva regole automatiche di scadenza.</p></div><Button variant="primary" onClick={() => setRuleForm({ id: null, title: "", category: "feeding", intervalDays: 14, nextDueAt: dtInput(), animalId: "", isEnabled: true })}>＋ Nuova regola</Button></div>
+      <div className="panel-heading"><div><p className="eyebrow">{t("AUTOMAZIONI")}</p><h2>{t("Promemoria ricorrenti")}</h2><p className="subheading">{t("Crea, modifica, sospendi o riattiva regole automatiche di scadenza.")}</p></div><Button variant="primary" onClick={() => setRuleForm({ id: null, title: "", category: "feeding", intervalDays: 14, nextDueAt: dtInput(), animalId: "", isEnabled: true })}>{t("＋ Nuova regola")}</Button></div>
       {ruleForm && <div className="embedded-form"><form className="form-grid" onSubmit={saveRule} key={ruleForm.id || "new-rule"}>
         <h3 className="form-full">{ruleForm.id ? "Modifica regola" : "Nuova regola ricorrente"}</h3>
-        <Field label="Titolo" name="title" defaultValue={ruleForm.title} required maxLength={160}/>
-        <Select label="Categoria" name="category" defaultValue={ruleForm.category} options={CATEGORIES}/>
-        <Field label="Intervallo (giorni)" name="intervalDays" type="number" defaultValue={ruleForm.intervalDays} min={1} max={3650} required/>
-        <Field label="Prossima scadenza" name="nextDueAt" type="datetime-local" defaultValue={dtInput(ruleForm.nextDueAt)} required/>
-        <label className="field"><span>Animale (facoltativo)</span><select name="animalId" defaultValue={ruleForm.animalId || ""}><option value="">Nessun animale</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
-        <label className="check-row"><input type="checkbox" name="isEnabled" defaultChecked={ruleForm.isEnabled !== false}/> Regola attiva</label>
-        <div className="form-actions form-full"><Button type="button" onClick={() => setRuleForm(null)}>Annulla</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva regola"}</Button></div>
+        <Field label={t("Titolo")} name="title" defaultValue={ruleForm.title} required maxLength={160}/>
+        <Select label={t("Categoria")} name="category" defaultValue={ruleForm.category} options={CATEGORIES}/>
+        <Field label={t("Intervallo (giorni)")} name="intervalDays" type="number" defaultValue={ruleForm.intervalDays} min={1} max={3650} required/>
+        <Field label={t("Prossima scadenza")} name="nextDueAt" type="datetime-local" defaultValue={dtInput(ruleForm.nextDueAt)} required/>
+        <label className="field"><span>{t("Animale (facoltativo)")}</span><select name="animalId" defaultValue={ruleForm.animalId || ""}><option value="">{t("Nessun animale")}</option>{animals.map(a => <option key={a.id} value={a.id}>{a.name} · {a.species}</option>)}</select></label>
+        <label className="check-row"><input type="checkbox" name="isEnabled" defaultChecked={ruleForm.isEnabled !== false}/> {t("Regola attiva")}</label>
+        <div className="form-actions form-full"><Button type="button" onClick={() => setRuleForm(null)}>{t("Annulla")}</Button><Button variant="primary" disabled={saving}>{saving ? "Salvataggio…" : "Salva regola"}</Button></div>
       </form></div>}
-      {rules.length === 0 ? <div className="empty-state"><h3>Nessuna regola ricorrente</h3><p>Crea una regola per generare attività ricorrenti senza doverle inserire ogni volta.</p></div> : <div className="log-list">{rules.map(rule => <article className="log-row" key={rule.id}>
+      {rules.length === 0 ? <div className="empty-state"><h3>{t("Nessuna regola ricorrente")}</h3><p>{t("Crea una regola per generare attività ricorrenti senza doverle inserire ogni volta.")}</p></div> : <div className="log-list">{rules.map(rule => <article className="log-row" key={rule.id}>
         <div><strong>{rule.title}</strong><p>{CATEGORIES.find(([v]) => v === rule.category)?.[1] || rule.category} · ogni {rule.intervalDays} giorni</p><small>Prossima scadenza: {dateLabel(rule.nextDueAt)} · {rule.animal?.name || "Tutto l’allevamento"}</small><small>{rule.isEnabled ? "Attiva" : "Disattivata"}</small></div>
-        <div className="inline-actions"><Button onClick={() => setRuleForm({ ...rule, nextDueAt: dtInput(rule.nextDueAt), animalId: rule.animalId || "" })}>Modifica</Button><Button onClick={() => void toggleRule(rule)}>{rule.isEnabled ? "Disattiva" : "Riattiva"}</Button>{rule.isEnabled && <Button variant="danger" onClick={() => void deleteRule(rule)}>Termina</Button>}</div>
+        <div className="inline-actions"><Button onClick={() => setRuleForm({ ...rule, nextDueAt: dtInput(rule.nextDueAt), animalId: rule.animalId || "" })}>{t("Modifica")}</Button><Button onClick={() => void toggleRule(rule)}>{rule.isEnabled ? "Disattiva" : "Riattiva"}</Button>{rule.isEnabled && <Button variant="danger" onClick={() => void deleteRule(rule)}>{t("Termina")}</Button>}</div>
       </article>)}</div>}
-      <div className="pagination-bar"><span className="muted">Pagina {rulePagination.page || rulePage} di {Math.max(1, rulePagination.totalPages || 1)} · {rulePagination.total ?? rules.length} regole</span><div className="inline-actions"><Button disabled={rulePage <= 1} onClick={() => setRulePage(p => Math.max(1, p - 1))}>← Precedente</Button><Button disabled={rulePage >= (rulePagination.totalPages || 1)} onClick={() => setRulePage(p => p + 1)}>Successiva →</Button></div></div>
+      <div className="pagination-bar"><span className="muted">Pagina {rulePagination.page || rulePage} di {Math.max(1, rulePagination.totalPages || 1)} · {rulePagination.total ?? rules.length} regole</span><div className="inline-actions"><Button disabled={rulePage <= 1} onClick={() => setRulePage(p => Math.max(1, p - 1))}>{t("← Precedente")}</Button><Button disabled={rulePage >= (rulePagination.totalPages || 1)} onClick={() => setRulePage(p => p + 1)}>{t("Successiva →")}</Button></div></div>
     </section>
   </div>;
 }

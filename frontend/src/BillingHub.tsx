@@ -1,5 +1,5 @@
 import type { AnyRecord } from "./types";
-import { getIntlLocale } from "./i18n";
+import { getIntlLocale, t } from "./i18n";
 import React, { useCallback, useEffect, useState } from "react";
 import type { CommonHubProps } from "./types";
 import { apiRequest } from "./api/api";
@@ -47,21 +47,21 @@ export function BillingHub({ onNotice = () => {} }: CommonHubProps) {
   const paid = Boolean(data?.entitlements?.paidSubscription);
   const customerHasSubscription = Boolean(subscription);
   return <div className="advanced-stack">
-    {checkoutState === "success" && <div className="notice info">Checkout completato. Stripe può impiegare qualche istante ad aggiornare lo stato tramite webhook: usa “Aggiorna stato” per verificarlo.</div>}
-    {checkoutState === "cancelled" && <div className="notice warning">Checkout annullato: non è stato avviato un nuovo abbonamento.</div>}
-    {error && <section className="panel"><p className="form-message" role="alert">{error}</p><Button onClick={() => void load()}>Riprova</Button></section>}
+    {checkoutState === "success" && <div className="notice info">{t("Checkout completato. Stripe può impiegare qualche istante ad aggiornare lo stato tramite webhook: usa “Aggiorna stato” per verificarlo.")}</div>}
+    {checkoutState === "cancelled" && <div className="notice warning">{t("Checkout annullato: non è stato avviato un nuovo abbonamento.")}</div>}
+    {error && <section className="panel"><p className="form-message" role="alert">{error}</p><Button onClick={() => void load()}>{t("Riprova")}</Button></section>}
     <section className="panel">
-      <div className="panel-heading"><div><p className="eyebrow">PIANO E PAGAMENTI</p><h2>Il tuo abbonamento</h2><p className="subheading">I pagamenti vengono gestiti da Stripe; Vivarqo non raccoglie i dati completi della carta.</p></div><Button onClick={() => void load()} disabled={busy}>↻ Aggiorna stato</Button></div>
-      {busy && !data ? <div className="loading">Caricamento abbonamento…</div> : <>
-        <div className="stats-grid"><article className="stat-card tone-0"><span>Stato</span><strong>{statusLabel(subscription?.status)}</strong><small>{paid ? "Funzioni del piano a pagamento abilitate" : "Funzioni a pagamento non abilitate"}</small></article><article className="stat-card tone-1"><span>Periodo dal</span><strong>{dateLabel(subscription?.currentPeriodStart)}</strong><small>Inizio periodo corrente</small></article><article className="stat-card tone-2"><span>Periodo fino al</span><strong>{dateLabel(subscription?.currentPeriodEnd)}</strong><small>{subscription?.cancelAtPeriodEnd ? "Annullamento programmato" : "Fine periodo corrente"}</small></article></div>
-        {!data?.configured && <div className="notice warning">Il pagamento non è configurato completamente sul server. Imposta chiavi Stripe, prezzo e segreto webhook in ambiente; i pulsanti di pagamento resteranno disabilitati.</div>}
+      <div className="panel-heading"><div><p className="eyebrow">{t("PIANO E PAGAMENTI")}</p><h2>{t("Il tuo abbonamento")}</h2><p className="subheading">{t("I pagamenti vengono gestiti da Stripe; Vivarqo non raccoglie i dati completi della carta.")}</p></div><Button onClick={() => void load()} disabled={busy}>{t("↻ Aggiorna stato")}</Button></div>
+      {busy && !data ? <div className="loading">{t("Caricamento abbonamento…")}</div> : <>
+        <div className="stats-grid"><article className="stat-card tone-0"><span>{t("Stato")}</span><strong>{statusLabel(subscription?.status)}</strong><small>{paid ? "Funzioni del piano a pagamento abilitate" : "Funzioni a pagamento non abilitate"}</small></article><article className="stat-card tone-1"><span>{t("Periodo dal")}</span><strong>{dateLabel(subscription?.currentPeriodStart)}</strong><small>{t("Inizio periodo corrente")}</small></article><article className="stat-card tone-2"><span>{t("Periodo fino al")}</span><strong>{dateLabel(subscription?.currentPeriodEnd)}</strong><small>{subscription?.cancelAtPeriodEnd ? "Annullamento programmato" : "Fine periodo corrente"}</small></article></div>
+        {!data?.configured && <div className="notice warning">{t("Il pagamento non è configurato completamente sul server. Imposta chiavi Stripe, prezzo e segreto webhook in ambiente; i pulsanti di pagamento resteranno disabilitati.")}</div>}
         <div className="inline-actions">
-          <Button variant="primary" disabled={busy || !data?.configured || paid} onClick={() => void go("checkout")}>Attiva / acquista abbonamento</Button>
-          <Button disabled={busy || !customerHasSubscription} onClick={() => void go("portal")}>Gestisci pagamenti e cancellazione</Button>
+          <Button variant="primary" disabled={busy || !data?.configured || paid} onClick={() => void go("checkout")}>{t("Attiva / acquista abbonamento")}</Button>
+          <Button disabled={busy || !customerHasSubscription} onClick={() => void go("portal")}>{t("Gestisci pagamenti e cancellazione")}</Button>
         </div>
-        {paid && <p className="muted">Il piano è attivo. Per aggiornare il metodo di pagamento o cambiare le preferenze di rinnovo, apri il portale Stripe.</p>}
-        {subscription?.cancelAtPeriodEnd && <p className="muted">L’abbonamento è previsto in cancellazione alla fine del periodo indicato sopra. Verifica i dettagli nel portale Stripe.</p>}
-        {!subscription && <p className="muted">Non risulta ancora un abbonamento collegato a questo account. L’acquisto sarà disponibile quando il server Stripe sarà configurato.</p>}
+        {paid && <p className="muted">{t("Il piano è attivo. Per aggiornare il metodo di pagamento o cambiare le preferenze di rinnovo, apri il portale Stripe.")}</p>}
+        {subscription?.cancelAtPeriodEnd && <p className="muted">{t("L’abbonamento è previsto in cancellazione alla fine del periodo indicato sopra. Verifica i dettagli nel portale Stripe.")}</p>}
+        {!subscription && <p className="muted">{t("Non risulta ancora un abbonamento collegato a questo account. L’acquisto sarà disponibile quando il server Stripe sarà configurato.")}</p>}
       </>}
     </section>
   </div>;
