@@ -9,9 +9,11 @@ export interface E2EState {
   failAnimalList: boolean;
   failDocumentList: boolean;
   failNotificationList: boolean;
+  failAccountPreferences: boolean;
   animalListDelayMs: number;
   documentListDelayMs: number;
   notificationListDelayMs: number;
+  inventoryCreateDelayMs: number;
   animals: E2ERecord[];
   cycle: E2ERecord;
   cycles: E2ERecord[];
@@ -29,6 +31,7 @@ export interface E2EState {
   notifications: E2ERecord[];
   unreadCount: number;
   preferences: E2ERecord;
+  accountPreferences: E2ERecord;
   devices: E2ERecord[];
   requests: Array<{ path: string; method: string; body: E2ERecord; query: string }>;
   nextId: number;
@@ -55,13 +58,14 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
     notes: "", _count: { eggs: 0, incubationLogs: 0 }
   };
   const state: E2EState = {
-    authenticated: false, accountLocale: "it", failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0,
+    authenticated: false, accountLocale: "it", failLogin: false, failAnimalList: false, failDocumentList: false, failNotificationList: false, failAccountPreferences: false, animalListDelayMs: 0, documentListDelayMs: 0, notificationListDelayMs: 0, inventoryCreateDelayMs: 0,
     animals: [animal, secondAnimal], cycle, cycles: [cycle], clutches: [clutch], eggs: [],
     events: [], incubationLogs: [], batches: [], weights: [], sheds: [], notes: [], sessions: [], documents: [],
     share: null,
     notifications: [{ id: "notice-1", title: "Attività in scadenza", body: "Controlla la scheda di Naga.", category: "task_due", createdAt: "2026-10-28T10:00:00.000Z", readAt: null, targetPath: "/animals/animal-1" }],
     unreadCount: 1,
     preferences: { inAppEnabled: true, pushEnabled: false, categories: { task_due: true, system: true }, quietHoursStart: "", quietHoursEnd: "" },
+    accountPreferences: { weightUnit: "kg", temperatureUnit: "f", dateFormat: "yyyy-MM-dd", defaultLandingPage: "animals", compactTables: true, theme: "dark" },
     devices: [{ id: "device-1", userAgent: "Chromium E2E", createdAt: "2026-10-28T10:00:00.000Z" }],
     requests: [], nextId: 1
   };
@@ -110,9 +114,21 @@ export async function mockApi(context: BrowserContext): Promise<E2EState> {
       if (body.locale === "it" || body.locale === "en") state.accountLocale = body.locale;
       return respond({ message: "Impostazioni aggiornate." });
     }
+    if (path === "account/preferences" && method === "GET") {
+      if (state.failAccountPreferences) return respond({ message: "Errore caricamento preferenze E2E." }, 503);
+      return respond({ preferences: state.accountPreferences });
+    }
+    if (path === "account/preferences" && method === "PATCH") {
+      state.accountPreferences = { ...state.accountPreferences, ...body };
+      return respond({ preferences: state.accountPreferences });
+    }
     if (path === "home/today" && method === "GET") return respond({ tasks: { dueToday: [], overdue: [] }, counts: { dueToday: 0, overdue: 0 }, recentEvents: [] });
     if (path.startsWith("billing/") && method === "GET") return respond({ subscription: { status: "active", plan: "BREEDER" } });
 
+    if (path === "inventory/items" && method === "POST") {
+      if (state.inventoryCreateDelayMs) await new Promise(resolve => setTimeout(resolve, state.inventoryCreateDelayMs));
+      return respond({ item: body });
+    }
     if (path === "inventory/items" && method === "GET") {
       return respond(itemsResponse("items", [{
         id: "inventory-1", name: "Ratto", category: "food", quantityOnHand: 8,

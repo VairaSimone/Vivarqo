@@ -539,6 +539,58 @@ test("impostazioni: il cambio lingua nell'header aggiorna la scelta del modulo",
   )).toBe(true);
 });
 
+test("impostazioni: il profilo si salva senza sovrascrivere preferenze non caricate", async ({ page }) => {
+  await signIn(page);
+  page.e2eState.failAccountPreferences = true;
+  await page.goto("/settings");
+
+  await expect(page.getByRole("alert")).toContainText("Non è stato possibile caricare le preferenze");
+  const retry = page.getByRole("button", { name: "Riprova a caricare le preferenze", exact: true });
+  await expect(retry).toBeVisible();
+  await expect(page.getByLabel("Unità di peso")).toBeDisabled();
+
+  await page.getByLabel("Nome visualizzato").fill("Profilo aggiornato");
+  await page.getByRole("button", { name: "Salva impostazioni", exact: true }).click();
+  await expect.poll(() => page.e2eState.requests.some(request =>
+    request.path === "account" && request.method === "PATCH" && request.body.displayName === "Profilo aggiornato"
+  )).toBe(true);
+
+  expect(page.e2eState.requests.filter(request =>
+    request.path === "account/preferences" && request.method === "PATCH"
+  )).toHaveLength(0);
+  expect(page.e2eState.accountPreferences.weightUnit).toBe("kg");
+  await expect(page.locator(".notice.warning")).toContainText("Profilo aggiornato");
+
+  page.e2eState.failAccountPreferences = false;
+  await retry.click();
+  await expect(page.getByLabel("Unità di peso")).toHaveValue("kg");
+  await expect(page.getByLabel("Unità di peso")).toBeEnabled();
+});
+
+test("modale generico: blocca doppi invii e non si chiude durante il salvataggio", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/inventory");
+  page.e2eState.inventoryCreateDelayMs = 700;
+
+  await page.getByRole("button", { name: /Nuovo articolo/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[name="name"]').fill("Scorta E2E");
+  await dialog.getByLabel("Categoria").selectOption("food");
+  await dialog.locator('input[name="unit"]').fill("pezzi");
+  await dialog.locator('input[name="quantityOnHand"]').fill("2");
+
+  const save = dialog.getByRole("button", { name: "Salva", exact: true });
+  await save.dblclick({ delay: 20 });
+  await expect(save).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+
+  await expect.poll(() => page.e2eState.requests.filter(request =>
+    request.path === "inventory/items" && request.method === "POST"
+  ).length).toBe(1);
+  await expect(dialog).toHaveCount(0);
+});
+
 test("registri inventario: titoli, colonne e stati sono tradotti in inglese", async ({ page }, testInfo) => {
   await signIn(page);
   await page.locator(".app-language-control select").selectOption("en");

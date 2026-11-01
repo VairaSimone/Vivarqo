@@ -33,7 +33,9 @@ export function Dialog({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
   onCloseRef.current = onClose;
+  busyRef.current = busy;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -58,7 +60,7 @@ export function Dialog({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        onCloseRef.current?.();
+        if (!busyRef.current) onCloseRef.current?.();
         return;
       }
       if (event.key !== "Tab") return;

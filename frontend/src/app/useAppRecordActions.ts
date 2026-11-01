@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction, FormEvent } from "react";
+import { useRef, useState, type Dispatch, type SetStateAction, type FormEvent } from "react";
 import { apiRequest } from "../api/api";
 import type { AnyRecord, InventoryFiltersState, NavigationHandler, NoticeHandler } from "../types";
 import { errorMessage, readFormValues } from "../types";
@@ -38,6 +38,8 @@ export function useAppRecordActions(options: AppRecordActionsOptions) {
     setInventoryFilters, setHistoryItem, setFinanceRefreshKey, loadData,
     go, onNotice, confirm
   } = options;
+  const [savingEntity, setSavingEntity] = useState(false);
+  const savingEntityRef = useRef(false);
 
   const updateInventoryFilter = (name: keyof InventoryFiltersState, value: string | boolean) => {
     setInventoryFilters(current => name === "lowStock"
@@ -58,8 +60,10 @@ export function useAppRecordActions(options: AppRecordActionsOptions) {
 
   const saveEntity = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (savingEntityRef.current || !modal) return;
+    savingEntityRef.current = true;
+    setSavingEntity(true);
     const raw = readFormValues(event.currentTarget);
-    if (!modal) return;
     const { endpoint, method = "POST", transform } = modal;
     try {
       await apiRequest(endpoint, { method, body: transform ? transform(raw) : raw });
@@ -69,6 +73,9 @@ export function useAppRecordActions(options: AppRecordActionsOptions) {
       await loadData(active);
     } catch (error) {
       onNotice(errorMessage(error), "error");
+    } finally {
+      savingEntityRef.current = false;
+      setSavingEntity(false);
     }
   };
 
@@ -173,7 +180,7 @@ export function useAppRecordActions(options: AppRecordActionsOptions) {
   };
 
   return {
-    updateInventoryFilter, resetInventoryFilters, updateRecordSearch, saveEntity,
+    updateInventoryFilter, resetInventoryFilters, updateRecordSearch, saveEntity, savingEntity,
     addAnimal, addInventory, addFinance, addTask, openEditRecord, deleteRecord,
     createInventoryMovement, markTask, createCare,
     actionButton: active === "inventario"

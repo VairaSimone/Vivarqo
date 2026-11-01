@@ -82,7 +82,7 @@ function App() {
 
   const showSessionNotice = showNotice;
   const {
-    updateInventoryFilter, resetInventoryFilters, updateRecordSearch, saveEntity,
+    updateInventoryFilter, resetInventoryFilters, updateRecordSearch, saveEntity, savingEntity,
     addInventory, addFinance, openEditRecord, deleteRecord, createInventoryMovement,
     markTask, createCare, actionButton
   } = useAppRecordActions({
@@ -215,7 +215,7 @@ function App() {
           <span>{t("Sessione protetta · Dati caricati dal backend")}</span>
         </footer>
       </div>
-      {modal && <Modal modal={modal} onClose={() => setModal(null)} onSubmit={saveEntity} />}
+      {modal && <Modal modal={modal} onClose={() => setModal(null)} onSubmit={saveEntity} busy={savingEntity} />}
       {quickEntryKind && (
         <QuickEntryDialog
           kind={quickEntryKind}

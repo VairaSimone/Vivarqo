@@ -7,6 +7,18 @@ const CACHE = "vivarqo-static-v2";
 const STATIC = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 const STATIC_DESTINATIONS = new Set<RequestDestination>(["script", "style", "image", "font"]);
 
+/** Accept root-relative navigation targets only after URL parser normalization. */
+function validatedAppPath(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/")) return "/";
+  try {
+    const target = new URL(value, serviceWorker.location.origin);
+    if (target.origin !== serviceWorker.location.origin) return "/";
+    return target.pathname + target.search + target.hash;
+  } catch {
+    return "/";
+  }
+}
+
 serviceWorker.addEventListener("install", (event: any) => {
   // Keep the previous worker active until the user accepts an available update.
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC)));
@@ -77,8 +89,7 @@ serviceWorker.addEventListener("push", (event: any) => {
       ? payload.title.slice(0, 160)
       : "Vivarqo";
     const body = typeof payload.body === "string" ? payload.body.slice(0, 1000) : "";
-    const requestedUrl = typeof payload.url === "string" ? payload.url : "/";
-    const safeUrl = requestedUrl.startsWith("/") && !requestedUrl.startsWith("//") ? requestedUrl : "/";
+    const safeUrl = validatedAppPath(payload.url);
     const category = typeof payload.category === "string" ? payload.category.slice(0, 30) : "general";
 
     await serviceWorker.registration.showNotification(title, {
@@ -96,10 +107,7 @@ serviceWorker.addEventListener("push", (event: any) => {
 serviceWorker.addEventListener("notificationclick", (event: any) => {
   event.notification.close();
   const requestedUrl = (event.notification.data as { url?: unknown } | null)?.url;
-  const safeUrl = typeof requestedUrl === "string" && requestedUrl.startsWith("/") && !requestedUrl.startsWith("//")
-    ? requestedUrl
-    : "/";
-  const target = new URL(safeUrl, serviceWorker.location.origin);
+  const target = new URL(validatedAppPath(requestedUrl), serviceWorker.location.origin);
 
   event.waitUntil((async () => {
     const windows = await serviceWorker.clients.matchAll({ type: "window", includeUncontrolled: true });

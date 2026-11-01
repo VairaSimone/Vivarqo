@@ -1007,6 +1007,10 @@ export const translations: Record<string, string> = {
   "Sessione protetta · Dati caricati dal backend": "Secure session · Data loaded from the backend",
   "VIVARQO": "VIVARQO",
   "Vivarqo · Crescere con cura.": "Vivarqo · Growing with care.",
+  "Caricamento preferenze…": "Loading preferences…",
+  "Non è stato possibile caricare le preferenze. Non verranno modificate dal salvataggio del profilo.": "Could not load preferences. They will not be changed when saving your profile.",
+  "Riprova a caricare le preferenze": "Retry loading preferences",
+  "Profilo aggiornato. Le preferenze non sono state modificate perché non erano disponibili.": "Profile updated. Preferences were not changed because they were unavailable.",
 };
 
 function normalize(value: string): string {

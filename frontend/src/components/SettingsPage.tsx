@@ -36,6 +36,9 @@ export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: Accoun
   const [busy, setBusy] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesLoadError, setPreferencesLoadError] = useState("");
+  const [preferencesLoadAttempt, setPreferencesLoadAttempt] = useState(0);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -47,25 +50,34 @@ export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: Accoun
 
   useEffect(() => {
     let active = true;
+    setPreferencesLoading(true);
+    setPreferencesLoadError("");
     apiRequest("account/preferences")
       .then((result) => {
-        if (active) setPreferences({ ...DEFAULT_PREFERENCES, ...(result.preferences || {}) });
+        if (!active) return;
+        setPreferences({ ...DEFAULT_PREFERENCES, ...(result.preferences || {}) });
+        setPreferencesLoaded(true);
       })
       .catch((error) => {
-        if (active) onNotice(errorMessage(error), "error");
+        if (!active) return;
+        setPreferencesLoaded(false);
+        setPreferencesLoadError(errorMessage(error));
       })
-      .finally(() => { if (active) setPreferencesLoaded(true); });
+      .finally(() => { if (active) setPreferencesLoading(false); });
     return () => { active = false; };
-  }, [onNotice]);
+  }, [onNotice, preferencesLoadAttempt]);
 
   const updatePreference = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => setPreferences((current) => ({ ...current, [key]: value }));
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
+    const canSavePreferences = preferencesLoaded;
     try {
-      await apiRequest("account/preferences", { method: "PATCH", body: preferences });
-      window.dispatchEvent(new CustomEvent("vivarqo:preferences-updated", { detail: preferences }));
+      if (canSavePreferences) {
+        await apiRequest("account/preferences", { method: "PATCH", body: preferences });
+        window.dispatchEvent(new CustomEvent("vivarqo:preferences-updated", { detail: preferences }));
+      }
       const body: Record<string, unknown> = { displayName, locale, timezone };
       if (email !== user.email || newPassword) {
         body.email = email;
@@ -74,7 +86,11 @@ export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: Accoun
       }
       const result = await apiRequest("account", { method: "PATCH", body });
       onLocaleApplied(locale);
-      onNotice(result.message || "Impostazioni e preferenze aggiornate.");
+      if (canSavePreferences) {
+        onNotice(result.message || "Impostazioni e preferenze aggiornate.");
+      } else {
+        onNotice("Profilo aggiornato. Le preferenze non sono state modificate perché non erano disponibili.", "warning");
+      }
       setCurrent("");
       setNew("");
     } catch (error) {
@@ -121,23 +137,30 @@ export function SettingsPage({ user, onNotice, onLocaleApplied }: { user: Accoun
       </SelectField>
       <p className="muted form-full">{t("La lingua del browser viene rilevata automaticamente al primo accesso. Puoi cambiarla qui: la scelta verrà salvata nel tuo account.")}</p>
       <Field label={t("Fuso orario IANA")} value={timezone} onChange={(event) => setTimezone(event.target.value)} required/>
-      <div className="form-full"><h3>{t("Preferenze di visualizzazione")}</h3></div>
-      <SelectField label={t("Unità di peso")} value={preferences.weightUnit} onChange={(event) => updatePreference("weightUnit", event.target.value)}>
+      <div className="form-full">
+        <h3>{t("Preferenze di visualizzazione")}</h3>
+        {preferencesLoading && <p className="muted" role="status">{t("Caricamento preferenze…")}</p>}
+        {preferencesLoadError && <div className="form-message error-text" role="alert">
+          <p>{t("Non è stato possibile caricare le preferenze. Non verranno modificate dal salvataggio del profilo.")}</p>
+          <Button type="button" variant="secondary" disabled={preferencesLoading} onClick={() => setPreferencesLoadAttempt(value => value + 1)}>{t("Riprova a caricare le preferenze")}</Button>
+        </div>}
+      </div>
+      <SelectField disabled={!preferencesLoaded || busy} label={t("Unità di peso")} value={preferences.weightUnit} onChange={(event) => updatePreference("weightUnit", event.target.value)}>
         <option value="g">{t("Grammi (g)")}</option><option value="kg">{t("Chilogrammi (kg)")}</option><option value="oz">{t("Once (oz)")}</option><option value="lb">{t("Libbre (lb)")}</option>
       </SelectField>
-      <SelectField label={t("Unità di temperatura")} value={preferences.temperatureUnit} onChange={(event) => updatePreference("temperatureUnit", event.target.value)}>
+      <SelectField disabled={!preferencesLoaded || busy} label={t("Unità di temperatura")} value={preferences.temperatureUnit} onChange={(event) => updatePreference("temperatureUnit", event.target.value)}>
         <option value="c">{t("Celsius (°C)")}</option><option value="f">{t("Fahrenheit (°F)")}</option>
       </SelectField>
-      <SelectField label={t("Formato data")} value={preferences.dateFormat} onChange={(event) => updatePreference("dateFormat", event.target.value)}>
+      <SelectField disabled={!preferencesLoaded || busy} label={t("Formato data")} value={preferences.dateFormat} onChange={(event) => updatePreference("dateFormat", event.target.value)}>
         <option value="locale">{t("Secondo la lingua")}</option><option value="dd/MM/yyyy">{t("GG/MM/AAAA")}</option><option value="yyyy-MM-dd">{t("AAAA-MM-GG")}</option>
       </SelectField>
-      <SelectField label={t("Schermata iniziale")} value={preferences.defaultLandingPage} onChange={(event) => updatePreference("defaultLandingPage", event.target.value)}>
+      <SelectField disabled={!preferencesLoaded || busy} label={t("Schermata iniziale")} value={preferences.defaultLandingPage} onChange={(event) => updatePreference("defaultLandingPage", event.target.value)}>
         <option value="today">{t("Oggi")}</option><option value="animals">{t("Animali")}</option><option value="calendar">{t("Calendario")}</option>
       </SelectField>
-      <SelectField label={t("Tema")} value={preferences.theme} onChange={(event) => updatePreference("theme", event.target.value)}>
+      <SelectField disabled={!preferencesLoaded || busy} label={t("Tema")} value={preferences.theme} onChange={(event) => updatePreference("theme", event.target.value)}>
         <option value="system">{t("Automatico")}</option><option value="light">{t("Chiaro")}</option><option value="dark">{t("Scuro")}</option>
       </SelectField>
-      <label className="field checkbox-field"><span>{t("Tabelle compatte")}</span><input type="checkbox" checked={preferences.compactTables} onChange={(event) => updatePreference("compactTables", event.target.checked)}/></label>
+      <label className="field checkbox-field"><span>{t("Tabelle compatte")}</span><input type="checkbox" checked={preferences.compactTables} disabled={!preferencesLoaded || busy} onChange={(event) => updatePreference("compactTables", event.target.checked)}/></label>
       <div className="form-full">
         <Field label={t("Password attuale (richiesta per modificare email o password)")} type="password" value={currentPassword} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password"/>
         <Field label={t("Nuova password (facoltativa)")} type="password" value={newPassword} onChange={(event) => setNew(event.target.value)} autoComplete="new-password" minLength={12}/>
