@@ -1,10 +1,11 @@
 import * as React from "react";
 import { t } from "../i18n";
+import { t } from "../i18n";
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string };
 
 export function Button({ children, variant = "secondary", className = "", ...props }: ButtonProps) {
-  return <button className={["button", variant, className].filter(Boolean).join(" ")} {...props}>{children}</button>;
+  return <button className={["button", variant, className].filter(Boolean).join(" ")} {...props}>{typeof children === "string" ? t(children) : children}</button>;
 }
 
 export type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "type" | "defaultValue"> & {

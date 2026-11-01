@@ -1,7 +1,6 @@
 export type AppLocale = "it" | "en";
 
 let activeLocale: AppLocale = detectBrowserLocale();
-let observer: MutationObserver | null = null;
 
 function isLocale(value: unknown): value is AppLocale {
   return value === "it" || value === "en";
@@ -972,6 +971,10 @@ const translations: Record<string, string> = {
   "Sezioni principali": "Main sections",
   "Navigazione rapida": "Quick navigation",
   "Lingua dell'interfaccia": "Interface language",
+  "sezione": "section",
+  "sezioni": "sections",
+  "Per ogni categoria il backend carica al massimo 100 record nello storico unificato: le registrazioni più vecchie oltre tale limite potrebbero non comparire.": "For each category, the backend loads at most 100 records in the unified history; older records beyond this limit may not appear.",
+  "— Seleziona un animale —": "— Select an animal —",
 };
 
 function normalize(value: string): string {
@@ -985,111 +988,16 @@ export function t(value: string): string {
 }
 
 
-type OriginalValue = { source: string; output: string };
-const originalText = new WeakMap<Text, OriginalValue>();
-const originalAttributes = new WeakMap<Element, Map<string, OriginalValue>>();
-const attributeNames = ["title", "aria-label", "placeholder", "alt"] as const;
-const ignoredTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "CODE", "PRE", "SVG"]);
-
-function localized(source: string): string {
-  if (activeLocale === "it") return source;
-  return translations[normalize(source)] ?? source;
-}
-
-function translateText(node: Text): void {
-  const parent = node.parentElement;
-  if (!parent || !node.data.trim()) return;
-  if (parent.closest("[data-no-translate]")) return;
-  if (ignoredTags.has(parent.tagName) || parent.closest("script,style,noscript,textarea,input,code,pre,svg")) return;
-
-  const current = node.data;
-  const stored = originalText.get(node);
-  const source = stored && current === stored.output ? stored.source : current;
-  const leading = source.match(/^\s*/)?.[0] ?? "";
-  const trailing = source.match(/\s*$/)?.[0] ?? "";
-  const core = source.slice(leading.length, source.length - trailing.length || undefined);
-  const output = leading + localized(core) + trailing;
-  originalText.set(node, { source, output });
-  if (current !== output) node.data = output;
-}
-
-function translateAttributes(element: Element): void {
-  if (element.closest("[data-no-translate]")) return;
-  let values = originalAttributes.get(element);
-  if (!values) {
-    values = new Map<string, OriginalValue>();
-    originalAttributes.set(element, values);
-  }
-
-  for (const name of attributeNames) {
-    if (!element.hasAttribute(name)) continue;
-    const current = element.getAttribute(name) ?? "";
-    const stored = values.get(name);
-    const source = stored && current === stored.output ? stored.source : current;
-    const output = localized(source);
-    values.set(name, { source, output });
-    if (current !== output) element.setAttribute(name, output);
-  }
-}
-
-function translateTree(root: Node): void {
-  if (root.nodeType === Node.TEXT_NODE) {
-    translateText(root as Text);
-    return;
-  }
-  if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE) return;
-
-  if (root.nodeType === Node.ELEMENT_NODE) translateAttributes(root as Element);
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let current: Node | null;
-  while ((current = walker.nextNode())) translateText(current as Text);
-
-  if (root instanceof Element) {
-    if (root.matches("[title],[aria-label],[placeholder],[alt]")) translateAttributes(root);
-    root.querySelectorAll("[title],[aria-label],[placeholder],[alt]").forEach(translateAttributes);
-  }
-}
-
-function applyDocumentLocale(): void {
-  if (typeof document === "undefined") return;
-  document.documentElement.lang = activeLocale;
-  translateTree(document.body);
-}
-
-export function setLocale(value: unknown): void {
+type OriginalValue = { source: string; output:export function setLocale(value: unknown): void {
   const next: AppLocale = isLocale(value) ? value : detectBrowserLocale();
   activeLocale = next;
+  if (typeof document !== "undefined") document.documentElement.lang = next;
   if (typeof window !== "undefined") {
-    document.documentElement.lang = next;
     window.dispatchEvent(new CustomEvent("vivarqo:locale-change", { detail: next }));
   }
 }
 
+/** Set the document language once; all visible copy is translated by React. */
 export function initializeLocalization(): void {
-  if (typeof document === "undefined" || !document.body) return;
-  document.documentElement.lang = activeLocale;
-  translateTree(document.body);
-
-  if (observer) observer.disconnect();
-  observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === "characterData" && mutation.target instanceof Text) {
-        translateText(mutation.target);
-        continue;
-      }
-      if (mutation.type === "attributes" && mutation.target instanceof Element) {
-        translateAttributes(mutation.target);
-      }
-      for (const node of mutation.addedNodes) translateTree(node);
-    }
-  });
-  observer.observe(document.body, {
-    subtree: true,
-    childList: true,
-    characterData: true,
-    attributes: true,
-    attributeFilter: [...attributeNames],
-  });
-
-  window.addEventListener("vivarqo:locale-change", applyDocumentLocale);
+  if (typeof document !== "undefined") document.documentElement.lang = activeLocale;
 }
