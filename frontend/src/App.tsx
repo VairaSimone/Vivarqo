@@ -19,9 +19,9 @@ import { SettingsPage } from "./components/SettingsPage";
 import { Tutorial } from "./components/Tutorial";
 import { InventoryFilters } from "./components/InventoryFilters";
 import { MoreHub } from "./components/MoreHub";
-import { Dialog } from "./ui/Dialog";
 import { useConfirmDialog } from "./ui/ConfirmDialog";
 import { useRef } from "react";
+import { Modal, type ModalForm } from "./app/AppModals";
 import type { AnyRecord, AccountUser, InventoryFiltersState, NoticeKind } from "./types";
 import { errorMessage } from "./types";
 import { readFormValues } from "./types";
@@ -37,28 +37,12 @@ const date = (v: string | number | Date | null | undefined) => { if (!v || v==="
 const localDateTime = (v?: string | Date | null) => { const d=v?new Date(v):new Date(); if(Number.isNaN(d.getTime()))return ""; const p=(n:number)=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes()); };
 const money = (v: string | number | null | undefined) => { if (v === null || v === undefined || v === "" || v === "—") return "—"; const n = Number(v); return Number.isFinite(n) ? new Intl.NumberFormat(getIntlLocale(), { style: "currency", currency: "EUR" }).format(n / 100) : "—"; };
 
-function Brand(){return <a className="brand" href="#oggi" aria-label="Vivarqo, Oggi"><span className="brand-mark">v</span><span>vivarqo<span className="brand-dot">.</span></span></a>;}
-function Button({children,variant="",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{children}</button>;}
-function Field({label,...props}: React.InputHTMLAttributes<HTMLInputElement> & {label:string}){return <label className="field"><span>{label}</span><input {...props}/></label>;}
-function SelectField({label,children,...props}: React.SelectHTMLAttributes<HTMLSelectElement> & {label:string;children?:React.ReactNode}){return <label className="field"><span>{label}</span><select {...props}>{children}</select></label>; }
+function Button({children,variant="",...props}: React.ButtonHTMLAttributes<HTMLButtonElement> & {variant?:string}){return <button className={"button "+variant} {...props}>{typeof children==="string"?t(children):children}</button>;}
 function Notice({notice}:{notice:{text:string;kind?:NoticeKind}|null}){return notice?<div className={"notice "+(notice.kind||"info")} role="status">{notice.text}</div>:null;}
 
 
 
 
-type ModalField = [
-  name: string,
-  label: string,
-  type: "text" | "number" | "date" | "datetime-local" | "select" | "textarea",
-  initial?: string | number
-];
-type ModalForm = {
-  title: string;
-  endpoint: string;
-  method?: "POST" | "PATCH";
-  fields: ModalField[];
-  transform?: (values: Record<string, string>) => Record<string, unknown>;
-};
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: string }>;
@@ -154,9 +138,4 @@ const actionButton: [string, () => void] | null = active==="inventario"?["＋ Nu
 
 
 
-function Modal({modal,onClose,onSubmit}: { modal: ModalForm; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
- return <Dialog title={modal.title} onClose={onClose} onSubmit={onSubmit} submitLabel={t("Salva")} size={modal.fields.length>6?"wide":"normal"}>
-  {modal.fields.map(([name,label,type,initial])=><div className={type==="textarea"?"form-full":""} key={name}>{type==="select"?<SelectField label={label} name={name} defaultValue={initial ?? ""} required>{(name==="sex"?[["unknown","Non specificato"],["male","Maschio"],["female","Femmina"]]:name==="category"?[["food","Alimenti"],["substrate","Substrati"],["material","Materiali"],["equipment","Attrezzatura"],["other","Altro"]]:name==="taskCategory"?[["feeding","Alimentazioni"],["weighing","Peso"],["shed_check","Muta"],["cleaning","Pulizia"],["reproduction","Riproduzione"],["document","Documenti"],["inventory","Inventario"],["custom","Personalizzata"]]:name==="movementType"?[["in","Carico"],["out","Scarico"],["adjustment","Rettifica"]]:name==="entryType"?[["income","Entrata"],["expense","Uscita"]]:[]).map(([v,l])=><option key={v} value={v}>{t(l)}</option>)}</SelectField>:type==="textarea"?<label className="field"><span>{label}</span><textarea name={name} rows={3} defaultValue={initial}/></label>:<Field label={label} name={name} type={type} defaultValue={initial} step={type==="number"?0.001:undefined} required={!label.includes("facoltativo")&&name!=="minimumQuantity"&&name!=="unitCostCents"}/>}</div>)}
- </Dialog>;
-}
 export default App;
