@@ -9,16 +9,16 @@ import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, 
 type Item = Record<string, unknown>;
 type User = { id: string; email: string; displayName: string; locale: Locale; timezone: string };
 
-export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, navigate }: {
-  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; navigate: (path: string) => void;
+export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, onThemeChange, navigate }: {
+  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; onThemeChange: (theme: "system" | "light" | "dark") => void; navigate: (path: string) => void;
 }) {
   if (path.startsWith("/notifications")) return <NotificationsPage locale={locale} navigate={navigate} />;
   if (path.startsWith("/settings/notifications")) return <NotificationSettingsPage locale={locale} />;
   if (path.startsWith("/billing")) return <BillingPage locale={locale} />;
-  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated} navigate={navigate} />;
+  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated} onThemeChange={onThemeChange} navigate={navigate} />;
 }
 
-function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, navigate }: { locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; navigate: (path: string) => void }) {
+function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onThemeChange, navigate }: { locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; onThemeChange: (theme: "system" | "light" | "dark") => void; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const prefs = useResource<{ preferences: Item }>("/account/preferences");
   const [profile, setProfile] = useState({ displayName: user.displayName, email: user.email, timezone: user.timezone || "Europe/Rome", currentPassword: "" });
@@ -70,7 +70,8 @@ function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, navi
     event.preventDefault(); setBusy(true); setError("");
     try {
       await api.patch("/account/preferences", preferences);
-      document.documentElement.dataset.theme = preferences.theme;
+      const theme = preferences.theme === "dark" || preferences.theme === "light" ? preferences.theme : "system";
+      onThemeChange(theme);
       showToast(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
