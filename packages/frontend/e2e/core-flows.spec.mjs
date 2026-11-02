@@ -37,42 +37,50 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(page.getByRole("alert")).toBeVisible();
 
   await signIn(page, owner);
-  const pwaState = await page.evaluate(async () => {
-    const link = document.querySelector('link[rel="manifest"]');
-    if (!link) throw new Error("PWA manifest link is missing");
-    const response = await fetch(link.href, { cache: "no-store" });
-    if (!response.ok) throw new Error("PWA manifest could not be loaded");
-    const manifest = await response.json();
-    const registration = await navigator.serviceWorker.ready;
+  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
+  expect(manifestHref).toBeTruthy();
+  const manifestResponse = await page.request.get(new URL(manifestHref, page.url()).toString());
+  expect(manifestResponse.ok(), "PWA manifest must load").toBe(true);
+  const manifest = await manifestResponse.json();
+  expect(manifest.start_url).toBe("/today");
+  expect(manifest.scope).toBe("/");
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.icons?.length).toBeGreaterThanOrEqual(2);
+  expect(manifest.icons.map((icon) => icon.sizes)).toEqual(expect.arrayContaining(["any"]));
+  expect(manifest.icons.filter((icon) => icon.type === "image/png").map((icon) => icon.sizes))
+    .toEqual(expect.arrayContaining(["192x192", "512x512"]));
+  const iconResults = await Promise.all(manifest.icons.map(async (icon) => {
+    const response = await page.request.get(new URL(icon.src, page.url()).toString());
+    return { source: icon.src, ok: response.ok(), contentType: response.headers()["content-type"] ?? "" };
+  }));
+  expect(iconResults.every((icon) => icon.ok), JSON.stringify(iconResults)).toBe(true);
+  expect(iconResults.filter((icon) => icon.contentType.includes("image/png"))).toHaveLength(2);
+  const appleIconHref = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+  expect(appleIconHref).toBeTruthy();
+  expect((await page.request.get(new URL(appleIconHref, page.url()).toString())).ok()).toBe(true);
+
+  const serviceWorkerScope = await page.evaluate(async () => {
+    if (!("serviceWorker" in navigator)) throw new Error("Service Workers are not supported by this browser");
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return registration.scope;
+  });
+  expect(serviceWorkerScope).toContain("127.0.0.1:4173");
+  await expect.poll(async () => page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    return registration?.active?.state ?? registration?.installing?.state ?? registration?.waiting?.state ?? "missing";
+  }), { timeout: 20_000, intervals: [250, 500, 1000] }).toBe("activated");
+  const workerDiagnostics = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.getRegistration("/");
     return {
-      manifest,
-      iconResults: await Promise.all(manifest.icons.map(async (icon) => {
-        const iconResponse = await fetch(icon.src);
-        return { ok: iconResponse.ok, contentType: iconResponse.headers.get("content-type") ?? "" };
-      })),
-      appleTouchIconLoaded: await (async () => {
-        const link = document.querySelector('link[rel="apple-touch-icon"]');
-        return Boolean(link && (await fetch(link.href)).ok);
-      })(),
-      iconSizes: manifest.icons.map((icon) => icon.sizes),
-      rasterIconSizes: manifest.icons.filter((icon) => icon.type === "image/png").map((icon) => icon.sizes),
-      serviceWorkerActive: Boolean(registration.active),
-      serviceWorkerScope: registration.scope,
-      controlled: Boolean(navigator.serviceWorker.controller)
+      scope: registration?.scope ?? null,
+      active: registration?.active?.state ?? null,
+      installing: registration?.installing?.state ?? null,
+      waiting: registration?.waiting?.state ?? null
     };
   });
-  expect(pwaState.manifest.start_url).toBe("/today");
-  expect(pwaState.manifest.scope).toBe("/");
-  expect(pwaState.manifest.display).toBe("standalone");
-  expect(pwaState.manifest.icons?.length).toBeGreaterThanOrEqual(2);
-  expect(pwaState.iconSizes).toEqual(expect.arrayContaining(["any"]));
-  expect(pwaState.rasterIconSizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
-  expect(pwaState.iconResults.every((icon) => icon.ok)).toBe(true);
-  expect(pwaState.iconResults.filter((icon) => icon.contentType.includes("image/png"))).toHaveLength(2);
-  expect(pwaState.appleTouchIconLoaded).toBe(true);
-  expect(pwaState.serviceWorkerActive).toBe(true);
-  expect(pwaState.serviceWorkerScope).toContain("127.0.0.1:4173");
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  expect(workerDiagnostics.active, JSON.stringify(workerDiagnostics)).toBe("activated");
+  await page.reload();
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), null, { timeout: 15_000 });
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Page.enable");
@@ -191,43 +199,6 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
   const created = list.animals.find((animal) => animal.name === animalName);
   expect(created?.id).toBeTruthy();
 
-  const viewports = [
-    { name: "desktop-1440x900", width: 1440, height: 900 },
-    { name: "laptop-1280x800", width: 1280, height: 800 },
-    { name: "tablet-1024x768", width: 1024, height: 768 },
-    { name: "mobile-390x844", width: 390, height: 844 },
-    { name: "mobile-320x700", width: 320, height: 700 }
-  ];
-  const routes = [
-    "today", "animals", "animals/" + created.id, "feeding", "feeding?create=1",
-    "tasks", "calendar", "reproduction", "clutches", "inventory", "documents",
-    "finance", "settings", "settings/notifications", "notifications", "billing", "imports", "exports"
-  ];
-  for (const viewport of viewports) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    for (const route of routes) {
-      if (route === "feeding?create=1") {
-        await page.goto("/feeding");
-        await page.getByRole("button", { name: "Registra alimentazione" }).first().click();
-      } else {
-        await page.goto("/" + route);
-      }
-      // Wait for the rendered page, not global network idleness: a React app can
-      // keep background requests alive even after the visible route is ready.
-      await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
-      if (route === "feeding?create=1") await expect(page.getByRole("dialog")).toBeVisible();
-      const dimensions = await page.evaluate(() => ({
-        viewport: document.documentElement.clientWidth,
-        document: document.documentElement.scrollWidth
-      }));
-      const folder = path.join("test-results", "responsive", viewport.name);
-      await mkdir(folder, { recursive: true });
-      await page.screenshot({ path: path.join(folder, route.replaceAll("/", "-").replaceAll("?", "-").replaceAll("=", "-") + ".png"), fullPage: true });
-      expect(dimensions.document, "unexpected horizontal page overflow at " + viewport.name + " on /" + route)
-        .toBeLessThanOrEqual(dimensions.viewport + 1);
-    }
-  }
-
   expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
   expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
 });
@@ -312,12 +283,12 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(animal?.id).toBeTruthy();
 
   await page.goto("/feeding");
-  await page.getByRole("button", { name: "Registra alimentazione" }).first().click();
+  await page.getByRole("button", { name: "Registra sessione" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("checkbox", { name: new RegExp(animalName) }).check();
   await page.getByLabel("Esito").selectOption("ate");
   await page.getByLabel("Alimento").fill("Rat");
-  await page.getByRole("button", { name: "Registra alimentazione" }).last().click();
+  await page.getByRole("button", { name: "Registra sessione" }).last().click();
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
@@ -339,6 +310,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.goto("/tasks?create=1");
   await page.getByLabel("Titolo attività").fill("E2E Task follow-up");
+  await page.getByLabel("Cerca scheda animale").fill(animalName);
   await page.getByLabel("Scheda animale").selectOption(animal.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
@@ -418,17 +390,28 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.goto("/reproduction");
   await page.getByRole("button", { name: "Nuovo ciclo" }).click();
   await page.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
+  await page.getByLabel("Cerca genitore a").fill(parentNames[0]);
   await page.getByLabel("Genitore A").selectOption(parentA.id);
+  await page.getByLabel("Cerca genitore b").fill(parentNames[1]);
   await page.getByLabel("Genitore B").selectOption(parentB.id);
+  const cycleCreatePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/reproduction-cycles") && response.request().method() === "POST"
+  );
   await page.getByRole("button", { name: "Salva modifiche" }).click();
-  const cyclesResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles?page=1&pageSize=25&status=all");
-  expect(cyclesResponse.status()).toBe(200);
-  const cycle = (await cyclesResponse.json()).cycles.find((item) => item.name === "E2E Breeding Cycle");
-  expect(cycle?.id).toBeTruthy();
+  const cycleCreateResponse = await cycleCreatePromise;
+  expect(cycleCreateResponse.status()).toBe(201);
+  const createdCycle = (await cycleCreateResponse.json()).cycle;
+  expect(createdCycle?.id).toBeTruthy();
+  // The cycles list is paginated and sorted by start date; inspect the created ID directly.
+  const cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + createdCycle.id);
+  expect(cycleDetailResponse.status()).toBe(200);
+  const cycle = (await cycleDetailResponse.json()).cycle;
+  expect(cycle.name).toBe("E2E Breeding Cycle");
 
   await page.goto("/reproduction-cycles/" + cycle.id);
   await page.getByRole("button", { name: "Registra evento" }).first().click();
   await page.getByLabel("Tipo evento").selectOption("pairing");
+  await page.getByLabel("Cerca scheda animale").fill(parentNames[0]);
   await page.getByLabel("Scheda animale").selectOption(parentA.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   let cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
@@ -517,7 +500,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF", "utf8")
   });
-  await page.getByLabel("Categoria documento").fill("Veterinario");
+  await page.getByLabel("Categoria").fill("Veterinario");
   await page.getByLabel("Scheda animale").selectOption(animal.id);
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
@@ -533,7 +516,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   expect(document?.id).toBeTruthy();
 
   await page.getByRole("button", { name: "Modifica" }).click();
-  await page.getByLabel("Categoria documento").fill("Clinico");
+  await page.getByLabel("Categoria").fill("Clinico");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   const updatedDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
   expect((await updatedDocuments.json()).documents.find((item) => item.id === document.id)?.category).toBe("Clinico");
@@ -623,3 +606,59 @@ test("revoked sessions are rejected by the next authenticated request", async ({
   const revokedSessionResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=1");
   expect(revokedSessionResponse.status()).toBe(401);
 });
+
+
+// Each viewport is its own Playwright test. A failure on one device cannot suppress
+// diagnostics and screenshots for the other four. A failing route is recorded and the
+// remaining paths at that viewport are still exercised.
+const responsiveViewports = [
+  { name: "desktop-1440x900", width: 1440, height: 900 },
+  { name: "laptop-1280x800", width: 1280, height: 800 },
+  { name: "tablet-1024x768", width: 1024, height: 768 },
+  { name: "mobile-390x844", width: 390, height: 844 },
+  { name: "mobile-320x700", width: 320, height: 700 }
+];
+const responsiveRoutes = [
+  "today", "animals", "feeding", "feeding?create=1", "tasks", "calendar",
+  "reproduction", "clutches", "inventory", "documents", "finance", "settings",
+  "settings/notifications", "notifications", "billing", "imports", "exports"
+];
+
+for (const viewport of responsiveViewports) {
+  test("responsive viewport " + viewport.name, async ({ page }) => {
+    test.setTimeout(240_000);
+    await signIn(page, owner);
+    const animalResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=1&status=all");
+    const firstAnimal = (await animalResponse.json()).animals?.[0];
+    const routes = firstAnimal ? ["animals/" + firstAnimal.id, ...responsiveRoutes] : responsiveRoutes;
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    const failures = [];
+    for (const route of routes) {
+      try {
+        if (route === "feeding?create=1") {
+          await page.goto("/feeding");
+          await page.getByRole("button", { name: "Registra sessione" }).first().click();
+        } else {
+          await page.goto("/" + route);
+        }
+        await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
+        if (route === "feeding?create=1") await expect(page.getByRole("dialog")).toBeVisible();
+        const dimensions = await page.evaluate(() => ({
+          viewport: document.documentElement.clientWidth,
+          document: document.documentElement.scrollWidth
+        }));
+        const folder = path.join("test-results", "responsive", viewport.name);
+        await mkdir(folder, { recursive: true });
+        await page.screenshot({
+          path: path.join(folder, route.replaceAll("/", "-").replaceAll("?", "-").replaceAll("=", "-") + ".png"),
+          fullPage: true
+        });
+        expect(dimensions.document, "horizontal overflow on /" + route)
+          .toBeLessThanOrEqual(dimensions.viewport + 1);
+      } catch (error) {
+        failures.push("/" + route + ": " + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+    expect(failures, "responsive failures at " + viewport.name + "; all routes were visited").toEqual([]);
+  });
+}
