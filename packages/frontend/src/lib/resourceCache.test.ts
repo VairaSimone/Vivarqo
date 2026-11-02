@@ -41,6 +41,34 @@ describe("resource cache", () => {
     expect(sharedSignal?.aborted).toBe(true);
   });
 
+  it("starts a fresh request when a consumer remounts before an aborted request settles", async () => {
+    const firstConsumer = new AbortController();
+    let firstSignal: AbortSignal | undefined;
+    let secondCalls = 0;
+
+    const first = loadCachedResource("strict-effects|it", (signal) => {
+      firstSignal = signal;
+      return new Promise<string>((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    }, firstConsumer.signal);
+
+    // Simulate React Strict Effects: cleanup aborts the only consumer, then
+    // the replacement effect subscribes synchronously before promise cleanup.
+    firstConsumer.abort();
+    expect(firstSignal?.aborted).toBe(true);
+
+    const second = loadCachedResource("strict-effects|it", async (signal) => {
+      secondCalls++;
+      expect(signal.aborted).toBe(false);
+      return "fresh response";
+    }, new AbortController().signal);
+
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await expect(second).resolves.toBe("fresh response");
+    expect(secondCalls).toBe(1);
+  });
+
   it("expires cached values after the TTL", async () => {
     vi.useFakeTimers();
     let calls = 0;
