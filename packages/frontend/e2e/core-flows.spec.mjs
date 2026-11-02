@@ -211,7 +211,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   await page.getByLabel("Scegli CSV o XLSX").setInputFiles({
     name: "vivarqo-e2e-animals.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from("name,species,sex,morph\\nE2E Imported Python,Python regius,unknown,Normal\\n", "utf8")
+    buffer: Buffer.from("name,species,sex,morph\nE2E Imported Python,Python regius,unknown,Normal\n", "utf8")
   });
 
   const previewResponsePromise = page.waitForResponse((response) =>
@@ -349,7 +349,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.getByRole("button", { name: "Movimenti" }).last().click();
   await page.getByLabel("Tipo movimento").selectOption("in");
-  await page.getByLabel("Quantità").fill("1");
+  await page.getByLabel("Giacenza").fill("1");
   await page.getByLabel("Costo unitario (€)").fill("5.00");
   await page.getByRole("button", { name: "Registra movimento" }).click();
   const movementsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items/" + stockItem.id + "/movements?page=1&pageSize=100");
