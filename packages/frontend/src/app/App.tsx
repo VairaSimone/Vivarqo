@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, clearCsrfCache, setApiLocale, setUnauthorizedHandler } from "../lib/api";
 import { AppShell } from "../layouts/AppShell";
-import { AuthPage } from "../features/AuthPage";
-import { DashboardPage } from "../features/DashboardPage";
-import { AnimalsPage } from "../features/AnimalsPage";
-import { CarePage } from "../features/CarePage";
-import { OperationsPage } from "../features/OperationsPage";
-import { ReproductionPage } from "../features/ReproductionPage";
-import { InventoryDocumentsPage } from "../features/InventoryDocumentsPage";
-import { FinancePage } from "../features/FinancePage";
-import { SettingsPage } from "../features/SettingsPage";
-import { DataTransferPage } from "../features/DataTransferPage";
-import { PublicAnimalPage } from "../features/PublicAnimalPage";
+const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
+const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
+const CarePage = lazy(() => import("../features/CarePage").then((module) => ({ default: module.CarePage })));
+const OperationsPage = lazy(() => import("../features/OperationsPage").then((module) => ({ default: module.OperationsPage })));
+const ReproductionPage = lazy(() => import("../features/ReproductionPage").then((module) => ({ default: module.ReproductionPage })));
+const InventoryDocumentsPage = lazy(() => import("../features/InventoryDocumentsPage").then((module) => ({ default: module.InventoryDocumentsPage })));
+const FinancePage = lazy(() => import("../features/FinancePage").then((module) => ({ default: module.FinancePage })));
+const SettingsPage = lazy(() => import("../features/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const DataTransferPage = lazy(() => import("../features/DataTransferPage").then((module) => ({ default: module.DataTransferPage })));
+const PublicAnimalPage = lazy(() => import("../features/PublicAnimalPage").then((module) => ({ default: module.PublicAnimalPage })));
 import type { Locale } from "../lib/domain";
 import { browserLocale, translate } from "../lib/i18n";
 import { getString } from "../lib/domain";
@@ -181,17 +181,17 @@ export function App() {
 
   if (isPublic) {
     const slug = routeOnly(path).split("/").filter(Boolean).at(-1) ?? "";
-    return <PublicAnimalPage slug={slug} locale={locale} />;
+    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><PublicAnimalPage slug={slug} locale={locale} /></Suspense>;
   }
 
   if (authRoute && !user) {
-    return <AuthPage mode={authRoute} locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} />;
+    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode={authRoute} locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>;
   }
 
   if (!authReady) return <div className="app-boot"><span className="brand-mark"><Icon name="leaf" /></span><LoadingState /></div>;
 
   if (!user && routeOnly(path) === "/") {
-    return <AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} />;
+    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>;
   }
 
   if (!user) {
@@ -215,6 +215,6 @@ export function App() {
   return <AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
     {!online && <div className="offline-banner" role="status"><Icon name="alert" size={15} />{t("networkOffline")}</div>}
     {authError && <div className="global-alert"><Alert tone="danger">{authError}</Alert><button onClick={() => setAuthError("")}>{t("close")}</button></div>}
-    {page}
+    <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>{page}</Suspense>
   </AppShell>;
 }
