@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError } from "../lib/api";
+import { api, ApiError, getApiLocale } from "../lib/api";
+import { loadCachedResource } from "../lib/resourceCache";
 
 type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | null };
 export function useResource<T>(url: string | null) {
@@ -16,7 +17,7 @@ export function useResource<T>(url: string | null) {
     }
     setState((previous) => ({ ...previous, loading: true, error: null }));
     const controller = new AbortController();
-    api.get<T>(url, { signal: controller.signal }).then((data) => {
+    loadCachedResource<T>(url + "|locale:" + getApiLocale(), (signal) => api.get<T>(url, { signal }), controller.signal).then((data) => {
       if (requestId.current === current) setState({ data, loading: false, error: null });
     }).catch((reason: unknown) => {
       if (controller.signal.aborted || requestId.current !== current) return;

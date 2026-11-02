@@ -1,3 +1,4 @@
+import { invalidateAllResourceCache } from "./resourceCache";
 const API_BASE = "/api/v1";
 let csrfToken: string | null = null;
 let csrfPromise: Promise<string> | null = null;
@@ -20,6 +21,7 @@ export class ApiError extends Error {
 export function setApiLocale(locale: string): void {
   apiLocale = locale === "en" ? "en" : "it";
 }
+export function getApiLocale(): string { return apiLocale; }
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
@@ -93,13 +95,13 @@ export const api = {
     return request<T>(path, "GET", undefined, options.signal);
   },
   post<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "POST", body);
+    return request<T>(path, "POST", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   patch<T = void>(path: string, body: unknown): Promise<T> {
-    return request<T>(path, "PATCH", body);
+    return request<T>(path, "PATCH", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   delete<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "DELETE", body);
+    return request<T>(path, "DELETE", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   async upload<T>(path: string, file: File, extraHeaders: Record<string, string> = {}): Promise<T> {
     const headers = new Headers({
@@ -120,6 +122,7 @@ export const api = {
       notifyUnauthorized(path, error.status);
       throw error;
     }
+    invalidateAllResourceCache();
     return await response.json() as T;
   },
   async download(path: string, fallbackFilename = "download"): Promise<void> {
