@@ -8,7 +8,7 @@ export default {
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   outputDir: "test-results",
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://127.0.0.1:4173",
     browserName: "chromium",
     headless: true,
     trace: "retain-on-failure",
