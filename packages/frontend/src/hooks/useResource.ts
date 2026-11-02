@@ -6,8 +6,13 @@ type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | nu
 export function useResource<T>(url: string | null) {
   const [state, setState] = useState<ResourceState<T>>({ data: null, loading: Boolean(url), error: null });
   const [revision, setRevision] = useState(0);
+  const [cacheVersion, setCacheVersion] = useState(0);
   const requestId = useRef(0);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
+
+  useEffect(() => subscribeResourceInvalidation(() => {
+    setCacheVersion((value) => value + 1);
+  }), []);
 
   useEffect(() => {
     const current = ++requestId.current;
