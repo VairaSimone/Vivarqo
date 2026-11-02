@@ -58,7 +58,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
   function updateEntry(id: string, field: string, value: string) {
     setEntries((current) => ({
       ...current,
-      [id]: { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "", ...current[id], [field]: value }
+      [id]: { ...(current[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" }), [field]: value }
     }));
   }
 

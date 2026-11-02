@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
-import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString } from "../lib/domain";
+import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";

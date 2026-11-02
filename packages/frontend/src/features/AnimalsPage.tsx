@@ -19,7 +19,7 @@ const emptyAnimal: AnimalForm = {
 };
 
 export function AnimalsPage({ locale, navigate, path }: { locale: Locale; navigate: (path: string) => void; path: string }) {
-  const t = (key: string) => translate(locale, key);
+  const t = (key: string, values?: Record<string, string | number>) => translate(locale, key, values);
   const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
   const [q, setQ] = useState(query.get("q") ?? "");
   const [search, setSearch] = useState(q);

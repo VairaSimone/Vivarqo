@@ -37,16 +37,21 @@ function validDateParts(value: string): [number, number, number] | null {
   const check = new Date(Date.UTC(year, month - 1, day));
   return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day ? [year, month, day] : null;
 }
-export function formatDate(value: string | null | undefined, locale: Locale): string {
+export function formatDate(
+  value: string | Date | null | undefined,
+  locale: Locale,
+  options: Intl.DateTimeFormatOptions = {}
+): string {
   if (!value) return "—";
-  const parts = validDateParts(value);
-  if (!parts) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date);
-  }
-  const [year, month, day] = parts;
-  const date = new Date(Date.UTC(year, month - 1, day, 12));
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(date);
+  const parts = typeof value === "string" ? validDateParts(value) : null;
+  const date = parts
+    ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12))
+    : value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const formatterOptions: Intl.DateTimeFormatOptions = Object.keys(options).length > 0
+    ? { ...options, ...(parts && !options.timeZone ? { timeZone: "UTC" } : {}) }
+    : { dateStyle: "medium", ...(parts ? { timeZone: "UTC" } : {}) };
+  return new Intl.DateTimeFormat(locale, formatterOptions).format(date);
 }
 export function formatDateTime(value: string | null | undefined, locale: Locale, timezone?: string): string {
   if (!value) return "—";
