@@ -441,12 +441,12 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const batch = cycleAfterBirth.offspring.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
-  await page.getByRole("button", { name: "Crea schede animali" }).click();
   page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\\nE2E Baby 2"));
   page.once("dialog", (dialog) => dialog.accept("Python regius"));
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
   );
+  await page.getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
   expect(babiesResponse.status()).toBe(201);
   const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
