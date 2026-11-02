@@ -70,9 +70,8 @@ export function RemoteSelect({
     if (!value || options.some((item) => getString(item, "id") === value)
       || (selectedOption && getString(selectedOption, "id") === value) || !detailEndpoint) return;
     const controller = new AbortController();
-    const current = ++requestId.current;
     api.get<Record<string, unknown>>(detailEndpoint(value), { signal: controller.signal }).then((payload) => {
-      if (requestId.current !== current) return;
+      if (controller.signal.aborted) return;
       const candidate = detailKey ? payload[detailKey] : payload;
       if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) setSelectedOption(candidate as Item);
     }).catch(() => { /* Keep the selected ID if its display record cannot be fetched. */ });

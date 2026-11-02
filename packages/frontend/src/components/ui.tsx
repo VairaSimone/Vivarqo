@@ -84,7 +84,7 @@ export function EmptyState({ title, description, action }: { title: string; desc
 }
 export function ErrorState({ message, retry }: { message: string; retry?: () => void }) {
   const retryLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Retry" : "Riprova";
-  return <div className="error-state"><Icon name="alert" size={19} /><span>{message}</span>{retry && <Button size="sm" variant="secondary" onClick={retry}>{retryLabel}</Button>}</div>;
+  return <div className="error-state" role="alert"><Icon name="alert" size={19} /><span>{message}</span>{retry && <Button size="sm" variant="secondary" onClick={retry}>{retryLabel}</Button>}</div>;
 }
 export function DataTable({ headers, rows, empty = "No records" }: { headers: string[]; rows: ReactNode[][]; empty?: string }) {
   return <div className="table-wrap"><table><thead><tr>{headers.map((header,index) => <th key={header + index}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row,index) => <tr key={index}>{row.map((cell,cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}><EmptyState title={empty} /></td></tr>}</tbody></table></div>;
@@ -154,6 +154,7 @@ export function useToast() {
     return () => window.clearTimeout(timer);
   }, [message, version]);
   const show = (nextMessage: string) => { setMessage(nextMessage); setVersion((value) => value + 1); };
-  const toast = message ? <div className="toast" role="status"><Icon name="checkCircle" size={16} /><span>{message}</span><IconButton label="Close" onClick={() => setMessage("")}><Icon name="close" size={13} /></IconButton></div> : null;
+  const closeLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Chiudi";
+  const toast = message ? <div className="toast" role="status"><Icon name="checkCircle" size={16} /><span>{message}</span><IconButton label={closeLabel} onClick={() => setMessage("")}><Icon name="close" size={13} /></IconButton></div> : null;
   return { toast, show };
 }
