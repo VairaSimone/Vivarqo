@@ -6,6 +6,11 @@ const { test, expect } = await import(process.env.PLAYWRIGHT_TEST_MODULE);
 const owner = { email: "e2e-owner@vivarqo.test", password: "Vivarqo-E2E-Only-2026!" };
 const other = { email: "e2e-other@vivarqo.test", password: "Vivarqo-E2E-Only-2026!" };
 
+function isExpectedMissingVapidConfiguration(response) {
+  return response.status() === 503 &&
+    new URL(response.url()).pathname === "/api/v1/push/public-key";
+}
+
 async function signIn(page, account) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
@@ -20,7 +25,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   const unexpectedServerErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("response", (response) => {
-    if (response.status() >= 500) unexpectedServerErrors.push(response.url() + " " + response.status());
+    if (response.status() >= 500 && !isExpectedMissingVapidConfiguration(response)) {\n      unexpectedServerErrors.push(response.url() + " " + response.status());\n    }
   });
 
   await page.goto("/login");
@@ -113,7 +118,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
 
-  const ownListResponse = await page.context().request.get("http://127.0.0.1:5173/api/v1/animals?page=1&pageSize=25&status=active");
+  const ownListResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=active");
   expect(ownListResponse.status()).toBe(200);
   const ownList = await ownListResponse.json();
   const created = ownList.animals.find((animal) => animal.name === animalName);
@@ -137,11 +142,11 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   const otherPage = await otherContext.newPage();
   try {
     await signIn(otherPage, other);
-    const otherListResponse = await otherContext.request.get("http://127.0.0.1:5173/api/v1/animals?page=1&pageSize=25&status=all");
+    const otherListResponse = await otherContext.request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=all");
     expect(otherListResponse.status()).toBe(200);
     const otherList = await otherListResponse.json();
     expect(otherList.animals.some((animal) => animal.id === created.id)).toBe(false);
-    const foreignDetail = await otherContext.request.get("http://127.0.0.1:5173/api/v1/animals/" + created.id);
+    const foreignDetail = await otherContext.request.get("http://127.0.0.1:4173/api/v1/animals/" + created.id);
     expect(foreignDetail.status()).toBe(404);
   } finally {
     await otherContext.close();
@@ -162,7 +167,7 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
   const unexpectedServerErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("response", (response) => {
-    if (response.status() >= 500) unexpectedServerErrors.push(response.url() + " " + response.status());
+    if (response.status() >= 500 && !isExpectedMissingVapidConfiguration(response)) {\n      unexpectedServerErrors.push(response.url() + " " + response.status());\n    }
   });
 
   await signIn(page, owner);
