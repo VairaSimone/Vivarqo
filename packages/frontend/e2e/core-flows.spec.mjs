@@ -498,19 +498,31 @@ test("profile and language preferences persist across reloads", async ({ page })
   await signIn(page, owner);
   await page.goto("/settings");
   await page.getByLabel("Nome visualizzato").fill("Vivarqo E2E User");
+  const profilePatchPromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account") && response.request().method() === "PATCH"
+  );
   await page.getByRole("button", { name: "Salva modifiche" }).first().click();
+  expect((await profilePatchPromise).status()).toBe(200);
   const profileResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/account");
   expect(profileResponse.status()).toBe(200);
   expect((await profileResponse.json()).user.displayName).toBe("Vivarqo E2E User");
 
+  const englishLocalePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account") && response.request().method() === "PATCH"
+  );
   await page.getByLabel("Lingua").selectOption("en");
+  expect((await englishLocalePromise).status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   const englishSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
   expect((await englishSession.json()).user.locale).toBe("en");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
+  const italianLocalePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account") && response.request().method() === "PATCH"
+  );
   await page.getByLabel("Language").selectOption("it");
+  expect((await italianLocalePromise).status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Impostazioni" })).toBeVisible();
   const italianSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
   expect((await italianSession.json()).user.locale).toBe("it");
