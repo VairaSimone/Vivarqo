@@ -468,13 +468,14 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   const animal = (await animalsResponse.json()).animals.find((item) => item.name === animalName);
   expect(animal?.id).toBeTruthy();
 
-  await page.goto("/documents?animalId=" + animal.id);
+  await page.goto("/documents");
+  await page.getByRole("button", { name: "Carica documento" }).first().click();
   await page.getByLabel("File").setInputFiles({
     name: "e2e-veterinary-record.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\\n1 0 obj<</Type/Catalog>>endobj\\ntrailer<</Root 1 0 R>>\\n%%EOF", "utf8")
   });
-  await page.getByLabel("Categoria documento").fill("Veterinario");
+  await page.getByLabel("Categoria documento").fill("Veterinario");\n  await page.getByLabel("Scheda animale").selectOption(animal.id);
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
   );
