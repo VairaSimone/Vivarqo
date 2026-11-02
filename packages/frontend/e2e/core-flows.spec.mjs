@@ -563,7 +563,8 @@ test("revoked sessions are rejected by the next authenticated request", async ({
   );
   await page.getByRole("button", { name: "Revoca tutte le sessioni" }).click();
   expect((await revokeResponsePromise).status()).toBe(200);
-  await page.goto("/animals");
   await page.waitForURL((url) => url.pathname === "/login");
   await expect(page.getByRole("heading", { name: "Bentornato" })).toBeVisible();
+  const revokedSessionResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=1");
+  expect(revokedSessionResponse.status()).toBe(401);
 });
