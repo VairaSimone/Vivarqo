@@ -475,7 +475,8 @@ test("private document upload, metadata edit, download and delete", async ({ pag
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\\n1 0 obj<</Type/Catalog>>endobj\\ntrailer<</Root 1 0 R>>\\n%%EOF", "utf8")
   });
-  await page.getByLabel("Categoria documento").fill("Veterinario");\n  await page.getByLabel("Scheda animale").selectOption(animal.id);
+  await page.getByLabel("Categoria documento").fill("Veterinario");
+  await page.getByLabel("Scheda animale").selectOption(animal.id);
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
   );
