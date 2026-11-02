@@ -173,6 +173,8 @@ jobs:
         run: |
           npm install --global @playwright/test@1.56.1
           playwright install --with-deps chromium
+      - name: Syntax-check browser E2E suite
+        run: node --check packages/frontend/e2e/core-flows.spec.mjs
       - name: Run real-browser E2E and responsive screenshots
         working-directory: packages/frontend
         run: |
