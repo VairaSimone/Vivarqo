@@ -1,7 +1,7 @@
 import { handleNotificationClick, handlePushEvent } from "./sw-notifications";
 
-const CACHE_NAME = "vivarqo-shell-v2";
-const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/vivarqo-icon.svg", "/icons/icon-192.svg", "/icons/icon-512.svg"];
+const CACHE_NAME = "vivarqo-shell-v3";
+const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/vivarqo-icon.svg", "/icons/icon-192.svg", "/icons/icon-512.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 type ExtendableLike = { waitUntil(promise: Promise<unknown>): void };
 type FetchLike = ExtendableLike & { request: Request; respondWith(response: Promise<Response> | Response): void };

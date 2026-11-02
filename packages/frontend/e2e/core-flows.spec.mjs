@@ -39,8 +39,16 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
     const registration = await navigator.serviceWorker.ready;
     return {
       manifest,
-      iconsLoaded: await Promise.all(manifest.icons.map(async (icon) => (await fetch(icon.src)).ok)),
+      iconResults: await Promise.all(manifest.icons.map(async (icon) => {
+        const iconResponse = await fetch(icon.src);
+        return { ok: iconResponse.ok, contentType: iconResponse.headers.get("content-type") ?? "" };
+      })),
+      appleTouchIconLoaded: await (async () => {
+        const link = document.querySelector('link[rel="apple-touch-icon"]');
+        return Boolean(link && (await fetch(link.href)).ok);
+      })(),
       iconSizes: manifest.icons.map((icon) => icon.sizes),
+      rasterIconSizes: manifest.icons.filter((icon) => icon.type === "image/png").map((icon) => icon.sizes),
       serviceWorkerActive: Boolean(registration.active),
       serviceWorkerScope: registration.scope,
       controlled: Boolean(navigator.serviceWorker.controller)
@@ -50,8 +58,11 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   expect(pwaState.manifest.scope).toBe("/");
   expect(pwaState.manifest.display).toBe("standalone");
   expect(pwaState.manifest.icons?.length).toBeGreaterThanOrEqual(2);
-  expect(pwaState.iconSizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
-  expect(pwaState.iconsLoaded.every(Boolean)).toBe(true);
+  expect(pwaState.iconSizes).toEqual(expect.arrayContaining(["any"]));
+  expect(pwaState.rasterIconSizes).toEqual(expect.arrayContaining(["192x192", "512x512"]));
+  expect(pwaState.iconResults.every((icon) => icon.ok)).toBe(true);
+  expect(pwaState.iconResults.filter((icon) => icon.contentType.includes("image/png"))).toHaveLength(2);
+  expect(pwaState.appleTouchIconLoaded).toBe(true);
   expect(pwaState.serviceWorkerActive).toBe(true);
   expect(pwaState.serviceWorkerScope).toContain("127.0.0.1:4173");
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
