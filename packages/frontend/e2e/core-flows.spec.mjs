@@ -440,13 +440,24 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
-  page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\nE2E Baby 2"));
-  page.once("dialog", (dialog) => dialog.accept("Python regius"));
+  const conversionPrompts = ["E2E Baby 1\nE2E Baby 2", "Python regius"];
+  let conversionPromptIndex = 0;
+  const acceptConversionPrompt = (dialog) => {
+    const value = conversionPrompts[conversionPromptIndex++];
+    if (value === undefined) {
+      void dialog.dismiss();
+      throw new Error("Unexpected extra prompt in offspring conversion flow");
+    }
+    void dialog.accept(value);
+  };
+  page.on("dialog", acceptConversionPrompt);
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
   );
   await page.getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
+  page.off("dialog", acceptConversionPrompt);
+  expect(conversionPromptIndex).toBe(2);
   expect(babiesResponse.status()).toBe(201);
   const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
   const babyNames = (await animalsAfterConversion.json()).animals.map((item) => item.name);
