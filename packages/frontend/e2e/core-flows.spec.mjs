@@ -173,7 +173,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
 });
 
-test("responsive screenshot matrix at all target viewport sizes", async ({ page }) => {
+test("responsive fixture: create an animal for detail-route coverage", async ({ page }) => {
   test.setTimeout(300_000);
   const pageErrors = [];
   const unexpectedServerErrors = [];
