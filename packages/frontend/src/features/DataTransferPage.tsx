@@ -29,8 +29,9 @@ function ImportPage({ locale }: { locale: Locale }) {
   const job = useResource<Item>(jobId ? `/imports/${encodeURIComponent(jobId)}?statusOnly=true` : null);
   const { toast, show } = useToast();
 
+  const status = getString(job.data, "status", getString(preview, "status"));
+
   useEffect(() => {
-    const status = getString(job.data, "status");
     if (status !== "queued" && status !== "processing") return;
     // Keep polling even when the cache returns the same pending object.
     // The resource cache expires entries after a short TTL; a stable interval
@@ -65,7 +66,6 @@ function ImportPage({ locale }: { locale: Locale }) {
     } finally { setBusy(false); }
   }
 
-  const status = getString(job.data, "status", getString(preview, "status"));
   const errors = getArray<Item>(preview, "errors");
   const duplicates = getArray<Item>(preview, "possibleDuplicates");
   const previewRows = getArray<Item>(preview, "preview");
