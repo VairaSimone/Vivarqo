@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const { test, expect } = await import(process.env.PLAYWRIGHT_TEST_MODULE);
@@ -201,4 +201,66 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
 
   expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
   expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
+});
+
+test("animal CSV import preview, confirmation and persisted result", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page, owner);
+  await page.goto("/imports");
+  await page.getByLabel("Tipo di dati").selectOption("animals");
+  await page.getByLabel("Scegli CSV o XLSX").setInputFiles({
+    name: "vivarqo-e2e-animals.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("name,species,sex,morph\\nE2E Imported Python,Python regius,unknown,Normal\\n", "utf8")
+  });
+
+  const previewResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/imports?entity=animals") && response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "Anteprima" }).click();
+  const previewResponse = await previewResponsePromise;
+  expect(previewResponse.status()).toBe(201);
+  const preview = await previewResponse.json();
+  expect(preview.validRows).toBe(1);
+  expect(preview.invalidRows).toBe(0);
+  expect(preview.importId).toBeTruthy();
+  expect(page.getByText("E2E Imported Python", { exact: false })).toBeVisible();
+
+  const confirmResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/imports/" + preview.importId + "/confirm") && response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "Conferma importazione" }).click();
+  const confirmResponse = await confirmResponsePromise;
+  expect(confirmResponse.status()).toBe(202);
+
+  await expect.poll(async () => {
+    const response = await page.context().request.get("http://127.0.0.1:4173/api/v1/imports/" + preview.importId + "?statusOnly=true");
+    expect(response.status()).toBe(200);
+    return (await response.json()).status;
+  }, { timeout: 90_000, intervals: [1000, 2000, 3000] }).toBe("completed");
+
+  await page.goto("/animals");
+  await expect(page.getByText("E2E Imported Python", { exact: true })).toBeVisible();
+});
+
+test("background export job produces a downloadable ZIP", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page, owner);
+  await page.goto("/exports");
+  await page.getByRole("button", { name: "Avvia esportazione" }).click();
+  const downloadButton = page.getByRole("button", { name: "Scarica" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^vivarqo-export-[0-9a-f-]+\.zip$/i);
+
+  const folder = path.join("test-results", "exports");
+  await mkdir(folder, { recursive: true });
+  const archivePath = path.join(folder, download.suggestedFilename());
+  await download.saveAs(archivePath);
+  const archive = await readFile(archivePath);
+  expect(archive.subarray(0, 2).toString("ascii")).toBe("PK");
+  expect(archive.length).toBeGreaterThan(100);
 });
