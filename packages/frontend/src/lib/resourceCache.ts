@@ -49,6 +49,13 @@ export function loadCachedResource<T>(
   if (cached) cache.delete(key);
 
   let entry = pending.get(key);
+  // React Strict Effects can unsubscribe the last consumer and immediately
+  // mount a replacement before the aborted loader's rejection microtask runs.
+  // Never let that replacement subscribe to an already-aborted request.
+  if (entry && (entry.controller.signal.aborted || entry.settled)) {
+    if (pending.get(key) === entry) pending.delete(key);
+    entry = undefined;
+  }
   if (!entry) {
     const controller = new AbortController();
     const requestGeneration = generation;
@@ -81,7 +88,12 @@ export function loadCachedResource<T>(
       complete = true;
       consumerSignal.removeEventListener("abort", onAbort);
       activeEntry.subscribers.delete(subscriber);
-      if (!activeEntry.settled && activeEntry.subscribers.size === 0) activeEntry.controller.abort();
+      if (!activeEntry.settled && activeEntry.subscribers.size === 0) {
+        // Remove it before aborting so a new consumer can immediately create
+        // a fresh request instead of racing the old promise's finally handler.
+        if (pending.get(key) === activeEntry) pending.delete(key);
+        activeEntry.controller.abort();
+      }
     };
     const onAbort = () => {
       unsubscribe();
