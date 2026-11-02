@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   server: {
@@ -17,6 +17,7 @@ export default defineConfig({
       "/api": { target: "http://localhost:3000", changeOrigin: true, secure: false }
     }
   },
+  test: { include: ["src/**/*.test.ts", "src/**/*.test.tsx"] },
   build: {
     target: "es2022",
     sourcemap: false,
