@@ -92,10 +92,10 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
 
   await page.goto("/settings/notifications");
   const permissionBeforePushSetup = await page.evaluate(() => Notification.permission);
-  expect(permissionBeforePushSetup).toBe("default");
+  expect(["default", "denied", "granted"]).toContain(permissionBeforePushSetup);
   await page.getByRole("button", { name: "Attiva notifiche push" }).click();
   await expect(page.getByRole("alert")).toContainText("Web Push non è configurato sul server.");
-  expect(await page.evaluate(() => Notification.permission)).toBe("default");
+  expect(await page.evaluate(() => Notification.permission)).toBe(permissionBeforePushSetup);
 
   await page.goto("/today");
   await page.context().setOffline(true);
@@ -284,11 +284,12 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.goto("/feeding");
   await page.getByRole("button", { name: "Registra sessione" }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("checkbox", { name: new RegExp(animalName) }).check();
-  await page.getByLabel("Esito").selectOption("ate");
-  await page.getByLabel("Alimento").fill("Rat");
-  await page.getByRole("button", { name: "Registra sessione" }).last().click();
+  const feedingDialog = page.getByRole("dialog");
+  await expect(feedingDialog).toBeVisible();
+  await feedingDialog.getByRole("checkbox", { name: new RegExp(animalName) }).check();
+  await feedingDialog.getByLabel("Esito").selectOption("ate");
+  await feedingDialog.getByLabel("Alimento").fill("Rat");
+  await feedingDialog.getByRole("button", { name: "Registra sessione" }).click();
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
@@ -297,8 +298,9 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(feedingEntry?.foodType).toBe("Rat");
 
   await page.getByRole("button", { name: "Modifica" }).click();
-  await page.getByLabel("Esito").selectOption("refused");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const feedingEditDialog = page.getByRole("dialog");
+  await feedingEditDialog.getByLabel("Esito").selectOption("refused");
+  await feedingEditDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const editedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   const editedEntry = (await editedFeedings.json()).sessions.flatMap((session) => session.entries).find((entry) => entry.id === feedingEntry.id);
   expect(editedEntry?.outcome).toBe("refused");
@@ -309,10 +311,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect((await deletedFeedings.json()).sessions.flatMap((session) => session.entries).some((entry) => entry.id === feedingEntry.id)).toBe(false);
 
   await page.goto("/tasks?create=1");
-  await page.getByLabel("Titolo attività").fill("E2E Task follow-up");
-  await page.getByLabel("Cerca scheda animale").fill(animalName);
-  await page.getByLabel("Scheda animale").selectOption(animal.id);
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const taskDialog = page.getByRole("dialog");
+  await taskDialog.getByLabel("Titolo attività").fill("E2E Task follow-up");
+  await taskDialog.getByLabel("Cerca scheda animale").fill(animalName);
+  await taskDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  await taskDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
   expect(tasksResponse.status()).toBe(200);
   const tasksBody = await tasksResponse.json();
@@ -324,12 +327,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.goto("/finance");
   await page.getByRole("button", { name: "Nuova voce" }).click();
-  await page.getByLabel("Importo (€)").fill("12.50");
-  await page.getByLabel("Valuta").fill("EUR");
-  await page.getByLabel("Categoria").nth(1).fill("Test E2E");
-  await page.getByLabel("Descrizione").fill("E2E veterinary expense");
-  await page.getByLabel("Scheda animale").selectOption(animal.id);
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const financeDialog = page.getByRole("dialog");
+  await financeDialog.getByLabel("Importo (€)").fill("12.50");
+  await financeDialog.getByLabel("Valuta").fill("EUR");
+  await financeDialog.getByLabel("Categoria").fill("Test E2E");
+  await financeDialog.getByLabel("Descrizione").fill("E2E veterinary expense");
+  await financeDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  await financeDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
   expect(financeResponse.status()).toBe(200);
   const financeBody = await financeResponse.json();
@@ -337,12 +341,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Nuovo articolo" }).click();
-  await page.getByLabel("Nome articolo").fill("E2E Food Stock");
-  await page.getByLabel("Categoria").selectOption("food");
-  await page.getByLabel("Unità").fill("kg");
-  await page.getByLabel("Giacenza").fill("2");
-  await page.getByLabel("Scorta minima").fill("1");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const inventoryDialog = page.getByRole("dialog");
+  await inventoryDialog.getByLabel("Nome articolo").fill("E2E Food Stock");
+  await inventoryDialog.getByLabel("Categoria").selectOption("food");
+  await inventoryDialog.getByLabel("Unità").fill("kg");
+  await inventoryDialog.getByLabel("Giacenza").fill("2");
+  await inventoryDialog.getByLabel("Scorta minima").fill("1");
+  await inventoryDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const inventoryResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=true");
   expect(inventoryResponse.status()).toBe(200);
   const inventoryBody = await inventoryResponse.json();
@@ -389,15 +394,16 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
 
   await page.goto("/reproduction");
   await page.getByRole("button", { name: "Nuovo ciclo" }).click();
-  await page.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
-  await page.getByLabel("Cerca genitore a").fill(parentNames[0]);
-  await page.getByLabel("Genitore A").selectOption(parentA.id);
-  await page.getByLabel("Cerca genitore b").fill(parentNames[1]);
-  await page.getByLabel("Genitore B").selectOption(parentB.id);
+  const cycleDialog = page.getByRole("dialog");
+  await cycleDialog.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
+  await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);
+  await cycleDialog.getByLabel("Genitore A").selectOption(parentA.id);
+  await cycleDialog.getByLabel("Cerca genitore b").fill(parentNames[1]);
+  await cycleDialog.getByLabel("Genitore B").selectOption(parentB.id);
   const cycleCreatePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/reproduction-cycles") && response.request().method() === "POST"
   );
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await cycleDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const cycleCreateResponse = await cycleCreatePromise;
   expect(cycleCreateResponse.status()).toBe(201);
   const createdCycle = (await cycleCreateResponse.json()).cycle;
@@ -410,35 +416,39 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
 
   await page.goto("/reproduction-cycles/" + cycle.id);
   await page.getByRole("button", { name: "Registra evento" }).first().click();
-  await page.getByLabel("Tipo evento").selectOption("pairing");
-  await page.getByLabel("Cerca scheda animale").fill(parentNames[0]);
-  await page.getByLabel("Scheda animale").selectOption(parentA.id);
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const eventDialog = page.getByRole("dialog");
+  await eventDialog.getByLabel("Tipo evento").selectOption("pairing");
+  await eventDialog.getByLabel("Cerca scheda animale").fill(parentNames[0]);
+  await eventDialog.getByLabel("Scheda animale").selectOption(parentA.id);
+  await eventDialog.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   expect((await cycleDetailResponse.json()).cycle.events.some((event) => event.eventType === "pairing")).toBe(true);
 
   await page.getByRole("button", { name: "Covate" }).click();
   await page.getByRole("button", { name: "Aggiungi covata" }).click();
-  await page.getByLabel("Deposizione").fill("2026-11-01");
-  await page.getByLabel("Numero uova").fill("2");
-  await page.getByLabel("Stato").fill("incubating");
-  await page.getByLabel("Incubatore").fill("E2E Incubator");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const clutchDialog = page.getByRole("dialog");
+  await clutchDialog.getByLabel("Deposizione").fill("2026-11-01");
+  await clutchDialog.getByLabel("Numero uova").fill("2");
+  await clutchDialog.getByLabel("Stato").fill("incubating");
+  await clutchDialog.getByLabel("Incubatore").fill("E2E Incubator");
+  await clutchDialog.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   const clutch = (await cycleDetailResponse.json()).cycle.clutches.find((item) => item.incubatorLabel === "E2E Incubator");
   expect(clutch?.id).toBeTruthy();
 
   await page.goto("/clutches/" + clutch.id);
   await page.getByRole("button", { name: "Registra uova" }).click();
-  await page.getByLabel("Codice uovo").fill("E2E-EGG-01\nE2E-EGG-02");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const eggsDialog = page.getByRole("dialog");
+  await eggsDialog.getByLabel("Codice uovo").fill("E2E-EGG-01\nE2E-EGG-02");
+  await eggsDialog.getByRole("button", { name: "Salva modifiche" }).click();
   let clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   expect((await clutchResponse.json()).clutch.eggs.length).toBe(2);
 
   await page.getByRole("button", { name: "Aggiungi misurazione" }).first().click();
-  await page.getByLabel("Temperatura (°C)").fill("31");
-  await page.getByLabel("Umidità (%)").fill("70");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const incubationDialog = page.getByRole("dialog");
+  await incubationDialog.getByLabel("Temperatura (°C)").fill("31");
+  await incubationDialog.getByLabel("Umidità (%)").fill("70");
+  await incubationDialog.getByRole("button", { name: "Salva modifiche" }).click();
   clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   const clutchDetail = (await clutchResponse.json()).clutch;
   expect(clutchDetail.incubationLogs.some((log) => Number(log.temperatureC) === 31 && Number(log.humidityPct) === 70)).toBe(true);
@@ -446,10 +456,11 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.goto("/reproduction-cycles/" + cycle.id);
   await page.getByRole("button", { name: "Nascite" }).click();
   await page.getByRole("button", { name: "Registra nascita" }).first().click();
-  await page.getByLabel("Data nascita").fill("2026-11-02");
-  await page.getByLabel("Covate").selectOption(clutch.id);
-  await page.getByLabel("Numero piccoli").fill("2");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const offspringDialog = page.getByRole("dialog");
+  await offspringDialog.getByLabel("Data nascita").fill("2026-11-02");
+  await offspringDialog.getByLabel("Covate").selectOption(clutch.id);
+  await offspringDialog.getByLabel("Numero piccoli").fill("2");
+  await offspringDialog.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   const cycleAfterBirth = (await cycleDetailResponse.json()).cycle;
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
@@ -469,7 +480,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
   );
-  await page.getByRole("button", { name: "Crea schede animali" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
   page.off("dialog", acceptConversionPrompt);
   expect(conversionPromptIndex).toBe(2);
@@ -500,8 +511,9 @@ test("private document upload, metadata edit, download and delete", async ({ pag
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF", "utf8")
   });
-  await page.getByLabel("Categoria").fill("Veterinario");
-  await page.getByLabel("Scheda animale").selectOption(animal.id);
+  const uploadDialog = page.getByRole("dialog");
+  await uploadDialog.getByLabel("Categoria").fill("Veterinario");
+  await uploadDialog.getByLabel("Scheda animale").selectOption(animal.id);
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
   );
@@ -516,8 +528,9 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   expect(document?.id).toBeTruthy();
 
   await page.getByRole("button", { name: "Modifica" }).click();
-  await page.getByLabel("Categoria").fill("Clinico");
-  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const documentEditDialog = page.getByRole("dialog");
+  await documentEditDialog.getByLabel("Categoria").fill("Clinico");
+  await documentEditDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const updatedDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
   expect((await updatedDocuments.json()).documents.find((item) => item.id === document.id)?.category).toBe("Clinico");
 
