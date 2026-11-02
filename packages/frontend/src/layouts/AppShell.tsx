@@ -86,7 +86,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
           id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "species"), group: t("navAnimals"), path: "/animals/" + getString(item, "id")
         })) : []),
         ...(taskResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(taskResponse.value, "tasks").map((item) => ({
-          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks/" + getString(item, "id")
+          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks?q=" + encodeURIComponent(query)
         })) : []),
         ...(documentResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(documentResponse.value, "documents").map((item) => ({
           id: getString(item, "id"), title: getString(item, "originalFilename"), subtitle: getString(item, "category"), group: t("navDocuments"), path: "/documents?q=" + encodeURIComponent(query)

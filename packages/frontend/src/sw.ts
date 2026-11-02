@@ -21,13 +21,29 @@ type WorkerScopeLike = {
   location: { origin: string };
 };
 const worker = self as unknown as WorkerScopeLike;
+
+async function fetchPrecache(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { cache: "no-cache", signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`Precache request for ${url} timed out after ${timeoutMs} ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 worker.addEventListener("install", (rawEvent) => {
   const event = rawEvent as ExtendableLike;
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     try {
       for (const url of REQUIRED_SHELL_URLS) {
-        const response = await fetch(url, { cache: "no-cache" });
+        const response = await fetchPrecache(url, 15_000);
         if (!response.ok) throw new Error(`Required shell resource ${url} returned HTTP ${response.status}`);
         await cache.put(url, response);
       }
