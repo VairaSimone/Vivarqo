@@ -1,4 +1,0 @@
-/* CSS entry point. Legacy compatibility stays below the modern design system. */
-@layer legacy, redesign;
-@import "./styles/legacy.css";
-@import "./styles/design-system.css";

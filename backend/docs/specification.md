@@ -2,7 +2,7 @@ VIVARQO
 Specifica tecnica del prodotto e dell’architettura
 Versione: 1.0
 Data: 27 ottobre 2026
-Stato: specifica di riferimento per l’implementazione
+Stato: specifica funzionale e tecnica di riferimento; frontend da ricostruire
 Prodotto: PWA gestionale per piccoli e medi allevatori di rettili
 ________________________________________
 Indice
@@ -38,7 +38,7 @@ Indice
 1. Scopo del documento
 Questo documento definisce in modo operativo il prodotto Vivarqo: moduli, comportamento delle funzioni, architettura software, stack tecnologico, modello relazionale dei dati, API, interfaccia grafica, sicurezza, test e distribuzione.
 Le scelte tecniche riportate qui sono vincolanti per la prima implementazione. Il documento non attribuisce al progetto decisioni commerciali mai definite: prezzo, limiti del piano gratuito, soglie di utilizzo e calendario commerciale vengono configurati prima del lancio e non sono codificati nell’applicazione.
-Il progetto è una nuova applicazione. Il repository di SnakeBee è una fonte di riferimento leggibile.
+Il progetto è una nuova applicazione. Il repository di SnakeBee è una fonte di riferimento leggibile. **Stato repository (2 novembre 2026):** il codice del precedente frontend è stato rimosso dal branch `main`; questa specifica conserva i requisiti e lo stack di destinazione per la nuova implementazione. Il backend attualmente versionato e `docs/openapi.yaml` prevalgono su eventuali ipotesi o dettagli non ancora implementati.
 2. Identità e perimetro
 •	Nome: Vivarqo.
 •	Destinatari: piccoli e medi allevatori di rettili; il riferimento operativo è un allevamento con circa 20–150 esemplari.

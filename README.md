@@ -1,6 +1,6 @@
 # Vivarqo
 
-Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository è organizzato come monorepo: `backend/` contiene l'API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi; `frontend/` contiene l’interfaccia React + Vite con i principali moduli applicativi e la shell installabile PWA.
+Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene attualmente il backend: API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi. Il frontend è stato rimosso dal branch `main` il 2 novembre 2026 per essere ricostruito da zero; i contratti API e la specifica di prodotto restano versionati come riferimento.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -20,7 +20,7 @@ pnpm db:generate
 pnpm dev:api
 ```
 
-Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia anche il processo dedicato ai job con `pnpm dev:worker`; in un terzo esegui `pnpm dev:frontend`: Vite rende disponibile la prima interfaccia React su `http://localhost:5173` e inoltra le richieste API a `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia anche il processo dedicato ai job con `pnpm dev:worker`. Il frontend non è incluso in `main` durante la fase di ricostruzione; l'API resta disponibile su `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
 
 ```bash
 docker compose -f backend/infra/docker/compose.yaml up -d --build api
@@ -51,7 +51,7 @@ curl http://localhost:3000/readyz
 
 - `GET /healthz`: liveness, non dipende da PostgreSQL.
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
-- Sono disponibili le API di account, autenticazione e i principali moduli di dominio; il frontend include schermate applicative collegate alle API. La presenza di una schermata non certifica da sola la conformità a ogni dettaglio della specifica.
+- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti in questa documentazione. Il frontend non è attualmente incluso nel repository ed è da ricostruire utilizzando `docs/openapi.yaml` e la specifica di prodotto.
 
 ## Account e autenticazione
 
@@ -79,14 +79,13 @@ La password deve avere almeno 12 caratteri. Gli account possono autenticarsi sol
 Per inviare email reali configura RESEND_API_KEY e EMAIL_FROM nel file .env. Se il provider non è configurato o non è raggiungibile, l'errore viene registrato senza includere token o dettagli sensibili; la risposta pubblica resta generica per non rivelare se un indirizzo è registrato. In un ambiente senza provider, le email non saranno consegnate e va usato un sender fittizio solo nei test.
 
 ## Configurazione
-Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine frontend ammessa da CORS e CSRF_SECRET deve essere una stringa casuale di almeno 32 caratteri.
+Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine browser ammessa da CORS e CSRF (da impostare sull'URL del futuro frontend)_SECRET deve essere una stringa casuale di almeno 32 caratteri.
 
 ## Comandi pnpm
 | Comando | Scopo |
 |---|---|
 | `pnpm dev:api` | Avvia l'API in watch mode |
-| `pnpm dev:frontend` | Avvia il frontend React + Vite |
-| `pnpm build` | Compila API e frontend |
+| `pnpm build` | Compila l'API backend |
 | `pnpm db:generate` | Genera il client Prisma |
 | `pnpm db:migrate:deploy` | Applica le migrazioni versionate |
 | `pnpm db:migrate:dev` | Crea/applica una migrazione in sviluppo; solo su DB di sviluppo |
@@ -101,13 +100,13 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 
 ## Stato del repository
 
-Nel repository sono presenti backend e frontend per account/autenticazione, animali, registri di cura, attività e calendario, riproduzioni, inventario, documenti e condivisioni pubbliche, finanze, import/export, abbonamenti Stripe e notifiche Web Push.
+Il backend implementa API per account/autenticazione, animali, registri di cura, attività e calendario, riproduzioni, inventario, documenti e condivisioni pubbliche, finanze, import/export, abbonamenti Stripe e notifiche Web Push. Il codice frontend è intenzionalmente assente da `main` e verrà ricostruito separatamente.
 
-Le richieste di importazione ed esportazione ora usano job persistenti PostgreSQL: conferme e richieste rispondono `202 Accepted`, i worker recuperano job abbandonati con lease e token di proprietà e il frontend mostra lo stato. Gli export generano gli archivi in streaming su file temporanei privati. I test di codice non sostituiscono le prove reali provider/browser descritte nella guida operativa.
+Le richieste di importazione ed esportazione usano job persistenti PostgreSQL: conferme e richieste rispondono `202 Accepted`, i worker recuperano job abbandonati con lease e token di proprietà e lo stato è consultabile tramite le API dedicate. Gli export generano gli archivi in streaming su file temporanei privati. I test di codice non sostituiscono le prove reali dei provider descritte nella guida operativa.
 
-Prima del lancio restano da completare o validare: configurazione dei provider reali e dei relativi contratti/regioni; prova Stripe Test Mode e Web Push sullo staging; restore drill effettivamente eseguito sul cluster staging; pubblicazione dei documenti legali solo dopo aver compilato i dati effettivi del titolare e dei fornitori e aver ottenuto revisione professionale; completamento e verifica automatica del contratto OpenAPI; verifica operativa del sender Sentry custom; allineamento del frontend alle librerie UI, routing, form e query previste dalla specifica. Le bozze legali in [docs/legal](docs/legal/) non sono pronte per la pubblicazione.
+Prima del lancio restano da completare o validare: configurazione dei provider reali e dei relativi contratti/regioni; prova Stripe Test Mode e Web Push sullo staging; restore drill effettivamente eseguito sul cluster staging; pubblicazione dei documenti legali solo dopo aver compilato i dati effettivi del titolare e dei fornitori e aver ottenuto revisione professionale; completamento e verifica automatica del contratto OpenAPI; verifica operativa del sender Sentry custom. Il frontend è assente e dovrà essere ricostruito prima del rilascio. Le bozze legali in [docs/legal](docs/legal/) non sono pronte per la pubblicazione.
 
-La PWA conserva gli asset statici ma non supporta ancora modifiche offline con sincronizzazione automatica. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
+Non è attualmente presente una PWA nel branch `main`: manifest, service worker e interfaccia dovranno essere realizzati nel nuovo frontend. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
 
 Il contratto API preliminare è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md); la specifica di riferimento è in [backend/docs/specification.md](backend/docs/specification.md).
 
@@ -329,7 +328,7 @@ Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HT
 - `CONFIRM_RESTORE=YES DATABASE_URL=... pnpm db:restore ./backups/vivarqo-<timestamp>.dump` richiede un checksum valido e rifiuta qualunque target che contenga già oggetti nello schema `public`; non usa `pg_restore --clean`.
 - `pnpm db:restore:drill` esegue dump e restore in un database temporaneo dello stesso cluster, confronta tabelle, migrazioni e conteggi delle tabelle chiave, quindi elimina il database temporaneo.
 - Il workflow manuale [Staging backup and restore drill](.github/workflows/staging-backup-restore.yml) esegue lo stesso controllo sul cluster staging senza sovrascrivere il DB sorgente. Richiede il secret `STAGING_DATABASE_URL` e un ruolo autorizzato a creare/eliminare il database temporaneo.
-- Il backup va inoltre copiato off-site, cifrato, con retention approvata e prove periodiche di restore: gli script non configurano da soli pianificazione, cifratura o storage esterno. Le API backend e le principali schermate React/PWA sono implementate; restano le discrepanze di stack e i flussi elencati nella sezione Stato del repository.
+- Il backup va inoltre copiato off-site, cifrato, con retention approvata e prove periodiche di restore: gli script non configurano da soli pianificazione, cifratura o storage esterno. Le API backend sono implementate; il frontend React/PWA non è presente nel branch `main` ed è da ricostruire secondo la specifica di prodotto.
 
 
 ## Preferenze e privacy account
@@ -344,6 +343,6 @@ Nota tecnica: le notifiche push e i job di importazione/esportazione usano worke
 Le bozze italiane di informativa privacy, termini e condizioni e cookie/tracking notice sono in [docs/legal](docs/legal/). Sono documenti di lavoro, non pronti per la pubblicazione: vanno completati con i dati reali del titolare, dei provider, delle regioni, delle retention, dei prezzi e dei flussi commerciali, quindi revisionati da un professionista competente. Vedi [la checklist di rilascio](docs/legal/RELEASE-CHECKLIST.md).
 
 
-## Frontend TypeScript
+## Frontend
 
-Il frontend React è migrato a TypeScript/TSX. Vedi [frontend/README.md](frontend/README.md) per type-check, build e service worker.
+Il codice del vecchio frontend è stato rimosso dal branch `main`. Per la nuova implementazione utilizzare `docs/openapi.yaml`, `backend/docs/specification.md` e il backend effettivamente versionato. Non esiste al momento un pacchetto frontend installabile o avviabile.

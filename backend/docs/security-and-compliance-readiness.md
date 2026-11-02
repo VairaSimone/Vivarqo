@@ -1,7 +1,7 @@
 # Sicurezza e conformità: stato, controlli e attività prima del lancio
 
 **Revisione tecnica:** 28 ottobre 2026  
-**Ambito verificato:** repository Vivarqo disponibile nel branch `main`, inclusi backend/API e frontend React/PWA. Il repository non contiene documenti legali pubblicati né prove autonome dell’ambiente di produzione.  
+**Ambito verificato:** repository Vivarqo disponibile nel branch `main`, con backend/API, database, migrazioni e infrastruttura. Il frontend React/PWA è stato rimosso il 2 novembre 2026 per essere ricostruito. Il repository non contiene documenti legali pubblicati né prove autonome dell’ambiente di produzione.  
 **Importante:** questa è una checklist tecnica, non una certificazione di conformità né un parere legale. La conformità dipende anche da chi gestisce il servizio, dalle finalità effettive, dai fornitori, dai paesi serviti, dai contratti e dai processi organizzativi.
 
 ## 1. Modifiche tecniche applicate in questo branch
@@ -36,12 +36,12 @@ Il Garante spiega che le violazioni vanno documentate e che la notifica entro 72
 
 ## 3. Cookie, ePrivacy e consenso
 
-Il backend non contiene il frontend né un sistema di analytics/advertising. Non è quindi possibile verificare quali cookie o tracker vengano effettivamente installati dalla UI o da script di terze parti.
+Il repository non contiene attualmente un frontend né un sistema di analytics/advertising. Non è quindi possibile verificare quali cookie o tracker verranno installati dalla nuova UI o da eventuali script di terze parti.
 
 Prima del rilascio:
 - documentare i cookie strettamente necessari (sessione e CSRF) e le loro finalità nella policy pertinente;
 - non attivare analytics non esenti, advertising, fingerprinting o altri tracker non necessari prima di aver raccolto un consenso valido, quando richiesto;
-- implementare nel frontend un pannello che permetta di accettare/rifiutare i tracker non necessari senza dark pattern, modificare le preferenze e revocare il consenso;
+- implementare nel nuovo frontend un pannello che permetta di accettare/rifiutare i tracker non necessari senza dark pattern, modificare le preferenze e revocare il consenso;
 - conservare una prova delle scelte quando il consenso è la base giuridica, e impedire il caricamento dei tracker prima della scelta.
 
 Riferimento ufficiale: [Linee guida del Garante su cookie e altri strumenti di tracciamento, 10 giugno 2021](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9677876) e art. 122 del Codice Privacy.

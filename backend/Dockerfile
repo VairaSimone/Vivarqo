@@ -13,7 +13,6 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
-COPY frontend/package.json frontend/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
@@ -27,7 +26,6 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
-COPY frontend/package.json frontend/package.json
 RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS runtime

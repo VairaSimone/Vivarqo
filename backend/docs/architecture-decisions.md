@@ -41,9 +41,9 @@
 
 ## Verifica conformità — 29 ottobre 2026
 
-- La coda frontend delle mutazioni offline è stata rimossa: le richieste mutative vengono rifiutate lato client quando il browser segnala di essere offline. La cache del service worker resta limitata agli asset statici.
+- La precedente implementazione frontend/PWA è stata rimossa da `main` il 2 novembre 2026 per consentire una ricostruzione completa. Le decisioni relative a caching e comportamento offline del client sono storiche e non descrivono componenti attualmente versionati.
 - L'export ZIP è generato incrementalmente su disco, senza il limite prodotto arbitrario di 50 MiB. Restano i limiti strutturali del formato ZIP classico (dimensione complessiva fino a circa 4 GiB, massimo 65.535 entry) e la generazione avviene ancora nella richiesta HTTP, non tramite un worker persistente.
-- Rimangono non conformità aperte: frontend JavaScript/JSX anziché TypeScript e librerie prescritte non installate; assenza del contratto OpenAPI completo e di `pg-boss`; campi/preferenze dell'account incompleti; cancellazione account self-service e verifiche operative/legali ancora da completare.
+- Le verifiche ancora aperte riguardano il contratto OpenAPI, le dipendenze e i processi effettivamente adottati rispetto alla specifica, le preferenze account e le verifiche operative/legali. Il frontend è attualmente assente da `main` e va ricostruito senza modificare i contratti backend.
 
 
 ### Follow-up — miglioramenti successivi
@@ -69,7 +69,7 @@
 
 ## Job asincroni import/export e prove operative — 30 ottobre 2026
 
-- Le tabelle `import_jobs` ed `export_jobs` fungono da coda persistente. Le conferme import e le richieste export rispondono `202`; il frontend interroga endpoint di stato.
+- Le tabelle `import_jobs` ed `export_jobs` fungono da coda persistente. Le conferme import e le richieste export rispondono `202`; il client deve interrogare gli endpoint di stato.
 - Claim atomico PostgreSQL con `FOR UPDATE SKIP LOCKED`, lease con heartbeat, UUID di lease come fencing token, recupero dopo crash e massimo tre tentativi.
 - La coda è condivisa da tutte le repliche; non è stato aggiunto pg-boss o un broker separato, evitando un servizio aggiuntivo per il carico attuale.
 - La generazione ZIP resta in streaming e viene eseguita fuori dalla richiesta HTTP, con file temporanei e storage privato.
@@ -86,7 +86,7 @@ Questa sezione prevale sulle osservazioni storiche degli incrementi precedenti q
 - **Web Push:** i tentativi sono persistiti in `push_delivery_attempts`; un worker PostgreSQL usa claim con `SKIP LOCKED`, lease recuperabili e retry. Lo storico privato è disponibile via `GET /api/v1/push-delivery-attempts` e ha retention di 90 giorni. Non viene usato pg-boss.
 - **Import/export:** le richieste usano `import_jobs` ed `export_jobs`, restituiscono `202 Accepted` e sono processate da worker PostgreSQL separati dall'API HTTP. Il claim è atomico, usa lease e fencing token, recupera i job abbandonati e limita i tentativi. L'export crea ZIP/CSV in streaming su file temporanei privati.
 - **Import supportati:** oltre ad animali e registri di cura, CSV/XLSX supporta finanze, inventario e le entità riproduttive (cicli, eventi, covate, uova, registri d'incubazione e gruppi di piccoli). Le relazioni sono risolte nell'ambito del solo account autenticato.
-- **Frontend e PWA:** le sorgenti applicative in `main` sono TypeScript/TSX. Il QR è generato sul dispositivo ed esportato come SVG. Il service worker conserva asset statici ma non accoda mutazioni offline e non memorizza risposte private API.
+- **Frontend e PWA:** l'implementazione precedente è stata rimossa da `main` il 2 novembre 2026. Le nuove UI dovranno rispettare i contratti API; le pagine pubbliche, la allowlist dei dati condivisibili e gli endpoint Web Push del backend restano il riferimento. Le precedenti decisioni sul service worker non descrivono una PWA attualmente presente.
 - **OpenAPI e monitoraggio:** `docs/openapi.yaml` è una specifica iniziale e richiede ancora completamento/verifica automatica rispetto a tutte le route. Il middleware `observability.ts` include un sender Sentry minimale e privacy-conscious, attivabile tramite `SENTRY_DSN`; non è installato l'SDK `@sentry/node`.
 - **Verifiche esterne ancora necessarie:** prova Stripe Test Mode con credenziali reali di test, prova Web Push su browser/dispositivo reale, restore drill su staging, verifica delle regioni e dei contratti dei provider, revisione legale delle informative e dei termini. Queste verifiche non possono essere dedotte dai test automatici.
 
