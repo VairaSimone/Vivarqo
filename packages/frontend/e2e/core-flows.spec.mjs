@@ -17,7 +17,7 @@ async function signIn(page, account) {
   await page.getByLabel("Password").fill(account.password);
   await page.getByRole("button", { name: "Accedi" }).click();
   await page.waitForURL(/\/today(?:\?.*)?$/);
-  await expect(page.getByRole("heading", { name: "Oggi" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
 
 test("real API authentication, CSRF, animal persistence, account isolation and responsive smoke", async ({ browser, page }) => {
@@ -104,7 +104,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   expect(apiOfflineResult).toBe("network-error");
   await page.context().setOffline(false);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Oggi" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 
   const animalName = "E2E Python Regius";
   await page.goto("/animals");
