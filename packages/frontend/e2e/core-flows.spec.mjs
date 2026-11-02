@@ -293,7 +293,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
-  const feedingEntry = feedingBody.sessions.flatMap((session) => session.entries).find((entry) => entry.animal?.id === animal.id);
+  const feedingEntry = feedingBody.sessions.flatMap((session) => session.entries).find((entry) => entry.animal?.name === animalName && entry.outcome === "ate" && entry.foodType === "Rat");
   expect(feedingEntry?.outcome).toBe("ate");
   expect(feedingEntry?.foodType).toBe("Rat");
 
@@ -419,7 +419,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const eventDialog = page.getByRole("dialog");
   await eventDialog.getByLabel("Tipo evento").selectOption("pairing");
   await eventDialog.getByLabel("Cerca scheda animale").fill(parentNames[0]);
-  await eventDialog.getByLabel("Scheda animale").selectOption(parentA.id);
+  await eventDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(parentA.id);
   await eventDialog.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   expect((await cycleDetailResponse.json()).cycle.events.some((event) => event.eventType === "pairing")).toBe(true);
@@ -522,7 +522,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
   );
-  await page.getByRole("button", { name: "Carica documento" }).click();
+  await uploadDialog.getByRole("button", { name: "Carica documento" }).click();
   const uploadResponse = await uploadResponsePromise;
   expect(uploadResponse.status()).toBe(201);
   await expect(page.getByText("e2e-veterinary-record.pdf", { exact: true })).toBeVisible();
