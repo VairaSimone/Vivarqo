@@ -192,4 +192,5 @@ jobs:
         if: failure()
         run: |
           cat /tmp/vivarqo-api.log || true
-          cat /tmp/vivarqo-frontend.log || true\n          cat /tmp/vivarqo-worker.log || true
+          cat /tmp/vivarqo-frontend.log || true
+          cat /tmp/vivarqo-worker.log || true
