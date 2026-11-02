@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, clearCsrfCache, setApiLocale, setUnauthorizedHandler } from "../lib/api";
 import { AppShell } from "../layouts/AppShell";
+import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
 const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
@@ -228,17 +229,18 @@ export function App() {
   }
 
   const route = routeOnly(path);
+  const matches = (base: string) => route === base || route.startsWith(base + "/");
   let page;
   if (route === "/today" || route === "/") page = <DashboardPage locale={locale} timezone={timezone} navigate={navigate} />;
-  else if (route.startsWith("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
-  else if (route.startsWith("/feeding")) page = <CarePage locale={locale} path={path} />;
-  else if (route.startsWith("/tasks") || route.startsWith("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
-  else if (route.startsWith("/reproduction") || route.startsWith("/reproduction-cycles") || route.startsWith("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
-  else if (route.startsWith("/inventory") || route.startsWith("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
-  else if (route.startsWith("/finance")) page = <FinancePage locale={locale} />;
-  else if (route.startsWith("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
-  else if (route.startsWith("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
-  else if (route.startsWith("/notifications") || route.startsWith("/settings") || route.startsWith("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
+  else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/feeding")) page = <CarePage locale={locale} path={path} />;
+  else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
+  else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/finance")) page = <FinancePage locale={locale} />;
+  else if (matches("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
+  else if (matches("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
+  else if (matches("/notifications") || matches("/settings") || matches("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
       onDisplayPreferencesChange={(next) => setDisplayPreferencesState((current) => ({ ...current, ...next, timezone }))}
       navigate={navigate} />;
   else page = <ErrorState message={locale === "it" ? "Pagina non trovata." : "Page not found."} retry={() => navigate("/today")} />;
@@ -246,6 +248,6 @@ export function App() {
   return <AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
     {!online && <div className="offline-banner" role="status"><Icon name="alert" size={15} /><span><strong>{t("networkOffline")}</strong><small>{t("offlineAppShellOnly")}</small></span></div>}
     {authError && <div className="global-alert"><Alert tone="danger">{authError}</Alert><button onClick={() => setAuthError("")}>{t("close")}</button></div>}
-    <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>{page}</Suspense>
+    <RouteErrorBoundary key={route} locale={locale}><Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>{page}</Suspense></RouteErrorBoundary>
   </AppShell>;
 }
