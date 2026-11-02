@@ -210,7 +210,12 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
       await api.patch("/notification-preferences", { pushEnabled: true });
       setValues((current) => ({ ...current, pushEnabled: true }));
       prefs.reload(); subscriptions.reload(); show(t("saveSuccess"));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t("operationFailed")); }
+    } catch (reason) {
+      const message = reason instanceof ApiError && reason.code === "WEB_PUSH_NOT_CONFIGURED"
+        ? t("pushNotConfigured")
+        : reason instanceof Error ? reason.message : t("operationFailed");
+      setError(message);
+    }
     finally { setBusy(false); }
   }
   async function disablePush() {
