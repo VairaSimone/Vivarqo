@@ -76,6 +76,8 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await cdp.send("Page.enable");
   const appManifest = await cdp.send("Page.getAppManifest");
   expect(appManifest.errors).toEqual([]);
+  const installability = await cdp.send("Page.getInstallabilityErrors");
+  expect(installability.installabilityErrors).toEqual([]);
   await cdp.detach();
 
   await page.goto("/settings/notifications");
