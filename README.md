@@ -79,7 +79,7 @@ La password deve avere almeno 12 caratteri. Gli account possono autenticarsi sol
 Per inviare email reali configura RESEND_API_KEY e EMAIL_FROM nel file .env. Se il provider non è configurato o non è raggiungibile, l'errore viene registrato senza includere token o dettagli sensibili; la risposta pubblica resta generica per non rivelare se un indirizzo è registrato. In un ambiente senza provider, le email non saranno consegnate e va usato un sender fittizio solo nei test.
 
 ## Configurazione
-Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine browser ammessa da CORS e CSRF (da impostare sull'URL del futuro frontend)_SECRET deve essere una stringa casuale di almeno 32 caratteri.
+Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine browser ammessa da CORS e CSRF e deve corrispondere all'URL del futuro frontend; CSRF_SECRET deve essere una stringa casuale di almeno 32 caratteri.
 
 ## Comandi pnpm
 | Comando | Scopo |
