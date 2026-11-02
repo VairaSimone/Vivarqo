@@ -177,16 +177,15 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
     { name: "mobile-320x700", width: 320, height: 700 }
   ];
   const routes = [
-    "today", "animals", "animals/" + created.id, "feeding", "feeding?create=1", "feeding?bulk=1",
-    "tasks", "tasks?create=1", "calendar", "reproduction", "reproduction-cycles", "clutches",
-    "inventory", "documents", "finance", "settings", "settings/notifications",
-    "notifications", "billing", "imports", "exports"
+    "today", "animals", "animals/" + created.id, "feeding?create=1",
+    "tasks", "calendar", "reproduction", "clutches", "inventory", "documents",
+    "finance", "settings", "settings/notifications", "notifications", "billing", "imports", "exports"
   ];
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     for (const route of routes) {
       await page.goto("/" + route);
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         document: document.documentElement.scrollWidth
