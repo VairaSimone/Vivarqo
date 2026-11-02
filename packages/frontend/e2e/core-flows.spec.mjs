@@ -191,11 +191,11 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
         viewport: document.documentElement.clientWidth,
         document: document.documentElement.scrollWidth
       }));
-      expect(dimensions.document, "unexpected horizontal page overflow at " + viewport.name + " on /" + route)
-        .toBeLessThanOrEqual(dimensions.viewport + 1);
       const folder = path.join("test-results", "responsive", viewport.name);
       await mkdir(folder, { recursive: true });
       await page.screenshot({ path: path.join(folder, route.replaceAll("/", "-").replaceAll("?", "-").replaceAll("=", "-") + ".png"), fullPage: true });
+      expect(dimensions.document, "unexpected horizontal page overflow at " + viewport.name + " on /" + route)
+        .toBeLessThanOrEqual(dimensions.viewport + 1);
     }
   }
 
