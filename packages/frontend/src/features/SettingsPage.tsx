@@ -197,11 +197,11 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
       if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error(locale === "it" ? "Questo browser non supporta Web Push." : "This browser does not support Web Push.");
       const currentRegistration = await navigator.serviceWorker.getRegistration();
       if (!currentRegistration) throw new Error(locale === "it" ? "Il service worker non è ancora installato. Apri la versione pubblicata della PWA e riprova." : "The service worker is not installed yet. Open the deployed PWA and try again.");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error(locale === "it" ? "Permesso notifiche non concesso." : "Notification permission was not granted.");
-      const registration = currentRegistration.active ? currentRegistration : await navigator.serviceWorker.ready;
       const key = await api.get<{ publicKey: string | null }>("/push/public-key");
       if (!key.publicKey) throw new Error(locale === "it" ? "Web Push non è configurato sul server." : "Web Push is not configured on the server.");
+      const registration = currentRegistration.active ? currentRegistration : await navigator.serviceWorker.ready;
+      const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      if (permission !== "granted") throw new Error(locale === "it" ? "Permesso notifiche non concesso." : "Notification permission was not granted.");
       const existing = await registration.pushManager.getSubscription();
       const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeVapidKey(key.publicKey) as unknown as BufferSource });
       const json = subscription.toJSON();
@@ -224,12 +224,29 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
   }
   async function removeSubscription(item: Item) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete(`/push-subscriptions/${getString(item, "id")}`); subscriptions.reload(); }
-    catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    try {
+      await api.delete(`/push-subscriptions/${getString(item, "id")}`);
+      subscriptions.reload();
+      const endpoint = getString(item, "endpoint");
+      if (endpoint && "serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          const localSubscription = await registration?.pushManager.getSubscription();
+          if (localSubscription?.endpoint === endpoint && !(await localSubscription.unsubscribe())) {
+            show(t("deviceRemovedLocalPending"));
+            return;
+          }
+        } catch {
+          show(t("deviceRemovedLocalPending"));
+          return;
+        }
+      }
+      show(t("deviceRemoved"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
   async function testPush() {
     setBusy(true); setError("");
-    try { await api.post("/notifications/test-push"); show(t("testPush")); }
+    try { await api.post("/notifications/test-push"); show(t("pushTestQueued")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }

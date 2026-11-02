@@ -80,6 +80,7 @@ const messages = {
     notificationPreferences: "Preferenze notifiche", inApp: "Notifiche nell'app", webPush: "Notifiche push",
     pushExplanation: "Le notifiche push possono arrivare anche quando Vivarqo non è aperto. Il browser chiederà il permesso solo dopo aver attivato questa funzione.",
     enablePush: "Attiva notifiche push", disablePush: "Disattiva notifiche push", testPush: "Invia notifica di prova",
+    deviceRemoved: "Dispositivo rimosso.", deviceRemovedLocalPending: "Dispositivo rimosso dall'account; il browser non ha confermato la revoca locale.", pushTestQueued: "Notifica di prova accodata per l'invio.",
     quietHours: "Fasce orarie silenziose", from: "Dalle", to: "Alle", categories: "Categorie",
     settingsTitle: "Impostazioni", settingsSubtitle: "Profilo, preferenze, sicurezza e dati.",
     accountProfile: "Profilo account", displayName: "Nome visualizzato", email: "Email",
@@ -231,6 +232,7 @@ const messages = {
     notificationPreferences: "Notification preferences", inApp: "In-app notifications", webPush: "Web push",
     pushExplanation: "Push notifications can arrive when Vivarqo is closed. Your browser will ask for permission only after you enable this feature.",
     enablePush: "Enable push notifications", disablePush: "Disable push notifications", testPush: "Send test notification",
+    deviceRemoved: "Device removed.", deviceRemovedLocalPending: "Device removed from the account; the browser did not confirm local revocation.", pushTestQueued: "Test notification queued for delivery."
     quietHours: "Quiet hours", from: "From", to: "To", categories: "Categories",
     settingsTitle: "Settings", settingsSubtitle: "Profile, preferences, security and data.",
     accountProfile: "Account profile", displayName: "Display name", email: "Email",
@@ -304,6 +306,11 @@ const messages = {
     reference: "Reference",
   }
 } as const;
+
+export const translationKeys = Object.freeze({
+  it: Object.keys(messages.it),
+  en: Object.keys(messages.en),
+});
 
 type MessageKey = keyof typeof messages.en;
 export function translate(locale: Locale, key: string, values: Record<string, string | number> = {}): string {
