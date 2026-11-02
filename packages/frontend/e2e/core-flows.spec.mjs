@@ -285,7 +285,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.goto("/feeding?create=1&animalId=" + animal.id);
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByLabel("Esito").selectOption("ate");
-  await page.getByLabel("Tipo di cibo").fill("Rat");
+  await page.getByLabel("Alimento").fill("Rat");
   await page.getByRole("button", { name: "Registra sessione" }).click();
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
@@ -308,7 +308,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   await page.goto("/tasks?create=1");
   await page.getByLabel("Titolo attività").fill("E2E Task follow-up");
-  await page.getByLabel("Animale").selectOption(animal.id);
+  await page.getByLabel("Scheda animale").selectOption(animal.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
   expect(tasksResponse.status()).toBe(200);
@@ -325,7 +325,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.getByLabel("Valuta").fill("EUR");
   await page.getByLabel("Categoria").nth(1).fill("Test E2E");
   await page.getByLabel("Descrizione").fill("E2E veterinary expense");
-  await page.getByLabel("Animale").selectOption(animal.id);
+  await page.getByLabel("Scheda animale").selectOption(animal.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
   expect(financeResponse.status()).toBe(200);
