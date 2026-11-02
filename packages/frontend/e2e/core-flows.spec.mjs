@@ -527,3 +527,17 @@ test("profile and language preferences persist across reloads", async ({ page })
   const italianSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
   expect((await italianSession.json()).user.locale).toBe("it");
 });
+
+test("revoked sessions are rejected by the next authenticated request", async ({ page }) => {
+  await signIn(page, owner);
+  await page.goto("/settings");
+  page.once("dialog", (dialog) => dialog.accept());
+  const revokeResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/auth/sessions/revoke-all") && response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "Revoca tutte le sessioni" }).click();
+  expect((await revokeResponsePromise).status()).toBe(200);
+  await page.goto("/animals");
+  await page.waitForURL((url) => url.pathname === "/login");
+  await expect(page.getByRole("heading", { name: "Bentornato" })).toBeVisible();
+});
