@@ -438,7 +438,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   const cycleAfterBirth = (await cycleDetailResponse.json()).cycle;
-  const batch = cycleAfterBirth.offspring.find((item) => Number(item.count) === 2);
+  const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
   page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\\nE2E Baby 2"));
