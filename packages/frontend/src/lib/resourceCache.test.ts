@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { invalidateAllResourceCache, loadCachedResource } from "./resourceCache";
+import { invalidateAllResourceCache, invalidateResourceCacheEntry, loadCachedResource } from "./resourceCache";
 
 describe("resource cache", () => {
   it("deduplicates concurrent requests and reuses the short-lived result", async () => {
