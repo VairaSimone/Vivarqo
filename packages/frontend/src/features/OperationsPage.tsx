@@ -37,7 +37,7 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("open");
   const [category, setCategory] = useState("");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(params.get("q") ?? "");
   const [modal, setModal] = useState(Boolean(params.get("create")));
   const [editing, setEditing] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);

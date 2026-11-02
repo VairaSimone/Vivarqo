@@ -52,12 +52,12 @@ worker.addEventListener("install", (rawEvent) => {
       const assets = [...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)]
         .map((match) => match[1]!).filter((url) => !url.includes("?"));
       for (const url of [...new Set(assets)]) {
-        const response = await fetch(url, { cache: "no-cache" });
+        const response = await fetchPrecache(url, 15_000);
         if (!response.ok) throw new Error(`Required application asset ${url} returned HTTP ${response.status}`);
         await cache.put(url, response);
       }
       const optionalResults = await Promise.allSettled(OPTIONAL_SHELL_URLS.map(async (url) => {
-        const response = await fetch(url, { cache: "no-cache" });
+        const response = await fetchPrecache(url, 8_000);
         if (!response.ok) throw new Error(`Optional PWA resource ${url} returned HTTP ${response.status}`);
         await cache.put(url, response);
       }));
