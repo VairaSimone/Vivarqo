@@ -137,7 +137,7 @@ export function createReproductionRouter() {
     const where = {
       userId: auth.userId,
       ...(page.status === "all" ? {} : { status: page.status }),
-      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+      ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
     };
     const [total, cycles] = await Promise.all([
       prisma.reproductionCycle.count({ where }),
