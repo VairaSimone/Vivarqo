@@ -396,7 +396,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   expect(cycle?.id).toBeTruthy();
 
   await page.goto("/reproduction-cycles/" + cycle.id);
-  await page.getByRole("button", { name: "Registra evento" }).click();
+  await page.getByRole("button", { name: "Registra evento" }).first().click();
   await page.getByLabel("Tipo evento").selectOption("pairing");
   await page.getByLabel("Scheda animale").selectOption(parentA.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
@@ -421,7 +421,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   let clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   expect((await clutchResponse.json()).clutch.eggs.length).toBe(2);
 
-  await page.getByRole("button", { name: "Aggiungi misurazione" }).click();
+  await page.getByRole("button", { name: "Aggiungi misurazione" }).first().click();
   await page.getByLabel("Temperatura (°C)").fill("31");
   await page.getByLabel("Umidità (%)").fill("70");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
@@ -431,7 +431,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
 
   await page.goto("/reproduction-cycles/" + cycle.id);
   await page.getByRole("button", { name: "Nascite" }).click();
-  await page.getByRole("button", { name: "Registra nascita" }).click();
+  await page.getByRole("button", { name: "Registra nascita" }).first().click();
   await page.getByLabel("Data nascita").fill("2026-11-02");
   await page.getByLabel("Covate").selectOption(clutch.id);
   await page.getByLabel("Numero piccoli").fill("2");
