@@ -529,7 +529,7 @@ test("profile and language preferences persist across reloads", async ({ page })
   );
   await page.getByRole("button", { name: "Salva modifiche" }).first().click();
   expect((await profilePatchPromise).status()).toBe(200);
-  const profileResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/account");
+  const profileResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
   expect(profileResponse.status()).toBe(200);
   expect((await profileResponse.json()).user.displayName).toBe("Vivarqo E2E User");
 
