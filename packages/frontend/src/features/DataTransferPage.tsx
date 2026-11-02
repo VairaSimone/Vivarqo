@@ -32,9 +32,12 @@ function ImportPage({ locale }: { locale: Locale }) {
   useEffect(() => {
     const status = getString(job.data, "status");
     if (status !== "queued" && status !== "processing") return;
-    const timer = window.setTimeout(job.reload, 2000);
-    return () => window.clearTimeout(timer);
-  }, [job.data, job.reload]);
+    // Keep polling even when the cache returns the same pending object.
+    // The resource cache expires entries after a short TTL; a stable interval
+    // ensures we make a fresh request as soon as that cached response expires.
+    const timer = window.setInterval(job.reload, 2000);
+    return () => window.clearInterval(timer);
+  }, [status, job.reload]);
 
   async function upload(event: FormEvent) {
     event.preventDefault();
@@ -127,8 +130,10 @@ function ExportPage({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
-    const timer = window.setTimeout(resource.reload, 2000);
-    return () => window.clearTimeout(timer);
+    // Do not stop after a cache hit: otherwise a pending export is polled only
+    // once and the UI never observes completion after the cache entry expires.
+    const timer = window.setInterval(resource.reload, 2000);
+    return () => window.clearInterval(timer);
   }, [status, resource.reload]);
 
   async function start() {
