@@ -293,7 +293,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
-  const feedingEntry = feedingBody.sessions.flatMap((session) => session.entries).find((entry) => entry.animalId === animal.id);
+  const feedingEntry = feedingBody.sessions.flatMap((session) => session.entries).find((entry) => entry.animal?.id === animal.id);
   expect(feedingEntry?.outcome).toBe("ate");
   expect(feedingEntry?.foodType).toBe("Rat");
 
@@ -302,7 +302,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await feedingEditDialog.getByLabel("Esito").selectOption("refused");
   await feedingEditDialog.getByRole("button", { name: "Salva modifiche" }).click();
   const editedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
-  const editedEntry = (await editedFeedings.json()).sessions.flatMap((session) => session.entries).find((entry) => entry.id === feedingEntry.id);
+  const editedEntry = (await editedFeedings.json()).sessions.flatMap((session) => session.entries).find((entry) => entry.id === feedingEntry?.id);
   expect(editedEntry?.outcome).toBe("refused");
 
   page.once("dialog", (dialog) => dialog.accept());
@@ -399,7 +399,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);
   await cycleDialog.getByRole("combobox", { name: "Genitore A" }).selectOption(parentA.id);
   await cycleDialog.getByLabel("Cerca genitore b").fill(parentNames[1]);
-  await cycleDialog.getByLabel("Genitore B").selectOption(parentB.id);
+  await cycleDialog.getByRole("combobox", { name: "Genitore B" }).selectOption(parentB.id);
   const cycleCreatePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/reproduction-cycles") && response.request().method() === "POST"
   );
@@ -518,7 +518,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   });
   const uploadDialog = page.getByRole("dialog");
   await uploadDialog.getByLabel("Categoria").fill("Veterinario");
-  await uploadDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  await uploadDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const uploadResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/documents") && response.request().method() === "POST"
   );
