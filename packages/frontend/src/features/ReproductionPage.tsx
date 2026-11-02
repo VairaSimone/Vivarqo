@@ -4,6 +4,7 @@ import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, qu
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
 type Item = Record<string, unknown>;
@@ -23,6 +24,7 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
   const params = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
   const tab = params.get("tab") === "offspring" ? "offspring" : "cycles";
   const [page, setPage] = useState(1);
+  const [batchPage, setBatchPage] = useState(1);
   const [status, setStatus] = useState("all");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
@@ -35,9 +37,8 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
     tab === "cycles" ? `/reproduction-cycles${queryString({ page, pageSize: 25, status })}` : null
   );
   const batches = useResource<{ offspringBatches: Item[]; pagination: { page: number; totalPages: number; total: number } }>(
-    tab === "offspring" ? "/offspring-batches?page=1&pageSize=100" : null
+    tab === "offspring" ? `/offspring-batches${queryString({ page: batchPage, pageSize: 25 })}` : null
   );
-  const animals = useResource<{ animals: Item[] }>("/animals?page=1&pageSize=100&status=active&sort=name");
   const { toast, show } = useToast();
 
   function openCycle(cycle?: Item) {
@@ -106,14 +107,17 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
         <Field label={t("cycleName")}><Input value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} /></Field>
         <div className="form-grid"><Field label={t("startedOn")}><Input required type="date" value={cycleForm.startedOn} onChange={(e) => setCycleForm({ ...cycleForm, startedOn: e.target.value })} /></Field><Field label={t("endedOn")}><Input type="date" value={cycleForm.endedOn} onChange={(e) => setCycleForm({ ...cycleForm, endedOn: e.target.value })} /></Field>
         <Field label={t("status")}><Select value={cycleForm.status} onChange={(e) => setCycleForm({ ...cycleForm, status: e.target.value })}>{cycleStatuses.map((value) => <option value={value} key={value}>{t(`cycleStatus_${value}`)}</option>)}</Select></Field></div>
-        <div className="form-grid"><Field label={t("parentA")}><Select value={cycleForm.parentAAnimalId} onChange={(e) => setCycleForm({ ...cycleForm, parentAAnimalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field><Field label={t("parentB")}><Select value={cycleForm.parentBAnimalId} onChange={(e) => setCycleForm({ ...cycleForm, parentBAnimalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field></div>
+        <div className="form-grid">
+          <RemoteSelect label={t("parentA")} value={cycleForm.parentAAnimalId} onChange={(parentAAnimalId) => setCycleForm({ ...cycleForm, parentAAnimalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+          <RemoteSelect label={t("parentB")} value={cycleForm.parentBAnimalId} onChange={(parentBAnimalId) => setCycleForm({ ...cycleForm, parentBAnimalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+        </div>
         <Field label={t("notes")}><Textarea rows={3} value={cycleForm.notes} onChange={(e) => setCycleForm({ ...cycleForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
     </Modal>}
     {offspringModal && <Modal title={t("addOffspring")} onClose={() => setOffspringModal(false)}>
       <form className="form-stack" onSubmit={saveOffspring}>{error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("cycles")}><Select required value={offspringForm.cycleId} onChange={(e) => setOffspringForm({ ...offspringForm, cycleId: e.target.value })}><option value="">—</option>{(cycles.data?.cycles ?? []).map((cycle) => <option key={getString(cycle, "id")} value={getString(cycle, "id")}>{getString(cycle, "name") || formatDate(getString(cycle, "startedOn"), locale)}</option>)}</Select></Field>
+        <RemoteSelect label={t("cycles")} value={offspringForm.cycleId} onChange={(cycleId) => setOffspringForm({ ...offspringForm, cycleId })} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => `/reproduction-cycles/${encodeURIComponent(id)}`} detailKey="cycle" locale={locale} />
         <div className="form-grid"><Field label={t("bornOn")}><Input required type="date" value={offspringForm.bornOn} onChange={(e) => setOffspringForm({ ...offspringForm, bornOn: e.target.value })} /></Field><Field label={t("count")}><Input required type="number" min="0" max="10000" value={offspringForm.count} onChange={(e) => setOffspringForm({ ...offspringForm, count: e.target.value })} /></Field></div>
         <Field label={t("notes")}><Textarea rows={2} value={offspringForm.notes} onChange={(e) => setOffspringForm({ ...offspringForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setOffspringModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
@@ -134,7 +138,6 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
   const [eventForm, setEventForm] = useState({ eventType: "pairing", occurredAt: localDateTimeValue(), animalId: "", details: "", temperatureC: "", humidityPct: "" });
   const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubationStartedAt: "", notes: "" });
   const [batchForm, setBatchForm] = useState({ clutchId: "", bornOn: todayDate(), count: "1", notes: "" });
-  const animals = useResource<{ animals: Item[] }>("/animals?page=1&pageSize=100&status=active&sort=name");
   const { toast, show } = useToast();
   const cycle = resource.data?.cycle;
   const events = getArray<Item>(cycle, "events");
@@ -240,7 +243,7 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
       <form className="form-stack" onSubmit={saveEvent}>{error && <Alert tone="danger">{error}</Alert>}
         <Field label={t("eventType")}><Select value={eventForm.eventType} onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })}>{eventTypes.map((value) => <option key={value} value={value}>{t(`event_${value}`)}</option>)}</Select></Field>
         <Field label={t("occurredAt")}><Input required type="datetime-local" value={eventForm.occurredAt} onChange={(e) => setEventForm({ ...eventForm, occurredAt: e.target.value })} /></Field>
-        <Field label={t("animalDetail")}><Select value={eventForm.animalId} onChange={(e) => setEventForm({ ...eventForm, animalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field>
+      <RemoteSelect label={t("animalDetail")} value={eventForm.animalId} onChange={(animalId) => setEventForm({ ...eventForm, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(animalId) => `/animals/${encodeURIComponent(animalId)}`} detailKey="animal" locale={locale} />
         <div className="form-grid"><Field label={t("temperature")}><Input type="number" step="0.1" value={eventForm.temperatureC} onChange={(e) => setEventForm({ ...eventForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={eventForm.humidityPct} onChange={(e) => setEventForm({ ...eventForm, humidityPct: e.target.value })} /></Field></div>
         <Field label={t("notes")}><Textarea rows={3} value={eventForm.details} onChange={(e) => setEventForm({ ...eventForm, details: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
