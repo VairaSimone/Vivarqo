@@ -493,3 +493,25 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   const remainingDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
   expect((await remainingDocuments.json()).documents.some((item) => item.id === document.id)).toBe(false);
 });
+
+test("profile and language preferences persist across reloads", async ({ page }) => {
+  await signIn(page, owner);
+  await page.goto("/settings");
+  await page.getByLabel("Nome visualizzato").fill("Vivarqo E2E User");
+  await page.getByRole("button", { name: "Salva modifiche" }).first().click();
+  const profileResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/account");
+  expect(profileResponse.status()).toBe(200);
+  expect((await profileResponse.json()).user.displayName).toBe("Vivarqo E2E User");
+
+  await page.getByLabel("Lingua").selectOption("en");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  const englishSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
+  expect((await englishSession.json()).user.locale).toBe("en");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+  await page.getByLabel("Language").selectOption("it");
+  await expect(page.getByRole("heading", { name: "Impostazioni" })).toBeVisible();
+  const italianSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
+  expect((await italianSession.json()).user.locale).toBe("it");
+});
