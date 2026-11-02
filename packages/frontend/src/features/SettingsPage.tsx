@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString } from "../lib/domain";
-import type { Locale } from "../lib/domain";
+import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
@@ -9,16 +9,25 @@ import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, 
 type Item = Record<string, unknown>;
 type User = { id: string; email: string; displayName: string; locale: Locale; timezone: string };
 
-export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, onThemeChange, navigate }: {
-  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; onThemeChange: (theme: "system" | "light" | "dark") => void; navigate: (path: string) => void;
+export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
+  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void;
+  onThemeChange: (theme: "system" | "light" | "dark") => void;
+  onDisplayPreferencesChange: (preferences: { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean }) => void;
+  navigate: (path: string) => void;
 }) {
   if (path.startsWith("/notifications")) return <NotificationsPage locale={locale} navigate={navigate} />;
   if (path.startsWith("/settings/notifications")) return <NotificationSettingsPage locale={locale} />;
   if (path.startsWith("/billing")) return <BillingPage locale={locale} />;
-  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated} onThemeChange={onThemeChange} navigate={navigate} />;
+  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated}
+    onThemeChange={onThemeChange} onDisplayPreferencesChange={onDisplayPreferencesChange} navigate={navigate} />;
 }
 
-function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onThemeChange, navigate }: { locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; onThemeChange: (theme: "system" | "light" | "dark") => void; navigate: (path: string) => void }) {
+function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
+  locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void;
+  onThemeChange: (theme: "system" | "light" | "dark") => void;
+  onDisplayPreferencesChange: (preferences: { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean }) => void;
+  navigate: (path: string) => void;
+}) {
   const t = (key: string) => translate(locale, key);
   const prefs = useResource<{ preferences: Item }>("/account/preferences");
   const [profile, setProfile] = useState({ displayName: user.displayName, email: user.email, timezone: user.timezone || "Europe/Rome", currentPassword: "" });
@@ -72,6 +81,12 @@ function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onTh
       await api.patch("/account/preferences", preferences);
       const theme = preferences.theme === "dark" || preferences.theme === "light" ? preferences.theme : "system";
       onThemeChange(theme);
+      onDisplayPreferencesChange({
+        weightUnit: (["g", "kg", "oz", "lb"].includes(preferences.weightUnit) ? preferences.weightUnit : "g") as WeightUnit,
+        temperatureUnit: (["c", "f"].includes(preferences.temperatureUnit) ? preferences.temperatureUnit : "c") as TemperatureUnit,
+        dateFormat: (["locale", "dd/MM/yyyy", "yyyy-MM-dd"].includes(preferences.dateFormat) ? preferences.dateFormat : "locale") as DateFormat,
+        compactTables: Boolean(preferences.compactTables)
+      });
       showToast(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }

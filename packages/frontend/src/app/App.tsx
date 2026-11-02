@@ -12,7 +12,8 @@ const FinancePage = lazy(() => import("../features/FinancePage").then((module) =
 const SettingsPage = lazy(() => import("../features/SettingsPage").then((module) => ({ default: module.SettingsPage })));
 const DataTransferPage = lazy(() => import("../features/DataTransferPage").then((module) => ({ default: module.DataTransferPage })));
 const PublicAnimalPage = lazy(() => import("../features/PublicAnimalPage").then((module) => ({ default: module.PublicAnimalPage })));
-import type { Locale } from "../lib/domain";
+import type { DisplayPreferences, Locale, WeightUnit, TemperatureUnit, DateFormat } from "../lib/domain";
+import { setDisplayPreferences as applyDisplayPreferences } from "../lib/domain";
 import { browserLocale, translate } from "../lib/i18n";
 import { getString } from "../lib/domain";
 import { useResource } from "../hooks/useResource";
@@ -49,6 +50,9 @@ export function App() {
   const [authError, setAuthError] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
   const [themePreference, setThemePreference] = useState<"system" | "light" | "dark">("system");
+  const [displayPreferences, setDisplayPreferencesState] = useState<DisplayPreferences>({
+    weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome"
+  });
   const t = (key: string) => translate(locale, key);
   const isPublic = isPublicPath(path);
   const authRoute = authMode(path);
@@ -133,10 +137,25 @@ export function App() {
   }, [isPublic]);
 
   useEffect(() => {
-    if (!accountPrefs.data?.preferences) return;
-    const storedTheme = getString(accountPrefs.data.preferences, "theme", "system");
+    const value = accountPrefs.data?.preferences ?? {};
+    const weight = getString(value, "weightUnit", "g");
+    const temperature = getString(value, "temperatureUnit", "c");
+    const date = getString(value, "dateFormat", "locale");
+    setDisplayPreferencesState({
+      weightUnit: (["g", "kg", "oz", "lb"].includes(weight) ? weight : "g") as WeightUnit,
+      temperatureUnit: (["c", "f"].includes(temperature) ? temperature : "c") as TemperatureUnit,
+      dateFormat: (["locale", "dd/MM/yyyy", "yyyy-MM-dd"].includes(date) ? date : "locale") as DateFormat,
+      compactTables: Boolean(value.compactTables),
+      timezone
+    });
+    const storedTheme = getString(value, "theme", "system");
     setThemePreference(storedTheme === "dark" || storedTheme === "light" ? storedTheme : "system");
-  }, [accountPrefs.data]);
+  }, [accountPrefs.data, timezone]);
+
+  useEffect(() => {
+    applyDisplayPreferences(displayPreferences);
+    document.documentElement.dataset.compactTables = String(displayPreferences.compactTables);
+  }, [displayPreferences]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -171,6 +190,7 @@ export function App() {
     catch { /* The local session view is cleared when the server session has already expired. */ }
     clearCsrfCache();
     setUser(null);
+    setDisplayPreferencesState({ weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome" });
     navigate("/login");
   }
 
@@ -218,11 +238,13 @@ export function App() {
   else if (route.startsWith("/finance")) page = <FinancePage locale={locale} />;
   else if (route.startsWith("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (route.startsWith("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
-  else if (route.startsWith("/notifications") || route.startsWith("/settings") || route.startsWith("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference} navigate={navigate} />;
+  else if (route.startsWith("/notifications") || route.startsWith("/settings") || route.startsWith("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
+      onDisplayPreferencesChange={(next) => setDisplayPreferencesState((current) => ({ ...current, ...next, timezone }))}
+      navigate={navigate} />;
   else page = <ErrorState message={locale === "it" ? "Pagina non trovata." : "Page not found."} retry={() => navigate("/today")} />;
 
   return <AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
-    {!online && <div className="offline-banner" role="status"><Icon name="alert" size={15} />{t("networkOffline")}</div>}
+    {!online && <div className="offline-banner" role="status"><Icon name="alert" size={15} /><span><strong>{t("networkOffline")}</strong><small>{t("offlineAppShellOnly")}</small></span></div>}
     {authError && <div className="global-alert"><Alert tone="danger">{authError}</Alert><button onClick={() => setAuthError("")}>{t("close")}</button></div>}
     <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>{page}</Suspense>
   </AppShell>;
