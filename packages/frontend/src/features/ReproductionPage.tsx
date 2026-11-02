@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
-import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../lib/domain";
+import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
@@ -32,6 +32,8 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
   const [error, setError] = useState("");
   const [cycleForm, setCycleForm] = useState({ name: "", startedOn: todayDate(), endedOn: "", status: "planned", parentAAnimalId: "", parentBAnimalId: "", notes: "" });
   const [offspringModal, setOffspringModal] = useState(false);
+  const [conversionBatch, setConversionBatch] = useState<Item | null>(null);
+  const [conversionBusy, setConversionBusy] = useState(false);
   const [offspringForm, setOffspringForm] = useState({ cycleId: "", clutchId: "", bornOn: todayDate(), count: "1", notes: "" });
   const cycles = useResource<{ cycles: Item[]; pagination: { page: number; totalPages: number; total: number } }>(
     tab === "cycles" ? `/reproduction-cycles${queryString({ page, pageSize: 25, status })}` : null
@@ -66,6 +68,16 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
     try { await api.delete(`/reproduction-cycles/${getString(cycle, "id")}`); cycles.reload(); show(t("delete")); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
+  async function convertBatchAnimals(names: string[], species: string) {
+    if (!conversionBatch) return;
+    setConversionBusy(true);
+    try {
+      await api.post(`/offspring-batches/${getString(conversionBatch, "id")}/animals`, { animals: names.map((name) => ({ name, species, sex: "unknown" })) });
+      setConversionBatch(null); batches.reload(); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setConversionBusy(false); }
+  }
+
   async function saveOffspring(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -93,14 +105,9 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
       {cycles.data?.pagination && <Pagination page={page} totalPages={cycles.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
     </> : <Panel><PanelHeader title={t("offspring")} action={<Button onClick={() => setOffspringModal(true)}><Icon name="plus" />{t("addOffspring")}</Button>} />
       {batches.loading && !batches.data ? <LoadingState /> : batches.error ? <ErrorState message={batches.error.message} retry={batches.reload} /> :
-        batches.data?.offspringBatches.length ? <div className="record-list">{batches.data.offspringBatches.map((batch) => <div className="record-row" key={getString(batch, "id")}><div><strong>{getString(batch, "count")} {t("offspring")}</strong><small>{formatDate(getString(batch, "bornOn"), locale)} · {getString(batch, "cycle") ? getString(batch.cycle, "name") : ""}</small><p>{getString(batch, "notes")}</p></div><div className="row-actions"><IconButton label={t("convertToAnimals")} onClick={() => {
-          const names = window.prompt(locale === "it" ? "Inserisci i nomi dei piccoli, uno per riga." : "Enter offspring names, one per line."); if (!names) return;
-          const cycle = batch.cycle as Item | undefined; const count = names.split("\n").map((value) => value.trim()).filter(Boolean);
-          const species = window.prompt(t("species"), "") ?? "";
-          if (!species) return;
-          void api.post(`/offspring-batches/${getString(batch, "id")}/animals`, { animals: count.map((name) => ({ name, species, sex: "unknown" })) }).then(() => show(t("saveSuccess"))).catch((reason) => show(reason instanceof ApiError ? reason.message : t("operationFailed")));
-        }}><Icon name="plus" /></IconButton><IconButton label={t("details")} onClick={() => navigate(`/reproduction-cycles/${getString(batch, "cycleId")}`)}><Icon name="chevron" /></IconButton><IconButton label={t("delete")} onClick={() => { if (window.confirm(t("confirmDelete"))) void api.delete(`/offspring-batches/${getString(batch, "id")}`).then(() => batches.reload()).catch((reason) => show(reason instanceof ApiError ? reason.message : t("operationFailed"))); }}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
-    </Panel>}
+        batches.data?.offspringBatches.length ? <div className="record-list">{batches.data.offspringBatches.map((batch) => <div className="record-row" key={getString(batch, "id")}><div><strong>{getString(batch, "count")} {t("offspring")}</strong><small>{formatDate(getString(batch, "bornOn"), locale)} · {getString(batch, "cycle") ? getString(batch.cycle, "name") : ""}</small><p>{getString(batch, "notes")}</p></div><div className="row-actions"><IconButton label={t("convertToAnimals")} onClick={() => setConversionBatch(batch)}><Icon name="plus" /></IconButton><IconButton label={t("details")} onClick={() => navigate(`/reproduction-cycles/${getString(batch, "cycleId")}`)}><Icon name="chevron" /></IconButton><IconButton label={t("delete")} onClick={() => { if (window.confirm(t("confirmDelete"))) void api.delete(`/offspring-batches/${getString(batch, "id")}`).then(() => batches.reload()).catch((reason) => show(reason instanceof ApiError ? reason.message : t("operationFailed"))); }}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}</Panel>}
+    {tab === "offspring" && batches.data?.pagination && <Pagination page={batchPage} totalPages={batches.data.pagination.totalPages} onChange={setBatchPage} label={t("page")} />}
+    {conversionBatch && <OffspringConversionModal key={getString(conversionBatch, "id")} batch={conversionBatch} locale={locale} busy={conversionBusy} onClose={() => setConversionBatch(null)} onSubmit={convertBatchAnimals} />}
 
     {modal && <Modal title={editing ? t("edit") : t("newCycle")} onClose={() => setModal(false)} wide>
       <form className="form-stack" onSubmit={saveCycle}>{error && <Alert tone="danger">{error}</Alert>}
@@ -132,6 +139,8 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
   const resource = useResource<{ cycle: Item }>(`/reproduction-cycles/${encodeURIComponent(id)}`);
   const [tab, setTab] = useState("events");
   const [modal, setModal] = useState<"event" | "clutch" | "offspring" | null>(null);
+  const [conversionBatch, setConversionBatch] = useState<Item | null>(null);
+  const [conversionBusy, setConversionBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
@@ -150,13 +159,13 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
       eventType: getString(event, "eventType", "pairing"),
       occurredAt: event ? localDateTimeValue(new Date(getString(event, "occurredAt"))) : localDateTimeValue(),
       animalId: getString(event, "animalId"), details: getString(event, "details"),
-      temperatureC: getString(event, "temperatureC"), humidityPct: getString(event, "humidityPct")
+      temperatureC: getString(event, "temperatureC") === "" ? "" : String(celsiusToTemperature(getString(event, "temperatureC"))), humidityPct: getString(event, "humidityPct")
     });
     setError(""); setModal("event");
   }
   async function saveEvent(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
-    const body = { eventType: eventForm.eventType, occurredAt: new Date(eventForm.occurredAt).toISOString(), animalId: eventForm.animalId || null, details: eventForm.details || null, temperatureC: eventForm.temperatureC === "" ? null : Number(eventForm.temperatureC), humidityPct: eventForm.humidityPct === "" ? null : Number(eventForm.humidityPct) };
+    const body = { eventType: eventForm.eventType, occurredAt: new Date(eventForm.occurredAt).toISOString(), animalId: eventForm.animalId || null, details: eventForm.details || null, temperatureC: eventForm.temperatureC === "" ? null : temperatureToCelsius(eventForm.temperatureC), humidityPct: eventForm.humidityPct === "" ? null : Number(eventForm.humidityPct) };
     try {
       if (editing) await api.patch(`/reproductive-events/${getString(editing, "id")}`, body);
       else await api.post(`/reproduction-cycles/${id}/events`, body);
@@ -201,6 +210,16 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
     setBatchForm({ clutchId: getString(batch, "clutchId"), bornOn: getString(batch, "bornOn") || todayDate(), count: getString(batch, "count", "1"), notes: getString(batch, "notes") });
     setError(""); setModal("offspring");
   }
+  async function convertBatchAnimals(names: string[], species: string) {
+    if (!conversionBatch) return;
+    setConversionBusy(true);
+    try {
+      await api.post(`/offspring-batches/${getString(conversionBatch, "id")}/animals`, { animals: names.map((name) => ({ name, species, sex: "unknown" })) });
+      setConversionBatch(null); resource.reload(); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setConversionBusy(false); }
+  }
+
   async function saveBatch(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -233,18 +252,15 @@ function CycleDetail({ id, locale, navigate }: { id: string; locale: Locale; nav
     </Panel>}
     {tab === "offspring" && <Panel><PanelHeader title={t("offspring")} action={<Button size="sm" onClick={() => openBatch()}><Icon name="plus" />{t("addOffspring")}</Button>} />
       {offspring.length ? <div className="record-list">{offspring.map((batch) => <div className="record-row" key={getString(batch, "id")}><div><strong>{getString(batch, "count")} {t("offspring")}</strong><small>{formatDate(getString(batch, "bornOn"), locale)}</small><p>{getString(batch, "notes")}</p></div><div className="row-actions"><IconButton label={t("convertToAnimals")} onClick={() => {
-        const input = window.prompt(locale === "it" ? "Nomi dei piccoli, uno per riga." : "Offspring names, one per line."); if (!input) return;
-        const names = input.split("\n").map((item) => item.trim()).filter(Boolean);
-        const species = window.prompt(t("species")); if (!species) return;
-        void api.post(`/offspring-batches/${getString(batch, "id")}/animals`, { animals: names.map((name) => ({ name, species, sex: "unknown" })) }).then(() => { resource.reload(); show(t("saveSuccess")); }).catch((reason) => show(reason instanceof ApiError ? reason.message : t("operationFailed")));
-      }}><Icon name="plus" /></IconButton><IconButton label={t("edit")} onClick={() => openBatch(batch)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteBatch(batch)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
+        setConversionBatch(batch); }><Icon name="plus" /></IconButton><IconButton label={t("edit")} onClick={() => openBatch(batch)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteBatch(batch)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
     </Panel>}
+    {conversionBatch && <OffspringConversionModal key={getString(conversionBatch, "id")} batch={conversionBatch} locale={locale} busy={conversionBusy} onClose={() => setConversionBatch(null)} onSubmit={convertBatchAnimals} />}
     {modal === "event" && <Modal title={editing ? t("edit") : t("addEvent")} onClose={() => setModal(null)}>
       <form className="form-stack" onSubmit={saveEvent}>{error && <Alert tone="danger">{error}</Alert>}
         <Field label={t("eventType")}><Select value={eventForm.eventType} onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })}>{eventTypes.map((value) => <option key={value} value={value}>{t(`event_${value}`)}</option>)}</Select></Field>
         <Field label={t("occurredAt")}><Input required type="datetime-local" value={eventForm.occurredAt} onChange={(e) => setEventForm({ ...eventForm, occurredAt: e.target.value })} /></Field>
       <RemoteSelect label={t("animalDetail")} value={eventForm.animalId} onChange={(animalId) => setEventForm({ ...eventForm, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(animalId) => `/animals/${encodeURIComponent(animalId)}`} detailKey="animal" locale={locale} />
-        <div className="form-grid"><Field label={t("temperature")}><Input type="number" step="0.1" value={eventForm.temperatureC} onChange={(e) => setEventForm({ ...eventForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={eventForm.humidityPct} onChange={(e) => setEventForm({ ...eventForm, humidityPct: e.target.value })} /></Field></div>
+        <div className="form-grid"><Field label={`${t("temperature").replace(/°C|°F/, temperatureUnitLabel())}`}><Input type="number" step="0.1" value={eventForm.temperatureC} onChange={(e) => setEventForm({ ...eventForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={eventForm.humidityPct} onChange={(e) => setEventForm({ ...eventForm, humidityPct: e.target.value })} /></Field></div>
         <Field label={t("notes")}><Textarea rows={3} value={eventForm.details} onChange={(e) => setEventForm({ ...eventForm, details: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
@@ -298,7 +314,7 @@ function ClutchDetail({ id, locale, navigate }: { id: string; locale: Locale; na
     setEditingLog(log ?? null);
     setLogForm({
       recordedAt: log ? localDateTimeValue(new Date(getString(log, "recordedAt"))) : localDateTimeValue(),
-      temperatureC: getString(log, "temperatureC"),
+      temperatureC: getString(log, "temperatureC") === "" ? "" : String(celsiusToTemperature(getString(log, "temperatureC"))),
       humidityPct: getString(log, "humidityPct"),
       eventType: getString(log, "eventType", "measurement"),
       notes: getString(log, "notes")
@@ -310,7 +326,7 @@ function ClutchDetail({ id, locale, navigate }: { id: string; locale: Locale; na
     try {
       const body = {
         recordedAt: new Date(logForm.recordedAt).toISOString(),
-        temperatureC: logForm.temperatureC === "" ? null : Number(logForm.temperatureC),
+        temperatureC: logForm.temperatureC === "" ? null : temperatureToCelsius(logForm.temperatureC),
         humidityPct: logForm.humidityPct === "" ? null : Number(logForm.humidityPct),
         eventType: logForm.eventType, notes: logForm.notes || null
       };
@@ -341,17 +357,49 @@ function ClutchDetail({ id, locale, navigate }: { id: string; locale: Locale; na
         {eggs.length ? <div className="egg-grid">{eggs.map((egg) => <div className="egg-card" key={getString(egg, "id")}><span><Icon name="egg" size={18} /></span><strong>{getString(egg, "code") || "—"}</strong><Badge>{getString(egg, "status")}</Badge><div className="row-actions"><IconButton label={t("edit")} onClick={() => setEditingEgg(egg)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEgg(egg)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
       </Panel>
       <Panel><PanelHeader title={t("incubation")} action={<Button size="sm" onClick={() => setMode("log")}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
-        {logs.length ? <div className="record-list">{logs.map((log) => <div className="record-row" key={getString(log, "id")}><div><strong>{getString(log, "eventType")}</strong><small>{formatDateTime(getString(log, "recordedAt"), locale)}</small><p>{getString(log, "temperatureC") ? `${getString(log, "temperatureC")} °C` : "—"} · {getString(log, "humidityPct") ? `${getString(log, "humidityPct")} %` : "—"}</p><small>{getString(log, "notes")}</small></div><div className="row-actions"><IconButton label={t("edit")} onClick={() => openLog(log)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteLog(log)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
+        {logs.length ? <div className="record-list">{logs.map((log) => <div className="record-row" key={getString(log, "id")}><div><strong>{getString(log, "eventType")}</strong><small>{formatDateTime(getString(log, "recordedAt"), locale)}</small><p>{getString(log, "temperatureC") ? formatTemperature(getString(log, "temperatureC"), locale) : "—"} · {getString(log, "humidityPct") ? `${getString(log, "humidityPct")} %` : "—"}</p><small>{getString(log, "notes")}</small></div><div className="row-actions"><IconButton label={t("edit")} onClick={() => openLog(log)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteLog(log)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
       </Panel>
     </div>
     {mode === "eggs" && <Modal title={t("addEggs")} onClose={() => setMode(null)}><form className="form-stack" onSubmit={addEggs}>{error && <Alert tone="danger">{error}</Alert>}<Field label={t("eggCode")} hint={locale === "it" ? "Un codice per riga; ogni riga crea un uovo." : "One code per line; each line creates one egg."}><Textarea rows={5} value={eggLines} onChange={(e) => setEggLines(e.target.value)} /></Field><div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div></form></Modal>}
     {mode === "log" && <Modal title={editingLog ? t("edit") : t("addIncubationLog")} onClose={() => { setEditingLog(null); setMode(null); }}><form className="form-stack" onSubmit={addLog}>{error && <Alert tone="danger">{error}</Alert>}
       <Field label={t("recordedAt")}><Input type="datetime-local" required value={logForm.recordedAt} onChange={(e) => setLogForm({ ...logForm, recordedAt: e.target.value })} /></Field>
-      <div className="form-grid"><Field label={t("temperature")}><Input type="number" step="0.1" value={logForm.temperatureC} onChange={(e) => setLogForm({ ...logForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={logForm.humidityPct} onChange={(e) => setLogForm({ ...logForm, humidityPct: e.target.value })} /></Field></div>
+      <div className="form-grid"><Field label={`${t("temperature").replace(/°C|°F/, temperatureUnitLabel())}`}><Input type="number" step="0.1" value={logForm.temperatureC} onChange={(e) => setLogForm({ ...logForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={logForm.humidityPct} onChange={(e) => setLogForm({ ...logForm, humidityPct: e.target.value })} /></Field></div>
       <Field label={t("eventType")}><Input value={logForm.eventType} onChange={(e) => setLogForm({ ...logForm, eventType: e.target.value })} /></Field><Field label={t("notes")}><Textarea rows={3} value={logForm.notes} onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })} /></Field>
       <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
     </form></Modal>}
     {editingEgg && <Modal title={t("edit")} onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}><Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field><Field label={t("eggStatus")}><Input value={getString(editingEgg, "status")} onChange={(e) => setEditingEgg({ ...editingEgg, status: e.target.value })} /></Field><Field label={t("notes")}><Textarea value={getString(editingEgg, "notes")} onChange={(e) => setEditingEgg({ ...editingEgg, notes: e.target.value })} /></Field><div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setEditingEgg(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div></form></Modal>}
     {toast}
   </div>;
+}
+
+function OffspringConversionModal({ batch, locale, busy, onClose, onSubmit }: {
+  batch: Item; locale: Locale; busy: boolean; onClose: () => void; onSubmit: (names: string[], species: string) => Promise<void>;
+}) {
+  const t = (key: string) => translate(locale, key);
+  const maximum = Math.max(1, Math.min(10000, Number(getString(batch, "count")) || 1));
+  const [species, setSpecies] = useState("");
+  const [names, setNames] = useState<string[]>([""]);
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const cleanNames = names.map((name) => name.trim()).filter(Boolean);
+    if (!species.trim()) { setError(locale === "it" ? "Inserisci la specie dei piccoli." : "Enter the offspring species."); return; }
+    if (!cleanNames.length) { setError(locale === "it" ? "Inserisci almeno un nome." : "Enter at least one name."); return; }
+    if (cleanNames.length > maximum) { setError(locale === "it" ? `Puoi creare al massimo ${maximum} animali per questo gruppo.` : `You can create at most ${maximum} animals for this batch.`); return; }
+    setError(""); await onSubmit(cleanNames, species.trim());
+  }
+  return <Modal title={t("convertToAnimals")} onClose={onClose} wide>
+    <form className="form-stack" onSubmit={(event) => void submit(event)}>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <Field label={t("species")}><Input required maxLength={120} value={species} onChange={(event) => setSpecies(event.target.value)} /></Field>
+      <div className="subsection-heading"><h3>{locale === "it" ? "Nomi dei piccoli" : "Offspring names"}</h3><span>{names.filter((name) => name.trim()).length} / {maximum}</span></div>
+      {names.map((name, index) => <div className="form-grid" key={index}>
+        <Field label={(locale === "it" ? "Nome" : "Name") + " " + (index + 1)}><Input required maxLength={120} value={name} onChange={(event) => setNames((current) => current.map((value, i) => i === index ? event.target.value : value))} /></Field>
+        <div className="field"><span className="field-label">&nbsp;</span><Button type="button" variant="ghost" disabled={names.length <= 1} onClick={() => setNames((current) => current.filter((_, i) => i !== index))}>{locale === "it" ? "Rimuovi" : "Remove"}</Button></div>
+      </div>)}
+      <Button type="button" variant="secondary" disabled={names.length >= maximum} onClick={() => setNames((current) => [...current, ""])}><Icon name="plus" />{locale === "it" ? "Aggiungi un nome" : "Add another name"}</Button>
+      <p className="muted-note">{locale === "it" ? "Verrà creato un animale per ogni nome compilato. I dati originali del gruppo resteranno invariati." : "One animal will be created for each completed name. The original batch record will remain unchanged."}</p>
+      <div className="modal-actions"><Button type="button" variant="secondary" onClick={onClose}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{busy ? t("loading") : t("convertToAnimals")}</Button></div>
+    </form>
+  </Modal>;
 }
