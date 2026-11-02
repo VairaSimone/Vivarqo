@@ -41,6 +41,23 @@ describe("resource cache", () => {
     expect(sharedSignal?.aborted).toBe(true);
   });
 
+  it("bypasses the response cache after an explicit invalidation", async () => {
+    let calls = 0;
+    const signal = new AbortController().signal;
+    const loader = async () => {
+      calls++;
+      return calls === 1 ? "cached response" : "fresh response";
+    };
+
+    await expect(loadCachedResource("reload|it", loader, signal)).resolves.toBe("cached response");
+    await expect(loadCachedResource("reload|it", loader, signal)).resolves.toBe("cached response");
+    expect(calls).toBe(1);
+
+    invalidateResourceCacheEntry("reload|it");
+    await expect(loadCachedResource("reload|it", loader, signal)).resolves.toBe("fresh response");
+    expect(calls).toBe(2);
+  });
+
   it("starts a fresh request when a consumer remounts before an aborted request settles", async () => {
     const firstConsumer = new AbortController();
     let firstSignal: AbortSignal | undefined;
