@@ -20,7 +20,7 @@ describe("WCAG AA theme contrast", () => {
   const darkStart = css.indexOf(':root[data-theme="dark"] {');
   const darkEnd = css.indexOf("}", darkStart);
   const parseTokens = (source: string) => Object.fromEntries(
-    [...source.matchAll(/^\s*--([\w-]+):\s*(#[\da-fA-F]{6})\s*;/gm)].map((match) => [match[1]!, match[2]!])
+    [...source.matchAll(/^\s*--([\w-]+):\s*(#[\da-fA-F]{3}(?:[\da-fA-F]{3})?)\s*;/gm)].map((match) => [match[1]!, match[2]!.length === 4 ? "#" + [...match[2]!.slice(1)].map((digit) => digit + digit).join("") : match[2]!])
   );
   const light = parseTokens(css.slice(lightStart, lightEnd));
   const dark = parseTokens(css.slice(darkStart, darkEnd));
