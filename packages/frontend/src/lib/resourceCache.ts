@@ -14,6 +14,11 @@ const TTL_MS = 12_000;
 const MAX_ENTRIES = 100;
 let generation = 0;
 
+/** Remove one cached response so an explicit reload always reaches the server. */
+export function invalidateResourceCacheEntry(key: string): void {
+  cache.delete(key);
+}
+
 function remember(key: string, value: unknown): void {
   if (cache.size >= MAX_ENTRIES && !cache.has(key)) {
     const oldest = cache.keys().next().value as string | undefined;
