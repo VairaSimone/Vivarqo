@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, getApiLocale } from "../lib/api";
-import { loadCachedResource, subscribeResourceInvalidation } from "../lib/resourceCache";
+import { invalidateResourceCacheEntry, loadCachedResource, subscribeResourceInvalidation } from "../lib/resourceCache";
 
 type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | null };
 export function useResource<T>(url: string | null) {
@@ -8,7 +8,10 @@ export function useResource<T>(url: string | null) {
   const [revision, setRevision] = useState(0);
   const [cacheVersion, setCacheVersion] = useState(0);
   const requestId = useRef(0);
-  const reload = useCallback(() => setRevision((value) => value + 1), []);
+  const reload = useCallback(() => {
+    if (url) invalidateResourceCacheEntry(url + "|locale:" + getApiLocale());
+    setRevision((value) => value + 1);
+  }, [url]);
 
   useEffect(() => subscribeResourceInvalidation(() => {
     setCacheVersion((value) => value + 1);
