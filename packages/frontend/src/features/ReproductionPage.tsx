@@ -82,7 +82,7 @@ function ReproductionHome({ locale, path, navigate }: { locale: Locale; path: st
     event.preventDefault(); setBusy(true); setError("");
     try {
       await api.post("/offspring-batches", { cycleId: offspringForm.cycleId, clutchId: offspringForm.clutchId || null, bornOn: offspringForm.bornOn, count: Number(offspringForm.count), notes: offspringForm.notes || null });
-      setOffspringModal(false); batches.reload(); show(t("saveSuccess"));
+      setOffspringModal(false); setBatchPage(1); batches.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }

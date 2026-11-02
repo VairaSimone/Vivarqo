@@ -43,24 +43,27 @@ export function RemoteSelect({
     const url = endpoint + queryString({ ...filterValues, q: search.trim() || null, page, pageSize: 25 });
     setLoading(true);
     setError("");
-    api.get<Record<string, unknown>>(url, { signal: controller.signal }).then((payload) => {
-      if (requestId.current !== current) return;
-      const rows = getArray<Item>(payload, responseKey);
-      setOptions((previous) => page === 1 ? rows : [
-        ...previous.filter((item) => !rows.some((row) => getString(row, "id") === getString(item, "id"))),
-        ...rows
-      ]);
-      const pagination = payload.pagination && typeof payload.pagination === "object"
-        ? payload.pagination as Record<string, unknown> : {};
-      const pages = Number(pagination.totalPages);
-      setTotalPages(Number.isFinite(pages) && pages > 0 ? pages : 1);
-    }).catch((reason: unknown) => {
-      if (controller.signal.aborted || requestId.current !== current) return;
-      setError(reason instanceof Error ? reason.message : (locale === "it" ? "Impossibile caricare i risultati." : "Could not load results."));
-    }).finally(() => {
-      if (requestId.current === current && !controller.signal.aborted) setLoading(false);
-    });
+    const debounce = window.setTimeout(() => {
+      api.get<Record<string, unknown>>(url, { signal: controller.signal }).then((payload) => {
+        if (requestId.current !== current) return;
+        const rows = getArray<Item>(payload, responseKey);
+        setOptions((previous) => page === 1 ? rows : [
+          ...previous.filter((item) => !rows.some((row) => getString(row, "id") === getString(item, "id"))),
+          ...rows
+        ]);
+        const pagination = payload.pagination && typeof payload.pagination === "object"
+          ? payload.pagination as Record<string, unknown> : {};
+        const pages = Number(pagination.totalPages);
+        setTotalPages(Number.isFinite(pages) && pages > 0 ? pages : 1);
+      }).catch((reason: unknown) => {
+        if (controller.signal.aborted || requestId.current !== current) return;
+        setError(reason instanceof Error ? reason.message : (locale === "it" ? "Impossibile caricare i risultati." : "Could not load results."));
+      }).finally(() => {
+        if (requestId.current === current && !controller.signal.aborted) setLoading(false);
+      });
+    }, 180);
     return () => {
+      window.clearTimeout(debounce);
       controller.abort();
       if (requestId.current === current) requestId.current++;
     };
