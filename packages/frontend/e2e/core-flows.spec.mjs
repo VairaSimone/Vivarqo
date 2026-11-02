@@ -136,6 +136,38 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
     await otherContext.close();
   }
 
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Esci" }).click();
+  await page.waitForURL((url) => url.pathname === "/login");
+  await expect(page.getByRole("heading", { name: "Bentornato" })).toBeVisible();
+
+  expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
+  expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
+});
+
+test("responsive screenshot matrix at all target viewport sizes", async ({ page }) => {
+  const pageErrors = [];
+  const unexpectedServerErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("response", (response) => {
+    if (response.status() >= 500) unexpectedServerErrors.push(response.url() + " " + response.status());
+  });
+
+  await signIn(page, owner);
+  const animalName = "E2E Responsive Python Regius";
+  await page.goto("/animals");
+  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.getByLabel("Nome").fill(animalName);
+  await page.getByLabel("Specie").fill("Python regius");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await expect(page.getByText(animalName, { exact: true })).toBeVisible();
+
+  const listResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=active");
+  expect(listResponse.status()).toBe(200);
+  const list = await listResponse.json();
+  const created = list.animals.find((animal) => animal.name === animalName);
+  expect(created?.id).toBeTruthy();
+
   const viewports = [
     { name: "desktop-1440x900", width: 1440, height: 900 },
     { name: "laptop-1280x800", width: 1280, height: 800 },
@@ -165,11 +197,6 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
       await page.screenshot({ path: path.join(folder, route.replaceAll("/", "-").replaceAll("?", "-").replaceAll("=", "-") + ".png"), fullPage: true });
     }
   }
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("button", { name: "Esci" }).click();
-  await page.waitForURL((url) => url.pathname === "/login");
-  await expect(page.getByRole("heading", { name: "Bentornato" })).toBeVisible();
 
   expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
   expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
