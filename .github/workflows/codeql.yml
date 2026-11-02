@@ -2,11 +2,15 @@ name: CodeQL Security Analysis
 
 on:
   push:
-    branches: [main]
+    branches: [main, frontend/rebuild]
   pull_request:
     branches: [main]
   schedule:
     - cron: "17 7 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

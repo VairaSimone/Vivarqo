@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { downloadQrSvg, qrMatrix } from "../lib/qr";
-import { dateForInput, formatDate, formatDateTime, getArray, getString, queryString, todayDate } from "../lib/domain";
+import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
 type Animal = Record<string, unknown>;
@@ -62,7 +63,6 @@ export function AnimalsPage({ locale, navigate, path }: { locale: Locale; naviga
   const resource = useResource<{ animals: Animal[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(url);
   const animals = resource.data?.animals ?? [];
   const pager = resource.data?.pagination;
-  const quickAnimals = useResource<{ animals: Animal[] }>(weightQuickModal ? "/animals?page=1&pageSize=100&status=active&sort=name" : null);
 
   function openCreate() { setEditing(null); setForm(emptyAnimal); setError(""); setModal(true); }
   function openEdit(animal: Animal) {
@@ -174,15 +174,15 @@ export function AnimalsPage({ locale, navigate, path }: { locale: Locale; naviga
         try {
           await api.post("/animals/" + quickAnimalId + "/weights", {
             measuredAt: new Date(quickDate + "T12:00:00").toISOString(),
-            weightG: Number(quickWeight), notes: quickNotes || null
+            weightG: weightToGrams(quickWeight), notes: quickNotes || null
           });
           setWeightQuickModal(false); setQuickWeight(""); setQuickNotes(""); show(t("saveSuccess"));
         } catch (reason) { setQuickError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
         finally { setQuickBusy(false); }
       }}>
         {quickError && <Alert tone="danger">{quickError}</Alert>}
-        <Field label={t("animalDetail")}><Select required value={quickAnimalId} onChange={(e) => setQuickAnimalId(e.target.value)}><option value="">—</option>{(quickAnimals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")} · {getString(animal, "species")}</option>)}</Select></Field>
-        <div className="form-grid"><Field label={t("measuredAt")}><Input type="date" required value={quickDate} onChange={(e) => setQuickDate(e.target.value)} /></Field><Field label={t("weight")}><Input type="number" required min="0.01" max="100000000" step="0.01" value={quickWeight} onChange={(e) => setQuickWeight(e.target.value)} /></Field></div>
+        <RemoteSelect label={t("animalDetail")} value={quickAnimalId} onChange={setQuickAnimalId} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+        <div className="form-grid"><Field label={t("measuredAt")}><Input type="date" required value={quickDate} onChange={(e) => setQuickDate(e.target.value)} /></Field><Field label={`${t("weight")} (${weightUnitLabel()})`}><Input type="number" required min="0.01" max="100000000" step="0.01" value={quickWeight} onChange={(e) => setQuickWeight(e.target.value)} /></Field></div>
         <Field label={t("notes")}><Textarea rows={2} value={quickNotes} onChange={(e) => setQuickNotes(e.target.value)} /></Field>
         <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setWeightQuickModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={quickBusy || !quickAnimalId}>{quickBusy ? t("loading") : t("save")}</Button></div>
       </form>
@@ -285,7 +285,7 @@ function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale
     setRecordKind(kind); setRecordEdit(existing ?? null); setFormError("");
     setRecordForm({
       date: existing ? dateForInput(getString(existing, kind === "weight" ? "measuredAt" : "occurredAt")) : new Date().toISOString().slice(0, 10),
-      weight: existing ? getString(existing, "weightG") : "",
+      weight: existing ? String(gramsToWeight(getString(existing, "weightG"))) : "",
       outcome: existing ? getString(existing, "outcome", "complete") : "complete",
       category: existing ? getString(existing, "category", "general") : "general",
       title: existing ? getString(existing, "title") : "",
@@ -300,7 +300,7 @@ function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale
     const recordId = getString(recordEdit, "id");
     try {
       if (recordKind === "weight") {
-        const payload = { measuredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), weightG: Number(recordForm.weight), notes: recordForm.notes || null };
+        const payload = { measuredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), weightG: weightToGrams(recordForm.weight), notes: recordForm.notes || null };
         if (isEdit) await api.patch(`/weights/${recordId}`, payload); else await api.post(`/animals/${id}/weights`, payload);
       } else if (recordKind === "shed") {
         const payload = { occurredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), outcome: recordForm.outcome, notes: recordForm.notes || null };
@@ -406,7 +406,7 @@ function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale
     {recordKind && <Modal title={recordKind === "weight" ? t("addWeight") : recordKind === "shed" ? t("addShed") : t("addNote")} onClose={() => setRecordKind(null)}>
       <form className="form-stack" onSubmit={saveRecord}>{formError && <Alert tone="danger">{formError}</Alert>}
         <Field label={t("date")}><Input required type="date" value={recordForm.date} onChange={(e) => setRecordForm({ ...recordForm, date: e.target.value })} /></Field>
-        {recordKind === "weight" && <Field label={t("weight")}><Input required type="number" min="0.01" step="0.01" value={recordForm.weight} onChange={(e) => setRecordForm({ ...recordForm, weight: e.target.value })} /></Field>}
+        {recordKind === "weight" && <Field label={`${t("weight")} (${weightUnitLabel()})`}><Input required type="number" min="0.01" step="0.01" value={recordForm.weight} onChange={(e) => setRecordForm({ ...recordForm, weight: e.target.value })} /></Field>}
         {recordKind === "shed" && <Field label={t("outcome")}><Select value={recordForm.outcome} onChange={(e) => setRecordForm({ ...recordForm, outcome: e.target.value })}><option value="complete">{locale === "it" ? "Completa" : "Complete"}</option><option value="partial">{locale === "it" ? "Parziale" : "Partial"}</option><option value="unknown">{t("unknown")}</option></Select></Field>}
         {recordKind === "note" && <><Field label={t("name")}><Input value={recordForm.title} onChange={(e) => setRecordForm({ ...recordForm, title: e.target.value })} /></Field><Field label={t("category")}><Input required value={recordForm.category} onChange={(e) => setRecordForm({ ...recordForm, category: e.target.value })} /></Field><Field label={t("notes")}><Textarea required rows={4} value={recordForm.body} onChange={(e) => setRecordForm({ ...recordForm, body: e.target.value })} /></Field></>}
         {recordKind !== "note" && <Field label={t("notes")}><Textarea rows={3} value={recordForm.notes} onChange={(e) => setRecordForm({ ...recordForm, notes: e.target.value })} /></Field>}
@@ -423,7 +423,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function RecordList({ records, kind, locale, onEdit, onDelete }: { records: Animal[]; kind: "weight" | "shed" | "note"; locale: Locale; onEdit: (record: Animal) => void; onDelete: (record: Animal) => void }) {
   if (!records.length) return <EmptyState title={translate(locale, "noRecords")} />;
-  return <div className="record-list">{records.map((record) => <div className="record-row" key={getString(record, "id")}><div><strong>{kind === "weight" ? `${getString(record, "weightG")} g` : kind === "shed" ? getString(record, "outcome") : getString(record, "title") || getString(record, "category")}</strong><small>{formatDate(kind === "weight" ? getString(record, "measuredAt") : getString(record, "occurredAt"), locale)}</small>{kind === "note" && <p>{getString(record, "body")}</p>}</div><div className="row-actions"><IconButton label={translate(locale, "edit")} onClick={() => onEdit(record)}><Icon name="edit" size={15} /></IconButton><IconButton label={translate(locale, "delete")} onClick={() => onDelete(record)}><Icon name="trash" size={15} /></IconButton></div></div>)}</div>;
+  return <div className="record-list">{records.map((record) => <div className="record-row" key={getString(record, "id")}><div><strong>{kind === "weight" ? formatWeight(getString(record, "weightG"), locale) : kind === "shed" ? getString(record, "outcome") : getString(record, "title") || getString(record, "category")}</strong><small>{formatDate(kind === "weight" ? getString(record, "measuredAt") : getString(record, "occurredAt"), locale)}</small>{kind === "note" && <p>{getString(record, "body")}</p>}</div><div className="row-actions"><IconButton label={translate(locale, "edit")} onClick={() => onEdit(record)}><Icon name="edit" size={15} /></IconButton><IconButton label={translate(locale, "delete")} onClick={() => onDelete(record)}><Icon name="trash" size={15} /></IconButton></div></div>)}</div>;
 }
 
 function WeightChart({ weights, locale }: { weights: Animal[]; locale: Locale }) {
@@ -431,7 +431,7 @@ function WeightChart({ weights, locale }: { weights: Animal[]; locale: Locale })
   if (points.length < 2) return <p className="muted-note">{translate(locale, "noWeights")}</p>;
   const min = Math.min(...points); const max = Math.max(...points); const range = Math.max(max - min, 1);
   const coords = points.map((value, index) => `${8 + index * (284 / (points.length - 1))},${84 - ((value - min) / range) * 64}`).join(" ");
-  return <div className="chart-wrap"><svg viewBox="0 0 300 100" role="img" aria-label={translate(locale, "weightHistory")}><path d="M8 84H292" stroke="currentColor" opacity=".15" /><polyline points={coords} fill="none" stroke="var(--forest)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />{points.map((value, index) => <circle key={index} cx={8 + index * (284 / (points.length - 1))} cy={84 - ((value - min) / range) * 64} r="3.5" fill="var(--terracotta)" />)}</svg><div className="chart-caption"><span>{min.toLocaleString(locale)} g</span><span>{max.toLocaleString(locale)} g</span></div></div>;
+  return <div className="chart-wrap"><svg viewBox="0 0 300 100" role="img" aria-label={translate(locale, "weightHistory")}><path d="M8 84H292" stroke="currentColor" opacity=".15" /><polyline points={coords} fill="none" stroke="var(--forest)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />{points.map((value, index) => <circle key={index} cx={8 + index * (284 / (points.length - 1))} cy={84 - ((value - min) / range) * 64} r="3.5" fill="var(--terracotta)" />)}</svg><div className="chart-caption"><span>{formatWeight(min, locale)}</span><span>{formatWeight(max, locale)}</span></div></div>;
 }
 
 function PublicSharePanel({ animalId, locale, resource, reload, show }: { animalId: string; locale: Locale; resource: Animal | null; reload: () => void; show: (message: string) => void }) {

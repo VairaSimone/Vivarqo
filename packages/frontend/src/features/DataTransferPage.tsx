@@ -29,12 +29,16 @@ function ImportPage({ locale }: { locale: Locale }) {
   const job = useResource<Item>(jobId ? `/imports/${encodeURIComponent(jobId)}?statusOnly=true` : null);
   const { toast, show } = useToast();
 
+  const status = getString(job.data, "status", getString(preview, "status"));
+
   useEffect(() => {
-    const status = getString(job.data, "status");
     if (status !== "queued" && status !== "processing") return;
-    const timer = window.setTimeout(job.reload, 2000);
-    return () => window.clearTimeout(timer);
-  }, [job.data, job.reload]);
+    // Keep polling even when the cache returns the same pending object.
+    // The resource cache expires after 12 seconds. Poll just beyond that TTL,
+    // leaving enough time for each request to complete before the next refresh.
+    const timer = window.setInterval(job.reload, 15_000);
+    return () => window.clearInterval(timer);
+  }, [status, job.reload]);
 
   async function upload(event: FormEvent) {
     event.preventDefault();
@@ -62,7 +66,6 @@ function ImportPage({ locale }: { locale: Locale }) {
     } finally { setBusy(false); }
   }
 
-  const status = getString(job.data, "status", getString(preview, "status"));
   const errors = getArray<Item>(preview, "errors");
   const duplicates = getArray<Item>(preview, "possibleDuplicates");
   const previewRows = getArray<Item>(preview, "preview");
@@ -98,7 +101,7 @@ function ImportPage({ locale }: { locale: Locale }) {
         <MiniMetric label={t("duplicates")} value={duplicates.length} />
       </div>
       {getArray<string>(preview, "headers").length > 0 && <p className="muted-note">{(preview.headers as string[]).join(" · ")}</p>}
-      {errors.length > 0 && <div className="import-errors"><h3>{t("invalidRows")}</h3>{errors.slice(0, 30).map((item, index) => <div key={index}><strong>{t("row")} {getString(item, "row")}</strong><span>{getString(item, "column")}</span><small>{getString(item, "reason")}</small></div>)}</div>}
+      {errors.length > 0 && <div className="import-errors"><h3>{t("invalidRows")}</h3>{errors.slice(0, 30).map((item, index) => <div key={index}><strong>{t("row")} {String(item.row ?? "")}</strong><span>{getString(item, "column")}</span><small>{getString(item, "reason")}</small></div>)}</div>}
       {duplicates.length > 0 && <><Alert tone="warning">{t("duplicates")}: {duplicates.length}. {locale === "it" ? "Puoi decidere esplicitamente se includerli." : "You can explicitly decide whether to include them."}</Alert><label className="checkbox-field"><input type="checkbox" checked={allowDuplicates} onChange={(e) => setAllowDuplicates(e.target.checked)} />{locale === "it" ? "Confermo di voler importare anche i possibili duplicati." : "I confirm that possible duplicates should also be imported."}</label></>}
       {previewRows.length > 0 && <div className="import-preview"><h3>{locale === "it" ? "Prime righe valide" : "First valid rows"}</h3><pre>{JSON.stringify(previewRows.slice(0, 8), null, 2)}</pre></div>}
       <div className="modal-actions"><Button onClick={() => void confirmImport()} disabled={busy || !jobId || (entity === "animals" && duplicates.length > 0 && !allowDuplicates)}>{t("confirmImport")}</Button></div>
@@ -106,7 +109,7 @@ function ImportPage({ locale }: { locale: Locale }) {
     {jobId && <Panel>
       <PanelHeader title={locale === "it" ? "Stato importazione" : "Import status"} action={<Button variant="ghost" size="sm" onClick={job.reload}><Icon name="refresh" />{t("refresh")}</Button>} />
       {job.loading && !job.data ? <LoadingState /> : job.error ? <ErrorState message={job.error.message} retry={job.reload} /> : <>
-        <div className="status-row"><Badge tone={status === "completed" ? "success" : status === "failed" ? "danger" : "info"}>{t(status === "preview" ? "preview" : status || "queued")}</Badge><span>{getString(job.data, "createdCount")} {locale === "it" ? "creati" : "created"} · {getString(job.data, "errorCount")} {locale === "it" ? "errori" : "errors"} · {getString(job.data, "skippedCount")} {locale === "it" ? "ignorati" : "skipped"}</span></div>
+        <div className="status-row"><Badge tone={status === "completed" ? "success" : status === "failed" ? "danger" : "info"}>{t(status === "preview" ? "preview" : status || "queued")}</Badge><span>{Number(job.data?.createdCount ?? 0)} {locale === "it" ? "creati" : "created"} · {Number(job.data?.errorCount ?? 0)} {locale === "it" ? "errori" : "errors"} · {Number(job.data?.skippedCount ?? 0)} {locale === "it" ? "ignorati" : "skipped"}</span></div>
         {getString(job.data, "lastErrorCode") && <Alert tone="danger">{getString(job.data, "lastErrorCode")}</Alert>}
       </>}
     </Panel>}
@@ -127,8 +130,10 @@ function ExportPage({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
-    const timer = window.setTimeout(resource.reload, 2000);
-    return () => window.clearTimeout(timer);
+    // Keep polling just beyond the 12-second cache TTL, so pending exports
+    // are re-fetched without aborting an in-flight request.
+    const timer = window.setInterval(resource.reload, 15_000);
+    return () => window.clearInterval(timer);
   }, [status, resource.reload]);
 
   async function start() {

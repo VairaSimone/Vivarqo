@@ -1268,6 +1268,25 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/JsonSuccess'
+  /api/v1/push-delivery-attempts:
+    get:
+      tags: [Notifications]
+      summary: Elenca i tentativi di consegna push dell'account
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, processing, retry_scheduled, sent, failed, subscription_gone]
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
   /api/v1/push/public-key:
     get:
       tags: [Notifications]
@@ -1284,7 +1303,24 @@ paths:
       summary: Elenca dispositivi push dell'account
       responses:
         '200':
-          $ref: '#/components/responses/JsonSuccess'
+          description: Dispositivi registrati. L'endpoint è restituito solo all'account proprietario e la risposta non è memorizzabile in cache.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscriptions]
+                properties:
+                  subscriptions:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, endpoint, createdAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        endpoint: { type: string, format: uri }
+                        userAgent: { type: string, nullable: true }
+                        createdAt: { type: string, format: date-time }
+                        lastSuccessAt: { type: string, format: date-time, nullable: true }
     post:
       tags: [Notifications]
       summary: Registra una sottoscrizione browser
@@ -1308,12 +1344,23 @@ paths:
   /api/v1/notifications/test-push:
     post:
       tags: [Notifications]
-      summary: Invia una notifica push di prova
+      summary: Accoda una notifica push di prova
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
       responses:
-        '200':
-          $ref: '#/components/responses/JsonSuccess'
+        '202':
+          description: Notifica di prova accodata per la consegna.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notificationId, delivery]
+                properties:
+                  notificationId:
+                    type: string
+                    format: uuid
+                  delivery:
+                    type: object
   /api/v1/imports:
     post:
       tags: [Imports]

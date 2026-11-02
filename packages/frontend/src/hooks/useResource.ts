@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError } from "../lib/api";
+import { api, ApiError, getApiLocale } from "../lib/api";
+import { invalidateResourceCacheEntry, loadCachedResource, subscribeResourceInvalidation } from "../lib/resourceCache";
 
 type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | null };
 export function useResource<T>(url: string | null) {
   const [state, setState] = useState<ResourceState<T>>({ data: null, loading: Boolean(url), error: null });
   const [revision, setRevision] = useState(0);
+  const [cacheVersion, setCacheVersion] = useState(0);
   const requestId = useRef(0);
-  const reload = useCallback(() => setRevision((value) => value + 1), []);
+  const reload = useCallback(() => {
+    if (url) invalidateResourceCacheEntry(url + "|locale:" + getApiLocale());
+    setRevision((value) => value + 1);
+  }, [url]);
+
+  useEffect(() => subscribeResourceInvalidation(() => {
+    setCacheVersion((value) => value + 1);
+  }), []);
 
   useEffect(() => {
     const current = ++requestId.current;
@@ -15,15 +24,19 @@ export function useResource<T>(url: string | null) {
       return;
     }
     setState((previous) => ({ ...previous, loading: true, error: null }));
-    api.get<T>(url).then((data) => {
+    const controller = new AbortController();
+    loadCachedResource<T>(url + "|locale:" + getApiLocale(), (signal) => api.get<T>(url, { signal }), controller.signal).then((data) => {
       if (requestId.current === current) setState({ data, loading: false, error: null });
     }).catch((reason: unknown) => {
-      if (requestId.current !== current) return;
+      if (controller.signal.aborted || requestId.current !== current) return;
       const error = reason instanceof ApiError ? reason : new ApiError(0, reason instanceof Error ? reason.message : "Network request failed", "NETWORK_ERROR");
       setState((previous) => ({ ...previous, loading: false, error }));
     });
-    return () => { if (requestId.current === current) requestId.current++; };
-  }, [url, revision]);
+    return () => {
+      controller.abort();
+      if (requestId.current === current) requestId.current++;
+    };
+  }, [url, revision, cacheVersion]);
 
   return { ...state, reload };
 }

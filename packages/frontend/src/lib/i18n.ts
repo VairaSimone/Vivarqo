@@ -8,7 +8,8 @@ const messages = {
     navResources: "Risorse", navInventory: "Inventario", navDocuments: "Documenti",
     navFinance: "Registro economico", navAdmin: "Amministrazione", navImports: "Importazione",
     navExports: "Esportazione", navPreferences: "Preferenze", navSettings: "Impostazioni",
-    navNotifications: "Notifiche", navBilling: "Abbonamento", search: "Cerca animali, attività…",
+    navNotifications: "Notifiche", navBilling: "Abbonamento", search: "Cerca in Vivarqo", searchPlaceholder: "Cerca animali, attività, documenti e riproduzioni…",
+    searchMinChars: "Inserisci almeno 2 caratteri.", searchNoResults: "Nessun risultato trovato.", searchFailed: "La ricerca non è riuscita. Controlla la connessione e riprova.",
     notifications: "Notifiche", profile: "Profilo", signOut: "Esci", language: "Lingua",
     italian: "Italiano", english: "English", collapse: "Comprimi menu", expand: "Espandi menu",
     loading: "Caricamento…", retry: "Riprova", cancel: "Annulla", save: "Salva modifiche",
@@ -80,6 +81,7 @@ const messages = {
     notificationPreferences: "Preferenze notifiche", inApp: "Notifiche nell'app", webPush: "Notifiche push",
     pushExplanation: "Le notifiche push possono arrivare anche quando Vivarqo non è aperto. Il browser chiederà il permesso solo dopo aver attivato questa funzione.",
     enablePush: "Attiva notifiche push", disablePush: "Disattiva notifiche push", testPush: "Invia notifica di prova",
+    deviceRemoved: "Dispositivo rimosso.", deviceRemovedLocalPending: "Dispositivo rimosso dall'account; il browser non ha confermato la revoca locale.", pushTestQueued: "Notifica di prova accodata per l'invio.", pushNotConfigured: "Web Push non è configurato sul server.",
     quietHours: "Fasce orarie silenziose", from: "Dalle", to: "Alle", categories: "Categorie",
     settingsTitle: "Impostazioni", settingsSubtitle: "Profilo, preferenze, sicurezza e dati.",
     accountProfile: "Profilo account", displayName: "Nome visualizzato", email: "Email",
@@ -104,7 +106,7 @@ const messages = {
     sendLink: "Invia link", resetPassword: "Reimposta password", verifyEmail: "Verifica email",
     emailVerificationHint: "Controlla la casella email e segui il link di verifica prima di accedere.",
     formRequired: "Compila i campi obbligatori.", operationSuccess: "Operazione completata.",
-    operationFailed: "Operazione non riuscita.", networkOffline: "Sei offline. Le modifiche non sono disponibili finché la connessione non torna.",
+    operationFailed: "Operazione non riuscita.", networkOffline: "Sei offline. Le modifiche non sono disponibili finché la connessione non torna.", offlineAppShellOnly: "È disponibile solo l'interfaccia dell'app: dati personali e modifiche richiedono una connessione.",
     offline: "Connessione assente", onlineAgain: "Connessione ripristinata",
     confirmDelete: "Confermi l'eliminazione? L'operazione potrebbe essere irreversibile.",
     confirmArchive: "Vuoi archiviare questo elemento?", noResults: "Nessun risultato.",
@@ -122,7 +124,7 @@ const messages = {
     cycleStatus_planned: "Pianificato", cycleStatus_active: "Attivo", cycleStatus_completed: "Completato", cycleStatus_cancelled: "Annullato",
     event_pairing: "Accoppiamento", event_observation: "Osservazione", event_ovulation: "Ovulazione",
     event_gravid: "Gravidanza", event_laying: "Deposizione", event_live_birth: "Parto", event_incubation_start: "Inizio incubazione",
-    event_hatch: "Sch racchiusa", event_loss: "Perdita", event_other: "Altro",
+    event_hatch: "Schiusa", event_loss: "Perdita", event_other: "Altro",
     item_food: "Alimento", item_substrate: "Substrato", item_material: "Materiale", item_equipment: "Attrezzatura", item_other: "Altro",
     saved: "Salvato", add: "Aggiungi", refresh: "Aggiorna", more: "Altro", viewAll: "Vedi tutti",
     emptyHint: "Quando saranno disponibili dati, li troverai qui.",
@@ -159,7 +161,8 @@ const messages = {
     navResources: "Resources", navInventory: "Inventory", navDocuments: "Documents",
     navFinance: "Financial log", navAdmin: "Administration", navImports: "Import",
     navExports: "Export", navPreferences: "Preferences", navSettings: "Settings",
-    navNotifications: "Notifications", navBilling: "Subscription", search: "Search animals, tasks…",
+    navNotifications: "Notifications", navBilling: "Subscription", search: "Search Vivarqo", searchPlaceholder: "Search animals, tasks, documents and breeding…",
+    searchMinChars: "Enter at least 2 characters.", searchNoResults: "No results found.", searchFailed: "Search failed. Check your connection and try again.",
     notifications: "Notifications", profile: "Profile", signOut: "Sign out", language: "Language",
     italian: "Italiano", english: "English", collapse: "Collapse menu", expand: "Expand menu",
     loading: "Loading…", retry: "Retry", cancel: "Cancel", save: "Save changes",
@@ -231,6 +234,7 @@ const messages = {
     notificationPreferences: "Notification preferences", inApp: "In-app notifications", webPush: "Web push",
     pushExplanation: "Push notifications can arrive when Vivarqo is closed. Your browser will ask for permission only after you enable this feature.",
     enablePush: "Enable push notifications", disablePush: "Disable push notifications", testPush: "Send test notification",
+    deviceRemoved: "Device removed.", deviceRemovedLocalPending: "Device removed from the account; the browser did not confirm local revocation.", pushTestQueued: "Test notification queued for delivery.", pushNotConfigured: "Web Push is not configured on the server.",
     quietHours: "Quiet hours", from: "From", to: "To", categories: "Categories",
     settingsTitle: "Settings", settingsSubtitle: "Profile, preferences, security and data.",
     accountProfile: "Account profile", displayName: "Display name", email: "Email",
@@ -255,7 +259,7 @@ const messages = {
     sendLink: "Send link", resetPassword: "Reset password", verifyEmail: "Verify email",
     emailVerificationHint: "Check your inbox and follow the verification link before signing in.",
     formRequired: "Complete the required fields.", operationSuccess: "Operation completed.",
-    operationFailed: "Operation failed.", networkOffline: "You're offline. Changes are unavailable until the connection returns.",
+    operationFailed: "Operation failed.", networkOffline: "You're offline. Changes are unavailable until the connection returns.", offlineAppShellOnly: "Only the application shell is available offline. Personal data and changes require a connection.",
     offline: "Offline", onlineAgain: "Connection restored",
     confirmDelete: "Delete this item? This action may be irreversible.",
     confirmArchive: "Archive this item?", noResults: "No results.",
@@ -304,6 +308,11 @@ const messages = {
     reference: "Reference",
   }
 } as const;
+
+export const translationKeys = Object.freeze({
+  it: Object.keys(messages.it),
+  en: Object.keys(messages.en),
+});
 
 type MessageKey = keyof typeof messages.en;
 export function translate(locale: Locale, key: string, values: Record<string, string | number> = {}): string {

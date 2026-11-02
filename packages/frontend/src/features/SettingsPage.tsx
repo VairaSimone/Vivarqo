@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString } from "../lib/domain";
-import type { Locale } from "../lib/domain";
+import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
@@ -9,16 +9,25 @@ import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, 
 type Item = Record<string, unknown>;
 type User = { id: string; email: string; displayName: string; locale: Locale; timezone: string };
 
-export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, navigate }: {
-  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; navigate: (path: string) => void;
+export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
+  locale: Locale; path: string; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void;
+  onThemeChange: (theme: "system" | "light" | "dark") => void;
+  onDisplayPreferencesChange: (preferences: { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean }) => void;
+  navigate: (path: string) => void;
 }) {
   if (path.startsWith("/notifications")) return <NotificationsPage locale={locale} navigate={navigate} />;
   if (path.startsWith("/settings/notifications")) return <NotificationSettingsPage locale={locale} />;
   if (path.startsWith("/billing")) return <BillingPage locale={locale} />;
-  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated} navigate={navigate} />;
+  return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated}
+    onThemeChange={onThemeChange} onDisplayPreferencesChange={onDisplayPreferencesChange} navigate={navigate} />;
 }
 
-function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, navigate }: { locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void; navigate: (path: string) => void }) {
+function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
+  locale: Locale; user: User; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void;
+  onThemeChange: (theme: "system" | "light" | "dark") => void;
+  onDisplayPreferencesChange: (preferences: { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean }) => void;
+  navigate: (path: string) => void;
+}) {
   const t = (key: string) => translate(locale, key);
   const prefs = useResource<{ preferences: Item }>("/account/preferences");
   const [profile, setProfile] = useState({ displayName: user.displayName, email: user.email, timezone: user.timezone || "Europe/Rome", currentPassword: "" });
@@ -70,7 +79,14 @@ function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, navi
     event.preventDefault(); setBusy(true); setError("");
     try {
       await api.patch("/account/preferences", preferences);
-      document.documentElement.dataset.theme = preferences.theme;
+      const theme = preferences.theme === "dark" || preferences.theme === "light" ? preferences.theme : "system";
+      onThemeChange(theme);
+      onDisplayPreferencesChange({
+        weightUnit: (["g", "kg", "oz", "lb"].includes(preferences.weightUnit) ? preferences.weightUnit : "g") as WeightUnit,
+        temperatureUnit: (["c", "f"].includes(preferences.temperatureUnit) ? preferences.temperatureUnit : "c") as TemperatureUnit,
+        dateFormat: (["locale", "dd/MM/yyyy", "yyyy-MM-dd"].includes(preferences.dateFormat) ? preferences.dateFormat : "locale") as DateFormat,
+        compactTables: Boolean(preferences.compactTables)
+      });
       showToast(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
@@ -197,11 +213,11 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
       if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error(locale === "it" ? "Questo browser non supporta Web Push." : "This browser does not support Web Push.");
       const currentRegistration = await navigator.serviceWorker.getRegistration();
       if (!currentRegistration) throw new Error(locale === "it" ? "Il service worker non è ancora installato. Apri la versione pubblicata della PWA e riprova." : "The service worker is not installed yet. Open the deployed PWA and try again.");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error(locale === "it" ? "Permesso notifiche non concesso." : "Notification permission was not granted.");
-      const registration = currentRegistration.active ? currentRegistration : await navigator.serviceWorker.ready;
       const key = await api.get<{ publicKey: string | null }>("/push/public-key");
       if (!key.publicKey) throw new Error(locale === "it" ? "Web Push non è configurato sul server." : "Web Push is not configured on the server.");
+      const registration = currentRegistration.active ? currentRegistration : await navigator.serviceWorker.ready;
+      const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      if (permission !== "granted") throw new Error(locale === "it" ? "Permesso notifiche non concesso." : "Notification permission was not granted.");
       const existing = await registration.pushManager.getSubscription();
       const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeVapidKey(key.publicKey) as unknown as BufferSource });
       const json = subscription.toJSON();
@@ -210,7 +226,12 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
       await api.patch("/notification-preferences", { pushEnabled: true });
       setValues((current) => ({ ...current, pushEnabled: true }));
       prefs.reload(); subscriptions.reload(); show(t("saveSuccess"));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : t("operationFailed")); }
+    } catch (reason) {
+      const message = reason instanceof ApiError && reason.code === "WEB_PUSH_NOT_CONFIGURED"
+        ? t("pushNotConfigured")
+        : reason instanceof Error ? reason.message : t("operationFailed");
+      setError(message);
+    }
     finally { setBusy(false); }
   }
   async function disablePush() {
@@ -224,12 +245,29 @@ function NotificationSettingsPage({ locale }: { locale: Locale }) {
   }
   async function removeSubscription(item: Item) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete(`/push-subscriptions/${getString(item, "id")}`); subscriptions.reload(); }
-    catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    try {
+      await api.delete(`/push-subscriptions/${getString(item, "id")}`);
+      subscriptions.reload();
+      const endpoint = getString(item, "endpoint");
+      if (endpoint && "serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          const localSubscription = await registration?.pushManager.getSubscription();
+          if (localSubscription?.endpoint === endpoint && !(await localSubscription.unsubscribe())) {
+            show(t("deviceRemovedLocalPending"));
+            return;
+          }
+        } catch {
+          show(t("deviceRemovedLocalPending"));
+          return;
+        }
+      }
+      show(t("deviceRemoved"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
   async function testPush() {
     setBusy(true); setError("");
-    try { await api.post("/notifications/test-push"); show(t("testPush")); }
+    try { await api.post("/notifications/test-push"); show(t("pushTestQueued")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }

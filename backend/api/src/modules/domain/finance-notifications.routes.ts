@@ -318,7 +318,7 @@ export function createNotificationRouter() {
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId: auth.userId },
       orderBy: { createdAt: "desc" },
-      select: { id: true, userAgent: true, createdAt: true, lastSuccessAt: true },
+      select: { id: true, endpoint: true, userAgent: true, createdAt: true, lastSuccessAt: true },
     });
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({ subscriptions });

@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
 type Item = Record<string, unknown>;
@@ -133,6 +134,14 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
   const [page, setPage] = useState(1);
   const [animalId, setAnimalId] = useState(params.get("animalId") ?? "");
   const [cycleId, setCycleId] = useState(params.get("cycleId") ?? "");
+  const [search, setSearch] = useState(params.get("q") ?? "");
+  useEffect(() => {
+    const currentParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
+    setSearch(currentParams.get("q") ?? "");
+    setAnimalId(currentParams.get("animalId") ?? "");
+    setCycleId(currentParams.get("cycleId") ?? "");
+    setPage(1);
+  }, [path]);
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
   const [note, setNote] = useState("");
@@ -144,10 +153,8 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
   const [error, setError] = useState("");
   const { toast, show } = useToast();
   const resource = useResource<{ documents: Item[]; pagination: { page: number; totalPages: number; total: number } }>(
-    "/documents" + queryString({ page, pageSize: 25, animalId, cycleId })
+    "/documents" + queryString({ page, pageSize: 25, animalId, cycleId, q: search })
   );
-  const animals = useResource<{ animals: Item[] }>("/animals?page=1&pageSize=100&status=all&sort=name");
-  const cycles = useResource<{ cycles: Item[] }>("/reproduction-cycles?page=1&pageSize=100&status=all");
 
   async function upload(event: FormEvent) {
     event.preventDefault(); if (!file) { setError(t("chooseFile")); return; }
@@ -178,12 +185,16 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navResources")} title={t("documentsTitle")} description={t("documentsSubtitle")} action={<Button onClick={() => setUploadModal(true)}><Icon name="upload" />{t("uploadDocument")}</Button>} />
-    <Panel className="filters-panel"><div className="filter-row"><Select value={animalId} onChange={(e) => { setAnimalId(e.target.value); setPage(1); setCycleId(""); }}><option value="">{t("animalDetail")} · {t("all")}</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select><Select value={cycleId} onChange={(e) => { setCycleId(e.target.value); setPage(1); setAnimalId(""); }}><option value="">{t("cycles")} · {t("all")}</option>{(cycles.data?.cycles ?? []).map((cycle) => <option key={getString(cycle, "id")} value={getString(cycle, "id")}>{getString(cycle, "name") || getString(cycle, "id")}</option>)}</Select></div></Panel>
+    <Panel className="filters-panel"><div className="form-grid">
+      <RemoteSelect label={t("animalDetail")} value={animalId} onChange={(value) => { setAnimalId(value); setPage(1); setCycleId(""); }} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} emptyLabel={t("all")} />
+      <RemoteSelect label={t("cycles")} value={cycleId} onChange={(value) => { setCycleId(value); setPage(1); setAnimalId(""); }} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => `/reproduction-cycles/${encodeURIComponent(id)}`} detailKey="cycle" locale={locale} emptyLabel={t("all")} />
+      <label className="search-control"><Icon name="search" size={14} /><Input type="search" aria-label={locale === "it" ? "Cerca documenti" : "Search documents"} placeholder={t("search")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
+    </div></Panel>
     <Panel><div className="list-meta"><span>{resource.data?.pagination.total ?? 0} {t("rows")}</span><span className="muted-note">{t("privateStorage")}</span></div>
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("file"), t("documentCategory"), t("date"), t("animalDetail"), t("actions")]} rows={(resource.data?.documents ?? []).map((document) => [
         <div className="document-name"><span className="item-symbol"><Icon name="file" /></span><span><strong>{getString(document, "originalFilename")}</strong><small>{formatNumber(getString(document, "sizeBytes"), locale, 0)} bytes</small></span></div>,
         getString(document, "category"), formatDate(getString(document, "createdAt"), locale),
-        getString(document, "animalId") ? (animals.data?.animals ?? []).find((animal) => getString(animal, "id") === getString(document, "animalId")) ? getString((animals.data?.animals ?? []).find((animal) => getString(animal, "id") === getString(document, "animalId")), "name") : t("navAnimals") : t("cycles"),
+        getString(document.animal, "name") || getString(document.cycle, "name") || (getString(document, "animalId") ? t("navAnimals") : t("cycles")),
         <div className="row-actions"><IconButton label={t("download")} onClick={() => void api.download(`/documents/${getString(document, "id")}/download`, getString(document, "originalFilename", "document"))}><Icon name="download" /></IconButton><IconButton label={t("edit")} onClick={() => openEdit(document)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void remove(document)}><Icon name="trash" /></IconButton></div>
       ])} empty={t("noDocuments")} />}
       {resource.data?.pagination && <Pagination page={page} totalPages={resource.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
@@ -192,8 +203,8 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
       <form className="form-stack" onSubmit={upload}>{error && <Alert tone="danger">{error}</Alert>}
         <Field label={t("file")}><Input required type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
         <Field label={t("documentCategory")}><Input required maxLength={40} value={category} onChange={(e) => setCategory(e.target.value)} /></Field>
-        <Field label={t("animalDetail")}><Select value={animalId} onChange={(e) => { setAnimalId(e.target.value); if (e.target.value) setCycleId(""); }}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field>
-        <Field label={t("cycles")}><Select value={cycleId} onChange={(e) => { setCycleId(e.target.value); if (e.target.value) setAnimalId(""); }}><option value="">—</option>{(cycles.data?.cycles ?? []).map((cycle) => <option key={getString(cycle, "id")} value={getString(cycle, "id")}>{getString(cycle, "name") || getString(cycle, "id")}</option>)}</Select></Field>
+        <RemoteSelect label={t("animalDetail")} value={animalId} onChange={(value) => { setAnimalId(value); if (value) setCycleId(""); }} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+        <RemoteSelect label={t("cycles")} value={cycleId} onChange={(value) => { setCycleId(value); if (value) setAnimalId(""); }} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => `/reproduction-cycles/${encodeURIComponent(id)}`} detailKey="cycle" locale={locale} />
         <Field label={t("notes")}><Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         <p className="muted-note">{locale === "it" ? "Formati ammessi: PDF, JPG, PNG e WEBP. Dimensione massima: 10 MB." : "Allowed formats: PDF, JPG, PNG and WEBP. Maximum size: 10 MB."}</p>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setUploadModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy || !file}>{busy ? t("loading") : t("uploadDocument")}</Button></div>
