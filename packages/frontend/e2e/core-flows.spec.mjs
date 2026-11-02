@@ -212,7 +212,10 @@ test("responsive screenshot matrix at all target viewport sizes", async ({ page 
       } else {
         await page.goto("/" + route);
       }
-      await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
+      // Wait for the rendered page, not global network idleness: a React app can
+      // keep background requests alive even after the visible route is ready.
+      await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
+      if (route === "feeding?create=1") await expect(page.getByRole("dialog")).toBeVisible();
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         document: document.documentElement.scrollWidth
