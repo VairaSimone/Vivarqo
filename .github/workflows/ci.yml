@@ -145,6 +145,15 @@ jobs:
           done
           cat /tmp/vivarqo-api.log
           exit 1
+      - name: Start real background worker
+        run: |
+          nohup pnpm dev:worker > /tmp/vivarqo-worker.log 2>&1 &
+          worker_pid=$!
+          sleep 3
+          if ! kill -0 "$worker_pid" 2>/dev/null; then
+            cat /tmp/vivarqo-worker.log
+            exit 1
+          fi
       - name: Build production frontend for PWA verification
         run: pnpm build:frontend
       - name: Start production Vite preview
@@ -183,4 +192,4 @@ jobs:
         if: failure()
         run: |
           cat /tmp/vivarqo-api.log || true
-          cat /tmp/vivarqo-frontend.log || true
+          cat /tmp/vivarqo-frontend.log || true\n          cat /tmp/vivarqo-worker.log || true
