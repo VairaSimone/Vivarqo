@@ -224,7 +224,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   expect(preview.validRows).toBe(1);
   expect(preview.invalidRows).toBe(0);
   expect(preview.importId).toBeTruthy();
-  expect(page.getByText("E2E Imported Python", { exact: false })).toBeVisible();
+  await expect(page.getByText("E2E Imported Python", { exact: false })).toBeVisible();
 
   const confirmResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/imports/" + preview.importId + "/confirm") && response.request().method() === "POST"
