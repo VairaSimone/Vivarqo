@@ -87,6 +87,8 @@ export function createDocumentShareRouter() {
         select: {
           id: true, animalId: true, cycleId: true, originalFilename: true, mimeType: true, sizeBytes: true,
           category: true, note: true, createdAt: true,
+           animal: { select: { id: true, name: true } },
+           cycle: { select: { id: true, name: true } },
         },
       }),
     ]);
