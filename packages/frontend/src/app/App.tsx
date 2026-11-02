@@ -48,6 +48,7 @@ export function App() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
+  const [themePreference, setThemePreference] = useState<"system" | "light" | "dark">("system");
   const t = (key: string) => translate(locale, key);
   const isPublic = isPublicPath(path);
   const authRoute = authMode(path);
@@ -133,13 +134,21 @@ export function App() {
 
   useEffect(() => {
     if (!accountPrefs.data?.preferences) return;
-    const theme = getString(accountPrefs.data.preferences, "theme", "system");
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => { document.documentElement.dataset.theme = theme === "system" ? (media.matches ? "dark" : "light") : theme; };
-    apply();
-    if (theme === "system") media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
+    const storedTheme = getString(accountPrefs.data.preferences, "theme", "system");
+    setThemePreference(storedTheme === "dark" || storedTheme === "light" ? storedTheme : "system");
   }, [accountPrefs.data]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme = themePreference === "system"
+        ? (media.matches ? "dark" : "light")
+        : themePreference;
+    };
+    apply();
+    if (themePreference === "system") media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [themePreference]);
 
   async function changeLocale(nextLocale: Locale) {
     setLocale(nextLocale);
@@ -209,7 +218,7 @@ export function App() {
   else if (route.startsWith("/finance")) page = <FinancePage locale={locale} />;
   else if (route.startsWith("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (route.startsWith("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
-  else if (route.startsWith("/notifications") || route.startsWith("/settings") || route.startsWith("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} navigate={navigate} />;
+  else if (route.startsWith("/notifications") || route.startsWith("/settings") || route.startsWith("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference} navigate={navigate} />;
   else page = <ErrorState message={locale === "it" ? "Pagina non trovata." : "Page not found."} retry={() => navigate("/today")} />;
 
   return <AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
