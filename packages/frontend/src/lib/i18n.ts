@@ -232,7 +232,7 @@ const messages = {
     notificationPreferences: "Notification preferences", inApp: "In-app notifications", webPush: "Web push",
     pushExplanation: "Push notifications can arrive when Vivarqo is closed. Your browser will ask for permission only after you enable this feature.",
     enablePush: "Enable push notifications", disablePush: "Disable push notifications", testPush: "Send test notification",
-    deviceRemoved: "Device removed.", deviceRemovedLocalPending: "Device removed from the account; the browser did not confirm local revocation.", pushTestQueued: "Test notification queued for delivery."
+    deviceRemoved: "Device removed.", deviceRemovedLocalPending: "Device removed from the account; the browser did not confirm local revocation.", pushTestQueued: "Test notification queued for delivery.",
     quietHours: "Quiet hours", from: "From", to: "To", categories: "Categories",
     settingsTitle: "Settings", settingsSubtitle: "Profile, preferences, security and data.",
     accountProfile: "Account profile", displayName: "Display name", email: "Email",
