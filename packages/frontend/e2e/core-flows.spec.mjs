@@ -416,7 +416,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
 
   await page.goto("/clutches/" + clutch.id);
   await page.getByRole("button", { name: "Registra uova" }).click();
-  await page.getByLabel("Codice uovo").fill("E2E-EGG-01\\nE2E-EGG-02");
+  await page.getByLabel("Codice uovo").fill("E2E-EGG-01\nE2E-EGG-02");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   let clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   expect((await clutchResponse.json()).clutch.eggs.length).toBe(2);
@@ -441,7 +441,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
-  page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\\nE2E Baby 2"));
+  page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\nE2E Baby 2"));
   page.once("dialog", (dialog) => dialog.accept("Python regius"));
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
@@ -473,7 +473,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   await page.getByLabel("File").setInputFiles({
     name: "e2e-veterinary-record.pdf",
     mimeType: "application/pdf",
-    buffer: Buffer.from("%PDF-1.4\\n1 0 obj<</Type/Catalog>>endobj\\ntrailer<</Root 1 0 R>>\\n%%EOF", "utf8")
+    buffer: Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF", "utf8")
   });
   await page.getByLabel("Categoria documento").fill("Veterinario");
   await page.getByLabel("Scheda animale").selectOption(animal.id);
