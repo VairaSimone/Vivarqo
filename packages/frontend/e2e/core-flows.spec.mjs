@@ -264,3 +264,96 @@ test("background export job produces a downloadable ZIP", async ({ page }) => {
   expect(archive.subarray(0, 2).toString("ascii")).toBe("PK");
   expect(archive.length).toBeGreaterThan(100);
 });
+
+test("care, tasks, finance and inventory mutations persist through the live API", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signIn(page, owner);
+
+  const animalName = "E2E Domain Python Regius";
+  await page.goto("/animals");
+  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.getByLabel("Nome").fill(animalName);
+  await page.getByLabel("Specie").fill("Python regius");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await expect(page.getByText(animalName, { exact: true })).toBeVisible();
+  const animalsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=active");
+  expect(animalsResponse.status()).toBe(200);
+  const animalsBody = await animalsResponse.json();
+  const animal = animalsBody.animals.find((item) => item.name === animalName);
+  expect(animal?.id).toBeTruthy();
+
+  await page.goto("/feeding?create=1&animalId=" + animal.id);
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByLabel("Esito").selectOption("ate");
+  await page.getByLabel("Tipo di cibo").fill("Rat");
+  await page.getByRole("button", { name: "Registra sessione" }).click();
+  const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
+  expect(feedingResponse.status()).toBe(200);
+  const feedingBody = await feedingResponse.json();
+  const feedingEntry = feedingBody.sessions.flatMap((session) => session.entries).find((entry) => entry.animalId === animal.id);
+  expect(feedingEntry?.outcome).toBe("ate");
+  expect(feedingEntry?.foodType).toBe("Rat");
+
+  await page.getByRole("button", { name: "Modifica" }).click();
+  await page.getByLabel("Esito").selectOption("refused");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const editedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
+  const editedEntry = (await editedFeedings.json()).sessions.flatMap((session) => session.entries).find((entry) => entry.id === feedingEntry.id);
+  expect(editedEntry?.outcome).toBe("refused");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Elimina" }).click();
+  const deletedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
+  expect((await deletedFeedings.json()).sessions.flatMap((session) => session.entries).some((entry) => entry.id === feedingEntry.id)).toBe(false);
+
+  await page.goto("/tasks?create=1");
+  await page.getByLabel("Titolo attività").fill("E2E Task follow-up");
+  await page.getByLabel("Animale").selectOption(animal.id);
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
+  expect(tasksResponse.status()).toBe(200);
+  const tasksBody = await tasksResponse.json();
+  const task = tasksBody.tasks.find((item) => item.title === "E2E Task follow-up");
+  expect(task?.id).toBeTruthy();
+  await page.getByRole("button", { name: "Completata" }).click();
+  const completedTasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=completed");
+  expect((await completedTasksResponse.json()).tasks.some((item) => item.id === task.id && item.status === "completed")).toBe(true);
+
+  await page.goto("/finance");
+  await page.getByRole("button", { name: "Nuova voce" }).click();
+  await page.getByLabel("Importo (€)").fill("12.50");
+  await page.getByLabel("Valuta").fill("EUR");
+  await page.getByLabel("Categoria").nth(1).fill("Test E2E");
+  await page.getByLabel("Descrizione").fill("E2E veterinary expense");
+  await page.getByLabel("Animale").selectOption(animal.id);
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
+  expect(financeResponse.status()).toBe(200);
+  const financeBody = await financeResponse.json();
+  expect(financeBody.entries.some((entry) => entry.description === "E2E veterinary expense" && entry.amountCents === 1250)).toBe(true);
+
+  await page.goto("/inventory");
+  await page.getByRole("button", { name: "Nuovo articolo" }).click();
+  await page.getByLabel("Nome articolo").fill("E2E Food Stock");
+  await page.getByLabel("Categoria").selectOption("food");
+  await page.getByLabel("Unità").fill("kg");
+  await page.getByLabel("Giacenza").fill("2");
+  await page.getByLabel("Scorta minima").fill("1");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const inventoryResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=true");
+  expect(inventoryResponse.status()).toBe(200);
+  const inventoryBody = await inventoryResponse.json();
+  const stockItem = inventoryBody.items.find((item) => item.name === "E2E Food Stock");
+  expect(stockItem?.id).toBeTruthy();
+  expect(Number(stockItem.quantityOnHand)).toBe(2);
+
+  await page.getByRole("button", { name: "Movimenti" }).last().click();
+  await page.getByLabel("Tipo movimento").selectOption("in");
+  await page.getByLabel("Quantità").fill("1");
+  await page.getByLabel("Costo unitario (€)").fill("5.00");
+  await page.getByRole("button", { name: "Registra movimento" }).click();
+  const movementsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items/" + stockItem.id + "/movements?page=1&pageSize=100");
+  expect(movementsResponse.status()).toBe(200);
+  const movementsBody = await movementsResponse.json();
+  expect(movementsBody.movements.some((movement) => movement.movementType === "in" && Number(movement.quantity) === 1)).toBe(true);
+});
