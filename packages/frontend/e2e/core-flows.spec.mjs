@@ -25,7 +25,9 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   const unexpectedServerErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("response", (response) => {
-    if (response.status() >= 500 && !isExpectedMissingVapidConfiguration(response)) {\n      unexpectedServerErrors.push(response.url() + " " + response.status());\n    }
+    if (response.status() >= 500 && !isExpectedMissingVapidConfiguration(response)) {
+      unexpectedServerErrors.push(response.url() + " " + response.status());
+    }
   });
 
   await page.goto("/login");
