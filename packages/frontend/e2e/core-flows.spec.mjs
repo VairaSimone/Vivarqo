@@ -168,7 +168,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: "Esci" }).click();
-  await page.waitForURL(/\\/login$/);
+  await page.waitForURL((url) => url.pathname === "/login");
   await expect(page.getByRole("heading", { name: "Bentornato" })).toBeVisible();
 
   expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
