@@ -34,9 +34,9 @@ function ImportPage({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (status !== "queued" && status !== "processing") return;
     // Keep polling even when the cache returns the same pending object.
-    // The resource cache expires entries after a short TTL; a stable interval
-    // ensures we make a fresh request as soon as that cached response expires.
-    const timer = window.setInterval(job.reload, 2000);
+    // The resource cache expires after 12 seconds. Poll just beyond that TTL,
+    // leaving enough time for each request to complete before the next refresh.
+    const timer = window.setInterval(job.reload, 15_000);
     return () => window.clearInterval(timer);
   }, [status, job.reload]);
 
@@ -130,9 +130,9 @@ function ExportPage({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     if (status !== "pending" && status !== "processing") return;
-    // Do not stop after a cache hit: otherwise a pending export is polled only
-    // once and the UI never observes completion after the cache entry expires.
-    const timer = window.setInterval(resource.reload, 2000);
+    // Keep polling just beyond the 12-second cache TTL, so pending exports
+    // are re-fetched without aborting an in-flight request.
+    const timer = window.setInterval(resource.reload, 15_000);
     return () => window.clearInterval(timer);
   }, [status, resource.reload]);
 
