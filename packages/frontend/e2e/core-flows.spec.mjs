@@ -288,7 +288,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await expect(feedingDialog).toBeVisible();
   await feedingDialog.getByRole("checkbox", { name: new RegExp(animalName) }).check();
   await feedingDialog.getByLabel("Esito").selectOption("ate");
-  await feedingDialog.getByLabel("Alimento").fill("Rat");
+  await feedingDialog.getByRole("textbox", { name: "Alimento" }).fill("Rat");
   await feedingDialog.getByRole("button", { name: "Registra sessione" }).click();
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
@@ -397,7 +397,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const cycleDialog = page.getByRole("dialog");
   await cycleDialog.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
   await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);
-  await cycleDialog.getByLabel("Genitore A").selectOption(parentA.id);
+  await cycleDialog.getByRole("combobox", { name: "Genitore A" }).selectOption(parentA.id);
   await cycleDialog.getByLabel("Cerca genitore b").fill(parentNames[1]);
   await cycleDialog.getByLabel("Genitore B").selectOption(parentB.id);
   const cycleCreatePromise = page.waitForResponse((response) =>
@@ -499,10 +499,15 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   await page.getByRole("button", { name: "Nuovo animale" }).click();
   await page.getByLabel("Nome").fill(animalName);
   await page.getByLabel("Specie").fill("Python regius");
+  const createAnimalResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/animals") && response.request().method() === "POST"
+  );
   await page.getByRole("button", { name: "Salva modifiche" }).click();
-  const animalsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=active");
-  const animal = (await animalsResponse.json()).animals.find((item) => item.name === animalName);
+  const createAnimalResponse = await createAnimalResponsePromise;
+  expect(createAnimalResponse.status()).toBe(201);
+  const animal = (await createAnimalResponse.json()).animal;
   expect(animal?.id).toBeTruthy();
+  await expect(page.getByText(animalName, { exact: true })).toBeVisible();
 
   await page.goto("/documents");
   await page.getByRole("button", { name: "Carica documento" }).first().click();
