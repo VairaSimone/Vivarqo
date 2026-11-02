@@ -584,6 +584,29 @@ test("profile and language preferences persist across reloads", async ({ page })
   await expect(page.getByRole("heading", { name: "Impostazioni" })).toBeVisible();
   const italianSession = await page.context().request.get("http://127.0.0.1:4173/api/v1/auth/me");
   expect((await italianSession.json()).user.locale).toBe("it");
+
+  const preferenceForm = page.locator(".settings-grid form").nth(1);
+  await preferenceForm.getByLabel("Tema").selectOption("dark");
+  const darkThemeResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account/preferences") && response.request().method() === "PATCH"
+  );
+  await preferenceForm.getByRole("button", { name: "Salva modifiche" }).click();
+  expect((await darkThemeResponse).status()).toBe(200);
+  await expect.poll(() => page.locator("html").getAttribute("data-theme")).toBe("dark");
+
+  await page.emulateMedia({ colorScheme: "dark" });
+  await preferenceForm.getByLabel("Tema").selectOption("system");
+  const systemThemeResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account/preferences") && response.request().method() === "PATCH"
+  );
+  await preferenceForm.getByRole("button", { name: "Salva modifiche" }).click();
+  expect((await systemThemeResponse).status()).toBe(200);
+  await expect.poll(() => page.locator("html").getAttribute("data-theme")).toBe("dark");
+
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect.poll(() => page.locator("html").getAttribute("data-theme")).toBe("light");
+  await page.reload();
+  await expect.poll(() => page.locator("html").getAttribute("data-theme")).toBe("light");
 });
 
 test("revoked sessions are rejected by the next authenticated request", async ({ page }) => {
