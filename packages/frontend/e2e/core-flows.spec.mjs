@@ -292,11 +292,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const animal = animalsBody.animals.find((item) => item.name === animalName);
   expect(animal?.id).toBeTruthy();
 
-  await page.goto("/feeding?create=1&animalId=" + animal.id);
+  await page.goto("/feeding");
+  await page.getByRole("button", { name: "Registra alimentazione" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("checkbox", { name: new RegExp(animalName) }).check();
   await page.getByLabel("Esito").selectOption("ate");
   await page.getByLabel("Alimento").fill("Rat");
-  await page.getByRole("button", { name: "Registra sessione" }).click();
+  await page.getByRole("button", { name: "Registra alimentazione" }).last().click();
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
