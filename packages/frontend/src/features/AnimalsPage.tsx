@@ -5,6 +5,7 @@ import { dateForInput, formatDate, formatDateTime, getArray, getString, queryStr
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
 type Animal = Record<string, unknown>;
@@ -62,7 +63,6 @@ export function AnimalsPage({ locale, navigate, path }: { locale: Locale; naviga
   const resource = useResource<{ animals: Animal[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(url);
   const animals = resource.data?.animals ?? [];
   const pager = resource.data?.pagination;
-  const quickAnimals = useResource<{ animals: Animal[] }>(weightQuickModal ? "/animals?page=1&pageSize=100&status=active&sort=name" : null);
 
   function openCreate() { setEditing(null); setForm(emptyAnimal); setError(""); setModal(true); }
   function openEdit(animal: Animal) {
@@ -181,7 +181,7 @@ export function AnimalsPage({ locale, navigate, path }: { locale: Locale; naviga
         finally { setQuickBusy(false); }
       }}>
         {quickError && <Alert tone="danger">{quickError}</Alert>}
-        <Field label={t("animalDetail")}><Select required value={quickAnimalId} onChange={(e) => setQuickAnimalId(e.target.value)}><option value="">—</option>{(quickAnimals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")} · {getString(animal, "species")}</option>)}</Select></Field>
+        <RemoteSelect label={t("animalDetail")} value={quickAnimalId} onChange={setQuickAnimalId} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
         <div className="form-grid"><Field label={t("measuredAt")}><Input type="date" required value={quickDate} onChange={(e) => setQuickDate(e.target.value)} /></Field><Field label={t("weight")}><Input type="number" required min="0.01" max="100000000" step="0.01" value={quickWeight} onChange={(e) => setQuickWeight(e.target.value)} /></Field></div>
         <Field label={t("notes")}><Textarea rows={2} value={quickNotes} onChange={(e) => setQuickNotes(e.target.value)} /></Field>
         <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setWeightQuickModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={quickBusy || !quickAnimalId}>{quickBusy ? t("loading") : t("save")}</Button></div>

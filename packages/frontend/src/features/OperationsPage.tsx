@@ -4,6 +4,7 @@ import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, qu
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
 type Item = Record<string, unknown>;
@@ -50,7 +51,6 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
   const reminders = useResource<{ reminderRules: Item[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>("/tasks/reminder-rules?page=1&pageSize=100&enabled=all");
   const detail = useResource<{ task: Item }>(taskId ? `/tasks/${encodeURIComponent(taskId)}` : null);
   const { toast, show } = useToast();
-  const animals = useResource<{ animals: Item[] }>("/animals?page=1&pageSize=100&status=active&sort=name");
 
   function openCreate() { setEditing(null); setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" }); setError(""); setModal(true); }
   function openEdit(task: Item) {
@@ -129,7 +129,7 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
         <Field label={t("taskTitle")}><Input required maxLength={160} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
         <div className="form-grid"><Field label={t("category")}><Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((value) => <option key={value} value={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
           <Field label={t("dueAt")}><Input required type="datetime-local" value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} /></Field></div>
-        <Field label={t("animalDetail")}><Select value={form.animalId} onChange={(e) => setForm({ ...form, animalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option value={getString(animal, "id")} key={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field>
+        <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => setForm({ ...form, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
         <Field label={t("description")}><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
@@ -140,7 +140,7 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
         <div className="form-grid"><Field label={t("category")}><Select value={reminderForm.category} onChange={(e) => setReminderForm({ ...reminderForm, category: e.target.value })}>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
         <Field label={t("intervalDays")}><Input required type="number" min="1" max="3650" value={reminderForm.intervalDays} onChange={(e) => setReminderForm({ ...reminderForm, intervalDays: e.target.value })} /></Field>
         <Field label={t("nextDueAt")}><Input required type="datetime-local" value={reminderForm.nextDueAt} onChange={(e) => setReminderForm({ ...reminderForm, nextDueAt: e.target.value })} /></Field></div>
-        <Field label={t("animalDetail")}><Select value={reminderForm.animalId} onChange={(e) => setReminderForm({ ...reminderForm, animalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option value={getString(animal, "id")} key={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field>
+        <RemoteSelect label={t("animalDetail")} value={reminderForm.animalId} onChange={(animalId) => setReminderForm({ ...reminderForm, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setReminderModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
     </Modal>}
