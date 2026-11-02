@@ -9,7 +9,14 @@ export default defineConfig({
       "/api": { target: "http://localhost:3000", changeOrigin: true, secure: false }
     }
   },
-  preview: { host: "0.0.0.0", port: 4173, strictPort: true },
+  preview: {
+    host: "0.0.0.0",
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      "/api": { target: "http://localhost:3000", changeOrigin: true, secure: false }
+    }
+  },
   build: {
     target: "es2022",
     sourcemap: false,
