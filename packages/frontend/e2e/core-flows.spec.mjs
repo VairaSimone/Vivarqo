@@ -356,4 +356,10 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(movementsResponse.status()).toBe(200);
   const movementsBody = await movementsResponse.json();
   expect(movementsBody.movements.some((movement) => movement.movementType === "in" && Number(movement.quantity) === 1)).toBe(true);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Archivia" }).click();
+  const archivedResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=false");
+  expect(archivedResponse.status()).toBe(200);
+  expect((await archivedResponse.json()).items.some((item) => item.id === stockItem.id && item.isActive === false)).toBe(true);
 });
