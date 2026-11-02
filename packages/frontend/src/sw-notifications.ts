@@ -119,6 +119,23 @@ export function handlePushEvent(
   })());
 }
 
+type NotificationEventRegistrationScope = {
+  addEventListener(type: string, callback: (event: any) => void): void;
+  registration: { showNotification(title: string, options: Record<string, unknown>): Promise<void> };
+  clients: ClientsLike;
+  location: { origin: string };
+};
+
+/** Bind the real service-worker event surface to the separately testable handlers. */
+export function registerNotificationEventHandlers(scope: NotificationEventRegistrationScope): void {
+  scope.addEventListener("push", (event) => {
+    handlePushEvent(event, scope.registration, scope.location.origin);
+  });
+  scope.addEventListener("notificationclick", (event) => {
+    handleNotificationClick(event, scope.clients, scope.location.origin);
+  });
+}
+
 export function handleNotificationClick(
   event: NotificationEventLike,
   clients: ClientsLike,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleNotificationClick, handlePushEvent, parsePushPayload, safeNotificationTarget } from "./sw-notifications";
+import { handleNotificationClick, handlePushEvent, parsePushPayload, registerNotificationEventHandlers, safeNotificationTarget } from "./sw-notifications";
 
 const origin = "https://app.vivarqo.test";
 
@@ -86,6 +86,48 @@ describe("Web Push payload handling", () => {
     }, { matchAll: async () => [], openWindow }, origin);
     await complete;
     expect(openWindow).toHaveBeenCalledWith("/today");
+  });
+
+  it("registers and dispatches the actual service-worker push and click events", async () => {
+    const handlers = new Map<string, (event: any) => void>();
+    const showNotification = vi.fn().mockResolvedValue(undefined);
+    const focus = vi.fn().mockResolvedValue({});
+    const navigate = vi.fn().mockResolvedValue({});
+    const openWindow = vi.fn();
+    const client = { url: origin + "/today", focused: true, focus, navigate };
+    const scope = {
+      addEventListener: (type: string, callback: (event: any) => void) => { handlers.set(type, callback); },
+      registration: { showNotification },
+      clients: { matchAll: async () => [client], openWindow },
+      location: { origin }
+    };
+
+    registerNotificationEventHandlers(scope);
+    expect(handlers.has("push")).toBe(true);
+    expect(handlers.has("notificationclick")).toBe(true);
+
+    let pushCompletion: Promise<unknown> | undefined;
+    handlers.get("push")?.({
+      data: { text: () => JSON.stringify({ title: "Vivarqo", body: "Reminder", url: "/tasks/123" }) },
+      waitUntil: (promise: Promise<unknown>) => { pushCompletion = promise; }
+    });
+    await pushCompletion;
+    expect(showNotification).toHaveBeenCalledWith("Vivarqo", expect.objectContaining({
+      body: "Reminder",
+      data: expect.objectContaining({ targetPath: "/tasks/123" })
+    }));
+
+    let clickCompletion: Promise<unknown> | undefined;
+    const close = vi.fn();
+    handlers.get("notificationclick")?.({
+      notification: { data: { targetPath: "/tasks/123" }, close },
+      waitUntil: (promise: Promise<unknown>) => { clickCompletion = promise; }
+    });
+    await clickCompletion;
+    expect(close).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith("/tasks/123");
+    expect(focus).toHaveBeenCalledOnce();
+    expect(openWindow).not.toHaveBeenCalled();
   });
 
   it("ignores existing windows from another origin", async () => {

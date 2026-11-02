@@ -1,4 +1,4 @@
-import { handleNotificationClick, handlePushEvent } from "./sw-notifications";
+import { registerNotificationEventHandlers } from "./sw-notifications";
 
 const CACHE_NAME = "vivarqo-shell-v3";
 const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/vivarqo-icon.svg", "/icons/icon-192.svg", "/icons/icon-512.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
@@ -46,12 +46,7 @@ worker.addEventListener("activate", (rawEvent) => {
     await worker.clients.claim();
   })());
 });
-worker.addEventListener("push", (event) => {
-  handlePushEvent(event, worker.registration, worker.location.origin);
-});
-worker.addEventListener("notificationclick", (event) => {
-  handleNotificationClick(event, worker.clients, worker.location.origin);
-});
+registerNotificationEventHandlers(worker);
 worker.addEventListener("fetch", (rawEvent) => {
   const event = rawEvent as FetchLike;
   const request = event.request;
