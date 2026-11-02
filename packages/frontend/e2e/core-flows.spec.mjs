@@ -439,3 +439,57 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   expect((await cycleDetailResponse.json()).cycle.offspring.some((batch) => Number(batch.count) === 2)).toBe(true);
 });
+
+test("private document upload, metadata edit, download and delete", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page, owner);
+
+  const animalName = "E2E Document Python";
+  await page.goto("/animals");
+  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.getByLabel("Nome").fill(animalName);
+  await page.getByLabel("Specie").fill("Python regius");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const animalsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=25&status=active");
+  const animal = (await animalsResponse.json()).animals.find((item) => item.name === animalName);
+  expect(animal?.id).toBeTruthy();
+
+  await page.goto("/documents?animalId=" + animal.id);
+  await page.getByLabel("File").setInputFiles({
+    name: "e2e-veterinary-record.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\\n1 0 obj<</Type/Catalog>>endobj\\ntrailer<</Root 1 0 R>>\\n%%EOF", "utf8")
+  });
+  await page.getByLabel("Categoria documento").fill("Veterinario");
+  const uploadResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/documents") && response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "Carica documento" }).click();
+  const uploadResponse = await uploadResponsePromise;
+  expect(uploadResponse.status()).toBe(201);
+  await expect(page.getByText("e2e-veterinary-record.pdf", { exact: true })).toBeVisible();
+
+  const documentsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
+  expect(documentsResponse.status()).toBe(200);
+  const document = (await documentsResponse.json()).documents.find((item) => item.originalFilename === "e2e-veterinary-record.pdf");
+  expect(document?.id).toBeTruthy();
+
+  await page.getByRole("button", { name: "Modifica" }).click();
+  await page.getByLabel("Categoria documento").fill("Clinico");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const updatedDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
+  expect((await updatedDocuments.json()).documents.find((item) => item.id === document.id)?.category).toBe("Clinico");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Scarica" }).click();
+  const download = await downloadPromise;
+  const downloadPath = path.join("test-results", "exports", download.suggestedFilename());
+  await mkdir(path.dirname(downloadPath), { recursive: true });
+  await download.saveAs(downloadPath);
+  expect((await readFile(downloadPath)).subarray(0, 4).toString("ascii")).toBe("%PDF");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Elimina" }).click();
+  const remainingDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
+  expect((await remainingDocuments.json()).documents.some((item) => item.id === document.id)).toBe(false);
+});
