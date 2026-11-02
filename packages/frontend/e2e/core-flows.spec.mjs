@@ -437,7 +437,21 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByLabel("Numero piccoli").fill("2");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
-  expect((await cycleDetailResponse.json()).cycle.offspring.some((batch) => Number(batch.count) === 2)).toBe(true);
+  const cycleAfterBirth = (await cycleDetailResponse.json()).cycle;
+  const batch = cycleAfterBirth.offspring.find((item) => Number(item.count) === 2);
+  expect(batch?.id).toBeTruthy();
+
+  await page.getByRole("button", { name: "Crea schede animali" }).click();
+  page.once("dialog", (dialog) => dialog.accept("E2E Baby 1\\nE2E Baby 2"));
+  page.once("dialog", (dialog) => dialog.accept("Python regius"));
+  const conversionResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
+  );
+  const babiesResponse = await conversionResponsePromise;
+  expect(babiesResponse.status()).toBe(201);
+  const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
+  const babyNames = (await animalsAfterConversion.json()).animals.map((item) => item.name);
+  expect(babyNames).toEqual(expect.arrayContaining(["E2E Baby 1", "E2E Baby 2"]));
 });
 
 test("private document upload, metadata edit, download and delete", async ({ page }) => {
