@@ -8,19 +8,19 @@
   --forest: #183a34;
   --forest-2: #315d50;
   --sage: #91a89a;
-  --terracotta: #c8754b;
+  --terracotta: #a95534;
   --paper: #f6f4ee;
   --surface: #fff;
   --surface-soft: #f9f8f4;
   --text: #202b27;
-  --muted: #748078;
+  --muted: #606d64;
   --border: #e6e5dd;
   --border-strong: #d8d9d0;
-  --success: #397b58;
+  --success: #34734f;
   --success-bg: #edf5ef;
-  --warning: #a66d2b;
+  --warning: #8f5d22;
   --warning-bg: #fbf4e9;
-  --danger: #b64e43;
+  --danger: #ad463c;
   --danger-bg: #fbefed;
   --info: #426e83;
   --info-bg: #edf4f7;
@@ -42,6 +42,7 @@
   --border-strong: #45574c;
   --forest: #9eb9a9;
   --forest-2: #91ad9c;
+  --terracotta: #e0a17e;
   --success: #83c49a;
   --success-bg: #1e3929;
   --warning: #e0b477;
@@ -594,3 +595,43 @@ tbody tr:hover { background: var(--surface-soft); }
 
 .badge-primary { background: #edf2ed; color: #315d50; }
 :root[data-theme="dark"] .badge-primary { background: #253d32; color: #a7c7b2; }
+
+
+/* Readability and keyboard baseline: retain the existing visual system while
+   preventing operational labels and metadata from dropping below 12px. */
+.brand-copy small, .nav-caption, .nav-count, .profile-copy strong, .profile-copy small,
+.sidebar-tools .nav-item, .language-code, .topbar-context, .global-search, kbd,
+.app-footer, .eyebrow, .btn, .btn-sm, .panel-header p, .metric-label,
+.dashboard-intro p, .task-main strong, .task-main small, .badge, .quick-action strong,
+.simple-row strong, .simple-row small, .activity-copy strong, .activity-copy small,
+.muted-note, .empty-state p, .error-state, .alert, .offline-banner,
+.global-alert > button, .toast, .field-label, .field-hint, .field-error,
+.checkbox-field, table, th, .list-meta, .pagination, .animal-name-cell strong,
+.item-name strong, .document-name strong, .animal-name-cell small, .item-name small,
+.document-name small, .animal-profile-main span, .tabs-line button, .detail-field span,
+.detail-field strong, .detail-copy, .text-link, .record-row strong, .record-row small,
+.record-row p, .chart-caption, .cycle-title span, .cycle-parents,
+.cycle-card-bottom > span, .cycle-parent span, .cycle-parent small, .cycle-stats,
+.timeline-copy span, .timeline-copy small, .timeline-copy strong, .timeline-copy p,
+.clutch-card strong, .clutch-card small, .egg-card strong, .animal-mini strong,
+.animal-mini small, .feeding-detail, .session-date, .selector-header strong,
+.selector-header small, .animal-option strong, .animal-option small, .segmented button,
+.calendar-weekday-row span, .calendar-day-number, .calendar-event,
+.calendar-day-items > small, .calendar-legend, .calendar-date-block small,
+.calendar-item-copy strong, .calendar-item-copy small, .movement-summary span,
+.category-bar-row > div:first-child, .category-bar-row strong, .toggle-row strong,
+.toggle-row small, .notification-copy strong, .notification-copy p,
+.notification-copy small, .billing-card p, .billing-card small, .export-intro p,
+.status-row, .import-errors h3, .import-preview h3, .import-errors > div,
+.import-preview pre, .auth-visual-foot, .auth-top, .auth-top button,
+.auth-subtitle, .auth-links button, .auth-legal, .public-badge,
+.public-fields span, .public-fields strong, .public-animal-card footer,
+.share-link-box > span, .mobile-bottom-nav button, .qr-share strong, .qr-share small {
+  font-size: max(12px, .75rem);
+}
+.btn { font-size: max(14px, .875rem); }
+.control, .search-control input { font-size: 16px; }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+}

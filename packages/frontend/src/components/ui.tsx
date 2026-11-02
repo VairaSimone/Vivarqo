@@ -1,4 +1,4 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useEffect, useState, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 type Tone = "success" | "warning" | "danger" | "info" | "primary" | "neutral";
 export function Icon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
@@ -96,14 +96,54 @@ export function Pagination({ page, totalPages, onChange, label = "Page" }: { pag
 }
 export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const closeLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Chiudi";
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = previous; };
-  }, [onClose]);
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title}><header className="modal-header"><h2>{title}</h2><IconButton label={closeLabel} onClick={onClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
+    const dialog = dialogRef.current;
+    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+      .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+    focusable()[0]?.focus();
+    if (!focusable().length) dialog?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      if (!elements.length) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = elements[0]!;
+      const last = elements[elements.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}><section ref={dialogRef} tabIndex={-1} className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title}><header className="modal-header"><h2>{title}</h2><IconButton label={closeLabel} onClick={onClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
 }
 export function useToast() {
   const [message, setMessage] = useState("");
