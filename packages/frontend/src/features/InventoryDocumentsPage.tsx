@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -135,6 +135,13 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
   const [animalId, setAnimalId] = useState(params.get("animalId") ?? "");
   const [cycleId, setCycleId] = useState(params.get("cycleId") ?? "");
   const [search, setSearch] = useState(params.get("q") ?? "");
+  useEffect(() => {
+    const currentParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
+    setSearch(currentParams.get("q") ?? "");
+    setAnimalId(currentParams.get("animalId") ?? "");
+    setCycleId(currentParams.get("cycleId") ?? "");
+    setPage(1);
+  }, [path]);
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("other");
   const [note, setNote] = useState("");

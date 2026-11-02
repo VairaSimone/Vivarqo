@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -35,13 +35,19 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
   const taskId = path.match(/^\/tasks\/([^/?]+)/)?.[1] ?? params.get("open");
   const tab = params.get("tab") === "reminders" ? "reminders" : "tasks";
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("open");
+  const [status, setStatus] = useState(params.has("q") ? "all" : "open");
   const [category, setCategory] = useState("");
   const [q, setQ] = useState(params.get("q") ?? "");
   const [modal, setModal] = useState(Boolean(params.get("create")));
   const [editing, setEditing] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => {
+    const currentParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
+    setQ(currentParams.get("q") ?? "");
+    setStatus(currentParams.has("q") ? "all" : "open");
+    setPage(1);
+  }, [path]);
   const [form, setForm] = useState({ title: "", description: "", category: "custom", dueAt: "", animalId: "" });
   const [reminderForm, setReminderForm] = useState({ title: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
   const [reminderModal, setReminderModal] = useState(false);
