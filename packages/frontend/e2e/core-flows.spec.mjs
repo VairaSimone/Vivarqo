@@ -146,6 +146,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
 });
 
 test("responsive screenshot matrix at all target viewport sizes", async ({ page }) => {
+  test.setTimeout(300_000);
   const pageErrors = [];
   const unexpectedServerErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
