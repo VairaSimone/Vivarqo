@@ -24,7 +24,7 @@
     "verify:web-push:live": "pnpm --filter @vivarqo/api exec tsx ../scripts/verify-web-push-live.ts"
   },
   "dependencies": {
-    "dotenv": "^17.2.3",
+    "dotenv": "^18.0.9",
     "prisma": "^7.0.0"
   }
 }
