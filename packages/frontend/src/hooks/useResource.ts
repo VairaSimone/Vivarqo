@@ -15,14 +15,18 @@ export function useResource<T>(url: string | null) {
       return;
     }
     setState((previous) => ({ ...previous, loading: true, error: null }));
-    api.get<T>(url).then((data) => {
+    const controller = new AbortController();
+    api.get<T>(url, { signal: controller.signal }).then((data) => {
       if (requestId.current === current) setState({ data, loading: false, error: null });
     }).catch((reason: unknown) => {
-      if (requestId.current !== current) return;
+      if (controller.signal.aborted || requestId.current !== current) return;
       const error = reason instanceof ApiError ? reason : new ApiError(0, reason instanceof Error ? reason.message : "Network request failed", "NETWORK_ERROR");
       setState((previous) => ({ ...previous, loading: false, error }));
     });
-    return () => { if (requestId.current === current) requestId.current++; };
+    return () => {
+      controller.abort();
+      if (requestId.current === current) requestId.current++;
+    };
   }, [url, revision]);
 
   return { ...state, reload };

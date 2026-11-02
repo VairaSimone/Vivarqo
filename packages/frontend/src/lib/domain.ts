@@ -1,5 +1,45 @@
 export type Locale = "it" | "en";
+export type WeightUnit = "g" | "kg" | "oz" | "lb";
+export type TemperatureUnit = "c" | "f";
+export type DateFormat = "locale" | "dd/MM/yyyy" | "yyyy-MM-dd";
+export type DisplayPreferences = { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean; timezone: string };
 type RecordValue = Record<string, unknown>;
+let activeDisplayPreferences: DisplayPreferences = { weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome" };
+export function setDisplayPreferences(value: Partial<DisplayPreferences>): void { activeDisplayPreferences = { ...activeDisplayPreferences, ...value }; }
+export function getDisplayPreferences(): DisplayPreferences { return { ...activeDisplayPreferences }; }
+export function weightToGrams(value: number | string, unit = activeDisplayPreferences.weightUnit): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) throw new Error("Invalid weight");
+  const factor: Record<WeightUnit, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
+  const grams = amount * factor[unit];
+  if (!Number.isFinite(grams) || grams < 0) throw new Error("Invalid weight");
+  return grams;
+}
+export function gramsToWeight(value: number | string, unit = activeDisplayPreferences.weightUnit): number {
+  const grams = Number(value);
+  if (!Number.isFinite(grams)) return 0;
+  const factor: Record<WeightUnit, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
+  return grams / factor[unit];
+}
+export function formatWeight(value: number | string, locale: Locale, unit = activeDisplayPreferences.weightUnit): string {
+  const digits = unit === "g" ? 0 : unit === "kg" ? 3 : 2;
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(gramsToWeight(value, unit)) + " " + unit;
+}
+export function temperatureToCelsius(value: number | string, unit = activeDisplayPreferences.temperatureUnit): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) throw new Error("Invalid temperature");
+  return unit === "f" ? (amount - 32) * 5 / 9 : amount;
+}
+export function celsiusToTemperature(value: number | string, unit = activeDisplayPreferences.temperatureUnit): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return unit === "f" ? amount * 9 / 5 + 32 : amount;
+}
+export function formatTemperature(valueC: number | string, locale: Locale, unit = activeDisplayPreferences.temperatureUnit): string {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(celsiusToTemperature(valueC, unit)) + (unit === "f" ? " °F" : " °C");
+}
+export function temperatureUnitLabel(): string { return activeDisplayPreferences.temperatureUnit === "f" ? "°F" : "°C"; }
+export function weightUnitLabel(): string { return activeDisplayPreferences.weightUnit; }
 
 export function getString(value: unknown, key: string, fallback = ""): string {
   if (typeof value !== "object" || value === null) return fallback;
@@ -37,27 +77,30 @@ function validDateParts(value: string): [number, number, number] | null {
   const check = new Date(Date.UTC(year, month - 1, day));
   return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day ? [year, month, day] : null;
 }
-export function formatDate(
-  value: string | Date | null | undefined,
-  locale: Locale,
-  options: Intl.DateTimeFormatOptions = {}
-): string {
+export function formatDate(value: string | Date | null | undefined, locale: Locale, options: Intl.DateTimeFormatOptions = {}): string {
   if (!value) return "—";
   const parts = typeof value === "string" ? validDateParts(value) : null;
-  const date = parts
-    ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12))
-    : value instanceof Date ? value : new Date(value);
+  const date = parts ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12)) : value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
+  if (!Object.keys(options).length && activeDisplayPreferences.dateFormat !== "locale") {
+    const values = new Intl.DateTimeFormat("en-CA", {
+      timeZone: parts ? "UTC" : activeDisplayPreferences.timezone,
+      year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(date);
+    const pick = (type: string) => values.find((part) => part.type === type)?.value ?? "";
+    const year = pick("year"), month = pick("month"), day = pick("day");
+    return activeDisplayPreferences.dateFormat === "dd/MM/yyyy" ? `${day}/${month}/${year}` : `${year}-${month}-${day}`;
+  }
   const formatterOptions: Intl.DateTimeFormatOptions = Object.keys(options).length > 0
     ? { ...options, ...(parts && !options.timeZone ? { timeZone: "UTC" } : {}) }
     : { dateStyle: "medium", ...(parts ? { timeZone: "UTC" } : {}) };
   return new Intl.DateTimeFormat(locale, formatterOptions).format(date);
 }
-export function formatDateTime(value: string | null | undefined, locale: Locale, timezone?: string): string {
+export function formatDateTime(value: string | null | undefined, locale: Locale, timezone = activeDisplayPreferences.timezone): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", ...(timezone ? { timeZone: timezone } : {}) }).format(date);
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(date);
 }
 export function dateForInput(value: string | null | undefined): string {
   if (!value) return "";
