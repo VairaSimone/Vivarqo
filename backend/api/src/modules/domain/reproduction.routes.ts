@@ -133,7 +133,12 @@ export function createReproductionRouter() {
   router.get("/reproduction-cycles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: z.enum(statuses).or(z.literal("all")).default("all") }), req.query);
-    const where = { userId: auth.userId, ...(page.status === "all" ? {} : { status: page.status }) };
+    const search = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
+    const where = {
+      userId: auth.userId,
+      ...(page.status === "all" ? {} : { status: page.status }),
+      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+    };
     const [total, cycles] = await Promise.all([
       prisma.reproductionCycle.count({ where }),
       prisma.reproductionCycle.findMany({

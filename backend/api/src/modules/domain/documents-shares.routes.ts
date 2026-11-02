@@ -58,6 +58,7 @@ export function createDocumentShareRouter() {
       animalId: z.string().uuid().optional(),
       cycleId: z.string().uuid().optional(),
       category: z.string().trim().max(40).optional(),
+      q: z.string().trim().max(160).optional(),
     }), req.query);
     const where: Record<string, unknown> = { userId: auth.userId, deletedAt: null };
     if (query.animalId) {
@@ -71,6 +72,11 @@ export function createDocumentShareRouter() {
       where.cycleId = query.cycleId;
     }
     if (query.category) where.category = query.category;
+    if (query.q) where.OR = [
+      { originalFilename: { contains: query.q, mode: "insensitive" } },
+      { category: { contains: query.q, mode: "insensitive" } },
+      { note: { contains: query.q, mode: "insensitive" } },
+    ];
     const [total, documents] = await Promise.all([
       prisma.document.count({ where: where as never }),
       prisma.document.findMany({
