@@ -13,12 +13,20 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
+COPY packages/frontend/package.json packages/frontend/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
 COPY . .
 RUN pnpm db:generate
-RUN pnpm --filter @vivarqo/api build
+RUN pnpm build:api
+RUN pnpm build:frontend
+
+FROM nginx:1.27-alpine AS web-runtime
+COPY backend/infra/nginx/frontend.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
 
 FROM base AS production-dependencies
 ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
@@ -26,6 +34,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
+COPY packages/frontend/package.json packages/frontend/package.json
 RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS runtime

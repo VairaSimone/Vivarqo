@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Vivarqo — Breeder workspace",
+  "short_name": "Vivarqo",
+  "description": "Il gestionale per piccoli e medi allevatori di rettili.",
+  "start_url": "/today",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f4ee",
+  "theme_color": "#183a34",
+  "lang": "it",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/vivarqo-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

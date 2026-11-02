@@ -1,6 +1,6 @@
 # Vivarqo
 
-Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene attualmente il backend: API Node.js, PostgreSQL/Prisma, migrazioni, documentazione e strumenti operativi. Il frontend è stato rimosso dal branch `main` il 2 novembre 2026 per essere ricostruito da zero; i contratti API e la specifica di prodotto restano versionati come riferimento.
+Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene un backend Node.js con PostgreSQL/Prisma e un frontend React/Vite in italiano e inglese, con layout responsive e una PWA installabile. Il client utilizza sessioni cookie, token CSRF e API same-origin.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -20,7 +20,7 @@ pnpm db:generate
 pnpm dev:api
 ```
 
-Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia anche il processo dedicato ai job con `pnpm dev:worker`. Il frontend non è incluso in `main` durante la fase di ricostruzione; l'API resta disponibile su `http://localhost:3000`. Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia il processo dedicato ai job con `pnpm dev:worker`; in un terzo terminale avvia il frontend con `pnpm dev:frontend` (Vite su `http://localhost:5173`, proxy `/api` verso l'API su `http://localhost:3000`). Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
 
 ```bash
 docker compose -f backend/infra/docker/compose.yaml up -d --build api
@@ -51,7 +51,7 @@ curl http://localhost:3000/readyz
 
 - `GET /healthz`: liveness, non dipende da PostgreSQL.
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
-- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti in questa documentazione. Il frontend non è attualmente incluso nel repository ed è da ricostruire utilizzando `docs/openapi.yaml` e la specifica di prodotto.
+- Sono disponibili le API di account, autenticazione e i moduli di dominio descritti in questa documentazione. Il frontend è in `packages/frontend`; eseguire `pnpm typecheck`, `pnpm test` e `pnpm build` dalla root per verificare l'intero monorepo.
 
 ## Account e autenticazione
 
@@ -79,19 +79,23 @@ La password deve avere almeno 12 caratteri. Gli account possono autenticarsi sol
 Per inviare email reali configura RESEND_API_KEY e EMAIL_FROM nel file .env. Se il provider non è configurato o non è raggiungibile, l'errore viene registrato senza includere token o dettagli sensibili; la risposta pubblica resta generica per non rivelare se un indirizzo è registrato. In un ambiente senza provider, le email non saranno consegnate e va usato un sender fittizio solo nei test.
 
 ## Configurazione
-Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine browser ammessa da CORS e CSRF e deve corrispondere all'URL del futuro frontend; CSRF_SECRET deve essere una stringa casuale di almeno 32 caratteri.
+Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrativi: non inserire segreti reali nel repository. DATABASE_URL deve essere una URL PostgreSQL valida; APP_ORIGIN è l'origine browser ammessa da CORS e CSRF e deve corrispondere all'origine pubblica del frontend; CSRF_SECRET deve essere una stringa casuale di almeno 32 caratteri.
 
 ## Comandi pnpm
 | Comando | Scopo |
 |---|---|
 | `pnpm dev:api` | Avvia l'API in watch mode |
-| `pnpm build` | Compila l'API backend |
+| `pnpm dev:frontend` | Avvia Vite per il frontend React |
+| `pnpm build` | Compila API backend e frontend React |
 | `pnpm db:generate` | Genera il client Prisma |
 | `pnpm db:migrate:deploy` | Applica le migrazioni versionate |
 | `pnpm db:migrate:dev` | Crea/applica una migrazione in sviluppo; solo su DB di sviluppo |
-| `pnpm test` | Esegue i test API |
-| `pnpm typecheck` | Type-check TypeScript |
+| `pnpm test` | Esegue i test API e frontend |
+| `pnpm test:api` / `pnpm test:frontend` | Esegue i test del singolo pacchetto |
+| `pnpm typecheck` | Type-check API e frontend |
+| `pnpm typecheck:api` / `pnpm typecheck:frontend` | Type-check del singolo pacchetto |
 | `pnpm build:api` | Compila solo l'API |
+| `pnpm build:frontend` | Type-check e build della PWA |
 | `pnpm db:backup` | Crea dump PostgreSQL custom e checksum SHA-256 |
 | `pnpm db:restore` | Ripristina solo su database vuoto dopo conferma esplicita |
 | `pnpm db:restore:drill` | Crea un DB temporaneo, ripristina e confronta schema/dati |
@@ -100,13 +104,13 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 
 ## Stato del repository
 
-Il backend implementa API per account/autenticazione, animali, registri di cura, attività e calendario, riproduzioni, inventario, documenti e condivisioni pubbliche, finanze, import/export, abbonamenti Stripe e notifiche Web Push. Il codice frontend è intenzionalmente assente da `main` e verrà ricostruito separatamente.
+Il backend implementa API per account/autenticazione, animali, registri di cura, attività e calendario, riproduzioni, inventario, documenti e condivisioni pubbliche, finanze, import/export, abbonamenti Stripe e notifiche Web Push. Il frontend React/PWA è versionato in `packages/frontend` e viene verificato dalla CI con type-check, test helper e build indipendenti.
 
 Le richieste di importazione ed esportazione usano job persistenti PostgreSQL: conferme e richieste rispondono `202 Accepted`, i worker recuperano job abbandonati con lease e token di proprietà e lo stato è consultabile tramite le API dedicate. Gli export generano gli archivi in streaming su file temporanei privati. I test di codice non sostituiscono le prove reali dei provider descritte nella guida operativa.
 
-Prima del lancio restano da completare o validare: configurazione dei provider reali e dei relativi contratti/regioni; prova Stripe Test Mode e Web Push sullo staging; restore drill effettivamente eseguito sul cluster staging; pubblicazione dei documenti legali solo dopo aver compilato i dati effettivi del titolare e dei fornitori e aver ottenuto revisione professionale; completamento e verifica automatica del contratto OpenAPI; verifica operativa del sender Sentry custom. Il frontend è assente e dovrà essere ricostruito prima del rilascio. Le bozze legali in [docs/legal](docs/legal/) non sono pronte per la pubblicazione.
+Prima del lancio restano da completare o validare: configurazione dei provider reali e dei relativi contratti/regioni; prova Stripe Test Mode e Web Push sullo staging; restore drill effettivamente eseguito sul cluster staging; pubblicazione dei documenti legali solo dopo aver compilato i dati effettivi del titolare e dei fornitori e aver ottenuto revisione professionale; completamento e verifica automatica del contratto OpenAPI; verifica operativa del sender Sentry custom. Il frontend è presente; prima del rilascio vanno ancora eseguiti i controlli end-to-end su staging, test cross-browser e verifica del percorso reale di installazione PWA. Le bozze legali in [docs/legal](docs/legal/) non sono pronte per la pubblicazione.
 
-Non è attualmente presente una PWA nel branch `main`: manifest, service worker e interfaccia dovranno essere realizzati nel nuovo frontend. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
+La PWA include manifest, icona e service worker. Per scelta di sicurezza la cache contiene soltanto la shell HTML e gli asset statici: le API e i dati privati non vengono memorizzati offline. Non sono ancora implementate modifiche offline né sincronizzazione automatica. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
 
 Il contratto API preliminare è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md); la specifica di riferimento è in [backend/docs/specification.md](backend/docs/specification.md).
 
@@ -343,6 +347,10 @@ Nota tecnica: le notifiche push e i job di importazione/esportazione usano worke
 Le bozze italiane di informativa privacy, termini e condizioni e cookie/tracking notice sono in [docs/legal](docs/legal/). Sono documenti di lavoro, non pronti per la pubblicazione: vanno completati con i dati reali del titolare, dei provider, delle regioni, delle retention, dei prezzi e dei flussi commerciali, quindi revisionati da un professionista competente. Vedi [la checklist di rilascio](docs/legal/RELEASE-CHECKLIST.md).
 
 
-## Frontend
+## Frontend React e PWA
 
-Il codice del vecchio frontend è stato rimosso dal branch `main`. Per la nuova implementazione utilizzare `docs/openapi.yaml`, `backend/docs/specification.md` e il backend effettivamente versionato. Non esiste al momento un pacchetto frontend installabile o avviabile.
+Il frontend vive in `packages/frontend` e usa React 19, TypeScript e Vite. Le schermate sono organizzate per dominio (`features/`), i componenti condivisi sono in `components/ui.tsx` e le chiamate HTTP passano da `lib/api.ts`, che gestisce cookie, CSRF e `Accept-Language`. Le traduzioni sono in `lib/i18n.ts`.
+
+Per lo sviluppo locale avviare `pnpm dev:api` e `pnpm dev:frontend`. Vite espone `http://localhost:5173` e inoltra `/api` a `http://localhost:3000`. La build statica viene generata in `packages/frontend/dist`; il web server di produzione deve servire gli asset e applicare il fallback SPA a `index.html` per le route client-side.
+
+Il manifest e il service worker rendono la shell installabile e conservano nella cache gli asset statici già caricati. Le richieste `/api/*` non vengono cache-ate: l'app non promette modifiche offline o sync differita. Web Push continua a usare la registrazione e l'invio server-side documentati nella sezione notifiche.

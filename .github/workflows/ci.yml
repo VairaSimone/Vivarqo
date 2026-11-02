@@ -57,12 +57,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
       - name: Type-check API
-        run: pnpm typecheck
+        run: pnpm typecheck:api
       - name: Test API
-        run: pnpm test
+        run: pnpm test:api
       - name: Verify PostgreSQL backup and restore in a temporary database
         run: pnpm db:restore:drill
       - name: Build API
         run: pnpm build:api
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.20.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type-check frontend
+        run: pnpm typecheck:frontend
+      - name: Test frontend helpers
+        run: pnpm test:frontend
+      - name: Build frontend
+        run: pnpm build:frontend
