@@ -27,7 +27,7 @@
     "typecheck:frontend": "pnpm --filter @vivarqo/frontend typecheck"
   },
   "dependencies": {
-    "dotenv": "^17.2.3",
+    "dotenv": "^18.0.9",
     "prisma": "^7.0.0"
   }
 }
