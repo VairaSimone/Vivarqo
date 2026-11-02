@@ -26,7 +26,10 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 function notifyUnauthorized(path: string, status: number): void {
-  if (status === 401 && !path.startsWith("/auth/")) unauthorizedHandler?.();
+  if (status === 401 && !path.startsWith("/auth/")) {
+    invalidateAllResourceCache();
+    unauthorizedHandler?.();
+  }
 }
 export function clearCsrfCache(): void {
   csrfToken = null;

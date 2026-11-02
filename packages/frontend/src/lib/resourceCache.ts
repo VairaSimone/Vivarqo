@@ -9,6 +9,7 @@ type PendingEntry = {
 
 const cache = new Map<string, CacheEntry>();
 const pending = new Map<string, PendingEntry>();
+const invalidationListeners = new Set<() => void>();
 const TTL_MS = 12_000;
 const MAX_ENTRIES = 100;
 let generation = 0;
@@ -99,8 +100,14 @@ export function loadCachedResource<T>(
   });
 }
 
+export function subscribeResourceInvalidation(listener: () => void): () => void {
+  invalidationListeners.add(listener);
+  return () => invalidationListeners.delete(listener);
+}
+
 /** Call after a successful mutation or when the authenticated account changes. */
 export function invalidateAllResourceCache(): void {
   generation++;
   cache.clear();
+  invalidationListeners.forEach((listener) => listener());
 }

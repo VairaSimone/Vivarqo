@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api, ApiError, clearCsrfCache, setApiLocale, setUnauthorizedHandler } from "../lib/api";
+import { invalidateAllResourceCache } from "../lib/resourceCache";
 import { AppShell } from "../layouts/AppShell";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
@@ -191,6 +192,7 @@ export function App() {
     try { await api.post("/auth/logout"); }
     catch { /* The local session view is cleared when the server session has already expired. */ }
     clearCsrfCache();
+    invalidateAllResourceCache();
     setUser(null);
     setDisplayPreferencesState({ weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome" });
     navigate("/login");

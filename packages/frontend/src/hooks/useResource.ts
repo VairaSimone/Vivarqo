@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, getApiLocale } from "../lib/api";
-import { loadCachedResource } from "../lib/resourceCache";
+import { loadCachedResource, subscribeResourceInvalidation } from "../lib/resourceCache";
 
 type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | null };
 export function useResource<T>(url: string | null) {
@@ -28,7 +28,7 @@ export function useResource<T>(url: string | null) {
       controller.abort();
       if (requestId.current === current) requestId.current++;
     };
-  }, [url, revision]);
+  }, [url, revision, cacheVersion]);
 
   return { ...state, reload };
 }
