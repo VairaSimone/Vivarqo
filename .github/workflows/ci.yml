@@ -66,6 +66,8 @@ jobs:
         run: pnpm build:api
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
+      - name: Docker build and validate frontend web target
+        run: docker build --target web-runtime -f backend/Dockerfile -t vivarqo-web:ci .
 
   frontend:
     runs-on: ubuntu-latest
