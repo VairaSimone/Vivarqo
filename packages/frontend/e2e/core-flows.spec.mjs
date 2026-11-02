@@ -403,7 +403,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const createdCycle = (await cycleCreateResponse.json()).cycle;
   expect(createdCycle?.id).toBeTruthy();
   // The cycles list is paginated and sorted by start date; inspect the created ID directly.
-  const cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + createdCycle.id);
+  let cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + createdCycle.id);
   expect(cycleDetailResponse.status()).toBe(200);
   const cycle = (await cycleDetailResponse.json()).cycle;
   expect(cycle.name).toBe("E2E Breeding Cycle");
@@ -414,7 +414,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByLabel("Cerca scheda animale").fill(parentNames[0]);
   await page.getByLabel("Scheda animale").selectOption(parentA.id);
   await page.getByRole("button", { name: "Salva modifiche" }).click();
-  let cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
+  cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   expect((await cycleDetailResponse.json()).cycle.events.some((event) => event.eventType === "pairing")).toBe(true);
 
   await page.getByRole("button", { name: "Covate" }).click();
