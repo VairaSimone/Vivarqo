@@ -363,3 +363,79 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(archivedResponse.status()).toBe(200);
   expect((await archivedResponse.json()).items.some((item) => item.id === stockItem.id && item.isActive === false)).toBe(true);
 });
+
+test("reproduction cycle, event, clutch, eggs, incubation and offspring persist", async ({ page }) => {
+  test.setTimeout(180_000);
+  await signIn(page, owner);
+
+  const parentNames = ["E2E Breeding Parent A", "E2E Breeding Parent B"];
+  await page.goto("/animals");
+  for (const name of parentNames) {
+    await page.getByRole("button", { name: "Nuovo animale" }).click();
+    await page.getByLabel("Nome").fill(name);
+    await page.getByLabel("Specie").fill("Python regius");
+    await page.getByRole("button", { name: "Salva modifiche" }).click();
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+  }
+  const animalsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
+  const animals = (await animalsResponse.json()).animals;
+  const parentA = animals.find((animal) => animal.name === parentNames[0]);
+  const parentB = animals.find((animal) => animal.name === parentNames[1]);
+  expect(parentA?.id).toBeTruthy();
+  expect(parentB?.id).toBeTruthy();
+
+  await page.goto("/reproduction");
+  await page.getByRole("button", { name: "Nuovo ciclo" }).click();
+  await page.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
+  await page.getByLabel("Genitore A").selectOption(parentA.id);
+  await page.getByLabel("Genitore B").selectOption(parentB.id);
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  const cyclesResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles?page=1&pageSize=25&status=all");
+  expect(cyclesResponse.status()).toBe(200);
+  const cycle = (await cyclesResponse.json()).cycles.find((item) => item.name === "E2E Breeding Cycle");
+  expect(cycle?.id).toBeTruthy();
+
+  await page.goto("/reproduction-cycles/" + cycle.id);
+  await page.getByRole("button", { name: "Registra evento" }).click();
+  await page.getByLabel("Tipo evento").selectOption("pairing");
+  await page.getByLabel("Scheda animale").selectOption(parentA.id);
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  let cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
+  expect((await cycleDetailResponse.json()).cycle.events.some((event) => event.eventType === "pairing")).toBe(true);
+
+  await page.getByRole("button", { name: "Covate" }).click();
+  await page.getByRole("button", { name: "Aggiungi covata" }).click();
+  await page.getByLabel("Deposizione").fill("2026-11-01");
+  await page.getByLabel("Numero uova").fill("2");
+  await page.getByLabel("Stato").fill("incubating");
+  await page.getByLabel("Incubatore").fill("E2E Incubator");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
+  const clutch = (await cycleDetailResponse.json()).cycle.clutches.find((item) => item.incubatorLabel === "E2E Incubator");
+  expect(clutch?.id).toBeTruthy();
+
+  await page.goto("/clutches/" + clutch.id);
+  await page.getByRole("button", { name: "Registra uova" }).click();
+  await page.getByLabel("Codice uovo").fill("E2E-EGG-01\\nE2E-EGG-02");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  let clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
+  expect((await clutchResponse.json()).clutch.eggs.length).toBe(2);
+
+  await page.getByRole("button", { name: "Aggiungi misurazione" }).click();
+  await page.getByLabel("Temperatura (°C)").fill("31");
+  await page.getByLabel("Umidità (%)").fill("70");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
+  const clutchDetail = (await clutchResponse.json()).clutch;
+  expect(clutchDetail.incubationLogs.some((log) => Number(log.temperatureC) === 31 && Number(log.humidityPct) === 70)).toBe(true);
+
+  await page.goto("/reproduction-cycles/" + cycle.id);
+  await page.getByRole("button", { name: "Nascite" }).click();
+  await page.getByRole("button", { name: "Registra nascita" }).click();
+  await page.getByLabel("Data nascita").fill("2026-11-02");
+  await page.getByLabel("Covate").selectOption(clutch.id);
+  await page.getByLabel("Numero piccoli").fill("2");
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
+  expect((await cycleDetailResponse.json()).cycle.offspring.some((batch) => Number(batch.count) === 2)).toBe(true);
+});
