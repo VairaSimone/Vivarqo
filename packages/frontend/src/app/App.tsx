@@ -72,6 +72,7 @@ export function App() {
     setUnauthorizedHandler(() => {
       clearCsrfCache();
       setUser(null);
+      setDisplayPreferencesState({ weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome" });
       setAuthError("");
       navigate("/login");
     });
