@@ -18,7 +18,6 @@ import {
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
   reproductionCycleStatusSchema,
-  statuses,
 } from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {

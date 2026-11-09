@@ -4,8 +4,17 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./reproduction": "./src/reproduction.ts",
-    "./inventory": "./src/inventory.ts"
+    "./reproduction": {
+      "types": "./dist/reproduction.d.ts",
+      "import": "./dist/reproduction.js"
+    },
+    "./inventory": {
+      "types": "./dist/inventory.d.ts",
+      "import": "./dist/inventory.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "zod": "^4.1.12"

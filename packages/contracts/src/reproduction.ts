@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const statuses = ["planned", "active", "completed", "cancelled"] as const;
+export const statuses = ["planned", "active", "completed", "cancelled"] as const;
 const eventTypes = ["pairing", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "loss", "other"] as const;
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nullableUuid = z.string().uuid().nullable().optional();

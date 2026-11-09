@@ -14,6 +14,7 @@ COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
 COPY packages/frontend/package.json packages/frontend/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
@@ -36,6 +37,7 @@ COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
 COPY backend/api/package.json backend/api/package.json
 COPY packages/frontend/package.json packages/frontend/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
 RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS runtime
@@ -43,6 +45,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=production-dependencies /app/backend/api/node_modules ./backend/api/node_modules
+COPY --from=production-dependencies /app/packages/contracts/node_modules ./packages/contracts/node_modules
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/backend/api/dist ./backend/api/dist
 COPY --from=build /app/backend/api/package.json ./backend/api/package.json
 COPY --from=build /app/backend/prisma ./backend/prisma
