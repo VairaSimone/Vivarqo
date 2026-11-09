@@ -193,11 +193,24 @@ function normalizeSqlExpression(value: string): string {
       inString = true;
       normalized += character;
     } else if (character === '"') inIdentifier = true;
-    else if (!/\s/.test(character)) normalized += character.toLowerCase();
+    else if (/\\s/.test(character)) normalized += " ";
+    else normalized += character.toLowerCase();
   }
-  return normalized
-    .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?:with|without)timezone|numeric)(?:\([^)]*\))?/g, "")
-    .replace(/[()]/g, "");
+
+  normalized = normalized
+    .replace(/\\bpublic\\./g, "")
+    .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\\([^)]*\\))?/g, "")
+    .replace(/\\s+/g, " ")
+    .trim();
+
+  // pg_get_expr() may add parentheses around the complete predicate. Remove
+  // only grouping that encloses the entire expression, not function arguments.
+  while (normalized.startsWith("(") && normalized.endsWith(")")) {
+    const closing = findMatchingParenthesis(normalized, 0);
+    if (closing !== normalized.length - 1) break;
+    normalized = normalized.slice(1, -1).trim();
+  }
+  return normalized;
 }
 
 function sameExpressions(expected: string[], actual: string[]): boolean {
@@ -364,21 +377,13 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
       isValid: boolean;
       isReady: boolean;
       isUnique: boolean;
-      tableName: string;
-      accessMethod: string;
-      keyExpressions: string[];
-      includedExpressions: string[];
-      predicate: string | null;
+      definition: string;
     }>>(
-      "SELECT idx.relname AS \"indexName\", i.indisvalid AS \"isValid\", i.indisready AS \"isReady\", " +
-      "i.indisunique AS \"isUnique\", tbl.relname AS \"tableName\", am.amname AS \"accessMethod\", " +
-      "ARRAY(SELECT pg_get_indexdef(i.indexrelid, key_positions.position, true) " +
-      "FROM generate_series(1, i.indnkeyatts) AS key_positions(position) ORDER BY key_positions.position) AS \"keyExpressions\", " +
-      "ARRAY(SELECT pg_get_indexdef(i.indexrelid, include_positions.position, true) " +
-      "FROM generate_series(i.indnkeyatts + 1, i.indnatts) AS include_positions(position) ORDER BY include_positions.position) AS \"includedExpressions\", " +
-      "pg_get_expr(i.indpred, i.indrelid) AS \"predicate\" " +
+      "SELECT idx.relname AS \\"indexName\\", i.indisvalid AS \\"isValid\\", " +
+      "i.indisready AS \\"isReady\\", i.indisunique AS \\"isUnique\\", " +
+      "pg_get_indexdef(i.indexrelid) AS \\"definition\\" " +
       "FROM pg_index i JOIN pg_class idx ON idx.oid = i.indexrelid JOIN pg_class tbl ON tbl.oid = i.indrelid " +
-      "JOIN pg_am am ON am.oid = idx.relam JOIN pg_namespace n ON n.oid = tbl.relnamespace WHERE n.nspname = 'public'",
+      "JOIN pg_namespace n ON n.oid = tbl.relnamespace WHERE n.nspname = 'public'",
     ),
     prisma.$queryRawUnsafe<Array<{ constraintName: string; isValidated: boolean }>>(
       "SELECT conname AS \"constraintName\", convalidated AS \"isValidated\" FROM pg_constraint WHERE connamespace = 'public'::regnamespace",
@@ -438,17 +443,21 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
     }
     if (!actual.isValid || !actual.isReady) issues.push("invalid or not-ready index: " + expected.name);
     if (actual.isUnique !== expected.unique) issues.push("wrong uniqueness: " + expected.name);
-    if (expected.tableName && actual.tableName !== expected.tableName) issues.push("wrong index table: " + expected.name);
-    if (expected.accessMethod && actual.accessMethod !== expected.accessMethod) issues.push("wrong index access method: " + expected.name);
-    if (expected.keyExpressions && !sameExpressions(expected.keyExpressions, actual.keyExpressions)) {
+    const parsedActual = parseCreatedIndexes(actual.definition)[0];
+    if (
+      !parsedActual ||
+      (expected.tableName && parsedActual.tableName !== expected.tableName) ||
+      (expected.accessMethod && parsedActual.accessMethod !== expected.accessMethod) ||
+      (expected.keyExpressions && !sameExpressions(expected.keyExpressions, parsedActual.keyExpressions ?? [])) ||
+      (expected.includedExpressions && !sameExpressions(expected.includedExpressions, parsedActual.includedExpressions ?? []))
+    ) {
       issues.push("wrong index key definition: " + expected.name);
-    }
-    if (expected.includedExpressions && !sameExpressions(expected.includedExpressions, actual.includedExpressions)) {
-      issues.push("wrong index INCLUDE definition: " + expected.name);
     }
     if (expected.predicate !== undefined) {
       const expectedPredicate = expected.predicate === null ? null : normalizeSqlExpression(expected.predicate);
-      const actualPredicate = actual.predicate === null ? null : normalizeSqlExpression(actual.predicate);
+      const actualPredicate = parsedActual?.predicate === null || parsedActual?.predicate === undefined
+        ? null
+        : normalizeSqlExpression(parsedActual.predicate);
       if (expectedPredicate !== actualPredicate) issues.push("wrong index predicate: " + expected.name);
     }
   }
