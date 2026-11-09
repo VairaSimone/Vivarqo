@@ -1343,9 +1343,9 @@ paths:
                       properties:
                         id: { type: string, format: uuid }
                         endpoint: { type: string, format: uri }
-                        userAgent: { type: string, nullable: true }
+                        userAgent: { type: [string, 'null'] }
                         createdAt: { type: string, format: date-time }
-                        lastSuccessAt: { type: string, format: date-time, nullable: true }
+                        lastSuccessAt: { type: [string, 'null'], format: date-time }
     post:
       tags: [Notifications]
       summary: Registra una sottoscrizione browser
@@ -1435,7 +1435,7 @@ paths:
       operationId: getCompatibilityExport
       tags: [Exports]
       parameters:
-        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Id'
       responses:
         '200':
           $ref: '#/components/responses/JsonSuccess'
@@ -1446,7 +1446,7 @@ paths:
       operationId: downloadCompatibilityExport
       tags: [Exports]
       parameters:
-        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Id'
       responses:
         '200':
           description: Archivio ZIP dell'esportazione.
@@ -1604,7 +1604,7 @@ paths:
       operationId: listCycleClutches
       tags: [Reproduction]
       parameters:
-        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Id'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -1617,7 +1617,7 @@ paths:
       operationId: updateReproductiveEvent
       tags: [Reproduction]
       parameters:
-        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Id'
       requestBody:
         required: true
         content:
@@ -1657,7 +1657,7 @@ paths:
       operationId: deleteReproductiveEvent
       tags: [Reproduction]
       parameters:
-        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Id'
       responses:
         '204':
           description: Evento riproduttivo eliminato.

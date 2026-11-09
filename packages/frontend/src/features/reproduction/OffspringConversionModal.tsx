@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from "react";
 import type { OffspringBatchDto } from "@vivarqo/contracts/reproduction";
-import { api, ApiError } from "../lib/api";
-import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
-import type { Locale } from "../lib/domain";
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { api, ApiError } from "../../lib/api";
+import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmit }: {
   batch: OffspringBatchDto; locale: Locale; busy: boolean; onClose: () => void; onSubmit: (names: string[], species: string) => Promise<void>;
 }) {
