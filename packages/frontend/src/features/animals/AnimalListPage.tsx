@@ -3,6 +3,8 @@ import { api, ApiError } from "../lib/api";
 import { downloadQrSvg, qrMatrix } from "../lib/qr";
 import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
+import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, GeneticTraitDto, PublicShareDto, ShedDto, WeightDto } from "@vivarqo/contracts/animals";
+
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { RemoteSelect } from "../components/RemoteSelect";

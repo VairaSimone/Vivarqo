@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
+import type { CalendarItemDto, ReminderRuleDto, TaskDto } from "@vivarqo/contracts/operations";
+import { dateString } from "./date-utils";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { RemoteSelect } from "../components/RemoteSelect";
@@ -62,7 +64,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
-  async function updateTask(task: Item, action: "complete" | "dismiss" | "delete") {
+  async function updateTask(task: TaskDto, action: "complete" | "dismiss" | "delete") {
     const id = getString(task, "id");
     try {
       if (action === "complete") await api.post(`/tasks/${id}/complete`);

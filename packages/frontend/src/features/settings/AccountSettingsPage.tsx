@@ -2,11 +2,13 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString } from "../lib/domain";
 import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../lib/domain";
+import type { AccountPreferencesDto, BillingEntitlementsDto, BillingSubscriptionDto, NotificationDto, NotificationPreferencesDto, PushSubscriptionDto, SettingsUserDto } from "@vivarqo/contracts/settings";
+
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 export function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
-  locale: Locale; user: SettingsUserDto; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: User) => void;
+  locale: Locale; user: SettingsUserDto; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: SettingsUserDto) => void;
   onThemeChange: (theme: "system" | "light" | "dark") => void;
   onDisplayPreferencesChange: (preferences: { weightUnit: WeightUnit; temperatureUnit: TemperatureUnit; dateFormat: DateFormat; compactTables: boolean }) => void;
   navigate: (path: string) => void;
@@ -42,7 +44,7 @@ export function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdate
     try {
       const body: Record<string, string> = { displayName: profile.displayName, timezone: profile.timezone };
       if (emailChanged) { body.email = profile.email; body.currentPassword = profile.currentPassword; }
-      const result = await api.patch<{ user?: User }>("/account", body);
+      const result = await api.patch<{ user?: SettingsUserDto }>("/account", body);
       if (emailChanged) {
         showToast(locale === "it" ? "Richiesta inviata. Verifica il nuovo indirizzo email, poi accedi di nuovo." : "Request sent. Verify the new email address, then sign in again.");
         setProfile((current) => ({ ...current, currentPassword: "" }));
@@ -51,7 +53,7 @@ export function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdate
       }
       if (result.user) onUserUpdated(result.user);
       else {
-        const current = await api.get<{ user: User }>("/auth/me");
+        const current = await api.get<{ user: SettingsUserDto }>("/auth/me");
         onUserUpdated(current.user);
       }
       showToast(t("saveSuccess"));

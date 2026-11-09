@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatDateTime, getArray, getString } from "../lib/domain";
 import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../lib/domain";
+import type { AccountPreferencesDto, BillingEntitlementsDto, BillingSubscriptionDto, NotificationDto, NotificationPreferencesDto, PushSubscriptionDto, SettingsUserDto } from "@vivarqo/contracts/settings";
+
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
