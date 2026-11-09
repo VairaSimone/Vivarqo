@@ -208,7 +208,7 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
       "SELECT conname AS \"constraintName\", convalidated AS \"isValidated\" FROM pg_constraint WHERE connamespace = 'public'::regnamespace",
     ),
     prisma.$queryRawUnsafe<Array<{ triggerName: string; enabled: string }>>(
-      "SELECT t.tgname AS \"triggerName\", t.tgenabled AS \"enabled\" FROM pg_trigger t " +
+      "SELECT t.tgname AS \"triggerName\", t.tgenabled::text AS \"enabled\" FROM pg_trigger t " +
       "JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace " +
       "WHERE n.nspname = 'public' AND NOT t.tgisinternal",
     ),
