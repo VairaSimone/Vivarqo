@@ -330,7 +330,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const taskDialog = page.getByRole("dialog");
   await taskDialog.getByLabel("Titolo attività").fill("E2E Task follow-up");
   await taskDialog.getByLabel("Cerca scheda animale").fill(animalName);
-  await taskDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  await taskDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const taskCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
     response.url().endsWith("/api/v1/tasks") &&
@@ -360,7 +360,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await financeDialog.getByLabel("Valuta").fill("EUR");
   await financeDialog.getByLabel("Categoria").fill("Test E2E");
   await financeDialog.getByLabel("Descrizione").fill("E2E veterinary expense");
-  await financeDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  await financeDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const financeCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
     response.url().endsWith("/api/v1/finance/entries") &&
@@ -546,24 +546,18 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
-  const conversionPrompts = ["E2E Baby 1\nE2E Baby 2", "Python regius"];
-  let conversionPromptIndex = 0;
-  const acceptConversionPrompt = (dialog) => {
-    const value = conversionPrompts[conversionPromptIndex++];
-    if (value === undefined) {
-      void dialog.dismiss();
-      throw new Error("Unexpected extra prompt in offspring conversion flow");
-    }
-    void dialog.accept(value);
-  };
-  page.on("dialog", acceptConversionPrompt);
+  const conversionDialog = page.getByRole("dialog");
+  await conversionDialog.getByLabel("Specie").fill("Python regius");
+  await conversionDialog.getByLabel("Nome 1").fill("E2E Baby 1");
+  await conversionDialog.getByRole("button", { name: "Aggiungi un nome" }).click();
+  await conversionDialog.getByLabel("Nome 2").fill("E2E Baby 2");
   const conversionResponsePromise = page.waitForResponse((response) =>
-    response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") && response.request().method() === "POST"
+    response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") &&
+    response.request().method() === "POST" &&
+    response.status() === 201
   );
-  await page.getByRole("dialog").getByRole("button", { name: "Crea schede animali" }).click();
+  await conversionDialog.getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
-  page.off("dialog", acceptConversionPrompt);
-  expect(conversionPromptIndex).toBe(2);
   expect(babiesResponse.status()).toBe(201);
   const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
   const babyNames = (await animalsAfterConversion.json()).animals.map((item) => item.name);
