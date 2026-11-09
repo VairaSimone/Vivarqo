@@ -193,14 +193,14 @@ function normalizeSqlExpression(value: string): string {
       inString = true;
       normalized += character;
     } else if (character === '"') inIdentifier = true;
-    else if (/\\s/.test(character)) normalized += " ";
+    else if (/\s/.test(character)) normalized += " ";
     else normalized += character.toLowerCase();
   }
 
   normalized = normalized
-    .replace(/\\bpublic\\./g, "")
-    .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\\([^)]*\\))?/g, "")
-    .replace(/\\s+/g, " ")
+    .replace(/\bpublic\./g, "")
+    .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\([^)]*\))?/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 
   // pg_get_expr() may add parentheses around the complete predicate. Remove
