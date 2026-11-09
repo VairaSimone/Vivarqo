@@ -612,7 +612,13 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   await page.getByRole("button", { name: "Modifica" }).click();
   const documentEditDialog = page.getByRole("dialog");
   await documentEditDialog.getByLabel("Categoria").fill("Clinico");
+  const documentUpdatedResponsePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/documents/" + document.id) &&
+    response.request().method() === "PATCH" &&
+    response.status() === 200
+  );
   await documentEditDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await documentUpdatedResponsePromise;
   const updatedDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
   expect((await updatedDocuments.json()).documents.find((item) => item.id === document.id)?.category).toBe("Clinico");
 
