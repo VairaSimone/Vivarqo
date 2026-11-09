@@ -18,7 +18,15 @@ type ExpectedColumn = {
   scale?: number;
 };
 type ExpectedModel = { table: string; columns: ExpectedColumn[] };
-type ExpectedIndex = { name: string; unique: boolean };
+type ExpectedIndex = {
+  name: string;
+  unique: boolean;
+  tableName?: string;
+  accessMethod?: string;
+  keyExpressions?: string[];
+  includedExpressions?: string[];
+  predicate?: string | null;
+};
 type ExpectedSchema = {
   models: ExpectedModel[];
   indexes: ExpectedIndex[];
@@ -50,6 +58,155 @@ export type SchemaIntegrityReport = {
 function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
+
+
+function findMatchingParenthesis(value: string, openIndex: number): number {
+  let depth = 0;
+  let inString = false;
+  let inIdentifier = false;
+  for (let index = openIndex; index < value.length; index += 1) {
+    const character = value[index]!;
+    const next = value[index + 1];
+    if (inString) {
+      if (character === "'" && next === "'") index += 1;
+      else if (character === "'") inString = false;
+      continue;
+    }
+    if (inIdentifier) {
+      if (character === '"' && next === '"') index += 1;
+      else if (character === '"') inIdentifier = false;
+      continue;
+    }
+    if (character === "'") inString = true;
+    else if (character === '"') inIdentifier = true;
+    else if (character === "(") depth += 1;
+    else if (character === ")") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function splitTopLevelExpressions(value: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let depth = 0;
+  let inString = false;
+  let inIdentifier = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    const next = value[index + 1];
+    if (inString) {
+      if (character === "'" && next === "'") index += 1;
+      else if (character === "'") inString = false;
+      continue;
+    }
+    if (inIdentifier) {
+      if (character === '"' && next === '"') index += 1;
+      else if (character === '"') inIdentifier = false;
+      continue;
+    }
+    if (character === "'") inString = true;
+    else if (character === '"') inIdentifier = true;
+    else if (character === "(") depth += 1;
+    else if (character === ")") depth -= 1;
+    else if (character === "," && depth === 0) {
+      parts.push(value.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+  const finalPart = value.slice(start).trim();
+  if (finalPart) parts.push(finalPart);
+  return parts;
+}
+
+function parseCreatedIndexes(sql: string): ExpectedIndex[] {
+  const indexes: ExpectedIndex[] = [];
+  const declaration = /\bCREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"((?:[^"]|"")*)"|([A-Za-z_]\w*))/gi;
+  for (const match of sql.matchAll(declaration)) {
+    const name = (match[2] ?? match[3]!).replace(/""/g, '"');
+    const suffixStart = match.index! + match[0].length;
+    const suffix = sql.slice(suffixStart);
+    const onClause = suffix.match(
+      /^\s+ON\s+(?:(?:"([^"]+)"|([A-Za-z_]\w*))\s*\.\s*)?(?:"([^"]+)"|([A-Za-z_]\w*))\s*(?:USING\s+([A-Za-z_]\w*)\s*)?\(/i,
+    );
+    if (!onClause) throw new Error("Could not parse CREATE INDEX table and key list for index " + name + ".");
+    const openIndex = suffixStart + onClause[0].lastIndexOf("(");
+    const closeIndex = findMatchingParenthesis(sql, openIndex);
+    if (closeIndex < 0) throw new Error("Unclosed key list in CREATE INDEX " + name + ".");
+    const keyExpressions = splitTopLevelExpressions(sql.slice(openIndex + 1, closeIndex));
+    if (keyExpressions.length === 0) throw new Error("CREATE INDEX " + name + " has no key expressions.");
+
+    let cursor = closeIndex + 1;
+    const includeClause = sql.slice(cursor).match(/^\s*INCLUDE\s*\(/i);
+    let includedExpressions: string[] = [];
+    if (includeClause) {
+      const includeOpen = cursor + includeClause[0].lastIndexOf("(");
+      const includeClose = findMatchingParenthesis(sql, includeOpen);
+      if (includeClose < 0) throw new Error("Unclosed INCLUDE list in CREATE INDEX " + name + ".");
+      includedExpressions = splitTopLevelExpressions(sql.slice(includeOpen + 1, includeClose));
+      cursor = includeClose + 1;
+    }
+    const predicateMatch = sql.slice(cursor).match(/^\s*WHERE\s+([\s\S]*?)(?:;|$)/i);
+    const schemaName = onClause[1] ?? onClause[2];
+    if (schemaName && schemaName !== "public") {
+      throw new Error("CREATE INDEX " + name + " targets unsupported schema " + schemaName + ".");
+    }
+    indexes.push({
+      name,
+      unique: Boolean(match[1]),
+      tableName: (onClause[3] ?? onClause[4])!,
+      accessMethod: (onClause[5] ?? "btree").toLowerCase(),
+      keyExpressions,
+      includedExpressions,
+      predicate: predicateMatch?.[1]?.trim() ?? null,
+    });
+  }
+  return indexes;
+}
+
+function normalizeSqlExpression(value: string): string {
+  let normalized = "";
+  let inString = false;
+  let inIdentifier = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]!;
+    const next = value[index + 1];
+    if (inString) {
+      normalized += character;
+      if (character === "'" && next === "'") {
+        normalized += next;
+        index += 1;
+      } else if (character === "'") inString = false;
+      continue;
+    }
+    if (inIdentifier) {
+      if (character === '"' && next === '"') {
+        normalized += '"';
+        index += 1;
+      } else if (character === '"') inIdentifier = false;
+      else normalized += character;
+      continue;
+    }
+    if (character === "'") {
+      inString = true;
+      normalized += character;
+    } else if (character === '"') inIdentifier = true;
+    else if (!/\s/.test(character)) normalized += character.toLowerCase();
+  }
+  return normalized
+    .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?:with|without)timezone|numeric)(?:\([^)]*\))?/g, "")
+    .replace(/[()]/g, "");
+}
+
+function sameExpressions(expected: string[], actual: string[]): boolean {
+  return expected.length === actual.length &&
+    expected.every((expression, index) =>
+      normalizeSqlExpression(expression) === normalizeSqlExpression(actual[index] ?? ""),
+    );
+}
+
 
 function loadMigrations(): Array<{ name: string; sql: string }> {
   return readdirSync(migrationsPath, { withFileTypes: true })
@@ -155,10 +312,10 @@ function parseExpectedSchema(): ExpectedSchema {
   }
 
   const allSql = migrations.map((migration) => migration.sql).join("\n");
-  const indexes = new Map<string, boolean>();
+  const indexes = new Map<string, ExpectedIndex>();
   for (const migration of migrations) {
-    for (const match of migration.sql.matchAll(/CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"([^"]+)"|([A-Za-z_]\w*))/gi)) {
-      indexes.set(match[2] ?? match[3]!, Boolean(match[1]));
+    for (const expectedIndex of parseCreatedIndexes(migration.sql)) {
+      indexes.set(expectedIndex.name, expectedIndex);
     }
   }
 
@@ -172,17 +329,17 @@ function parseExpectedSchema(): ExpectedSchema {
     if (!tableName) continue;
     const compositePrimaryKey = body.match(/@@id\([^\n]*map:\s*"([^"]+)"/)?.[1];
     if (compositePrimaryKey) {
-      indexes.set(compositePrimaryKey, true);
+      indexes.set(compositePrimaryKey, { name: compositePrimaryKey, unique: true });
       constraints.push(compositePrimaryKey);
     } else if (/@id\b/.test(body)) {
-      indexes.set(tableName + "_pkey", true);
+      indexes.set(tableName + "_pkey", { name: tableName + "_pkey", unique: true });
       constraints.push(tableName + "_pkey");
     }
   }
 
   return {
     models,
-    indexes: [...indexes].map(([name, isUnique]) => ({ name, unique: isUnique })),
+    indexes: [...indexes.values()],
     constraints: unique(constraints),
     triggers: unique([...allSql.matchAll(/CREATE\s+TRIGGER\s+"?([A-Za-z_]\w*)"?/gi)].map((match) => match[1]!)),
     functions: unique([...allSql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+"?([A-Za-z_]\w*)"?/gi)].map((match) => match[1]!)),
@@ -202,10 +359,26 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
       "numeric_precision AS \"numericPrecision\", numeric_scale AS \"numericScale\" " +
       "FROM information_schema.columns WHERE table_schema = 'public'",
     ),
-    prisma.$queryRawUnsafe<Array<{ indexName: string; isValid: boolean; isReady: boolean; isUnique: boolean }>>(
-      "SELECT idx.relname AS \"indexName\", i.indisvalid AS \"isValid\", i.indisready AS \"isReady\", i.indisunique AS \"isUnique\" " +
+    prisma.$queryRawUnsafe<Array<{
+      indexName: string;
+      isValid: boolean;
+      isReady: boolean;
+      isUnique: boolean;
+      tableName: string;
+      accessMethod: string;
+      keyExpressions: string[];
+      includedExpressions: string[];
+      predicate: string | null;
+    }>>(
+      "SELECT idx.relname AS \"indexName\", i.indisvalid AS \"isValid\", i.indisready AS \"isReady\", " +
+      "i.indisunique AS \"isUnique\", tbl.relname AS \"tableName\", am.amname AS \"accessMethod\", " +
+      "ARRAY(SELECT pg_get_indexdef(i.indexrelid, key_positions.position, true) " +
+      "FROM generate_series(1, i.indnkeyatts) AS key_positions(position) ORDER BY key_positions.position) AS \"keyExpressions\", " +
+      "ARRAY(SELECT pg_get_indexdef(i.indexrelid, include_positions.position, true) " +
+      "FROM generate_series(i.indnkeyatts + 1, i.indnatts) AS include_positions(position) ORDER BY include_positions.position) AS \"includedExpressions\", " +
+      "pg_get_expr(i.indpred, i.indrelid) AS \"predicate\" " +
       "FROM pg_index i JOIN pg_class idx ON idx.oid = i.indexrelid JOIN pg_class tbl ON tbl.oid = i.indrelid " +
-      "JOIN pg_namespace n ON n.oid = tbl.relnamespace WHERE n.nspname = 'public'",
+      "JOIN pg_am am ON am.oid = idx.relam JOIN pg_namespace n ON n.oid = tbl.relnamespace WHERE n.nspname = 'public'",
     ),
     prisma.$queryRawUnsafe<Array<{ constraintName: string; isValidated: boolean }>>(
       "SELECT conname AS \"constraintName\", convalidated AS \"isValidated\" FROM pg_constraint WHERE connamespace = 'public'::regnamespace",
@@ -265,6 +438,19 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
     }
     if (!actual.isValid || !actual.isReady) issues.push("invalid or not-ready index: " + expected.name);
     if (actual.isUnique !== expected.unique) issues.push("wrong uniqueness: " + expected.name);
+    if (expected.tableName && actual.tableName !== expected.tableName) issues.push("wrong index table: " + expected.name);
+    if (expected.accessMethod && actual.accessMethod !== expected.accessMethod) issues.push("wrong index access method: " + expected.name);
+    if (expected.keyExpressions && !sameExpressions(expected.keyExpressions, actual.keyExpressions)) {
+      issues.push("wrong index key definition: " + expected.name);
+    }
+    if (expected.includedExpressions && !sameExpressions(expected.includedExpressions, actual.includedExpressions)) {
+      issues.push("wrong index INCLUDE definition: " + expected.name);
+    }
+    if (expected.predicate !== undefined) {
+      const expectedPredicate = expected.predicate === null ? null : normalizeSqlExpression(expected.predicate);
+      const actualPredicate = actual.predicate === null ? null : normalizeSqlExpression(actual.predicate);
+      if (expectedPredicate !== actualPredicate) issues.push("wrong index predicate: " + expected.name);
+    }
   }
 
   const actualConstraints = new Map(constraints.map((item) => [item.constraintName, item]));

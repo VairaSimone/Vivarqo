@@ -75,4 +75,8 @@ DATABASE_URL="$DRIFTED_URL" pnpm db:ensure
 psql "$DRIFTED_URL" -v ON_ERROR_STOP=1 -c 'DROP INDEX public.animals_user_name_idx;' >/dev/null
 expect_ensure_failure "$DRIFTED_URL" "missing index: animals_user_name_idx"
 
+echo "Schema drill 4b/4: an index with the expected name but wrong key definition is rejected."
+psql "$DRIFTED_URL" -v ON_ERROR_STOP=1 -c 'CREATE INDEX animals_user_name_idx ON animals (user_id);' >/dev/null
+expect_ensure_failure "$DRIFTED_URL" "wrong index key definition: animals_user_name_idx"
+
 echo "Database schema initialization drill passed."
