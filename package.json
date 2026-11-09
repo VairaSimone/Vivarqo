@@ -7,12 +7,12 @@
     "node": ">=24.11.0 <25"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @vivarqo/api dev",
-    "dev:worker": "pnpm --filter @vivarqo/api exec tsx src/worker.ts",
+    "dev:api": "pnpm contracts:build && pnpm --filter @vivarqo/api dev",
+    "dev:worker": "pnpm contracts:build && pnpm --filter @vivarqo/api exec tsx src/worker.ts",
     "db:generate": "prisma generate --config backend/prisma.config.ts",
     "db:migrate:deploy": "prisma migrate deploy --config backend/prisma.config.ts",
     "db:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
-    "check:openapi": "node backend/scripts/check-openapi.mjs",
+    "check:openapi": "node backend/scripts/check-openapi.mjs && npx --yes @redocly/cli@2.76.0 lint --extends=minimal docs/openapi.yaml",
     "test": "pnpm test:api && pnpm test:frontend",
     "typecheck": "pnpm typecheck:api && pnpm typecheck:frontend",
     "build": "pnpm build:api && pnpm build:frontend",

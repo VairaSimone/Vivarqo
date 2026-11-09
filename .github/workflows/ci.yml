@@ -46,8 +46,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Verify OpenAPI operations match mounted backend routes
-        run: node backend/scripts/check-openapi.mjs
+      - name: Verify OpenAPI routes and specification structure
+        run: pnpm check:openapi
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
@@ -143,6 +143,8 @@ jobs:
         run: pnpm db:generate
       - name: Apply migrations to isolated E2E database
         run: pnpm db:ensure
+      - name: Build shared contracts for runtime API and worker
+        run: pnpm contracts:build
       - name: Seed isolated browser accounts
         run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts
       - name: Start real API

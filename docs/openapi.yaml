@@ -1430,6 +1430,33 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/JsonSuccess'
+  /api/v1/account/export/{id}:
+    get:
+      operationId: getCompatibilityExport
+      tags: [Exports]
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/account/export/{id}/download:
+    get:
+      operationId: downloadCompatibilityExport
+      tags: [Exports]
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+      responses:
+        '200':
+          description: Archivio ZIP dell'esportazione.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/Error'
   /api/v1/account/export:
     post:
       tags: [Exports]
