@@ -1,9 +1,7 @@
-import type { Locale, WeightUnit, TemperatureUnit, DateFormat } from "../../frontend/src/lib/domain";
-
 export interface AccountPreferencesDto {
-  weightUnit: WeightUnit | string;
-  temperatureUnit: TemperatureUnit | string;
-  dateFormat: DateFormat | string;
+  weightUnit: "g" | "kg" | "oz" | "lb" | string;
+  temperatureUnit: "c" | "f" | string;
+  dateFormat: "locale" | "dd/MM/yyyy" | "yyyy-MM-dd" | string;
   defaultLandingPage: string;
   compactTables: boolean;
   theme: "system" | "light" | "dark" | string;
@@ -44,13 +42,16 @@ export interface BillingSubscriptionDto {
 
 export interface BillingEntitlementsDto {
   plan?: string;
-  [key: string]: unknown;
+  maxAnimals?: number | null;
+  maxDocuments?: number | null;
+  maxStorageBytes?: number | null;
+  features?: string[];
 }
 
 export interface SettingsUserDto {
   id: string;
   email: string;
   displayName: string;
-  locale: Locale;
+  locale: "it" | "en";
   timezone: string;
 }
