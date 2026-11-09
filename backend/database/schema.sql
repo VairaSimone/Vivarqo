@@ -860,7 +860,7 @@ CREATE INDEX document_deletion_jobs_user_created_idx
 -- Tenant guard for the document deletion outbox: owner and storage key must
 -- match the soft-deleted document referenced by the job.
 CREATE OR REPLACE FUNCTION vivarqo_check_document_deletion_tenant_consistency()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $vivarqo$
 DECLARE
     document_owner_id UUID;
     document_storage_key TEXT;
@@ -878,7 +878,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$vivarqo$ LANGUAGE plpgsql;
 
 CREATE TRIGGER document_deletion_jobs_tenant_guard
     BEFORE INSERT OR UPDATE ON document_deletion_jobs
