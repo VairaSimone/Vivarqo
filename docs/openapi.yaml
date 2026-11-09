@@ -1024,7 +1024,7 @@ paths:
   /api/v1/documents:
     get:
       tags: [Documents]
-      summary: Elenca i documenti privati
+      summary: Elenca i documenti privati (sizeBytes è una stringa decimale)
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
@@ -1081,12 +1081,37 @@ paths:
           $ref: '#/components/responses/JsonSuccess'
     delete:
       tags: [Documents]
-      summary: Elimina un documento privato
+      summary: Accoda l'eliminazione logica e fisica di un documento privato
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
       responses:
-        '204':
-          description: Documento eliminato.
+        '202':
+          description: Documento rimosso dall'elenco; l'eliminazione dello storage è gestita dal worker.
+          content:
+            application/json:
+              schema: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/document-deletions:
+    get:
+      tags: [Documents]
+      summary: Consulta lo stato delle eliminazioni fisiche dei documenti
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+  /api/v1/document-deletions/{id}/retry:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Documents]
+      summary: Riaccoda un'eliminazione documentale fallita
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '202':
+          $ref: '#/components/responses/JsonSuccess'
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/animals/{id}/public-share:
     get:
       tags: [Documents]
