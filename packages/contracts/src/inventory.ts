@@ -17,7 +17,7 @@ export interface InventoryMovementDto {
   movementType: "in" | "out" | "set";
   quantity: number;
   occurredAt: string;
-  unitCost: number | null;
+  unitCostCents?: number | null;
   reference: string | null;
   notes: string | null;
 }
@@ -32,6 +32,8 @@ export interface DocumentDto {
   createdAt: string;
   updatedAt: string;
   status?: "active" | "pending_deletion" | "deleted";
+  animal?: { id: string; name: string } | null;
+  cycle?: { id: string; name: string | null } | null;
 }
 
 export interface DocumentDeletionJobDto {

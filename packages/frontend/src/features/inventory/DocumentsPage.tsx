@@ -57,7 +57,7 @@ export function DocumentsPage({ locale, path, navigate }: { locale: Locale; path
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
-  async function remove(document: Item) {
+  async function remove(document: DocumentDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try {
       await api.delete(`/documents/${getString(document, "id")}`);

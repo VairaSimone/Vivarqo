@@ -11,6 +11,18 @@
     "./inventory": {
       "types": "./dist/inventory.d.ts",
       "import": "./dist/inventory.js"
+    },
+    "./animals": {
+      "types": "./dist/animals.d.ts",
+      "import": "./dist/animals.js"
+    },
+    "./operations": {
+      "types": "./dist/operations.d.ts",
+      "import": "./dist/operations.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
     }
   },
   "scripts": {
