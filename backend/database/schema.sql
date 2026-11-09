@@ -816,7 +816,7 @@ CREATE TABLE push_delivery_attempts (
     http_status           INTEGER,
     error_code            VARCHAR(80),
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE UNIQUE INDEX push_delivery_attempts_delivery_attempt_unique
     ON push_delivery_attempts (delivery_key, attempt_number);
