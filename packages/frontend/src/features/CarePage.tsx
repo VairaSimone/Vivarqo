@@ -129,7 +129,18 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
               return <div className="feeding-entry" key={getString(entry, "id")}>
                 <div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{getString(animal, "name") || t("noRecords")}</strong><small>{getString(animal, "species")}</small></span></div>
                 <div className="feeding-detail"><Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge><span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>{entry.foodWeightG ? <small>{formatWeight(String(entry.foodWeightG), locale)}</small> : null}</div>
-                <div className="row-actions"><IconButton label={t("edit")} onClick={() => { setError(""); setEditData({ outcome: outcomeValue, foodType: getString(entry, "foodType"), foodSize: getString(entry, "foodSize"), foodWeightG: String(gramsToWeight(getString(entry, "foodWeightG"))), notes: getString(entry, "notes") }); setEditEntry(entry); }}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEntry(entry)}><Icon name="trash" size={15} /></IconButton></div>
+                <div className="row-actions"><IconButton label={t("edit")} onClick={() => {
+                  setError("");
+                  const foodWeightValue = getString(entry, "foodWeightG");
+                  setEditData({
+                    outcome: outcomeValue,
+                    foodType: getString(entry, "foodType"),
+                    foodSize: getString(entry, "foodSize"),
+                    foodWeightG: foodWeightValue ? String(gramsToWeight(foodWeightValue)) : "",
+                    notes: getString(entry, "notes"),
+                  });
+                  setEditEntry(entry);
+                }}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEntry(entry)}><Icon name="trash" size={15} /></IconButton></div>
               </div>;
             })}</div>
             {getString(session, "notes") && <p className="muted-note">{getString(session, "notes")}</p>}

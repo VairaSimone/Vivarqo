@@ -316,7 +316,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(editedEntry?.outcome).toBe("refused");
 
   page.once("dialog", (dialog) => dialog.accept());
+  const feedingDeletedResponse = page.waitForResponse((response) =>
+    response.request().method() === "DELETE" &&
+    response.url().includes("/api/v1/feeding-entries/" + feedingEntry.id) &&
+    response.status() === 204
+  );
   await page.getByRole("button", { name: "Elimina" }).click();
+  await feedingDeletedResponse;
   const deletedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect((await deletedFeedings.json()).sessions.flatMap((session) => session.entries).some((entry) => entry.id === feedingEntry.id)).toBe(false);
 
@@ -325,13 +331,25 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await taskDialog.getByLabel("Titolo attività").fill("E2E Task follow-up");
   await taskDialog.getByLabel("Cerca scheda animale").fill(animalName);
   await taskDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  const taskCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().endsWith("/api/v1/tasks") &&
+    response.status() === 201
+  );
   await taskDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await taskCreatedResponse;
   const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
   expect(tasksResponse.status()).toBe(200);
   const tasksBody = await tasksResponse.json();
   const task = tasksBody.tasks.find((item) => item.title === "E2E Task follow-up");
   expect(task?.id).toBeTruthy();
+  const taskCompletedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/tasks/" + task.id + "/complete") &&
+    response.status() === 200
+  );
   await page.getByRole("button", { name: "Completata" }).click();
+  await taskCompletedResponse;
   const completedTasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=completed");
   expect((await completedTasksResponse.json()).tasks.some((item) => item.id === task.id && item.status === "completed")).toBe(true);
 
@@ -343,7 +361,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await financeDialog.getByLabel("Categoria").fill("Test E2E");
   await financeDialog.getByLabel("Descrizione").fill("E2E veterinary expense");
   await financeDialog.getByLabel("Scheda animale").selectOption(animal.id);
+  const financeCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().endsWith("/api/v1/finance/entries") &&
+    response.status() === 201
+  );
   await financeDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await financeCreatedResponse;
   const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
   expect(financeResponse.status()).toBe(200);
   const financeBody = await financeResponse.json();
@@ -357,7 +381,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await inventoryDialog.getByLabel("Unità").fill("kg");
   await inventoryDialog.getByLabel("Giacenza").fill("2");
   await inventoryDialog.getByLabel("Scorta minima").fill("1");
+  const inventoryCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().endsWith("/api/v1/inventory/items") &&
+    response.status() === 201
+  );
   await inventoryDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await inventoryCreatedResponse;
   const inventoryResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=true");
   expect(inventoryResponse.status()).toBe(200);
   const inventoryBody = await inventoryResponse.json();
@@ -369,14 +399,26 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.getByLabel("Tipo movimento").selectOption("in");
   await page.getByLabel("Giacenza").fill("1");
   await page.getByLabel("Costo unitario (€)").fill("5.00");
+  const movementCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/movements") &&
+    response.status() === 201
+  );
   await page.getByRole("button", { name: "Registra movimento" }).click();
+  await movementCreatedResponse;
   const movementsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items/" + stockItem.id + "/movements?page=1&pageSize=100");
   expect(movementsResponse.status()).toBe(200);
   const movementsBody = await movementsResponse.json();
   expect(movementsBody.movements.some((movement) => movement.movementType === "in" && Number(movement.quantity) === 1)).toBe(true);
 
   page.once("dialog", (dialog) => dialog.accept());
+  const itemArchivedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/archive") &&
+    response.status() === 200
+  );
   await page.getByRole("button", { name: "Archivia" }).click();
+  await itemArchivedResponse;
   const archivedResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=false");
   expect(archivedResponse.status()).toBe(200);
   expect((await archivedResponse.json()).items.some((item) => item.id === stockItem.id && item.isActive === false)).toBe(true);
@@ -460,7 +502,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Registra uova" }).click();
   const eggsDialog = page.getByRole("dialog");
   await eggsDialog.getByLabel("Codice uovo").fill("E2E-EGG-01\nE2E-EGG-02");
+  const eggsCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/clutches/" + clutch.id + "/eggs") &&
+    response.status() === 201
+  );
   await eggsDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await eggsCreatedResponse;
   let clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   expect((await clutchResponse.json()).clutch.eggs.length).toBe(2);
 
@@ -468,7 +516,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const incubationDialog = page.getByRole("dialog");
   await incubationDialog.getByLabel("Temperatura (°C)").fill("31");
   await incubationDialog.getByLabel("Umidità (%)").fill("70");
+  const incubationCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/clutches/" + clutch.id + "/incubation-logs") &&
+    response.status() === 201
+  );
   await incubationDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await incubationCreatedResponse;
   clutchResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/clutches/" + clutch.id);
   const clutchDetail = (await clutchResponse.json()).clutch;
   expect(clutchDetail.incubationLogs.some((log) => Number(log.temperatureC) === 31 && Number(log.humidityPct) === 70)).toBe(true);
@@ -480,7 +534,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await offspringDialog.getByLabel("Data nascita").fill("2026-11-02");
   await offspringDialog.getByLabel("Covate").selectOption(clutch.id);
   await offspringDialog.getByLabel("Numero piccoli").fill("2");
+  const offspringCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().endsWith("/api/v1/offspring-batches") &&
+    response.status() === 201
+  );
   await offspringDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await offspringCreatedResponse;
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   const cycleAfterBirth = (await cycleDetailResponse.json()).cycle;
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
