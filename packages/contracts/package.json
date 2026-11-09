@@ -1,0 +1,13 @@
+{
+  "name": "@vivarqo/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./reproduction": "./src/reproduction.ts",
+    "./inventory": "./src/inventory.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  }
+}

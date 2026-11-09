@@ -12,6 +12,7 @@
     "db:generate": "prisma generate --config backend/prisma.config.ts",
     "db:migrate:deploy": "prisma migrate deploy --config backend/prisma.config.ts",
     "db:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
+    "check:openapi": "node backend/scripts/check-openapi.mjs",
     "test": "pnpm test:api && pnpm test:frontend",
     "typecheck": "pnpm typecheck:api && pnpm typecheck:frontend",
     "build": "pnpm build:api && pnpm build:frontend",

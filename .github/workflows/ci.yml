@@ -46,6 +46,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Verify OpenAPI operations match mounted backend routes
+        run: node backend/scripts/check-openapi.mjs
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client

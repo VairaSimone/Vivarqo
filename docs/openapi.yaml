@@ -1539,6 +1539,104 @@ paths:
           $ref: '#/components/responses/JsonSuccess'
         '400':
           $ref: '#/components/responses/Error'
+  /api/v1/account/preferences:
+    get:
+      operationId: getAccountPreferences
+      tags: [Account]
+      responses:
+        '200':
+          description: Preferenze dell'account corrente.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [preferences]
+                properties:
+                  preferences:
+                    type: object
+                    additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateAccountPreferences
+      tags: [Account]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/reproduction-cycles/{id}/clutches:
+    get:
+      operationId: listCycleClutches
+      tags: [Reproduction]
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/reproductive-events/{id}:
+    patch:
+      operationId: updateReproductiveEvent
+      tags: [Reproduction]
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                eventType:
+                  type: string
+                  enum: [pairing, observation, ovulation, gravid, laying, live_birth, incubation_start, hatch, loss, other]
+                occurredAt:
+                  type: string
+                  format: date-time
+                animalId:
+                  type: [string, 'null']
+                  format: uuid
+                details:
+                  type: [string, 'null']
+                  maxLength: 20000
+                temperatureC:
+                  type: [number, 'null']
+                  minimum: -100
+                  maximum: 100
+                humidityPct:
+                  type: [number, 'null']
+                  minimum: 0
+                  maximum: 100
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonSuccess'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteReproductiveEvent
+      tags: [Reproduction]
+      parameters:
+        - $ref: '#/components/parameters/UuidId'
+      responses:
+        '204':
+          description: Evento riproduttivo eliminato.
+        '404':
+          $ref: '#/components/responses/Error'
+
 components:
   securitySchemes:
     sessionCookieDev:
