@@ -104,6 +104,13 @@ export const offspringSchema = z.object({
   notes: z.string().trim().max(20_000).nullable().optional(),
 }).strict();
 
+export const patchOffspringSchema = z.object({
+  clutchId: nullableUuid,
+  bornOn: dateOnly.optional(),
+  count: z.coerce.number().int().min(0).max(10_000).optional(),
+  notes: z.string().trim().max(20_000).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+
 export const newAnimalSchema = z.object({
   name: z.string().trim().min(1).max(120),
   identifier: z.string().trim().max(120).nullable().optional(),

@@ -15,6 +15,7 @@ import {
   patchEggSchema,
   incubationSchema,
   offspringSchema,
+  patchOffspringSchema,
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
   reproductionCycleStatusSchema,
@@ -463,12 +464,7 @@ export function createReproductionRouter() {
   router.patch("/offspring-batches/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const batchId = routeUuid(req.params.id, "offspring batch id");
-    const input = parseBody(z.object({
-      clutchId: nullableUuid,
-      bornOn: dateOnly.optional(),
-      count: z.coerce.number().int().min(0).max(10_000).optional(),
-      notes: z.string().trim().max(20_000).nullable().optional(),
-    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const input = parseBody(patchOffspringSchema, req.body);
     const existing = await prisma.offspringBatch.findFirst({
       where: { id: batchId, cycle: { is: { userId: auth.userId } } },
     });
