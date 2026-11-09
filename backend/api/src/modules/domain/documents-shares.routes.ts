@@ -92,7 +92,13 @@ export function createDocumentShareRouter() {
         },
       }),
     ]);
-    res.status(200).json({ documents, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
+    // Prisma returns BigInt for sizeBytes; JSON.stringify cannot serialize BigInt.
+    // Keep the wire contract consistent with POST/PATCH by exposing an exact decimal string.
+    const serializedDocuments = documents.map((document) => ({
+      ...document,
+      sizeBytes: document.sizeBytes.toString(),
+    }));
+    res.status(200).json({ documents: serializedDocuments, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/documents", requireSession, uploadBody, async (req, res) => {

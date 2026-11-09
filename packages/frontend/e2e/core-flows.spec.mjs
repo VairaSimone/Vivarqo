@@ -289,7 +289,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await feedingDialog.getByRole("checkbox", { name: new RegExp(animalName) }).check();
   await feedingDialog.getByLabel("Esito").selectOption("ate");
   await feedingDialog.getByRole("textbox", { name: "Alimento" }).fill("Rat");
+  const feedingCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && response.url().includes("/api/v1/feeding-sessions") && response.status() === 201
+  );
   await feedingDialog.getByRole("button", { name: "Registra sessione" }).click();
+  await feedingCreatedResponse;
   const feedingResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect(feedingResponse.status()).toBe(200);
   const feedingBody = await feedingResponse.json();
@@ -420,7 +424,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await eventDialog.getByLabel("Tipo evento").selectOption("pairing");
   await eventDialog.getByLabel("Cerca scheda animale").fill(parentNames[0]);
   await eventDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(parentA.id);
+  const eventCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().includes("/api/v1/reproduction-cycles/" + cycle.id + "/events") &&
+    response.status() === 201
+  );
   await eventDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await eventCreatedResponse;
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   expect((await cycleDetailResponse.json()).cycle.events.some((event) => event.eventType === "pairing")).toBe(true);
 
@@ -431,7 +441,11 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await clutchDialog.getByLabel("Numero uova").fill("2");
   await clutchDialog.getByLabel("Stato").fill("incubating");
   await clutchDialog.getByLabel("Incubatore").fill("E2E Incubator");
+  const clutchCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && response.url().includes("/api/v1/clutches") && response.status() === 201
+  );
   await clutchDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await clutchCreatedResponse;
   cycleDetailResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/reproduction-cycles/" + cycle.id);
   const clutch = (await cycleDetailResponse.json()).cycle.clutches.find((item) => item.incubatorLabel === "E2E Incubator");
   expect(clutch?.id).toBeTruthy();

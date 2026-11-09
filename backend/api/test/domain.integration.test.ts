@@ -194,6 +194,11 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send(pdf)
       .expect(201);
     const docId = upload.body.document.id as string;
+    expect(upload.body.document.sizeBytes).toBe(String(pdf.length));
+    const listedDocuments = await owner.agent.get(`/api/v1/documents?animalId=${animal.id}`).expect(200);
+    const listedDocument = listedDocuments.body.documents.find((document: { id: string }) => document.id === docId);
+    expect(listedDocument).toBeDefined();
+    expect(listedDocument.sizeBytes).toBe(String(pdf.length));
     const docDownload = await other.agent.get(`/api/v1/documents/${docId}/download`).expect(404);
     expect(docDownload.body.code).toBe("DOCUMENT_NOT_FOUND");
     const downloaded = await owner.agent.get(`/api/v1/documents/${docId}/download`).expect(200);
