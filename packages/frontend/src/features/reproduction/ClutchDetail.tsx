@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { ClutchDetailDto, EggDto, IncubationLogDto } from "@vivarqo/contracts/reproduction";
+import { EggManagement } from "./EggManagement";
+import { IncubationLogs } from "./IncubationLogs";
 import { api, ApiError } from "../lib/api";
 import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -73,12 +75,8 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     <div className="back-row"><button className="text-link" onClick={() => navigate(`/reproduction-cycles/${getString(cycle, "id")}`)}>← {getString(cycle, "name") || t("cycles")}</button></div>
     <PageHeader eyebrow={t("clutches")} title={formatDate(getString(clutch, "laidOn"), locale)} description={`${getString(clutch, "eggCount")} ${t("eggs")} · ${getString(clutch, "incubatorLabel") || "—"}`} action={<Button onClick={() => openLog()}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
     <div className="detail-grid">
-      <Panel><PanelHeader title={t("eggs")} action={<Button size="sm" onClick={() => setMode("eggs")}><Icon name="plus" />{t("addEggs")}</Button>} />
-        {eggs.length ? <div className="egg-grid">{eggs.map((egg) => <div className="egg-card" key={getString(egg, "id")}><span><Icon name="egg" size={18} /></span><strong>{getString(egg, "code") || "—"}</strong><Badge>{getString(egg, "status")}</Badge><div className="row-actions"><IconButton label={t("edit")} onClick={() => setEditingEgg(egg)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEgg(egg)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
-      </Panel>
-      <Panel><PanelHeader title={t("incubation")} action={<Button size="sm" onClick={() => setMode("log")}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
-        {logs.length ? <div className="record-list">{logs.map((log) => <div className="record-row" key={getString(log, "id")}><div><strong>{getString(log, "eventType")}</strong><small>{formatDateTime(getString(log, "recordedAt"), locale)}</small><p>{getString(log, "temperatureC") ? formatTemperature(getString(log, "temperatureC"), locale) : "—"} · {getString(log, "humidityPct") ? `${getString(log, "humidityPct")} %` : "—"}</p><small>{getString(log, "notes")}</small></div><div className="row-actions"><IconButton label={t("edit")} onClick={() => openLog(log)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteLog(log)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
-      </Panel>
+      <EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} />
+      <IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />
     </div>
     {mode === "eggs" && <Modal title={t("addEggs")} onClose={() => setMode(null)}><form className="form-stack" onSubmit={addEggs}>{error && <Alert tone="danger">{error}</Alert>}<Field label={t("eggCode")} hint={locale === "it" ? "Un codice per riga; ogni riga crea un uovo." : "One code per line; each line creates one egg."}><Textarea rows={5} value={eggLines} onChange={(e) => setEggLines(e.target.value)} /></Field><div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div></form></Modal>}
     {mode === "log" && <Modal title={editingLog ? t("edit") : t("addIncubationLog")} onClose={() => { setEditingLog(null); setMode(null); }}><form className="form-stack" onSubmit={addLog}>{error && <Alert tone="danger">{error}</Alert>}

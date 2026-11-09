@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import type { ClutchDto, OffspringBatchDto, ReproductiveEventDto, ReproductionCycleDto } from "@vivarqo/contracts/reproduction";
 import { eventTypes } from "./types";
 import { OffspringConversionModal } from "./OffspringConversionModal";
+import { ReproductiveEventEditor } from "./ReproductiveEventEditor";
+import { ClutchEditor } from "./ClutchEditor";
+import { OffspringManagement } from "./OffspringManagement";
 type CycleDetailEditTarget = ReproductiveEventDto | ClutchDto | OffspringBatchDto;
 import { api, ApiError } from "../lib/api";
 import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
@@ -130,34 +133,9 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       {offspring.length ? <div className="record-list">{offspring.map((batch) => <div className="record-row" key={getString(batch, "id")}><div><strong>{getString(batch, "count")} {t("offspring")}</strong><small>{formatDate(getString(batch, "bornOn"), locale)}</small><p>{getString(batch, "notes")}</p></div><div className="row-actions"><IconButton label={t("convertToAnimals")} onClick={() => setConversionBatch(batch)}><Icon name="plus" /></IconButton><IconButton label={t("edit")} onClick={() => openBatch(batch)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteBatch(batch)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
     </Panel>}
     {conversionBatch && <OffspringConversionModal key={getString(conversionBatch, "id")} batch={conversionBatch} locale={locale} busy={conversionBusy} onClose={() => setConversionBatch(null)} onSubmit={convertBatchAnimals} />}
-    {modal === "event" && <Modal title={editing ? t("edit") : t("addEvent")} onClose={() => setModal(null)}>
-      <form className="form-stack" onSubmit={saveEvent}>{error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("eventType")}><Select value={eventForm.eventType} onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })}>{eventTypes.map((value) => <option key={value} value={value}>{t(`event_${value}`)}</option>)}</Select></Field>
-        <Field label={t("occurredAt")}><Input required type="datetime-local" value={eventForm.occurredAt} onChange={(e) => setEventForm({ ...eventForm, occurredAt: e.target.value })} /></Field>
-      <RemoteSelect label={t("animalDetail")} value={eventForm.animalId} onChange={(animalId) => setEventForm({ ...eventForm, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(animalId) => `/animals/${encodeURIComponent(animalId)}`} detailKey="animal" locale={locale} />
-        <div className="form-grid"><Field label={`${t("temperature").replace(/°C|°F/, temperatureUnitLabel())}`}><Input type="number" step="0.1" value={eventForm.temperatureC} onChange={(e) => setEventForm({ ...eventForm, temperatureC: e.target.value })} /></Field><Field label={t("humidity")}><Input type="number" min="0" max="100" step="0.1" value={eventForm.humidityPct} onChange={(e) => setEventForm({ ...eventForm, humidityPct: e.target.value })} /></Field></div>
-        <Field label={t("notes")}><Textarea rows={3} value={eventForm.details} onChange={(e) => setEventForm({ ...eventForm, details: e.target.value })} /></Field>
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
-      </form>
-    </Modal>}
-    {modal === "clutch" && <Modal title={editing ? t("edit") : t("addClutch")} onClose={() => { setEditing(null); setModal(null); }}>
-      <form className="form-stack" onSubmit={saveClutch}>{error && <Alert tone="danger">{error}</Alert>}
-        <div className="form-grid"><Field label={t("laidOn")}><Input required type="date" value={clutchForm.laidOn} onChange={(e) => setClutchForm({ ...clutchForm, laidOn: e.target.value })} /></Field><Field label={t("eggCount")}><Input required type="number" min="0" value={clutchForm.eggCount} onChange={(e) => setClutchForm({ ...clutchForm, eggCount: e.target.value })} /></Field></div>
-        <Field label={t("status")}><Input value={clutchForm.status} onChange={(e) => setClutchForm({ ...clutchForm, status: e.target.value })} /></Field>
-        <Field label={t("incubator")}><Input value={clutchForm.incubatorLabel} onChange={(e) => setClutchForm({ ...clutchForm, incubatorLabel: e.target.value })} /></Field>
-        <Field label={t("notes")}><Textarea rows={3} value={clutchForm.notes} onChange={(e) => setClutchForm({ ...clutchForm, notes: e.target.value })} /></Field>
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
-      </form>
-    </Modal>}
-    {modal === "offspring" && <Modal title={editing ? t("edit") : t("addOffspring")} onClose={() => { setEditing(null); setModal(null); }}>
-      <form className="form-stack" onSubmit={saveBatch}>{error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("bornOn")}><Input required type="date" value={batchForm.bornOn} onChange={(e) => setBatchForm({ ...batchForm, bornOn: e.target.value })} /></Field>
-        <Field label={t("clutches")}><Select value={batchForm.clutchId} onChange={(e) => setBatchForm({ ...batchForm, clutchId: e.target.value })}><option value="">—</option>{clutches.map((clutch) => <option key={getString(clutch, "id")} value={getString(clutch, "id")}>{formatDate(getString(clutch, "laidOn"), locale)}</option>)}</Select></Field>
-        <Field label={t("count")}><Input required type="number" min="0" max="10000" value={batchForm.count} onChange={(e) => setBatchForm({ ...batchForm, count: e.target.value })} /></Field>
-        <Field label={t("notes")}><Textarea rows={3} value={batchForm.notes} onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })} /></Field>
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
-      </form>
-    </Modal>}
+    {modal === "event" && <ReproductiveEventEditor locale={locale} isEditing={Boolean(editing)} form={eventForm} onChange={setEventForm} error={error} busy={busy} onClose={() => setModal(null)} onSubmit={saveEvent} />}
+    {modal === "clutch" && <ClutchEditor locale={locale} isEditing={Boolean(editing)} form={clutchForm} onChange={setClutchForm} error={error} busy={busy} onClose={() => { setEditing(null); setModal(null); }} onSubmit={saveClutch} />}
+    {tab === "offspring" && <OffspringManagement locale={locale} batches={offspring} clutches={clutches} editorOpen={modal === "offspring"} isEditing={Boolean(editing)} form={batchForm} error={error} busy={busy} onAdd={() => openBatch()} onConvert={setConversionBatch} onEdit={openBatch} onDelete={deleteBatch} onChange={setBatchForm} onClose={() => { setEditing(null); setModal(null); }} onSubmit={saveBatch} />}
     {toast}
   </div>;
 }
