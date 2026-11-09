@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, ApiError } from "../lib/api";
-import { downloadQrSvg, qrMatrix } from "../lib/qr";
-import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../lib/domain";
-import type { Locale } from "../lib/domain";
+import { api, ApiError } from "../../lib/api";
+import { downloadQrSvg, qrMatrix } from "../../lib/qr";
+import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
 import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, GeneticTraitDto, PublicShareDto, ShedDto, WeightDto } from "@vivarqo/contracts/animals";
 
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const animalResource = useResource<{ animal: AnimalDto }>(`/animals/${encodeURIComponent(id)}`);

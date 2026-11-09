@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, ApiError } from "../lib/api";
-import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../lib/domain";
-import type { Locale } from "../lib/domain";
+import { api, ApiError } from "../../lib/api";
+import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
 import type { CalendarItemDto, ReminderRuleDto, TaskDto } from "@vivarqo/contracts/operations";
 import { dateString } from "./date-utils";
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path: string; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const params = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");

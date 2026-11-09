@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from "react";
 import type { InventoryItemDto, InventoryMovementDto } from "@vivarqo/contracts/inventory";
-import { api, ApiError } from "../lib/api";
-import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../lib/domain";
-import type { Locale } from "../lib/domain";
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { api, ApiError } from "../../lib/api";
+import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function InventoryPage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
   const [page, setPage] = useState(1);

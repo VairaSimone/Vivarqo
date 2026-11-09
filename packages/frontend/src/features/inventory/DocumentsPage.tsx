@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { DocumentDto, DocumentDeletionJobDto } from "@vivarqo/contracts/inventory";
-import { api, ApiError } from "../lib/api";
-import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../lib/domain";
-import type { Locale } from "../lib/domain";
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { api, ApiError } from "../../lib/api";
+import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const params = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");

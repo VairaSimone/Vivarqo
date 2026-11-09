@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { api, ApiError } from "../lib/api";
-import { downloadQrSvg, qrMatrix } from "../lib/qr";
-import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../lib/domain";
-import type { Locale } from "../lib/domain";
-import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, GeneticTraitDto, PublicShareDto, ShedDto, WeightDto } from "@vivarqo/contracts/animals";
+import { api, ApiError } from "../../lib/api";
+import { downloadQrSvg, qrMatrix } from "../../lib/qr";
+import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
+import type { Locale } from "../../lib/domain";
+import type { AnimalDto } from "@vivarqo/contracts/animals";
 
-import { translate } from "../lib/i18n";
-import { useResource } from "../hooks/useResource";
-import { RemoteSelect } from "../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
+import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
+import { RemoteSelect } from "../../components/RemoteSelect";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+type AnimalForm = {
+  name: string; identifier: string; species: string; sex: string; morph: string; geneticsNotes: string;
+  birthDate: string; birthDateEstimated: boolean; acquiredDate: string; originDescription: string;
+  previousBreeder: string; locationLabel: string; status: string; notes: string;
+};
+const emptyAnimal: AnimalForm = {
+  name: "", identifier: "", species: "", sex: "unknown", morph: "", geneticsNotes: "", birthDate: "",
+  birthDateEstimated: false, acquiredDate: "", originDescription: "", previousBreeder: "", locationLabel: "", status: "active", notes: ""
+};
+
 export function AnimalListPage({ locale, navigate, path }: { locale: Locale; navigate: (path: string) => void; path: string }) {
   const t = (key: string, values?: Record<string, string | number>) => translate(locale, key, values);
   const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
@@ -88,7 +98,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     } finally { setBusy(false); }
   }
 
-  async function updateStatus(animal: Animal, action: "archive" | "restore" | "delete") {
+  async function updateStatus(animal: AnimalDto, action: "archive" | "restore" | "delete") {
     const label = action === "archive" ? t("confirmArchive") : t("confirmDelete");
     if (!window.confirm(label)) return;
     try {
@@ -111,11 +121,6 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       <div className="row-actions"><IconButton label={t("edit")} onClick={() => openEdit(animal)}><Icon name="edit" size={16} /></IconButton>{getString(animal, "status") === "archived" ? <IconButton label={t("restore")} onClick={() => void updateStatus(animal, "restore")}><Icon name="restore" size={16} /></IconButton> : <IconButton label={t("archive")} onClick={() => void updateStatus(animal, "archive")}><Icon name="archive" size={16} /></IconButton>}<IconButton label={t("delete")} onClick={() => void updateStatus(animal, "delete")}><Icon name="trash" size={16} /></IconButton></div>
     ];
   });
-
-  if (path.match(/^\/animals\/[^/?]+/)) {
-    const id = path.split("?")[0].split("/")[2] ?? "";
-    return <AnimalDetailPage id={id} locale={locale} navigate={navigate} />;
-  }
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
