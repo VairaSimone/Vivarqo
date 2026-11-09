@@ -195,6 +195,17 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .expect(201);
     const docId = upload.body.document.id as string;
     expect(upload.body.document.sizeBytes).toBe(String(pdf.length));
+    const storedDocument = await prisma.document.findUniqueOrThrow({
+      where: { id: docId },
+      select: { storageKey: true },
+    });
+    await expect(prisma.documentDeletionJob.create({
+      data: {
+        userId: other.userId,
+        documentId: docId,
+        storageKey: storedDocument.storageKey,
+      },
+    })).rejects.toThrow();
     const listedDocuments = await owner.agent.get(`/api/v1/documents?animalId=${animal.id}`).expect(200);
     const listedDocument = listedDocuments.body.documents.find((document: { id: string }) => document.id === docId);
     expect(listedDocument).toBeDefined();
@@ -256,6 +267,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const denied = await other.agent.patch(`/api/v1/finance/entries/${created.body.entry.id}`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({ description: "hack" }).expect(404);
     expect(denied.body.code).toBe("FINANCE_ENTRY_NOT_FOUND");
+
+    const concurrentPreferences = await Promise.all([
+      owner.agent.get("/api/v1/notification-preferences").expect(200),
+      owner.agent.get("/api/v1/notification-preferences").expect(200),
+    ]);
+    expect(concurrentPreferences.every((response) => response.body.preferences.userId === owner.userId)).toBe(true);
 
     const notification = await prisma.notification.create({
       data: { userId: owner.userId, category: "billing", title: "Subscription update", body: "Subscription status updated" },

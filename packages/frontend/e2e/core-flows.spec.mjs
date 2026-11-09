@@ -568,7 +568,13 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   expect((await readFile(downloadPath)).subarray(0, 4).toString("ascii")).toBe("%PDF");
 
   page.once("dialog", (dialog) => dialog.accept());
+  const deleteDocumentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/documents/" + document.id) &&
+    response.request().method() === "DELETE" &&
+    response.status() === 202
+  );
   await page.getByRole("button", { name: "Elimina" }).click();
+  await deleteDocumentResponsePromise;
   const remainingDocuments = await page.context().request.get("http://127.0.0.1:4173/api/v1/documents?page=1&pageSize=25&animalId=" + animal.id);
   expect((await remainingDocuments.json()).documents.some((item) => item.id === document.id)).toBe(false);
 });
