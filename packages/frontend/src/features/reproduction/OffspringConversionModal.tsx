@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import type { OffspringBatchDto } from "@vivarqo/contracts/reproduction";
 import { api, ApiError } from "../lib/api";
 import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";

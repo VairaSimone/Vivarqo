@@ -1,4 +1,8 @@
 import { useState, type FormEvent } from "react";
+import type { ClutchDto, OffspringBatchDto, ReproductiveEventDto, ReproductionCycleDto } from "@vivarqo/contracts/reproduction";
+import { eventTypes } from "./types";
+import { OffspringConversionModal } from "./OffspringConversionModal";
+type CycleDetailEditTarget = ReproductiveEventDto | ClutchDto | OffspringBatchDto;
 import { api, ApiError } from "../lib/api";
 import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -11,11 +15,11 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   const resource = useResource<{ cycle: ReproductionCycleDto }>(`/reproduction-cycles/${encodeURIComponent(id)}`);
   const [tab, setTab] = useState("events");
   const [modal, setModal] = useState<"event" | "clutch" | "offspring" | null>(null);
-  const [conversionBatch, setConversionBatch] = useState<CycleDetailEditTarget | null>(null);
+  const [conversionBatch, setConversionBatch] = useState<OffspringBatchDto | null>(null);
   const [conversionBusy, setConversionBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<Item | null>(null);
+  const [editing, setEditing] = useState<CycleDetailEditTarget | null>(null);
   const [eventForm, setEventForm] = useState({ eventType: "pairing", occurredAt: localDateTimeValue(), animalId: "", details: "", temperatureC: "", humidityPct: "" });
   const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubationStartedAt: "", notes: "" });
   const [batchForm, setBatchForm] = useState({ clutchId: "", bornOn: todayDate(), count: "1", notes: "" });

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import type { ClutchDetailDto, EggDto, IncubationLogDto } from "@vivarqo/contracts/reproduction";
 import { api, ApiError } from "../lib/api";
 import { celsiusToTemperature, formatDate, formatDateTime, formatTemperature, getArray, getString, localDateTimeValue, queryString, temperatureToCelsius, temperatureUnitLabel, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -19,7 +20,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const clutch = resource.data?.clutch;
   const eggs = clutch?.eggs ?? [];
   const logs = clutch?.incubationLogs ?? [];
-  const cycle = clutch?.cycle as Item | undefined;
+  const cycle = clutch?.cycle;
   const { toast, show } = useToast();
 
   async function addEggs(event: FormEvent) {
