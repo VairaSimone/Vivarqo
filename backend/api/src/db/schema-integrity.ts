@@ -371,22 +371,30 @@ export async function ensureDatabaseSchema(): Promise<SchemaIntegrityReport> {
   const tables = await currentPublicTableNames();
   const hasMigrationTable = tables.includes("_prisma_migrations");
   const applicationTables = tables.filter((name) => name !== "_prisma_migrations");
-  let initialApplied = false;
-  let historyRowsExist = false;
-
+  let migrationRows: MigrationRow[] = [];
   if (hasMigrationTable) {
-    const rows = await prisma.$queryRawUnsafe<MigrationRow[]>(
+    migrationRows = await prisma.$queryRawUnsafe<MigrationRow[]>(
       "SELECT migration_name AS \"migrationName\", finished_at AS \"finishedAt\", rolled_back_at AS \"rolledBackAt\" " +
       "FROM public._prisma_migrations",
     );
-    historyRowsExist = rows.length > 0;
-    initialApplied = rows.some((row) =>
-      row.migrationName === initialMigrationName && row.finishedAt !== null && row.rolledBackAt === null,
+  }
+  const appliedMigrations = new Set(
+    migrationRows
+      .filter((row) => row.finishedAt !== null && row.rolledBackAt === null)
+      .map((row) => row.migrationName),
+  );
+  const initialApplied = appliedMigrations.has(initialMigrationName);
+  const unfinishedMigrations = migrationRows.filter((row) => row.finishedAt === null && row.rolledBackAt === null);
+  if (unfinishedMigrations.length > 0) {
+    throw new Error(
+      "The database contains unfinished Prisma migrations (" +
+      unfinishedMigrations.map((row) => row.migrationName).join(", ") +
+      "). Reconcile or roll back those migrations after taking a backup; automatic deployment was stopped.",
     );
   }
 
   if (applicationTables.length > 0 && !initialApplied) {
-    if (historyRowsExist) {
+    if (migrationRows.length > 0) {
       throw new Error("Migration history exists without a successfully applied initial migration. Reconcile it manually; history was not changed.");
     }
     const existingReport = await inspectDatabaseSchema();
@@ -396,6 +404,20 @@ export async function ensureDatabaseSchema(): Promise<SchemaIntegrityReport> {
     logger.warn({ migrationCount: expectedSchema.migrations.length }, "Verified complete existing schema; baselining every versioned migration");
     for (const migration of expectedSchema.migrations) {
       await runPrismaMigrationCommand(["resolve", "--applied", migration]);
+    }
+  } else if (applicationTables.length > 0) {
+    // If startup was interrupted while baselining a manually provisioned
+    // complete schema, finish only the missing history rows after verifying
+    // every current object. A genuinely older schema is left to migrate deploy.
+    const missingBaseline = expectedSchema.migrations.filter((migration) => !appliedMigrations.has(migration));
+    if (missingBaseline.length > 0) {
+      const existingReport = await inspectDatabaseSchema();
+      if (existingReport.issues.length === 0) {
+        logger.warn({ migrationCount: missingBaseline.length }, "Completing baseline for a fully verified existing schema");
+        for (const migration of missingBaseline) {
+          await runPrismaMigrationCommand(["resolve", "--applied", migration]);
+        }
+      }
     }
   }
 

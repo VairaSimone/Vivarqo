@@ -304,7 +304,13 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.getByRole("button", { name: "Modifica" }).click();
   const feedingEditDialog = page.getByRole("dialog");
   await feedingEditDialog.getByLabel("Esito").selectOption("refused");
+  const feedingUpdatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    response.url().includes("/api/v1/feeding-entries/" + feedingEntry.id) &&
+    response.status() === 200
+  );
   await feedingEditDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await feedingUpdatedResponse;
   const editedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   const editedEntry = (await editedFeedings.json()).sessions.flatMap((session) => session.entries).find((entry) => entry.id === feedingEntry?.id);
   expect(editedEntry?.outcome).toBe("refused");
@@ -341,7 +347,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
   expect(financeResponse.status()).toBe(200);
   const financeBody = await financeResponse.json();
-  expect(financeBody.entries.some((entry) => entry.description === "E2E veterinary expense" && entry.amountCents === 1250)).toBe(true);
+  expect(financeBody.entries.some((entry) => entry.description === "E2E veterinary expense" && entry.amountCents === "1250")).toBe(true);
 
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Nuovo articolo" }).click();
@@ -397,7 +403,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   expect(parentB?.id).toBeTruthy();
 
   await page.goto("/reproduction");
-  await page.getByRole("button", { name: "Nuovo ciclo" }).click();
+  await page.getByRole("button", { name: "Nuovo ciclo" }).first().click();
   const cycleDialog = page.getByRole("dialog");
   await cycleDialog.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
   await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);

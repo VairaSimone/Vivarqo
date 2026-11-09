@@ -394,7 +394,7 @@ CREATE TABLE import_jobs (
     allow_possible_duplicates  BOOLEAN NOT NULL DEFAULT FALSE,
     processing_started_at      TIMESTAMPTZ,
     lease_token                 UUID,
-    attempts                   INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    attempts                   INTEGER NOT NULL DEFAULT 0,
     last_error_code            VARCHAR(80),
     expires_at                 TIMESTAMPTZ NOT NULL,
     created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -409,7 +409,7 @@ CREATE TABLE export_jobs (
     include_documents     BOOLEAN NOT NULL DEFAULT FALSE,
     processing_started_at TIMESTAMPTZ,
     lease_token           UUID,
-    attempts              INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    attempts              INTEGER NOT NULL DEFAULT 0,
     last_error_code       VARCHAR(80),
     expires_at            TIMESTAMPTZ NOT NULL,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -817,7 +817,6 @@ CREATE TABLE push_delivery_attempts (
     error_code            VARCHAR(80),
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT push_delivery_attempts_attempt_number_check CHECK (attempt_number > 0)
 );
 CREATE UNIQUE INDEX push_delivery_attempts_delivery_attempt_unique
     ON push_delivery_attempts (delivery_key, attempt_number);
@@ -840,21 +839,50 @@ CREATE TABLE document_deletion_jobs (
     user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     document_id           UUID NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
     storage_key           TEXT NOT NULL,
-    status                VARCHAR(20) NOT NULL DEFAULT 'queued'
-                          CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
-    attempts              INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    status                VARCHAR(20) NOT NULL DEFAULT 'queued',
+    attempts              INTEGER NOT NULL DEFAULT 0,
     next_attempt_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     processing_started_at TIMESTAMPTZ,
     lease_token           UUID,
     last_error_code       VARCHAR(80),
     completed_at          TIMESTAMPTZ,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT document_deletion_jobs_attempts_nonnegative CHECK (attempts >= 0),
+    CONSTRAINT document_deletion_jobs_status_check CHECK (status IN ('queued', 'processing', 'completed', 'failed'))
 );
 CREATE INDEX document_deletion_jobs_status_next_attempt_idx
     ON document_deletion_jobs (status, next_attempt_at);
 CREATE INDEX document_deletion_jobs_user_created_idx
     ON document_deletion_jobs (user_id, created_at DESC);
+
+
+-- Tenant guard for the document deletion outbox: owner and storage key must
+-- match the soft-deleted document referenced by the job.
+CREATE OR REPLACE FUNCTION vivarqo_check_document_deletion_tenant_consistency()
+RETURNS TRIGGER AS $
+DECLARE
+    document_owner_id UUID;
+    document_storage_key TEXT;
+BEGIN
+    SELECT user_id, storage_key
+      INTO document_owner_id, document_storage_key
+      FROM documents
+     WHERE id = NEW.document_id;
+
+    IF document_owner_id IS NULL
+       OR document_owner_id <> NEW.user_id
+       OR document_storage_key <> NEW.storage_key THEN
+        RAISE EXCEPTION 'document deletion job must reference the matching owner and storage key';
+    END IF;
+
+    RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TRIGGER document_deletion_jobs_tenant_guard
+    BEFORE INSERT OR UPDATE ON document_deletion_jobs
+    FOR EACH ROW EXECUTE FUNCTION vivarqo_check_document_deletion_tenant_consistency();
 
 COMMIT;
 

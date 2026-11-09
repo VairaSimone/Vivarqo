@@ -21,3 +21,28 @@ CREATE TABLE "document_deletion_jobs" (
 CREATE UNIQUE INDEX "document_deletion_jobs_document_id_key" ON "document_deletion_jobs"("document_id");
 CREATE INDEX "document_deletion_jobs_status_next_attempt_idx" ON "document_deletion_jobs"("status", "next_attempt_at");
 CREATE INDEX "document_deletion_jobs_user_created_idx" ON "document_deletion_jobs"("user_id", "created_at" DESC);
+
+CREATE OR REPLACE FUNCTION vivarqo_check_document_deletion_tenant_consistency()
+RETURNS TRIGGER AS $$
+DECLARE
+    document_owner_id UUID;
+    document_storage_key TEXT;
+BEGIN
+    SELECT user_id, storage_key
+      INTO document_owner_id, document_storage_key
+      FROM documents
+     WHERE id = NEW.document_id;
+
+    IF document_owner_id IS NULL
+       OR document_owner_id <> NEW.user_id
+       OR document_storage_key <> NEW.storage_key THEN
+        RAISE EXCEPTION 'document deletion job must reference the matching owner and storage key';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER document_deletion_jobs_tenant_guard
+    BEFORE INSERT OR UPDATE ON document_deletion_jobs
+    FOR EACH ROW EXECUTE FUNCTION vivarqo_check_document_deletion_tenant_consistency();
