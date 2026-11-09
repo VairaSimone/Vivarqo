@@ -42,13 +42,24 @@ function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path:
   const [editing, setEditing] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // A route opened directly with ?create=1 must be ready for submission too.
+  // Keeping dueAt empty here made native required-field validation block the
+  // form before the API request was ever sent.
+  const [form, setForm] = useState({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" });
   useEffect(() => {
     const currentParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
     setQ(currentParams.get("q") ?? "");
     setStatus(currentParams.has("q") ? "all" : "open");
     setPage(1);
+    if (currentParams.has("create")) {
+      setEditing(null);
+      setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" });
+      setError("");
+      setModal(true);
+    } else {
+      setModal(false);
+    }
   }, [path]);
-  const [form, setForm] = useState({ title: "", description: "", category: "custom", dueAt: "", animalId: "" });
   const [reminderForm, setReminderForm] = useState({ title: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
   const [reminderModal, setReminderModal] = useState(false);
   const [reminderEdit, setReminderEdit] = useState<Item | null>(null);

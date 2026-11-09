@@ -546,7 +546,10 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const batch = cycleAfterBirth.offspringBatches.find((item) => Number(item.count) === 2);
   expect(batch?.id).toBeTruthy();
 
+  // Open the per-batch conversion form before filling its fields.
+  await page.getByRole("button", { name: "Crea schede animali" }).click();
   const conversionDialog = page.getByRole("dialog");
+  await expect(conversionDialog).toBeVisible();
   await conversionDialog.getByLabel("Specie").fill("Python regius");
   await conversionDialog.getByLabel("Nome 1").fill("E2E Baby 1");
   await conversionDialog.getByRole("button", { name: "Aggiungi un nome" }).click();
