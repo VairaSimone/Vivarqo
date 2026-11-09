@@ -200,6 +200,9 @@ function normalizeSqlExpression(value: string): string {
   normalized = normalized
     .replace(/\bpublic\./g, "")
     .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\([^)]*\))?/g, "")
+    // Remove grouping around a bare identifier, but not the parentheses that
+    // delimit a function call such as lower(code).
+    .replace(/(?<![A-Za-z0-9_$])\(([A-Za-z_][A-Za-z0-9_$]*)\)(?!\s*\()/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
 
