@@ -111,8 +111,8 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
   }
   if (response.status === 404 && method === "GET") throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  if (response.status === 404 && method === "DELETE") return Buffer.alloc(0);
   if (!response.ok) {
-    if (method === "DELETE" && response.status === 404) return Buffer.alloc(0);
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the request", { providerStatus: response.status });
   }
   if (method !== "GET") return Buffer.alloc(0);

@@ -155,6 +155,7 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
   const resource = useResource<{ documents: Item[]; pagination: { page: number; totalPages: number; total: number } }>(
     "/documents" + queryString({ page, pageSize: 25, animalId, cycleId, q: search })
   );
+  const deletionResource = useResource<{ deletions: Item[] }>("/document-deletions");
 
   async function upload(event: FormEvent) {
     event.preventDefault(); if (!file) { setError(t("chooseFile")); return; }
@@ -179,8 +180,19 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
   }
   async function remove(document: Item) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete(`/documents/${getString(document, "id")}`); resource.reload(); show(t("delete")); }
-    catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    try {
+      await api.delete(`/documents/${getString(document, "id")}`);
+      resource.reload();
+      deletionResource.reload();
+      show(t("documentDeletionQueued"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function retryDocumentDeletion(job: Item) {
+    try {
+      await api.post(`/document-deletions/${getString(job, "id")}/retry`, {});
+      deletionResource.reload();
+      show(t("documentDeletionQueued"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
   return <div className="page-stack">
@@ -199,6 +211,24 @@ function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: strin
       ])} empty={t("noDocuments")} />}
       {resource.data?.pagination && <Pagination page={page} totalPages={resource.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
     </Panel>
+    {deletionResource.data?.deletions.length ? <Panel>
+      <div className="list-meta">
+        <strong>{t("documentDeletionStatus")}</strong>
+        <Button size="sm" variant="ghost" onClick={deletionResource.reload}><Icon name="refresh" />{t("refresh")}</Button>
+      </div>
+      <div className="record-list">
+        {deletionResource.data.deletions.map((job) => {
+          const status = getString(job, "status");
+          return <div className="record-row" key={getString(job, "id")}>
+            <div>
+              <strong>{getString(job.document, "originalFilename") || getString(job, "documentId")}</strong>
+              <small>{t("documentDeletionStatus_" + status)} · {getString(job, "attempts")} {t("attempts")}</small>
+            </div>
+            {status === "failed" ? <Button size="sm" variant="secondary" onClick={() => void retryDocumentDeletion(job)}>{t("retry")}</Button> : null}
+          </div>;
+        })}
+      </div>
+    </Panel> : null}
     {uploadModal && <Modal title={t("uploadDocument")} onClose={() => setUploadModal(false)}>
       <form className="form-stack" onSubmit={upload}>{error && <Alert tone="danger">{error}</Alert>}
         <Field label={t("file")}><Input required type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>

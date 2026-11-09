@@ -5,6 +5,7 @@ import { processQueuedAnimalImport } from "../animals/import.routes.js";
 import { processQueuedCareImport } from "./care-import.routes.js";
 import { processQueuedDomainImport } from "./domain-import.routes.js";
 import { processQueuedExportJob } from "./exports.routes.js";
+import { deletePrivateObject } from "./private-storage.js";
 
 const POLL_INTERVAL_MS = 2_000;
 const LEASE_MS = 5 * 60_000;
@@ -13,6 +14,7 @@ const MAX_ATTEMPTS = 3;
 
 type ClaimedImport = { id: string; userId: string; entityType: string; attempts: number; leaseToken: string };
 type ClaimedExport = { id: string; userId: string; attempts: number; leaseToken: string };
+type ClaimedDocumentDeletion = { id: string; userId: string; documentId: string; storageKey: string; attempts: number; leaseToken: string };
 
 async function claimImport(jobId?: string): Promise<ClaimedImport | null> {
   const now = new Date();
@@ -191,12 +193,90 @@ export async function dispatchExportJob(jobId?: string): Promise<boolean> {
   return true;
 }
 
-export async function dispatchDataJobsBatch(): Promise<{ imports: number; exports: number }> {
+const DOCUMENT_DELETE_MAX_ATTEMPTS = 8;
+const DOCUMENT_DELETE_LEASE_MS = 5 * 60_000;
+const DOCUMENT_DELETE_RETRY_DELAYS_MS = [5_000, 15_000, 60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000, 2 * 60 * 60_000] as const;
+
+async function claimDocumentDeletionJob(jobId?: string): Promise<ClaimedDocumentDeletion | null> {
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - DOCUMENT_DELETE_LEASE_MS);
+  await prisma.documentDeletionJob.updateMany({
+    where: { status: "processing", processingStartedAt: { lte: staleBefore }, attempts: { gte: DOCUMENT_DELETE_MAX_ATTEMPTS } },
+    data: { status: "failed", processingStartedAt: null, leaseToken: null, lastErrorCode: "DOCUMENT_DELETE_ATTEMPTS_EXHAUSTED" },
+  });
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRawUnsafe<ClaimedDocumentDeletion[]>(
+      "WITH candidate AS (" +
+      " SELECT id FROM document_deletion_jobs " +
+      " WHERE ((status = 'queued' AND next_attempt_at <= $1) " +
+      " OR (status = 'processing' AND processing_started_at <= $2)) " +
+      " AND attempts < $3 AND ($4::uuid IS NULL OR id = $4::uuid) " +
+      " ORDER BY next_attempt_at ASC, created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED" +
+      ") UPDATE document_deletion_jobs AS job SET status = 'processing', processing_started_at = $1, " +
+      " attempts = job.attempts + 1, lease_token = gen_random_uuid(), last_error_code = NULL, updated_at = $1 " +
+      " FROM candidate WHERE job.id = candidate.id " +
+      " RETURNING job.id::text AS id, job.user_id::text AS \"userId\", job.document_id::text AS \"documentId\", " +
+      " job.storage_key AS \"storageKey\", job.attempts AS attempts, job.lease_token::text AS \"leaseToken\"",
+      now, staleBefore, DOCUMENT_DELETE_MAX_ATTEMPTS, jobId ?? null,
+    );
+    return rows[0] ?? null;
+  });
+}
+
+function startDocumentDeletionHeartbeat(job: ClaimedDocumentDeletion): NodeJS.Timeout {
+  const timer = setInterval(() => {
+    void prisma.documentDeletionJob.updateMany({
+      where: { id: job.id, status: "processing", leaseToken: job.leaseToken },
+      data: { processingStartedAt: new Date() },
+    }).catch((error: unknown) => {
+      logger.warn({ deletionId: job.id, errorName: error instanceof Error ? error.name : "UnknownError" }, "Document deletion lease heartbeat failed");
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+  timer.unref();
+  return timer;
+}
+
+/** Deletes storage only after the logical DB deletion and outbox row commit. */
+export async function dispatchDocumentDeletionJob(jobId?: string): Promise<boolean> {
+  const job = await claimDocumentDeletionJob(jobId);
+  if (!job) return false;
+  const heartbeat = startDocumentDeletionHeartbeat(job);
+  try {
+    await deletePrivateObject(job.storageKey);
+    const completed = await prisma.documentDeletionJob.updateMany({
+      where: { id: job.id, userId: job.userId, status: "processing", leaseToken: job.leaseToken },
+      data: { status: "completed", completedAt: new Date(), processingStartedAt: null, leaseToken: null, nextAttemptAt: new Date(), lastErrorCode: null },
+    });
+    if (completed.count !== 1) throw new Error("Document deletion lease was lost before completion");
+  } catch (error) {
+    const terminal = job.attempts >= DOCUMENT_DELETE_MAX_ATTEMPTS;
+    const retryDelay = DOCUMENT_DELETE_RETRY_DELAYS_MS[Math.min(job.attempts - 1, DOCUMENT_DELETE_RETRY_DELAYS_MS.length - 1)]!;
+    const errorCode = error instanceof Error ? error.name.slice(0, 80) : "STORAGE_DELETE_FAILED";
+    await prisma.documentDeletionJob.updateMany({
+      where: { id: job.id, userId: job.userId, status: "processing", leaseToken: job.leaseToken },
+      data: {
+        status: terminal ? "failed" : "queued",
+        nextAttemptAt: new Date(Date.now() + retryDelay),
+        processingStartedAt: null,
+        leaseToken: null,
+        lastErrorCode: terminal ? "DOCUMENT_DELETE_FAILED" : errorCode,
+      },
+    });
+    logger.warn({ deletionId: job.id, attempts: job.attempts, terminal, errorName: error instanceof Error ? error.name : "UnknownError" }, "Private document deletion attempt failed");
+  } finally {
+    clearInterval(heartbeat);
+  }
+  return true;
+}
+
+export async function dispatchDataJobsBatch(): Promise<{ imports: number; exports: number; documentDeletions: number }> {
   let imports = 0;
   let exports = 0;
+  let documentDeletions = 0;
   if (await dispatchImportJob()) imports = 1;
   if (await dispatchExportJob()) exports = 1;
-  return { imports, exports };
+  if (await dispatchDocumentDeletionJob()) documentDeletions = 1;
+  return { imports, exports, documentDeletions };
 }
 
 let timer: NodeJS.Timeout | null = null;
@@ -209,7 +289,7 @@ export function startDataJobsWorker(): () => void {
     inFlight = true;
     try {
       const result = await dispatchDataJobsBatch();
-      if (result.imports > 0 || result.exports > 0) logger.info(result, "Asynchronous import/export jobs processed");
+      if (result.imports > 0 || result.exports > 0 || result.documentDeletions > 0) logger.info(result, "Asynchronous import/export/document-deletion jobs processed");
     } catch (error) {
       logger.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Data jobs worker failed");
       captureException(error, { worker: "data-jobs" });
