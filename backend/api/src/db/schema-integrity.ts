@@ -379,9 +379,9 @@ export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
       isUnique: boolean;
       definition: string;
     }>>(
-      "SELECT idx.relname AS \\"indexName\\", i.indisvalid AS \\"isValid\\", " +
-      "i.indisready AS \\"isReady\\", i.indisunique AS \\"isUnique\\", " +
-      "pg_get_indexdef(i.indexrelid) AS \\"definition\\" " +
+      "SELECT idx.relname AS \"indexName\", i.indisvalid AS \"isValid\", " +
+      "i.indisready AS \"isReady\", i.indisunique AS \"isUnique\", " +
+      "pg_get_indexdef(i.indexrelid) AS \"definition\" " +
       "FROM pg_index i JOIN pg_class idx ON idx.oid = i.indexrelid JOIN pg_class tbl ON tbl.oid = i.indrelid " +
       "JOIN pg_namespace n ON n.oid = tbl.relnamespace WHERE n.nspname = 'public'",
     ),
