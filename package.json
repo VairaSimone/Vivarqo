@@ -27,7 +27,8 @@
     "test:frontend": "pnpm --filter @vivarqo/frontend test",
     "typecheck:api": "pnpm --filter @vivarqo/api typecheck",
     "typecheck:frontend": "pnpm --filter @vivarqo/frontend typecheck",
-    "build:frontend": "pnpm --filter @vivarqo/frontend build"
+    "build:frontend": "pnpm --filter @vivarqo/frontend build",
+    "db:ensure": "pnpm --filter @vivarqo/api exec tsx src/migrate.ts"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
