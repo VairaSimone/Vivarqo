@@ -42,7 +42,11 @@ export interface DocumentDeletionJobDto {
   status: string;
   attempts: number;
   lastError: string | null;
-  nextAttemptAt: string | null;
+  nextAttemptAt?: string | null;
+  lastErrorCode?: string | null;
+  createdAt?: string;
+  completedAt?: string | null;
+  document: { originalFilename: string } | null;
 }
 
 export interface InventoryDocumentRecordDto {

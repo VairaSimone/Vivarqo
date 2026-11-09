@@ -7,6 +7,8 @@ import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+const inventoryCategories = ["food", "substrate", "material", "equipment", "other"] as const;
+
 export function InventoryPage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
   const [page, setPage] = useState(1);
