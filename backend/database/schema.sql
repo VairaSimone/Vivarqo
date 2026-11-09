@@ -774,6 +774,88 @@ CREATE TRIGGER offspring_batches_clutch_guard
     BEFORE INSERT OR UPDATE ON offspring_batches
     FOR EACH ROW EXECUTE FUNCTION vivarqo_check_tenant_consistency();
 
+-- ---------------------------------------------------------------------------
+-- 12. Allineamento consolidato alle migrazioni successive al primo schema
+--     Questo file deve rappresentare lo stato finale delle migrazioni versionate.
+-- ---------------------------------------------------------------------------
+
+-- Le rettifiche inventariali possono portare lo stock esattamente a zero.
+ALTER TABLE stock_movements
+    DROP CONSTRAINT IF EXISTS stock_movements_quantity_check;
+ALTER TABLE stock_movements
+    ADD CONSTRAINT stock_movements_quantity_check
+    CHECK (quantity >= 0 AND (movement_type = 'adjustment' OR quantity > 0));
+
+-- Preferenze persistenti per account.
+CREATE TABLE user_preferences (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id               UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    weight_unit           VARCHAR(8) NOT NULL DEFAULT 'g',
+    temperature_unit      VARCHAR(8) NOT NULL DEFAULT 'c',
+    date_format           VARCHAR(16) NOT NULL DEFAULT 'locale',
+    default_landing_page  VARCHAR(40) NOT NULL DEFAULT 'today',
+    compact_tables        BOOLEAN NOT NULL DEFAULT FALSE,
+    theme                 VARCHAR(16) NOT NULL DEFAULT 'system',
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Outbox persistente dei tentativi di consegna Web Push.
+CREATE TABLE push_delivery_attempts (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notification_id       UUID REFERENCES notifications(id) ON DELETE SET NULL,
+    push_subscription_id  UUID REFERENCES push_subscriptions(id) ON DELETE SET NULL,
+    delivery_key          VARCHAR(180) NOT NULL,
+    attempt_number        INTEGER NOT NULL,
+    status                VARCHAR(24) NOT NULL DEFAULT 'queued',
+    scheduled_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    attempted_at          TIMESTAMPTZ,
+    sent_at               TIMESTAMPTZ,
+    next_attempt_at       TIMESTAMPTZ,
+    http_status           INTEGER,
+    error_code            VARCHAR(80),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT push_delivery_attempts_attempt_number_check CHECK (attempt_number > 0)
+);
+CREATE UNIQUE INDEX push_delivery_attempts_delivery_attempt_unique
+    ON push_delivery_attempts (delivery_key, attempt_number);
+CREATE INDEX push_delivery_attempts_status_scheduled_idx
+    ON push_delivery_attempts (status, scheduled_at);
+CREATE INDEX push_delivery_attempts_user_created_idx
+    ON push_delivery_attempts (user_id, created_at DESC);
+CREATE INDEX push_delivery_attempts_notification_idx
+    ON push_delivery_attempts (notification_id);
+
+-- Limiti di tentativi e lease dei job asincroni.
+ALTER TABLE import_jobs
+    ADD CONSTRAINT import_jobs_attempts_nonnegative CHECK (attempts >= 0);
+ALTER TABLE export_jobs
+    ADD CONSTRAINT export_jobs_attempts_nonnegative CHECK (attempts >= 0);
+
+-- Eliminazione documenti: soft-delete DB + outbox con retry storage.
+CREATE TABLE document_deletion_jobs (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id               UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id           UUID NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+    storage_key           TEXT NOT NULL,
+    status                VARCHAR(20) NOT NULL DEFAULT 'queued'
+                          CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
+    attempts              INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processing_started_at TIMESTAMPTZ,
+    lease_token           UUID,
+    last_error_code       VARCHAR(80),
+    completed_at          TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX document_deletion_jobs_status_next_attempt_idx
+    ON document_deletion_jobs (status, next_attempt_at);
+CREATE INDEX document_deletion_jobs_user_created_idx
+    ON document_deletion_jobs (user_id, created_at DESC);
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
