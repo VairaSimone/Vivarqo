@@ -19,6 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public
       NODE_ENV: test
+      CSRF_SECRET: ci-api-only-secret-never-use-outside-test-environment-2026
       RUN_DB_INTEGRATION: "true"
     services:
       postgres:
