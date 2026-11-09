@@ -162,7 +162,10 @@ function parseExpectedSchema(): ExpectedSchema {
     }
   }
 
-  const constraints = [...allSql.matchAll(/\bCONSTRAINT\s+"?([A-Za-z_]\w*)"?/gi)].map((match) => match[1]!);
+  const constraints = [
+    ...[...allSql.matchAll(/^\s*CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)].map((match) => match[1]!),
+    ...[...allSql.matchAll(/^\s*ADD\s+CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)].map((match) => match[1]!),
+  ];
   for (const match of modelBlocks) {
     const body = match[2]!;
     const tableName = body.match(/^\s*@@map\("([^"]+)"\)/m)?.[1];
