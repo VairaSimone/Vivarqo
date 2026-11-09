@@ -12,8 +12,13 @@ void ensureDatabaseSchema()
     }, "Database migrations and schema verification completed");
   })
   .catch((error: unknown) => {
+    const rawMessage = error instanceof Error ? error.message : "Unknown migration error";
+    const safeMessage = rawMessage
+      .replace(/postgres(?:ql)?:\/\/[^\s"'\]]+/gi, "[database URL redacted]")
+      .slice(0, 2_000);
     logger.fatal({
       errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: safeMessage,
     }, "Database migration job failed");
     process.exitCode = 1;
   })
