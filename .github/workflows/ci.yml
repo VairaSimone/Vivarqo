@@ -61,6 +61,8 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
+      - name: Verify empty, baseline, partial and drifted database initialization
+        run: bash backend/scripts/schema-initialization-drill.sh
       - name: Type-check API
         run: pnpm typecheck:api
       - name: Test API

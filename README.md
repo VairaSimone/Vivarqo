@@ -27,7 +27,7 @@ Questa modalità avvia PostgreSQL in Docker. Applica prima le migrazioni con `pn
 docker compose -f backend/infra/docker/compose.yaml up -d --build api
 ```
 
-La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione; l'API, prima di aprire la porta HTTP, applica automaticamente le migrazioni e verifica la completezza dello schema.
+La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione. Il servizio one-shot `migrate` applica le migrazioni e verifica lo schema prima che `api` e `worker` possano avviarsi; i processi applicativi eseguono soltanto una verifica in lettura e non applicano DDL.
 
 Lo schema SQL consolidato di riferimento è versionato in [`backend/database/schema.sql`](backend/database/schema.sql); le migrazioni incrementali eseguibili sono raccolte in `backend/prisma/migrations/` e il modello ORM in `backend/prisma/schema.prisma`. Per ogni modifica futura aggiungere una nuova migrazione versionata: non modificare una migrazione già applicata e non usare `prisma db push` in produzione.
 
