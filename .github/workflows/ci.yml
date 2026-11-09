@@ -50,7 +50,7 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Apply PostgreSQL migration
-        run: pnpm db:migrate:deploy
+        run: pnpm db:ensure
       - name: Install PostgreSQL 18 client tools
         run: |
           sudo apt-get update
@@ -137,7 +137,7 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Apply migrations to isolated E2E database
-        run: pnpm db:migrate:deploy
+        run: pnpm db:ensure
       - name: Seed isolated browser accounts
         run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts
       - name: Start real API

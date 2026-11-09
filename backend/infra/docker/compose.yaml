@@ -16,6 +16,24 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+    command: ["node", "backend/api/dist/migrate.js"]
+    restart: "no"
+    env_file:
+      - ../../../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
+      PRIVATE_STORAGE_PATH: /app/var/private
+    volumes:
+      - vivarqo-private-data:/app/var/private
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: ../../..
@@ -35,6 +53,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
@@ -65,6 +85,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       api:
         condition: service_healthy
     healthcheck:
