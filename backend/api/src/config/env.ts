@@ -51,6 +51,8 @@ const environmentSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   METRICS_BEARER_TOKEN: z.string().min(32).optional(),
   PRIVATE_STORAGE_PATH: z.string().min(1).default("./var/private"),
+  EXPORT_MAX_ARCHIVE_BYTES: z.coerce.number().int().min(1024 * 1024).max(Number.MAX_SAFE_INTEGER).default(20 * 1024 * 1024 * 1024),
+  EXPORT_MAX_ENTRIES: z.coerce.number().int().min(1).max(1_000_000).default(100_000),
 });
 
 const parsedEnvironment = environmentSchema.safeParse(process.env);
