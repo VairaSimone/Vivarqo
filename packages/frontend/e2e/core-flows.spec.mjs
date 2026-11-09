@@ -358,7 +358,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const financeDialog = page.getByRole("dialog");
   await financeDialog.getByLabel("Importo (€)").fill("12.50");
   await financeDialog.getByLabel("Valuta").fill("EUR");
-  await financeDialog.getByLabel("Categoria").fill("Test E2E");
+  await financeDialog.getByLabel("Categoria", { exact: true }).fill("Test E2E");
   await financeDialog.getByLabel("Descrizione").fill("E2E veterinary expense");
   await financeDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const financeCreatedResponse = page.waitForResponse((response) =>

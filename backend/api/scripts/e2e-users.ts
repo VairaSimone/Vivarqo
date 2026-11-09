@@ -58,13 +58,13 @@ async function cleanAccounts() {
     });
     await tx.egg.deleteMany({ where: { clutch: { is: ownedClutches } } });
     await tx.incubationLog.deleteMany({ where: { clutch: { is: ownedClutches } } });
-    await tx.offspringBatch.deleteMany({ where: { cycle: { is: ownedCycles } } });
 
-    // Animals may point back to their origin clutch/batch.
+    // The origin relations use RESTRICT: clear them before removing their batches.
     await tx.animal.updateMany({
       where: ownedAnimals,
       data: { originClutchId: null, originOffspringBatchId: null },
     });
+    await tx.offspringBatch.deleteMany({ where: { cycle: { is: ownedCycles } } });
     await tx.clutch.deleteMany({ where: ownedClutches });
     await tx.reproductionCycle.deleteMany({ where: ownedCycles });
 
