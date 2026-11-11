@@ -101,6 +101,7 @@ services:
     networks:
       - backend
       - database
+      - egress
     depends_on:
       postgres:
         condition: service_healthy
@@ -149,8 +150,8 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m
     networks:
-      - backend
       - database
+      - egress
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,5 +255,7 @@ networks:
   frontend:
     internal: true
   backend:
+    internal: true
   database:
     internal: true
+  egress:

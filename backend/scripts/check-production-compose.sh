@@ -91,8 +91,18 @@ if (!healthcheck.includes("$POSTGRES_USER") || !healthcheck.includes("$POSTGRES_
   throw new Error("PostgreSQL healthcheck must defer variable expansion to the container");
 }
 const networks = config.networks ?? {};
-if (networks.database?.internal !== true || networks.frontend?.internal !== true) {
-  throw new Error("Database and frontend Docker networks must be internal");
+if (networks.database?.internal !== true || networks.frontend?.internal !== true || networks.backend?.internal !== true) {
+  throw new Error("Database, frontend and web/API backend Docker networks must be internal");
+}
+if (networks.egress?.internal === true) {
+  throw new Error("The dedicated provider egress network must allow outbound connections");
+}
+const hasNetwork = (service, network) => Object.prototype.hasOwnProperty.call(service.networks ?? {}, network);
+if (!hasNetwork(services.api, "egress") || !hasNetwork(services.worker, "egress")) {
+  throw new Error("Only API and worker need the outbound provider egress network");
+}
+if (hasNetwork(services.web, "egress") || hasNetwork(services.postgres, "egress") || hasNetwork(services.backup, "egress")) {
+  throw new Error("Web, PostgreSQL and backup must not have direct outbound network access");
 }
 if (services.api.environment?.DATABASE_USER === services.migrate.environment?.DATABASE_USER) {
   throw new Error("API and migration services must use different PostgreSQL roles");

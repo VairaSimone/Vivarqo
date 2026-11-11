@@ -7,10 +7,10 @@ Questa configurazione separa sviluppo locale, staging e produzione. È una confi
 Usare `backend/infra/docker/compose.production.yaml` sia per staging sia per produzione, con file environment, progetto Docker, database, segreti e backup distinti. Per impostazione predefinita eseguire staging e produzione su host distinti: entrambe le istanze pubblicano 80/443 tramite Caddy. Per co-localizzarle serve un unico ingress/proxy edge condiviso e una configurazione Caddy centralizzata, non due stack che tentano di occupare le stesse porte.
 
 - Solo Caddy pubblica le porte TCP 80/443 (UDP 443 è opzionale per HTTP/3). Caddy gestisce TLS/ACME e inoltra a Nginx.
-- Nginx serve la PWA e inoltra `/api` al backend. L'header `X-Forwarded-Proto` originale viene conservato fino a Express.
+- Nginx serve la PWA e inoltra `/api` al backend sulla rete interna `backend`. Solo API e worker sono collegati anche alla rete `egress` per contattare email, Stripe e S3; Nginx, PostgreSQL e il servizio backup non hanno accesso diretto alla rete esterna. L'header `X-Forwarded-Proto` originale viene conservato fino a Express.
 - PostgreSQL è solo sulla rete Docker `database`, dichiarata `internal`; non ha porte pubblicate.
 - API e worker non pubblicano porte host. Nginx, API e worker comunicano su reti Docker private; API e worker hanno connettività in uscita per email, Stripe e S3.
-- Le API e i worker usano il ruolo PostgreSQL applicativo (`vivarqo_app` o l'equivalente staging), senza privilegi amministrativi. Le migrazioni usano il ruolo admin. Il backup usa un terzo account dedicato, membro soltanto del ruolo predefinito `pg_read_all_data`, quindi in sola lettura.
+- Le API e i worker usano il ruolo PostgreSQL applicativo (`vivarqo_app` o l'equivalente staging), senza privilegi amministrativi. Le migrazioni usano il ruolo admin. Il backup usa un terzo account dedicato, membro soltanto del ruolo predefinito `pg_read_all_data` e con attributo `BYPASSRLS`: resta non-superuser e senza privilegi di scrittura, ma può leggere tutte le righe anche quando saranno introdotte policy Row-Level Security.
 - I file applicativi e i documenti restano in un volume privato; in produzione il backend richiede anche il bucket S3 privato configurato.
 
 Con Caddy → Nginx → Express impostare `TRUST_PROXY_HOPS=2`. Se cambia la catena proxy, ricalcolare il numero; non usare `true` o fiducia indiscriminata negli header forwarded.
