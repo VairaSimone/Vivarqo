@@ -140,6 +140,17 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect(period.cancelAtPeriodEnd).toBe(true);
     expect(period.currentPeriodEnd?.getTime()).toBe((baseTime + 2_592_000) * 1000);
 
+    // Stripe does not guarantee event ordering. A distinct, delayed Checkout event
+    // must not overwrite the active subscription data already synchronized above.
+    const lateCheckoutEvent = {
+      ...checkoutEvent,
+      id: `evt_vivarqo_${randomUUID()}`,
+    };
+    await sendEvent(owner.agent, lateCheckoutEvent).expect(200);
+    const afterLateCheckout = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(afterLateCheckout.status).toBe("active");
+    expect(afterLateCheckout.currentPeriodEnd?.getTime()).toBe((baseTime + 2_592_000) * 1000);
+
     const failedEvent = {
       id: `evt_vivarqo_${randomUUID()}`, type: "invoice.payment_failed",
       data: { object: { id: "in_test_failed", customer: "cus_test_vivarqo" } },
@@ -160,6 +171,39 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect(duplicate.body).toMatchObject({ received: true, duplicate: true });
     const billingState = await owner.agent.get("/api/v1/billing/subscription").expect(200);
     expect(billingState.body.entitlements.paidSubscription).toBe(true);
+
+    const deletedEvent = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      type: "customer.subscription.deleted",
+      data: { object: {
+        id: "sub_test_vivarqo",
+        customer: "cus_test_vivarqo",
+        metadata: { user_id: owner.userId },
+        status: "canceled",
+        current_period_start: baseTime,
+        current_period_end: baseTime + 2_592_000,
+        cancel_at_period_end: false,
+        items: { data: [{ price: { id: "price_test_vivarqo" } }] },
+      } },
+    };
+    await sendEvent(owner.agent, deletedEvent).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("canceled");
+
+    const lateFailedInvoice = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      type: "invoice.payment_failed",
+      data: { object: { id: "in_test_late_failed", customer: "cus_test_vivarqo" } },
+    };
+    await sendEvent(owner.agent, lateFailedInvoice).expect(200);
+    const afterLateInvoice = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(afterLateInvoice.status).toBe("canceled");
+
+    const lateSubscriptionUpdate = {
+      ...updatedEvent,
+      id: `evt_vivarqo_${randomUUID()}`,
+    };
+    await sendEvent(owner.agent, lateSubscriptionUpdate).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("canceled");
     expect(stripeFetch).toHaveBeenCalledTimes(2);
   });
 

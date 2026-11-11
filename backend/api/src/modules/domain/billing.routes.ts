@@ -84,7 +84,12 @@ function verifyStripeSignature(rawBody: Buffer, signatureHeader: string | undefi
   });
 }
 
-type BillingTransaction = Pick<typeof prisma, "subscription" | "stripeWebhookEvent" | "user">;
+type BillingTransaction = Pick<typeof prisma, "$queryRaw" | "subscription" | "stripeWebhookEvent" | "user">;
+async function lockBillingUser(tx: BillingTransaction, userId: string): Promise<void> {
+  // Serialize all subscription lifecycle events for an account. Stripe webhook
+  // delivery is at-least-once and events are not guaranteed to arrive in order.
+  await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
+}
 async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<void> {
   const object = event.data.object;
   const eventType = event.type;
@@ -102,6 +107,14 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     if (!userId) return;
     const account = await tx.user.findFirst({ where: { id: userId, deletedAt: null, accountStatus: "active" }, select: { id: true } });
     if (!account) return;
+    await lockBillingUser(tx, userId);
+    const current = await tx.subscription.findUnique({
+      where: { userId }, select: { stripeSubscriptionId: true, status: true },
+    });
+    // Do not let a delayed subscription.created/updated event revive a subscription
+    // after Stripe has already delivered customer.subscription.deleted for this ID.
+    if (current?.stripeSubscriptionId === stripeSubscriptionId &&
+        current.status === "canceled" && eventType !== "customer.subscription.deleted") return;
     const price = object.items && typeof object.items === "object" && "data" in object.items && Array.isArray((object.items as { data?: unknown }).data)
       ? ((object.items as { data: Array<Record<string, unknown>> }).data[0]?.price as Record<string, unknown> | undefined)?.id
       : undefined;
@@ -127,6 +140,17 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     const customerId = stringId(object.customer);
     const subscriptionId = stringId(object.subscription);
     if (!customerId || !subscriptionId) return;
+    await lockBillingUser(tx, userRaw);
+    const current = await tx.subscription.findUnique({
+      where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true },
+    });
+    // checkout.session.completed is not authoritative for billing status or period
+    // dates. If subscription.created/updated was already processed, preserve it.
+    if (current && (
+      ["active", "trialing"].includes(current.status) ||
+      (current.stripeSubscriptionId === subscriptionId &&
+        ["canceled", "unpaid", "paused", "incomplete_expired"].includes(current.status))
+    )) return;
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
@@ -140,16 +164,28 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     return;
   }
 
-  if (eventType === "invoice.payment_failed") {
+  if (eventType === "invoice.payment_failed" || eventType === "invoice.paid") {
     const customerId = stringId(object.customer);
-    if (customerId) await tx.subscription.updateMany({ where: { stripeCustomerId: customerId }, data: { status: "past_due" } });
-    return;
-  }
-
-  if (eventType === "invoice.paid") {
-    const customerId = stringId(object.customer);
-    if (customerId) await tx.subscription.updateMany({
-      where: { stripeCustomerId: customerId, status: "past_due" },
+    if (!customerId) return;
+    const current = await tx.subscription.findFirst({
+      where: { stripeCustomerId: customerId }, select: { userId: true },
+    });
+    if (!current) return;
+    await lockBillingUser(tx, current.userId);
+    if (eventType === "invoice.payment_failed") {
+      // A delayed failed-invoice event must never move a deleted/unpaid subscription
+      // back into past_due, which would otherwise reopen the grace-period entitlement.
+      await tx.subscription.updateMany({
+        where: {
+          userId: current.userId, stripeCustomerId: customerId,
+          status: { in: ["active", "trialing", "past_due"] },
+        },
+        data: { status: "past_due" },
+      });
+      return;
+    }
+    await tx.subscription.updateMany({
+      where: { userId: current.userId, stripeCustomerId: customerId, status: "past_due" },
       data: { status: "active" },
     });
   }
