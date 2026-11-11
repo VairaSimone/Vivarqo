@@ -106,7 +106,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         if (isEdit) await api.patch(`/animal-notes/${recordId}`, payload); else await api.post(`/animals/${id}/notes`, payload);
       }
       setRecordKind(null); weights.reload(); sheds.reload(); notes.reload(); animalResource.reload(); show(t("saveSuccess"));
-    } catch (reason) { setFormError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    } catch (reason) { setFormError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
 
