@@ -422,7 +422,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "text/csv")
-      .send(Buffer.from("animalIdentifier,performedAt\\nCARE-MAP-1,2026-10-16T10:00:00.000Z\\n", "utf8"))
+      .send(Buffer.from("animalIdentifier,performedAt\nCARE-MAP-1,2026-10-16T10:00:00.000Z\n", "utf8"))
       .expect(201);
     expect(missingOutcome.body.validRows).toBe(0);
     expect(missingOutcome.body.missingFields).toContainEqual(["outcome"]);
