@@ -23,6 +23,7 @@ import { createHomeCalendarRouter } from "./modules/operations/home-calendar.rou
 import { createReproductionRouter } from "./modules/domain/reproduction.routes.js";
 import { createInventoryRouter } from "./modules/domain/inventory.routes.js";
 import { createDocumentShareRouter } from "./modules/domain/documents-shares.routes.js";
+import { createAnimalPhotoRouter } from "./modules/domain/animal-photos.routes.js";
 import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
 import { createBillingRouter, type BillingRouterOptions } from "./modules/domain/billing.routes.js";
 import { createExportRouter } from "./modules/domain/exports.routes.js";
@@ -91,6 +92,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
   app.use("/api/v1/animals", createAnimalRouter());
+  app.use("/api/v1", createAnimalPhotoRouter());
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/imports", createDomainImportRouter());
