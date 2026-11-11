@@ -45,6 +45,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [quickError, setQuickError] = useState("");
   const [editing, setEditing] = useState<AnimalDto | null>(null);
   const [form, setForm] = useState<AnimalForm>(emptyAnimal);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { toast, show } = useToast();
@@ -64,9 +65,10 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const animals = resource.data?.animals ?? [];
   const pager = resource.data?.pagination;
 
-  function openCreate() { setEditing(null); setForm(emptyAnimal); setError(""); setModal(true); }
+  function openCreate() { setEditing(null); setForm(emptyAnimal); setPhotoFile(null); setError(""); setModal(true); }
   function openEdit(animal: AnimalDto) {
     setEditing(animal);
+    setPhotoFile(null);
     setForm({
       name: getString(animal, "name"), identifier: getString(animal, "identifier"), species: getString(animal, "species"),
       sex: getString(animal, "sex", "unknown"), morph: getString(animal, "morph"), geneticsNotes: getString(animal, "geneticsNotes"),
@@ -79,23 +81,68 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   }
 
   async function save(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault();
+    setBusy(true);
+    setError("");
     const body = {
       ...form, identifier: form.identifier || null, morph: form.morph || null,
       geneticsNotes: form.geneticsNotes || null, birthDate: form.birthDate || null,
       acquiredDate: form.acquiredDate || null, originDescription: form.originDescription || null,
       previousBreeder: form.previousBreeder || null, locationLabel: form.locationLabel || null, notes: form.notes || null
     };
+    let targetAnimal = editing;
     try {
-      if (editing) await api.patch(`/animals/${getString(editing, "id")}`, body);
-      else {
+      if (editing) {
+        await api.patch("/animals/" + getString(editing, "id"), body);
+      } else {
         const { status: _status, ...createBody } = body;
-        await api.post("/animals", createBody);
+        const created = await api.post<{ animal: AnimalDto }>("/animals", createBody);
+        targetAnimal = created.animal;
+        // Keep the created id when a subsequent photo upload needs to be retried.
+        setEditing(created.animal);
       }
-      setModal(false); resource.reload(); show(editing ? t("animalUpdated") : t("animalCreated"));
+      if (photoFile && targetAnimal) {
+        await api.upload("/animals/" + getString(targetAnimal, "id") + "/photo", photoFile);
+      }
+      setModal(false);
+      setPhotoFile(null);
+      resource.reload();
+      show(editing ? t("animalUpdated") : t("animalCreated"));
+    } catch (reason) {
+      if (targetAnimal && !editing) resource.reload();
+      setError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    if (!editing || !getString(editing, "photoUrl")) return;
+    if (!window.confirm(t("confirmDelete"))) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.delete("/animals/" + getString(editing, "id") + "/photo");
+      setEditing({ ...editing, photoUrl: null });
+      setPhotoFile(null);
+      resource.reload();
+      show(t("photoRemoved"));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : t("operationFailed"));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function selectPhoto(file: File | null) {
+    if (!file) { setPhotoFile(null); return; }
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (file.size > 5 * 1024 * 1024 || (file.type && !allowed.includes(file.type))) {
+      setError(t("photoValidation"));
+      return;
+    }
+    setError("");
+    setPhotoFile(file);
   }
 
   async function updateStatus(animal: AnimalDto, action: "archive" | "restore" | "delete") {
@@ -112,7 +159,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const rows = animals.map((animal) => {
     const id = getString(animal, "id");
     return [
-      <button className="animal-name-cell" onClick={() => navigate(`/animals/${id}`)}><span className="animal-avatar"><Icon name="snake" size={16} /></span><span><strong>{getString(animal, "name")}</strong><small>{getString(animal, "identifier") || getString(animal, "species")}</small></span></button>,
+      <button className="animal-name-cell" onClick={() => navigate(`/animals/${id}`)}><span className="animal-avatar">{getString(animal, "photoUrl") ? <img className="animal-avatar-image" src={getString(animal, "photoUrl")} alt="" loading="lazy" /> : <Icon name="snake" size={16} />}</span><span><strong>{getString(animal, "name")}</strong><small>{getString(animal, "identifier") || getString(animal, "species")}</small></span></button>,
       <span>{getString(animal, "species")}</span>,
       <span>{getString(animal, "morph") || "—"}</span>,
       <span>{getString(animal, "sex") ? t(getString(animal, "sex")) : "—"}</span>,
@@ -185,6 +232,11 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     {modal && <Modal title={editing ? t("animalEdit") : t("animalNew")} onClose={() => setModal(false)} wide>
       <form className="form-stack" onSubmit={save}>
         {error && <Alert tone="danger">{error}</Alert>}
+        <Field label={t("animalPhoto")} hint={t("animalPhotoHint")}>
+          <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => selectPhoto(e.target.files?.[0] ?? null)} />
+        </Field>
+        {photoFile && <p className="muted-note">{photoFile.name}</p>}
+        {editing?.photoUrl && <div className="animal-photo-editor"><img src={editing.photoUrl} alt={t("animalPhoto")} /><Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void removePhoto()}>{t("removePhoto")}</Button></div>}
         <div className="form-grid">
           <Field label={t("name")}><Input required maxLength={120} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label={t("identifier")}><Input maxLength={120} value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} /></Field>
