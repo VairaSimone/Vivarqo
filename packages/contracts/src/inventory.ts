@@ -14,7 +14,7 @@ export interface InventoryItemDto {
 export interface InventoryMovementDto {
   id: string;
   itemId: string;
-  movementType: "in" | "out" | "set";
+  movementType: "in" | "out" | "adjustment";
   quantity: number;
   occurredAt: string;
   unitCostCents?: number | null;
@@ -26,7 +26,7 @@ export interface DocumentDto {
   id: string;
   animalId: string | null;
   originalFilename: string;
-  sizeBytes: number;
+  sizeBytes: string;
   category: string | null;
   note: string | null;
   createdAt: string;
@@ -41,7 +41,7 @@ export interface DocumentDeletionJobDto {
   documentId: string;
   status: string;
   attempts: number;
-  lastError: string | null;
+  lastError?: string | null;
   nextAttemptAt?: string | null;
   lastErrorCode?: string | null;
   createdAt?: string;
