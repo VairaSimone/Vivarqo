@@ -14,7 +14,7 @@ const uploadBody = raw({
   type: ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/octet-stream"],
   limit: "10mb",
 });
-const shareFields = ["name", "species", "morph", "sex", "birthDate"] as const;
+const shareFields = ["name", "species", "morph", "sex", "birthDate", "photo"] as const;
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const result = schema.safeParse(value);
   if (!result.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed", { issues: result.error.issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message })) });
@@ -341,6 +341,8 @@ export function createDocumentShareRouter() {
             morph: true,
             sex: true,
             birthDate: true,
+            photoKey: true,
+            updatedAt: true,
           },
         },
       },
@@ -356,6 +358,7 @@ export function createDocumentShareRouter() {
         case "morph": if (animal.morph !== null) publicAnimal.morph = animal.morph; break;
         case "sex": publicAnimal.sex = animal.sex; break;
         case "birthDate": if (animal.birthDate !== null) publicAnimal.birthDate = animal.birthDate.toISOString().slice(0, 10); break;
+        case "photo": if (animal.photoKey) publicAnimal.photoUrl = "/api/v1/public/animals/" + slug + "/photo?v=" + animal.updatedAt.getTime(); break;
       }
     }
     res.setHeader("Cache-Control", "no-store");
