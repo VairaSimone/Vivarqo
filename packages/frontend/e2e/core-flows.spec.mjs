@@ -875,21 +875,30 @@ for (const viewport of responsiveViewports) {
             for (let index = 0; index < await actionButtons.count(); index += 1) {
               const button = actionButtons.nth(index);
               await expect(button).toBeVisible();
-              await button.scrollIntoViewIfNeeded();
+              // Center each action in the usable viewport. scrollIntoViewIfNeeded()
+              // considers viewport intersection but does not account for fixed overlays.
+              await button.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
               const hitTarget = await button.evaluate((element) => {
                 const rect = element.getBoundingClientRect();
                 const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                const bottomNav = document.querySelector(".mobile-bottom-nav");
+                const bottomNavTop = bottomNav?.getBoundingClientRect().top ?? document.documentElement.clientHeight;
                 return {
                   width: rect.width,
                   height: rect.height,
                   insideViewport: rect.left >= 0 && rect.right <= document.documentElement.clientWidth,
-                  receivesPointer: Boolean(hit && element.contains(hit))
+                  aboveBottomNavigation: rect.bottom <= bottomNavTop + 1,
+                  receivesPointer: Boolean(hit && (hit === element || element.contains(hit))),
+                  coveredBy: hit && hit !== element && !element.contains(hit)
+                    ? { tag: hit.tagName, className: typeof hit.className === "string" ? hit.className : "", ariaLabel: hit.getAttribute("aria-label") }
+                    : null
                 };
               });
               expect(hitTarget.width, "table action target width").toBeGreaterThanOrEqual(44);
               expect(hitTarget.height, "table action target height").toBeGreaterThanOrEqual(44);
               expect(hitTarget.insideViewport, "table action must stay within the viewport").toBe(true);
-              expect(hitTarget.receivesPointer, "table action must not be covered by another element").toBe(true);
+              expect(hitTarget.aboveBottomNavigation, "table action must be in the unobstructed area above the bottom navigation").toBe(true);
+              expect(hitTarget.receivesPointer, `table action must receive pointer events; covered by ${JSON.stringify(hitTarget.coveredBy)}`).toBe(true);
             }
           } else if (tableLayout.overflow === "true") {
             await expect(page.locator(".table-scroll-hint")).toBeVisible();
