@@ -52,6 +52,8 @@ describe("account timezone helpers", () => {
     expect(todayDate(new Date(instant), "America/Los_Angeles")).toBe("2026-01-01");
     // A date-only value remains a calendar date and is never shifted.
     expect(dateForInput("2026-01-02")).toBe("2026-01-02");
+    expect(dateForInput("2026-02-30")).toBe("");
+    expect(formatDate("2026-02-30", "en")).toBe("—");
   });
 
   it("round-trips datetime-local values through an account timezone", () => {
