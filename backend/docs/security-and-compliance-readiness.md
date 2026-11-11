@@ -106,7 +106,7 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 
 ## Aggiornamento 11 novembre 2026 — deployment e rate limiting
 
-La configurazione production/staging e le relative istruzioni sono in [production-deployment.md](production-deployment.md). Il Compose locale è development-only; lo stack production/staging usa file-backed secrets, Caddy per TLS, reti interne, ruoli PostgreSQL separati (admin per migrazioni/backup, ruolo DML non-superuser per API/worker) e un servizio backup verso un bind mount host indipendente dal volume DB.
+La configurazione production/staging e le relative istruzioni sono in [production-deployment.md](production-deployment.md). Il Compose locale è development-only; lo stack production/staging usa file-backed secrets, Caddy per TLS, reti interne, ruoli PostgreSQL separati (admin per migrazioni, ruolo DML non-superuser per API/worker e ruolo read-only per backup) e un servizio backup verso un bind mount host indipendente dal volume DB.
 
 Il limite generale API non è per-processo: `app.ts` monta `persistentRateLimit(300, "api-global")`, che utilizza il contatore PostgreSQL HMAC. La verifica d'integrazione crea due istanze store separate e dimostra la condivisione del contatore.
 

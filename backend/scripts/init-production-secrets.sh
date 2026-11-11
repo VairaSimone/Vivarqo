@@ -24,6 +24,7 @@ create_random_secret() {
 
 create_random_secret postgres_admin_password
 create_random_secret postgres_app_password
+create_random_secret postgres_backup_password
 create_random_secret csrf_secret
 
 cat <<EOF

@@ -29,7 +29,7 @@ create_environment() {
 
   mkdir -p "$secrets_dir" "$backup_dir"
   chmod 700 "$secrets_dir" "$backup_dir"
-  for secret in postgres_admin_password postgres_app_password csrf_secret resend_api_key stripe_secret_key stripe_webhook_secret vapid_private_key s3_access_key_id s3_secret_access_key; do
+  for secret in postgres_admin_password postgres_app_password postgres_backup_password csrf_secret resend_api_key stripe_secret_key stripe_webhook_secret vapid_private_key s3_access_key_id s3_secret_access_key; do
     printf 'ci-only-secret-value-not-for-use\n' > "$secrets_dir/$secret"
     chmod 0444 "$secrets_dir/$secret"
   done
@@ -48,6 +48,7 @@ TRUST_PROXY_HOPS=2
 DATABASE_NAME=vivarqo_$environment
 DATABASE_ADMIN_USER=vivarqo_${environment}_admin
 DATABASE_USER=vivarqo_${environment}_app
+DATABASE_BACKUP_USER=vivarqo_${environment}_backup
 DATABASE_PORT=5432
 EMAIL_FROM=noreply@example.test
 STRIPE_PRICE_ID=price_ci_only
@@ -105,11 +106,20 @@ if (services.worker.environment?.DATABASE_PASSWORD_FILE !== "/run/secrets/postgr
 if (services.migrate.environment?.DATABASE_PASSWORD_FILE !== "/run/secrets/postgres_admin_password") {
   throw new Error("Migrations must use the separate database administration secret");
 }
+if (services.backup.environment?.POSTGRES_USER === services.postgres.environment?.POSTGRES_USER) {
+  throw new Error("Backup must not use the PostgreSQL administration role");
+}
+if (services.backup.environment?.POSTGRES_PASSWORD_FILE !== "/run/secrets/postgres_backup_password") {
+  throw new Error("Backup must use its own read-only database secret");
+}
+if (services.postgres.environment?.DATABASE_BACKUP_USER === services.postgres.environment?.POSTGRES_USER) {
+  throw new Error("Backup database role must differ from the administration role");
+}
 if (services.worker.healthcheck?.disable !== true || services.migrate.healthcheck?.disable !== true) {
   throw new Error("Worker and one-shot migrations must not inherit the API HTTP healthcheck");
 }
 for (const name of [
-  "postgres_admin_password", "postgres_app_password", "csrf_secret", "resend_api_key",
+  "postgres_admin_password", "postgres_app_password", "postgres_backup_password", "csrf_secret", "resend_api_key",
   "stripe_secret_key", "stripe_webhook_secret", "vapid_private_key",
   "s3_access_key_id", "s3_secret_access_key",
 ]) {

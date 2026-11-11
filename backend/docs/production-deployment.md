@@ -10,7 +10,7 @@ Usare `backend/infra/docker/compose.production.yaml` sia per staging sia per pro
 - Nginx serve la PWA e inoltra `/api` al backend. L'header `X-Forwarded-Proto` originale viene conservato fino a Express.
 - PostgreSQL è solo sulla rete Docker `database`, dichiarata `internal`; non ha porte pubblicate.
 - API e worker non pubblicano porte host. Nginx, API e worker comunicano su reti Docker private; API e worker hanno connettività in uscita per email, Stripe e S3.
-- Le API usano il ruolo PostgreSQL `vivarqo_app` (o il corrispondente ruolo staging), che non è superuser e non può creare database o ruoli. Solo la migrazione usa il ruolo admin; il backup usa il ruolo admin con accesso limitato all'host di backup.
+- Le API e i worker usano il ruolo PostgreSQL applicativo (`vivarqo_app` o l'equivalente staging), senza privilegi amministrativi. Le migrazioni usano il ruolo admin. Il backup usa un terzo account dedicato, membro soltanto del ruolo predefinito `pg_read_all_data`, quindi in sola lettura.
 - I file applicativi e i documenti restano in un volume privato; in produzione il backend richiede anche il bucket S3 privato configurato.
 
 Con Caddy → Nginx → Express impostare `TRUST_PROXY_HOPS=2`. Se cambia la catena proxy, ricalcolare il numero; non usare `true` o fiducia indiscriminata negli header forwarded.
@@ -28,7 +28,7 @@ sudo backend/scripts/init-production-secrets.sh /etc/vivarqo/staging/secrets
 
 Ogni directory deve rimanere root-owned e mode `0700`. I file sono mode `0444` perché i file-backed secrets di Docker Compose montano i file host senza rimappare uid/gid: così li leggono soltanto i container a cui sono esplicitamente montati. La directory host non è attraversabile da utenti non privilegiati. Non mettere questi file in backup non cifrati o nel repository.
 
-Oltre ai tre file generati, provisionare tramite secret manager:
+Oltre ai quattro file generati, provisionare tramite secret manager:
 - `resend_api_key`
 - `stripe_secret_key` (`sk_live_...` in produzione, `sk_test_...` in staging)
 - `stripe_webhook_secret`
@@ -80,13 +80,13 @@ Il firewall del provider e dell'host deve consentire pubblicamente solo 80/443 e
 
 ## Database e privilegi
 
-La password admin e quella del ruolo applicativo sono generate separatamente. All'inizializzazione del volume PostgreSQL, `init-app-role.sh` crea il ruolo app senza privilegi SUPERUSER/CREATEDB/CREATEROLE e gli assegna DML sulle tabelle e uso delle sequenze. Le migrazioni usano il ruolo admin perché possono creare tabelle, indici ed estensioni. API e worker usano esclusivamente il ruolo app.
+La password admin, quella del ruolo applicativo e quella del ruolo backup sono generate separatamente. All'inizializzazione del volume PostgreSQL, `init-app-role.sh` crea il ruolo app senza privilegi SUPERUSER/CREATEDB/CREATEROLE e gli assegna DML sulle tabelle e uso delle sequenze. Crea anche il ruolo backup, senza privilegi di scrittura o amministrativi, con accesso predefinito `pg_read_all_data`. Le migrazioni usano il ruolo admin perché possono creare tabelle, indici ed estensioni. API e worker usano esclusivamente il ruolo app; il container backup usa esclusivamente il ruolo read-only.
 
 Gli script init PostgreSQL vengono eseguiti soltanto quando il volume dati viene inizializzato per la prima volta. Una rotazione successiva della password app richiede l'aggiornamento coordinato del secret e del ruolo DB prima del riavvio dei servizi; non eliminare il volume per applicare una rotazione.
 
 ## Backup e disaster recovery
 
-Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. Lo script host `verify-production-backup-mount.sh` rifiuta una directory non montata o sullo stesso device del Docker data root. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente e monitorata per spazio libero.
+Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. Lo script host `verify-production-backup-mount.sh` rifiuta una directory non montata o sullo stesso device del Docker data root. Il container usa un account database read-only dedicato e non monta la password dell'admin. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente e monitorata per spazio libero.
 
 **La copia su disco separato nello stesso host non è un backup off-site e da sola non basta per il disaster recovery.** Configurare una replica esterna cifrata (secret manager/backup agent aziendale, restic o equivalente) verso un account e una regione separati, verificare i checksum dopo il trasferimento e fare restore drill periodici su un host/cluster differente. Il repository non può creare credenziali o attivare l'off-site senza il provider scelto e i relativi segreti. Non considerare il rilascio pronto finché questa replica e il relativo ripristino non sono provati.
 

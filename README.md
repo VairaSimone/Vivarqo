@@ -360,6 +360,6 @@ Il manifest e il service worker rendono la shell installabile e conservano nella
 
 ## Deployment production e staging
 
-La configurazione pubblica è separata dal Compose locale: usare `backend/infra/docker/compose.production.yaml` con `.env.production` oppure `.env.staging`. Caddy è l'unico servizio che pubblica 80/443 e gestisce HTTPS; PostgreSQL, API e web restano su reti private. API e worker usano un ruolo PostgreSQL senza privilegi amministrativi; le migrazioni e i backup usano un ruolo distinto. I segreti sono file-backed e separati per ambiente.
+La configurazione pubblica è separata dal Compose locale: usare `backend/infra/docker/compose.production.yaml` con `.env.production` oppure `.env.staging`. Caddy è l'unico servizio che pubblica 80/443 e gestisce HTTPS; PostgreSQL, API e web restano su reti private. API e worker usano un ruolo PostgreSQL senza privilegi amministrativi; le migrazioni usano il ruolo admin e il backup un account distinto in sola lettura. I segreti sono file-backed e separati per ambiente.
 
 La guida completa, inclusi provisioning dei segreti, TLS, backup separato e requisiti off-site, è in [`backend/docs/production-deployment.md`](backend/docs/production-deployment.md). Il backup automatico scrive su storage host separato dal volume PostgreSQL, ma la replica off-site cifrata e il restore su host alternativo devono essere attivati e provati nell'infrastruttura scelta.
