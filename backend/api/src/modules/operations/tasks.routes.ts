@@ -356,7 +356,7 @@ export function createTasksRouter() {
     const id = routeId(req.params.id, "task id");
     const task = await prisma.task.findFirst({
       where: { id, userId: auth.userId },
-      include: { animal: true, reminderRule: { select: { id: true, intervalDays: true, isEnabled: true } } },
+      include: { animal: { select: { id: true, name: true, identifier: true, species: true } }, reminderRule: { select: { id: true, intervalDays: true, isEnabled: true } } },
     });
     if (!task) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
     res.status(200).json({ task });
