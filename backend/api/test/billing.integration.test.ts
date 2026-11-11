@@ -107,7 +107,10 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     const pendingBillingState = await owner.agent.get("/api/v1/billing/subscription").expect(200);
     expect(pendingBillingState.body.entitlements).toMatchObject({
       paidSubscription: false,
-      accessAllowed: false,
+      // The default product mode is intentionally free-first. When the
+      // subscription-required mode is enabled this entitlement blocks access.
+      accessAllowed: true,
+      accessMode: "unrestricted",
       status: "incomplete",
     });
 
