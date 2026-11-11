@@ -138,6 +138,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     if (!file) { setPhotoFile(null); return; }
     const allowed = ["image/jpeg", "image/png", "image/webp"];
     if (file.size > 5 * 1024 * 1024 || (file.type && !allowed.includes(file.type))) {
+      setPhotoFile(null);
       setError(t("photoValidation"));
       return;
     }
