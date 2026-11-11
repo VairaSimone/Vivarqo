@@ -71,7 +71,7 @@ export function CalendarPage({ locale, timezone, navigate }: { locale: Locale; t
     </Panel>
     {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : view === "list" ? <Panel>
       {items.length ? <div className="calendar-list">{items.map((item) => <button className="calendar-list-row" key={getString(item, "id")} onClick={() => itemClick(item)}>
-        <span className="calendar-date-block"><strong>{formatDate(getString(item, "start"), locale, { day: "2-digit" }).replace(/\D/g, "")}</strong><small>{formatDate(getString(item, "start"), locale, { month: "short" })}</small></span>
+        <span className="calendar-date-block"><strong>{formatDate(getString(item, "start"), locale, { day: "2-digit", timeZone: timezone }).replace(/\D/g, "")}</strong><small>{formatDate(getString(item, "start"), locale, { month: "short", timeZone: timezone })}</small></span>
         <span className="calendar-item-copy"><strong>{getString(item, "title")}</strong><small>{getString(item, "type")} · {formatDateTime(getString(item, "start"), locale, timezone)}</small></span>
         <Badge>{getString(item, "status")}</Badge><Icon name="chevron" />
       </button>)}</div> : <EmptyState title={t("noCalendarEvents")} />}
