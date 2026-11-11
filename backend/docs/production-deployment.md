@@ -38,7 +38,7 @@ Oltre ai tre file generati, provisionare tramite secret manager:
 
 La chiave VAPID pubblica, il Price ID e le configurazioni dei provider non segrete restano nei rispettivi file environment. Le chiavi, i bucket, gli account Stripe e le directory secret di staging e produzione devono essere distinti.
 
-Il loader applicativo supporta `VARIABLE_FILE`; legge i file a runtime e non inserisce i percorsi *_FILE o i valori dei segreti nell'ambiente del processo. La password DB viene usata per costruire la URL PostgreSQL in memoria. Le chiavi Stripe Test Mode sono rifiutate quando `VIVARQO_NODE_ENV=production`.
+Il loader applicativo supporta `VARIABLE_FILE`; legge i file a runtime e non inserisce i percorsi *_FILE o i valori dei segreti nell'ambiente del processo. Il container Caddy riceve soltanto dominio pubblico ed email ACME, non l'intera configurazione applicativa. La password DB viene usata per costruire la URL PostgreSQL in memoria. Le chiavi Stripe Test Mode sono rifiutate quando `VIVARQO_NODE_ENV=production`.
 
 ## Avvio staging
 

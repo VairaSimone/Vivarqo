@@ -34,7 +34,7 @@ services:
     networks:
       - database
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -161,8 +161,6 @@ services:
   caddy:
     image: caddy:2.10-alpine
     restart: unless-stopped
-    env_file:
-      - ${VIVARQO_ENV_FILE:?Set VIVARQO_ENV_FILE}
     environment:
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}

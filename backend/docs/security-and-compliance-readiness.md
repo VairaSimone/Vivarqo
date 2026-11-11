@@ -1,7 +1,7 @@
 # Sicurezza e conformità: stato, controlli e attività prima del lancio
 
-**Revisione tecnica:** 28 ottobre 2026  
-**Ambito verificato:** repository Vivarqo disponibile nel branch `main`, con backend/API, database, migrazioni e infrastruttura. Il frontend React/PWA è stato rimosso il 2 novembre 2026 per essere ricostruito. Il repository non contiene documenti legali pubblicati né prove autonome dell’ambiente di produzione.  
+**Revisione tecnica:** 11 novembre 2026  
+**Ambito verificato:** branch `main`, inclusi backend/API, database/migrazioni, frontend React/PWA, test E2E e configurazioni Docker di sviluppo e produzione. Le configurazioni versionate non dimostrano da sole che provider, certificati TLS o backup off-site siano stati attivati su un ambiente reale.  
 **Importante:** questa è una checklist tecnica, non una certificazione di conformità né un parere legale. La conformità dipende anche da chi gestisce il servizio, dalle finalità effettive, dai fornitori, dai paesi serviti, dai contratti e dai processi organizzativi.
 
 ## 1. Modifiche tecniche applicate in questo branch
@@ -23,7 +23,7 @@ Riferimenti di base: [Regolamento (UE) 2016/679 — GDPR](https://eur-lex.europa
 | Area | Stato tecnico attuale | Attività necessaria prima del lancio |
 |---|---|---|
 | Privacy by design/minimizzazione | Query separate per account; campi pubblici in allowlist; log redatti; artefatti temporanei con scadenza. | Verificare il ciclo di vita di tutti i dati, inclusi log, backup, email, fornitori e account disattivati. |
-| Informativa artt. 13–14 | Non è presente nel repository una privacy notice pubblicabile e completa. | Identificare il titolare legale, contatti, finalità, basi giuridiche, categorie di dati, destinatari/responsabili, trasferimenti, retention, diritti e reclamo al Garante. Non inventare questi dati nel codice. |
+| Informativa artt. 13–14 | È presente una bozza in `docs/legal/PRIVACY-NOTICE-IT.md`, ancora incompleta e con segnaposto. | Identificare il titolare legale, contatti, finalità, basi giuridiche, categorie di dati, destinatari/responsabili, trasferimenti, retention, diritti e reclamo al Garante. Non inventare questi dati nel codice. |
 | Diritti dell'interessato | È disponibile l'export tecnico, gli endpoint di modifica e `DELETE /api/v1/account` per la cancellazione self-service con verifica della password e conferma esplicita. | Verificare in staging il ciclo completo di cancellazione, inclusi oggetti S3, abbonamento Stripe, copie residue e retention dei backup; documentare i canali per accesso, rettifica, limitazione, opposizione e portabilità quando applicabili. Definire e applicare le eccezioni di conservazione legale. |
 | Responsabili del trattamento art. 28 | Email transazionali, storage e pagamenti sono integrazioni esterne configurabili. | Verificare e archiviare DPA/accordi con ogni provider, elenco sub-responsabili, regioni effettive e istruzioni di trattamento. |
 | Trasferimenti internazionali | Il codice non dimostra dove il provider o ogni sub-responsabile tratti tutti i dati. | Verificare regione, accessi di supporto, sub-responsabili e meccanismo GDPR per eventuali trasferimenti extra-SEE; predisporre valutazioni supplementari se necessarie. |
@@ -61,7 +61,7 @@ L'applicabilità di obblighi specifici e possibili esenzioni dipende dal ruolo c
 
 ## 5. Abbonamenti e tutela del consumatore in Italia/UE
 
-L'API integra Stripe Checkout e Customer Portal, ma il repository non contiene le pagine di acquisto, le condizioni contrattuali né la UI di cancellazione. Se il servizio è offerto anche a consumatori, serve una revisione rispetto al Codice del Consumo e alle norme sui contratti di servizi digitali, inclusa la [Direttiva (UE) 2019/770](https://eur-lex.europa.eu/eli/dir/2019/770/oj?locale=it) e il recepimento nazionale.
+L'API integra Stripe Checkout e Customer Portal e il frontend contiene la pagina di gestione dell'abbonamento. Restano da completare e pubblicare le condizioni contrattuali e le informazioni precontrattuali, e da verificare i flussi reali di checkout, rinnovo, disdetta e recesso. Se il servizio è offerto anche a consumatori, serve una revisione rispetto al Codice del Consumo e alle norme sui contratti di servizi digitali, inclusa la [Direttiva (UE) 2019/770](https://eur-lex.europa.eu/eli/dir/2019/770/oj?locale=it) e il recepimento nazionale.
 
 Prima del lancio commerciale verificare: identità del professionista, prezzo totale e imposte, frequenza di addebito, rinnovo e cessazione, funzionalità del piano, prova gratuita se presente, modalità di reclamo, diritto di recesso ed eventuali eccezioni/consensi specifici, aggiornamenti e rimedi per difetti di conformità. Le schermate Stripe da sole non sostituiscono le informazioni precontrattuali e i termini legali.
 
