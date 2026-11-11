@@ -110,8 +110,8 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     {tab === "tasks" ? <>
       <Panel className="filters-panel"><div className="filter-row">
         <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="open">{t("open")}</option><option value="all">{t("all")}</option><option value="completed">{t("completed")}</option><option value="dismissed">{t("dismissed")}</option></Select>
-        <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select>
+        <Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="open">{t("open")}</option><option value="all">{t("all")}</option><option value="completed">{t("completed")}</option><option value="dismissed">{t("dismissed")}</option></Select>
+        <Select aria-label={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select>
       </div></Panel>
       {tasks.loading && !tasks.data ? <LoadingState /> : tasks.error ? <ErrorState message={tasks.error.message} retry={tasks.reload} /> :
         <Panel><div className="list-meta"><span>{tasks.data?.pagination.total ?? 0} {t("rows")}</span><Button size="sm" variant="ghost" onClick={tasks.reload}><Icon name="refresh" />{t("refresh")}</Button></div>

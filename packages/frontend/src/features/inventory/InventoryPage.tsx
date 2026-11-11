@@ -88,8 +88,8 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     <PageHeader eyebrow={t("navResources")} title={t("inventoryTitle")} description={t("inventorySubtitle")} action={<Button onClick={() => openItem()}><Icon name="plus" />{t("addItem")}</Button>} />
     <Panel className="filters-panel"><div className="filter-row">
       <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-      <Select value={active} onChange={(e) => { setActive(e.target.value); setPage(1); }}><option value="true">{t("active")}</option><option value="all">{t("all")}</option><option value="false">{t("archived")}</option></Select>
-      <Select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{inventoryCategories.map((value) => <option value={value} key={value}>{t(`item_${value}`)}</option>)}</Select>
+      <Select aria-label={t("active")} value={active} onChange={(e) => { setActive(e.target.value); setPage(1); }}><option value="true">{t("active")}</option><option value="all">{t("all")}</option><option value="false">{t("archived")}</option></Select>
+      <Select aria-label={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{inventoryCategories.map((value) => <option value={value} key={value}>{t(`item_${value}`)}</option>)}</Select>
       <label className="checkbox-field low-stock-filter"><input type="checkbox" checked={lowStock} onChange={(e) => { setLowStock(e.target.checked); setPage(1); }} />{t("lowStock")}</label>
     </div></Panel>
     <Panel><div className="list-meta"><span>{resource.data?.pagination.total ?? 0} {t("rows")}</span><Button size="sm" variant="ghost" onClick={resource.reload}><Icon name="refresh" />{t("refresh")}</Button></div>

@@ -87,7 +87,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
     </div>
     <Panel className="filters-panel"><div className="filter-row">
       <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-      <Select value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }}><option value="">{t("all")}</option><option value="income">{t("income")}</option><option value="expense">{t("expense")}</option></Select>
+      <Select aria-label={locale === "it" ? "Tipo di registrazione" : "Entry type"} value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }}><option value="">{t("all")}</option><option value="income">{t("income")}</option><option value="expense">{t("expense")}</option></Select>
       <Input placeholder={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} />
       <Input aria-label={t("from")} type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
       <Input aria-label={t("to")} type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
