@@ -200,9 +200,9 @@ export function createCareImportRouter() {
     };
     const requiredFields: Record<CareEntity, string[][]> = {
       weights: [["animalId", "animalIdentifier"], ["measuredAt"], ["weightG"]],
-      sheds: [["animalId", "animalIdentifier"], ["occurredAt"]],
+      sheds: [["animalId", "animalIdentifier"], ["occurredAt"], ["outcome"]],
       notes: [["animalId", "animalIdentifier"], ["occurredAt"], ["category"], ["body"]],
-      feedings: [["animalId", "animalIdentifier"], ["performedAt"]],
+      feedings: [["animalId", "animalIdentifier"], ["performedAt"], ["outcome"]],
     };
     let mapping;
     try {
