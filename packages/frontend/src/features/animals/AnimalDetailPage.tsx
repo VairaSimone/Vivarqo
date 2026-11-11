@@ -51,6 +51,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
 
   useEffect(() => {
+    setFeedingPage(1);
+    setFeedingEditEntry(null);
+  }, [id]);
+
+  useEffect(() => {
     const totalPages = feedings.data?.pagination.totalPages;
     if (totalPages !== undefined && feedingPage > Math.max(1, totalPages)) {
       setFeedingPage(Math.max(1, totalPages));
@@ -230,7 +235,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           {feedings.loading && !feedings.data ? <LoadingState /> : feedings.error ? <ErrorState message={feedings.error.message} retry={feedings.reload} /> : feedings.data?.sessions.length ? <div className="session-list">
             {feedings.data.sessions.map((session) => {
               const entries = getArray<FeedingItem>(session, "entries");
-              const entry = entries.find((candidate) => getString(candidate, "animalId") === id) ?? entries[0];
+              const entry = entries.find((candidate) => getString(candidate, "animalId") === id);
               if (!entry) return null;
               const outcomeValue = getString(entry, "outcome");
               const foodWeight = getString(entry, "foodWeightG");
@@ -290,7 +295,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Field label={t("outcome")}><Select value={feedingEditForm.outcome} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, outcome: e.target.value })}><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select></Field>
         <Field label={t("foodType")}><Input maxLength={120} value={feedingEditForm.foodType} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input maxLength={120} value={feedingEditForm.foodSize} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodSize: e.target.value })} /></Field>
-        <Field label={t("foodWeight")}><Input type="number" min="0.01" step="0.01" value={feedingEditForm.foodWeightG} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodWeightG: e.target.value })} /></Field>
+        <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={feedingEditForm.foodWeightG} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodWeightG: e.target.value })} /></Field>
         <Field label={t("notes")}><Textarea rows={3} value={feedingEditForm.notes} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setFeedingEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={feedingBusy}>{feedingBusy ? t("loading") : t("save")}</Button></div>
       </form>
