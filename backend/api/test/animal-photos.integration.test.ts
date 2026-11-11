@@ -1,4 +1,5 @@
 import express from "express";
+import { Readable } from "node:stream";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   animalFindFirst: vi.fn(),
   animalUpdate: vi.fn(),
   auditCreate: vi.fn(),
+  publicShareFindFirst: vi.fn(),
   transaction: vi.fn(),
   validateImage: vi.fn(),
   storeObject: vi.fn(),
@@ -19,7 +21,7 @@ vi.mock("../src/db/prisma.js", () => ({
       findFirst: mocks.animalFindFirst,
       update: mocks.animalUpdate,
     },
-    publicShare: { findFirst: vi.fn() },
+    publicShare: { findFirst: mocks.publicShareFindFirst },
     $transaction: mocks.transaction,
   },
 }));
@@ -56,6 +58,8 @@ describe("animal photo upload lifecycle", () => {
     mocks.animalFindFirst.mockResolvedValue({ id: animalId, photoKey: null });
     mocks.animalUpdate.mockResolvedValue({ id: animalId, updatedAt: storedAt });
     mocks.auditCreate.mockResolvedValue({});
+    mocks.publicShareFindFirst.mockResolvedValue(null);
+    mocks.openObject.mockResolvedValue({ stream: Readable.from([uploadedBytes]), sizeBytes: uploadedBytes.length });
     mocks.transaction.mockImplementation(async (callback: (tx: any) => Promise<unknown>) => callback({
       animal: {
         findFirst: mocks.animalFindFirst,
@@ -66,6 +70,49 @@ describe("animal photo upload lifecycle", () => {
     mocks.validateImage.mockReturnValue({ mimeType: "image/jpeg", extension: "jpg" });
     mocks.storeObject.mockResolvedValue("animal-photos/new-photo.jpg");
     mocks.deleteObject.mockResolvedValue(undefined);
+  });
+
+  it("streams a private photo only after confirming the authenticated owner", async () => {
+    mocks.animalFindFirst.mockResolvedValue({ id: animalId, photoKey: "animal-photos/private-photo.jpg" });
+
+    const response = await request(authenticatedApp()).get("/animals/" + animalId + "/photo");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toBe("image/jpeg");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(mocks.animalFindFirst).toHaveBeenCalledWith({
+      where: { id: animalId, userId: ownerId },
+      select: { photoKey: true },
+    });
+    expect(mocks.openObject).toHaveBeenCalledWith("animal-photos/private-photo.jpg", 5 * 1024 * 1024);
+  });
+
+  it("does not serve a public photo when the share allowlist excludes it", async () => {
+    mocks.publicShareFindFirst.mockResolvedValue({
+      visibleFields: ["name", "species"],
+      animal: { photoKey: "animal-photos/public-photo.jpg" },
+    });
+
+    const response = await request(authenticatedApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
+
+    expect(response.status).toBe(404);
+    expect(mocks.openObject).not.toHaveBeenCalled();
+  });
+
+  it("serves a public photo only when the share explicitly includes photo", async () => {
+    mocks.publicShareFindFirst.mockResolvedValue({
+      visibleFields: ["name", "photo"],
+      animal: { photoKey: "animal-photos/public-photo.jpg" },
+    });
+
+    const response = await request(authenticatedApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toBe("image/jpeg");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["x-robots-tag"]).toBe("noindex");
+    expect(mocks.openObject).toHaveBeenCalledWith("animal-photos/public-photo.jpg", 5 * 1024 * 1024);
   });
 
   it("checks ownership before creating a private object", async () => {
