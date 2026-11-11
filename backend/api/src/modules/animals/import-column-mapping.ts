@@ -6,7 +6,7 @@ export interface ImportColumnMapping {
 
 /**
  * Resolves import headers consistently for animal, care and domain imports.
- * Automatic aliases are defaults; explicit user selections override them.
+ * Explicit mappings and explicit exclusions take precedence over aliases.
  */
 export function resolveImportColumnMapping(
   headers: string[],
@@ -17,11 +17,10 @@ export function resolveImportColumnMapping(
 ): ImportColumnMapping {
   const allowed = new Set(availableFields);
   const manual: Record<string, string> = {};
+  const ignoredHeaders = new Set<string>();
 
   if (requestedMapping !== undefined) {
-    if (typeof requestedMapping !== "string") {
-      throw new Error("IMPORT_MAPPING_INVALID");
-    }
+    if (typeof requestedMapping !== "string") throw new Error("IMPORT_MAPPING_INVALID");
     let parsed: unknown;
     try {
       parsed = JSON.parse(requestedMapping);
@@ -31,7 +30,20 @@ export function resolveImportColumnMapping(
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error("IMPORT_MAPPING_INVALID");
     }
-    const entries = Object.entries(parsed as Record<string, unknown>);
+
+    const requestObject = parsed as Record<string, unknown>;
+    const wrapped = Object.prototype.hasOwnProperty.call(requestObject, "fields")
+      || Object.prototype.hasOwnProperty.call(requestObject, "ignoredHeaders");
+    if (wrapped && Object.keys(requestObject).some((key) => key !== "fields" && key !== "ignoredHeaders")) {
+      throw new Error("IMPORT_MAPPING_INVALID");
+    }
+    const rawFields = wrapped ? requestObject.fields : requestObject;
+    const rawIgnored = wrapped ? requestObject.ignoredHeaders ?? [] : [];
+    if (typeof rawFields !== "object" || rawFields === null || Array.isArray(rawFields) || !Array.isArray(rawIgnored)) {
+      throw new Error("IMPORT_MAPPING_INVALID");
+    }
+
+    const entries = Object.entries(rawFields as Record<string, unknown>);
     if (entries.length > availableFields.length) throw new Error("IMPORT_MAPPING_INVALID");
     for (const [field, header] of entries) {
       if (!allowed.has(field) || typeof header !== "string" || !headers.includes(header)) {
@@ -39,19 +51,25 @@ export function resolveImportColumnMapping(
       }
       manual[field] = header;
     }
+    for (const header of rawIgnored) {
+      if (typeof header !== "string" || !headers.includes(header)) throw new Error("IMPORT_MAPPING_INVALID");
+      ignoredHeaders.add(header);
+    }
   }
 
   const mappedHeaders: Record<string, string> = {};
   const autoClaims: Record<string, string[]> = {};
   for (const header of headers) {
+    if (ignoredHeaders.has(header)) continue;
     const normalized = header.toLocaleLowerCase("it-IT")
       .normalize("NFD")
-      .replace(/[\\u0300-\\u036f]/g, "")
+      .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]/g, "");
     const field = aliases[normalized];
     if (!field || !allowed.has(field) || Object.prototype.hasOwnProperty.call(manual, field)) continue;
     (autoClaims[field] ??= []).push(header);
   }
+
   for (const [field, columns] of Object.entries(autoClaims)) {
     // Keep the first automatic match and leave extra columns unassigned so the
     // user can resolve ambiguous source headers in the mapping UI.

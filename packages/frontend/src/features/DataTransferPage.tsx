@@ -112,9 +112,14 @@ function ImportPage({ locale }: { locale: Locale }) {
       const selectedMapping = Object.fromEntries(Object.entries(assignments)
         .filter(([, field]) => Boolean(field))
         .map(([header, field]) => [field, header]));
+      const ignoredHeaders = Object.entries(assignments)
+        .filter(([, field]) => !field)
+        .map(([header]) => header);
       const params = new URLSearchParams({ entity });
       if (selectedSheet) params.set("sheet", selectedSheet);
-      if (Object.keys(selectedMapping).length) params.set("mapping", JSON.stringify(selectedMapping));
+      if (Object.keys(selectedMapping).length || ignoredHeaders.length) {
+        params.set("mapping", JSON.stringify({ fields: selectedMapping, ignoredHeaders }));
+      }
       const result = await api.upload<Item>("/imports?" + params.toString(), file);
       setPreview(result);
       setJobId(getString(result, "importId"));
