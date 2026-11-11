@@ -3,6 +3,8 @@ import type { Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
+import { logger } from "../../logger.js";
+import { deletePrivateObject } from "../domain/private-storage.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema } from "./animals.schemas.js";
 
@@ -36,6 +38,15 @@ function toAnimalData(input: z.output<typeof createAnimalSchema>) {
     ...input,
     birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
     acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
+  };
+}
+
+
+function animalResponse<T extends { id: string; photoKey: string | null; updatedAt: Date }>(animal: T) {
+  const { photoKey, ...safeAnimal } = animal;
+  return {
+    ...safeAnimal,
+    photoUrl: photoKey ? "/api/v1/animals/" + animal.id + "/photo?v=" + animal.updatedAt.getTime() : null,
   };
 }
 
@@ -98,7 +109,7 @@ export function createAnimalRouter() {
       }),
     ]);
     res.status(200).json({
-      animals,
+      animals: animals.map(animalResponse),
       pagination: {
         page: pageInput.page,
         pageSize: pageInput.pageSize,
@@ -125,7 +136,7 @@ export function createAnimalRouter() {
         });
         return created;
       });
-      res.status(201).json({ animal });
+      res.status(201).json({ animal: animalResponse(animal) });
     } catch (error) {
       mapUniqueViolation(error);
     }
@@ -156,7 +167,7 @@ export function createAnimalRouter() {
         });
         return animals;
       });
-      res.status(201).json({ animals: created, createdCount: created.length });
+      res.status(201).json({ animals: created.map(animalResponse), createdCount: created.length });
     } catch (error) {
       mapUniqueViolation(error);
     }
@@ -167,7 +178,7 @@ export function createAnimalRouter() {
     const id = parseUuid(req.params.id!);
     const animal = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
-    res.status(200).json({ animal });
+    res.status(200).json({ animal: animalResponse(animal) });
   });
 
   router.patch("/:id", requireSession, async (req, res) => {
@@ -198,7 +209,7 @@ export function createAnimalRouter() {
         });
         return updated;
       });
-      res.status(200).json({ animal });
+      res.status(200).json({ animal: animalResponse(animal) });
     } catch (error) {
       mapUniqueViolation(error);
     }
@@ -210,7 +221,7 @@ export function createAnimalRouter() {
     const animal = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     if (animal.status === "archived") {
-      res.status(200).json({ animal });
+      res.status(200).json({ animal: animalResponse(animal) });
       return;
     }
     const archived = await prisma.$transaction(async (tx) => {
@@ -223,7 +234,7 @@ export function createAnimalRouter() {
       });
       return result;
     });
-    res.status(200).json({ animal: archived });
+    res.status(200).json({ animal: animalResponse(archived) });
   });
 
   router.post("/:id/restore", requireSession, async (req, res) => {
@@ -233,7 +244,7 @@ export function createAnimalRouter() {
     if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     if (animal.status !== "archived") throw new AppError(409, "ANIMAL_NOT_ARCHIVED", "Only archived animals can be restored");
     const restored = await prisma.animal.update({ where: { id }, data: { status: "active", archivedAt: null } });
-    res.status(200).json({ animal: restored });
+    res.status(200).json({ animal: animalResponse(restored) });
   });
 
   router.delete("/:id", requireSession, async (req, res) => {
@@ -270,6 +281,13 @@ export function createAnimalRouter() {
       });
     }
     await prisma.animal.delete({ where: { id } });
+    if (animal.photoKey) {
+      try {
+        await deletePrivateObject(animal.photoKey);
+      } catch (error) {
+        logger.error({ animalId: id, storageKey: animal.photoKey, error }, "Failed to delete an animal photo after deleting its animal record");
+      }
+    }
     res.status(204).send();
   });
 
