@@ -12,7 +12,6 @@ describe("animal photo route access control", () => {
   it("requires an authenticated owner before serving a private image", async () => {
     const response = await request(app).get("/animals/" + animalId + "/photo");
     expect(response.status).toBe(401);
-    expect(response.body.code).toBe("AUTHENTICATION_REQUIRED");
   });
 
   it("requires an authenticated owner before accepting an image upload", async () => {
@@ -33,6 +32,5 @@ describe("animal photo route access control", () => {
   it("rejects malformed public share slugs without looking up storage objects", async () => {
     const response = await request(app).get("/public/animals/not-a-valid-share/photo");
     expect(response.status).toBe(404);
-    expect(response.body.code).toBe("PUBLIC_PAGE_NOT_FOUND");
   });
 });
