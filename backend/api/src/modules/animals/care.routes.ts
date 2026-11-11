@@ -55,10 +55,13 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const page = pageOptions(req.query);
     const where: Record<string, unknown> = { userId: auth.userId };
+    const requestedAnimalId = typeof req.query.animalId === "string"
+      ? parseUuid(req.query.animalId, "animalId")
+      : null;
     const searchQuery = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
     const entryFilters: Array<Record<string, unknown>> = [{ animal: { is: { userId: auth.userId } } }];
-    if (typeof req.query.animalId === "string") {
-      entryFilters.push({ animalId: parseUuid(req.query.animalId, "animalId") });
+    if (requestedAnimalId) {
+      entryFilters.push({ animalId: requestedAnimalId });
     }
     if (typeof req.query.outcome === "string") {
       if (!["ate", "refused", "not_offered", "unknown"].includes(req.query.outcome)) {
@@ -101,12 +104,14 @@ export function createCareRouter() {
       prisma.feedingSession.count({ where: where as never }),
       prisma.feedingSession.findMany({
         where: where as never,
-        orderBy: { performedAt: "desc" },
+        orderBy: [{ performedAt: "desc" }, { id: "desc" }],
         skip: (page.page - 1) * page.pageSize,
         take: page.pageSize,
         include: {
           entries: {
-            where: { animal: { is: { userId: auth.userId } } },
+            where: requestedAnimalId
+              ? { animalId: requestedAnimalId, animal: { is: { userId: auth.userId } } }
+              : { animal: { is: { userId: auth.userId } } },
             include: { animal: { select: { id: true, name: true, identifier: true, species: true, status: true } } },
           },
         },
@@ -188,11 +193,62 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
     const input = parseBody(patchFeedingEntrySchema, req.body);
-    const owned = await prisma.feedingEntry.findFirst({
-      where: { id, session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } },
+    const { performedAt, ...entryFields } = input;
+
+    const entry = await prisma.$transaction(async (tx) => {
+      const owned = await tx.feedingEntry.findFirst({
+        where: { id, session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } },
+        include: { session: { select: { id: true, performedAt: true, notes: true } } },
+      });
+      if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
+
+      let dateChanged = false;
+      if (performedAt) {
+        const nextDate = new Date(performedAt);
+        dateChanged = nextDate.getTime() !== owned.session.performedAt.getTime();
+        if (dateChanged) {
+          const sessionEntryCount = await tx.feedingEntry.count({ where: { sessionId: owned.sessionId } });
+          if (sessionEntryCount > 1) {
+            // Split this entry from a bulk session; other animals keep their date and session notes.
+            const separatedSession = await tx.feedingSession.create({
+              data: { userId: auth.userId, performedAt: nextDate, notes: owned.session.notes },
+            });
+            await tx.feedingEntry.update({
+              where: { id },
+              data: { ...entryFields, sessionId: separatedSession.id } as never,
+            });
+          } else {
+            await tx.feedingSession.update({
+              where: { id: owned.sessionId },
+              data: { performedAt: nextDate },
+            });
+            if (Object.keys(entryFields).length > 0) {
+              await tx.feedingEntry.update({ where: { id }, data: entryFields as never });
+            }
+          }
+        }
+      }
+
+      if (!dateChanged && Object.keys(entryFields).length > 0) {
+        await tx.feedingEntry.update({ where: { id }, data: entryFields as never });
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          userId: auth.userId,
+          action: "feeding.entry_updated",
+          entityType: "feeding_entry",
+          entityId: id,
+          metadata: { dateChanged },
+        },
+      });
+
+      return tx.feedingEntry.findFirstOrThrow({
+        where: { id },
+        include: { session: { select: { id: true, performedAt: true, notes: true } } },
+      });
     });
-    if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
-    const entry = await prisma.feedingEntry.update({ where: { id }, data: input as never });
+
     res.status(200).json({ entry });
   });
 

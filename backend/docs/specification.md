@@ -483,6 +483,9 @@ Copertura minima obbligatoria per:
 25.2 Test integrazione
 •	Un account non può leggere né modificare animali, documenti, importazioni o sottoscrizioni di un altro account.
 •	La sessione di alimentazione non può contenere animali di proprietari diversi.
+•	La scheda di ogni animale mostra lo storico alimentazioni filtrato per animale, ordinato dal più recente e paginato lato server.
+•	Ogni voce dello storico espone data/ora, risultato, alimento, dimensione, peso e note, con modifica ed eliminazione per singola registrazione.
+•	Modificando la data di una voce in una sessione multipla, le altre voci mantengono data e note originali.
 •	Il salvataggio multiplo è atomico: o tutti i record della sessione vengono salvati, o nessuno.
 •	Il saldo inventario cambia nella stessa transazione del movimento.
 •	Un webhook Stripe duplicato non genera modifiche duplicate.

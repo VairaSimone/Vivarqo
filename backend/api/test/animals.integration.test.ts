@@ -365,6 +365,94 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(otherHistory.body.code).toBe("ANIMAL_NOT_FOUND");
   });
 
+  it("paginates per-animal feeding history and edits one bulk entry without moving sibling entries", async () => {
+    const owner = await account();
+    const other = await account();
+    const animal = await createAnimal(owner, "Feeding history animal");
+    const companion = await createAnimal(owner, "Feeding history companion");
+
+    const createSession = async (performedAt: string, entries: Array<Record<string, unknown>>, notes: string | null = null) => {
+      const result = await owner.agent
+        .post("/api/v1/feeding-sessions")
+        .set("Origin", origin)
+        .set("X-CSRF-Token", owner.csrf)
+        .send({ performedAt, entries, notes })
+        .expect(201);
+      return result.body.session as { id: string; entries: Array<{ id: string; animalId: string }>; performedAt: string };
+    };
+
+    const shared = await createSession("2026-10-28T09:00:00.000Z", [
+      { animalId: animal.id, outcome: "ate", foodType: "rat", foodSize: "medium", foodWeightG: 120, notes: "Entry note" },
+      { animalId: companion.id, outcome: "refused", foodType: "mouse" },
+    ], "Shared session note");
+    const targetEntry = shared.entries.find((entry) => entry.animalId === animal.id)!;
+    await createSession("2026-10-29T09:00:00.000Z", [{ animalId: animal.id, outcome: "ate" }]);
+    await createSession("2026-10-27T09:00:00.000Z", [{ animalId: animal.id, outcome: "refused" }]);
+
+    const firstPage = await owner.agent.get("/api/v1/feeding-sessions?animalId=" + animal.id + "&page=1&pageSize=2").expect(200);
+    expect(firstPage.body.pagination).toMatchObject({ page: 1, pageSize: 2, total: 3, totalPages: 2 });
+    expect(firstPage.body.sessions.map((session: { performedAt: string }) => session.performedAt)).toEqual([
+      "2026-10-29T09:00:00.000Z",
+      "2026-10-28T09:00:00.000Z",
+    ]);
+    expect(firstPage.body.sessions.every((session: { entries: Array<{ animalId: string }> }) =>
+      session.entries.length === 1 && session.entries[0].animalId === animal.id,
+    )).toBe(true);
+    const secondPage = await owner.agent.get("/api/v1/feeding-sessions?animalId=" + animal.id + "&page=2&pageSize=2").expect(200);
+    expect(secondPage.body.sessions.map((session: { performedAt: string }) => session.performedAt)).toEqual(["2026-10-27T09:00:00.000Z"]);
+
+    const updated = await owner.agent
+      .patch("/api/v1/feeding-entries/" + targetEntry.id)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        performedAt: "2026-10-30T11:30:00.000Z",
+        outcome: "refused",
+        foodType: "rat XL",
+        foodSize: "large",
+        foodWeightG: 160,
+        notes: "Updated entry note",
+      })
+      .expect(200);
+    expect(updated.body.entry.session.performedAt).toBe("2026-10-30T11:30:00.000Z");
+    expect(updated.body.entry).toMatchObject({
+      outcome: "refused",
+      foodType: "rat XL",
+      foodSize: "large",
+      notes: "Updated entry note",
+    });
+
+    const companionHistory = await owner.agent.get("/api/v1/feeding-sessions?animalId=" + companion.id).expect(200);
+    expect(companionHistory.body.sessions).toHaveLength(1);
+    expect(companionHistory.body.sessions[0].performedAt).toBe("2026-10-28T09:00:00.000Z");
+    expect(companionHistory.body.sessions[0].notes).toBe("Shared session note");
+    expect(companionHistory.body.sessions[0].entries).toHaveLength(1);
+    expect(companionHistory.body.sessions[0].entries[0].animalId).toBe(companion.id);
+
+    const otherPatch = await other.agent
+      .patch("/api/v1/feeding-entries/" + targetEntry.id)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", other.csrf)
+      .send({ outcome: "ate" })
+      .expect(404);
+    expect(otherPatch.body.code).toBe("FEEDING_ENTRY_NOT_FOUND");
+    await other.agent
+      .delete("/api/v1/feeding-entries/" + targetEntry.id)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", other.csrf)
+      .expect(404);
+
+    await owner.agent
+      .delete("/api/v1/feeding-entries/" + targetEntry.id)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .expect(204);
+    const remaining = await owner.agent.get("/api/v1/feeding-sessions?animalId=" + animal.id).expect(200);
+    expect(remaining.body.pagination.total).toBe(2);
+    const companionAfterDelete = await owner.agent.get("/api/v1/feeding-sessions?animalId=" + companion.id).expect(200);
+    expect(companionAfterDelete.body.sessions).toHaveLength(1);
+  });
+
   it("validates weights, records care history, and isolates updates to record owners", async () => {
     const owner = await account();
     const other = await account();

@@ -82,6 +82,7 @@ export const feedingSessionSchema = z.object({
 });
 
 export const patchFeedingEntrySchema = z.object({
+  performedAt: z.string().datetime({ offset: true }).optional(),
   outcome: feedingOutcomeSchema.optional(),
   foodType: nullableText(120),
   foodSize: nullableText(120),

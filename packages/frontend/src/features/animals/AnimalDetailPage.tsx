@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import { downloadQrSvg, qrMatrix } from "../../lib/qr";
-import { dateForInput, dateTimeInputToUtc, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
+import { dateForInput, dateTimeInputToUtc, dateTimeInputValue, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
 import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, GeneticTraitDto, PublicShareDto, ShedDto, WeightDto } from "@vivarqo/contracts/animals";
 
@@ -9,6 +9,9 @@ import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+
+type FeedingItem = Record<string, unknown>;
+
 export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const animalResource = useResource<{ animal: AnimalDto }>(`/animals/${encodeURIComponent(id)}`);
@@ -27,14 +30,32 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
+  const [feedingPage, setFeedingPage] = useState(1);
+  const [feedingEditEntry, setFeedingEditEntry] = useState<FeedingItem | null>(null);
+  const [feedingBusy, setFeedingBusy] = useState(false);
+  const [feedingFormError, setFeedingFormError] = useState("");
+  const [feedingEditForm, setFeedingEditForm] = useState({
+    performedAt: "", outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "",
+  });
   const { toast, show } = useToast();
   const animal = animalResource.data?.animal;
   const weights = useResource<{ weights: WeightDto[] }>(animal && tab === "history" ? `/animals/${id}/weights?page=1&pageSize=100` : null);
   const sheds = useResource<{ sheds: ShedDto[] }>(animal && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
   const notes = useResource<{ notes: AnimalNoteDto[] }>(animal && tab === "history" ? `/animals/${id}/notes?page=1&pageSize=100` : null);
+  const feedings = useResource<{
+    sessions: FeedingItem[];
+    pagination: { page: number; pageSize: number; total: number; totalPages: number };
+  }>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
+
+  useEffect(() => {
+    const totalPages = feedings.data?.pagination.totalPages;
+    if (totalPages !== undefined && feedingPage > Math.max(1, totalPages)) {
+      setFeedingPage(Math.max(1, totalPages));
+    }
+  }, [feedings.data?.pagination.totalPages, feedingPage]);
 
   function openAnimalEdit() {
     if (!animal) return;
@@ -124,6 +145,54 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
+  function openFeedingEdit(session: FeedingItem, entry: FeedingItem) {
+    setFeedingFormError("");
+    setFeedingEditForm({
+      performedAt: dateTimeInputValue(getString(session, "performedAt")),
+      outcome: getString(entry, "outcome", "ate"),
+      foodType: getString(entry, "foodType"),
+      foodSize: getString(entry, "foodSize"),
+      foodWeightG: getString(entry, "foodWeightG") ? String(gramsToWeight(getString(entry, "foodWeightG"))) : "",
+      notes: getString(entry, "notes"),
+    });
+    setFeedingEditEntry(entry);
+  }
+
+  async function saveFeedingEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!feedingEditEntry) return;
+    setFeedingBusy(true);
+    setFeedingFormError("");
+    try {
+      await api.patch("/feeding-entries/" + getString(feedingEditEntry, "id"), {
+        performedAt: dateTimeInputToUtc(feedingEditForm.performedAt),
+        outcome: feedingEditForm.outcome,
+        foodType: feedingEditForm.foodType || null,
+        foodSize: feedingEditForm.foodSize || null,
+        foodWeightG: feedingEditForm.foodWeightG ? weightToGrams(feedingEditForm.foodWeightG) : null,
+        notes: feedingEditForm.notes || null,
+      });
+      setFeedingEditEntry(null);
+      feedings.reload();
+      show(t("saveSuccess"));
+    } catch (reason) {
+      setFeedingFormError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed"));
+    } finally {
+      setFeedingBusy(false);
+    }
+  }
+
+  async function deleteFeedingEntry(entry: FeedingItem) {
+    if (!window.confirm(t("confirmDelete"))) return;
+    try {
+      await api.delete("/feeding-entries/" + getString(entry, "id"));
+      feedings.reload();
+      show(t("delete"));
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+
   if (animalResource.loading && !animal) return <LoadingState />;
   if (animalResource.error || !animal) return <ErrorState message={animalResource.error?.message ?? t("noRecords")} retry={animalResource.reload} />;
   const animalName = getString(animal, "name");
@@ -156,6 +225,37 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
 
     {tab === "history" && <div className="page-stack">
       <div className="detail-grid">
+        <Panel>
+          <PanelHeader title={t("feedingHistory")} action={getString(animal, "status") === "active" ? <Button size="sm" onClick={() => navigate("/feeding?animalId=" + encodeURIComponent(id) + "&create=1")}><Icon name="feed" size={14} />{t("newFeeding")}</Button> : undefined} />
+          {feedings.loading && !feedings.data ? <LoadingState /> : feedings.error ? <ErrorState message={feedings.error.message} retry={feedings.reload} /> : feedings.data?.sessions.length ? <div className="session-list">
+            {feedings.data.sessions.map((session) => {
+              const entries = getArray<FeedingItem>(session, "entries");
+              const entry = entries.find((candidate) => getString(candidate, "animalId") === id) ?? entries[0];
+              if (!entry) return null;
+              const outcomeValue = getString(entry, "outcome");
+              const foodWeight = getString(entry, "foodWeightG");
+              return <article className="session-card" key={getString(entry, "id")}>
+                <div className="session-date">
+                  <span>{formatDateTime(getString(session, "performedAt"), locale)}</span>
+                  <Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge>
+                </div>
+                <div className="feeding-entry">
+                  <div className="feeding-detail">
+                    <span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>
+                    {foodWeight ? <small>{formatWeight(foodWeight, locale)}</small> : null}
+                  </div>
+                  <div className="row-actions">
+                    <IconButton label={t("edit")} onClick={() => openFeedingEdit(session, entry)}><Icon name="edit" size={15} /></IconButton>
+                    <IconButton label={t("delete")} onClick={() => void deleteFeedingEntry(entry)}><Icon name="trash" size={15} /></IconButton>
+                  </div>
+                </div>
+                {getString(entry, "notes") && <p className="muted-note">{getString(entry, "notes")}</p>}
+                {getString(session, "notes") && <p className="muted-note">{getString(session, "notes")}</p>}
+              </article>;
+            })}
+          </div> : <EmptyState title={t("noFeedings")} description={t("emptyHint")} />}
+          {feedings.data?.pagination && <Pagination page={feedings.data.pagination.page} totalPages={feedings.data.pagination.totalPages} onChange={setFeedingPage} label={t("page")} />}
+        </Panel>
         <Panel><PanelHeader title={t("weightHistory")} action={<Button size="sm" onClick={() => openRecord("weight")}><Icon name="plus" size={14} />{t("addWeight")}</Button>} />
           <WeightChart weights={weights.data?.weights ?? []} locale={locale} />
           <RecordList records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
@@ -183,6 +283,18 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       {traits.data?.traits?.length ? traits.data.traits.map((trait) => <div className="simple-row" key={getString(trait, "id")}><span className="simple-row-icon"><Icon name="leaf" /></span><div><strong>{getString(trait, "traitName")}</strong><small>{getString(trait, "traitValue")}{getString(trait, "confidenceNote") ? ` · ${getString(trait, "confidenceNote")}` : ""}</small></div><IconButton label={t("delete")} onClick={() => { if (window.confirm(t("confirmDelete"))) void api.delete(`/genetic-traits/${getString(trait, "id")}`).then(() => traits.reload()); }}><Icon name="trash" size={15} /></IconButton></div>) : <EmptyState title={t("noRecords")} />}</Panel>}
 
     {tab === "share" && <PublicSharePanel animalId={id} locale={locale} hasPhoto={Boolean(getString(animal, "photoUrl"))} resource={share.data?.share ?? null} reload={share.reload} show={show} />}
+    {feedingEditEntry && <Modal title={t("edit")} onClose={() => setFeedingEditEntry(null)}>
+      <form className="form-stack" onSubmit={saveFeedingEdit}>
+        {feedingFormError && <Alert tone="danger">{feedingFormError}</Alert>}
+        <Field label={t("feedingDate")}><Input required type="datetime-local" value={feedingEditForm.performedAt} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, performedAt: e.target.value })} /></Field>
+        <Field label={t("outcome")}><Select value={feedingEditForm.outcome} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, outcome: e.target.value })}><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select></Field>
+        <Field label={t("foodType")}><Input maxLength={120} value={feedingEditForm.foodType} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodType: e.target.value })} /></Field>
+        <Field label={t("foodSize")}><Input maxLength={120} value={feedingEditForm.foodSize} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodSize: e.target.value })} /></Field>
+        <Field label={t("foodWeight")}><Input type="number" min="0.01" step="0.01" value={feedingEditForm.foodWeightG} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodWeightG: e.target.value })} /></Field>
+        <Field label={t("notes")}><Textarea rows={3} value={feedingEditForm.notes} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, notes: e.target.value })} /></Field>
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setFeedingEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={feedingBusy}>{feedingBusy ? t("loading") : t("save")}</Button></div>
+      </form>
+    </Modal>}
     {animalEditModal && <Modal title={t("animalEdit")} onClose={() => setAnimalEditModal(false)} wide>
       <form className="form-stack" onSubmit={saveAnimalEdit}>
         {animalEditError && <Alert tone="danger">{animalEditError}</Alert>}
