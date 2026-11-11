@@ -467,10 +467,38 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
 
     // Genetic-trait records are child resources: ownership must be inherited
     // from the parent animal, and source animals must belong to the same user.
+    const sourceAnimal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Genetic source animal", species: "Python regius", identifier: "GENETIC-SOURCE-1" },
+    });
     const trait = await owner.agent.post(`/api/v1/animals/${animal.id}/genetic-traits`)
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ traitName: "Pastel", traitValue: "Visual", confidenceNote: "Owner record" }).expect(201);
+      .send({
+        traitName: "Pastel",
+        traitValue: "Visual",
+        sourceAnimalId: sourceAnimal.id,
+        confidenceNote: "Breeder records, high confidence",
+      }).expect(201);
     const traitId = trait.body.trait.id as string;
+    expect(trait.body.trait.sourceAnimal).toMatchObject({
+      id: sourceAnimal.id,
+      name: "Genetic source animal",
+      identifier: "GENETIC-SOURCE-1",
+    });
+    const updatedTrait = await owner.agent.patch(`/api/v1/genetic-traits/${traitId}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        traitName: "Pastel proven",
+        traitValue: "Het",
+        sourceAnimalId: sourceAnimal.id,
+        confidenceNote: "Updated origin note",
+      }).expect(200);
+    expect(updatedTrait.body.trait).toMatchObject({
+      traitName: "Pastel proven",
+      traitValue: "Het",
+      sourceAnimalId: sourceAnimal.id,
+      confidenceNote: "Updated origin note",
+      sourceAnimal: { id: sourceAnimal.id, name: "Genetic source animal" },
+    });
     await other.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(404);
     await other.agent.patch(`/api/v1/genetic-traits/${traitId}`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf)

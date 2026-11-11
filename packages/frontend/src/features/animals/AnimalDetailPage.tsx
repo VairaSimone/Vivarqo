@@ -376,6 +376,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           onChange={(sourceAnimalId) => setTraitForm({ ...traitForm, sourceAnimalId })}
           endpoint="/animals"
           responseKey="animals"
+          filters={{ status: "all" }}
           labelKey="name"
           secondaryKey="identifier"
           detailEndpoint={sourceAnimalDetailEndpoint}
