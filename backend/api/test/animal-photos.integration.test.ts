@@ -113,7 +113,7 @@ describe("animal photo upload lifecycle", () => {
       animal: { photoKey: "animal-photos/public-photo.jpg" },
     });
 
-    const response = await request(authenticatedApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
+    const response = await request(anonymousApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toBe("image/jpeg");
