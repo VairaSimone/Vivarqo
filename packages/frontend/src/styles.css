@@ -885,3 +885,7 @@ table, th, td {
     max-height: 280px;
   }
 }
+
+@media (max-width: 767px) {
+  .import-mapping-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
