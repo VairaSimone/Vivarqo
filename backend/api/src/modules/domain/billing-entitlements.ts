@@ -32,8 +32,9 @@ export async function getUserEntitlements(userId: string, expectedPriceId = env.
   };
 }
 async function lockQuota(tx: Prisma.TransactionClient, userId: string) {
-  // Transaction-scoped advisory lock: serializes this account's quota checks across replicas.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
+  // Row lock returns a UUID (not PostgreSQL void) and serializes quota checks for this account
+  // across API and worker replicas until the surrounding write transaction commits.
+  await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
 }
 async function transactionEntitlements(tx: Prisma.TransactionClient, userId: string) {
   const subscription = await tx.subscription.findUnique({ where: { userId }, select: subscriptionSelect });
