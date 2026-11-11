@@ -8,6 +8,7 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { createAnimalSchema } from "./animals.schemas.js";
 import { parseAnimalFile } from "./animal-file-parser.js";
+import { resolveImportColumnMapping } from "./import-column-mapping.js";
 
 const fileBody = raw({
   type: ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"],
@@ -56,6 +57,8 @@ interface PotentialDuplicate {
 interface PreviewReport {
   headers: string[];
   unmappedHeaders: string[];
+  mappedHeaders: Record<string, string>;
+  missingFields: string[][];
   selectedSheet: string | null;
   sheets: string[];
   fileType: "csv" | "xlsx";
@@ -103,36 +106,20 @@ function makePreview(
   fileType: "csv" | "xlsx",
   sheets: string[],
   selectedSheet: string | null,
+  requestedMapping: unknown,
 ): { report: PreviewReport; mappedHeaders: Record<string, string> } {
-  const mappedHeaders: Record<string, string> = {};
-  const unmappedHeaders: string[] = [];
-  for (const header of headers) {
-    const field = aliases[normalizeHeader(header)];
-    if (!field) {
-      unmappedHeaders.push(header);
-      continue;
-    }
-    if (mappedHeaders[field]) {
-      throw new AppError(400, "IMPORT_HEADER_AMBIGUOUS", "More than one column maps to the same Vivarqo field", {
-        field,
-        columns: [mappedHeaders[field], header],
-      });
-    }
-    mappedHeaders[field] = header;
-  }
-  const missingRequired = ["name", "species"].filter((field) => !mappedHeaders[field]);
-  if (missingRequired.length) {
-    throw new AppError(400, "IMPORT_REQUIRED_COLUMNS", "The file needs columns for name and species", {
-      missingFields: missingRequired,
-      recognizedColumns: mappedHeaders,
-      availableHeaders: headers,
-    });
-  }
+  const availableFields = ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate",
+    "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"];
+  const mapping = resolveImportColumnMapping(
+    headers, aliases, availableFields, [["name"], ["species"]], requestedMapping,
+  );
+  const mappedHeaders = mapping.mappedHeaders;
+  const unmappedHeaders = mapping.unmappedHeaders;
 
   const validRows: PreviewReport["validRows"] = [];
   const errors: RowError[] = [];
   const seenIdentifiers = new Set<string>();
-  for (const row of fileRows) {
+  for (const row of mapping.missingFields.length ? [] : fileRows) {
     const raw: Record<string, unknown> = {};
     for (const [field, header] of Object.entries(mappedHeaders)) {
       raw[field] = convertValue(field, row.values[header] ?? "");
@@ -159,7 +146,10 @@ function makePreview(
     validRows.push({ rowNumber: row.rowNumber, animal: parsed.data });
   }
   return {
-    report: { headers, unmappedHeaders, selectedSheet, sheets, fileType, validRows, errors, potentialDuplicates: [] },
+    report: {
+      headers, unmappedHeaders, mappedHeaders, missingFields: mapping.missingFields,
+      selectedSheet, sheets, fileType, validRows, errors, potentialDuplicates: [],
+    },
     mappedHeaders,
   };
 }
@@ -245,7 +235,19 @@ export function createImportRouter() {
     const mime = (req.get("content-type") ?? "").split(";")[0]!.trim().toLocaleLowerCase("en-US");
     const selectedSheet = typeof req.query.sheet === "string" ? req.query.sheet : undefined;
     const file = parseAnimalFile(req.body, mime, selectedSheet);
-    const { report: preview } = makePreview(file.headers, file.rows, file.fileType, file.sheets, file.selectedSheet);
+    let previewResult: ReturnType<typeof makePreview>;
+    try {
+      previewResult = makePreview(file.headers, file.rows, file.fileType, file.sheets, file.selectedSheet, req.query.mapping);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("IMPORT_MAPPING_")) {
+        throw new AppError(400, error.message, "The selected column mapping is invalid");
+      }
+      throw error;
+    }
+    const { report: preview } = previewResult;
+    const availableFields = ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate",
+      "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"];
+    const requiredFields = [["name"], ["species"]];
 
     const identifiers = preview.validRows
       .map((row) => row.animal.identifier)
@@ -339,6 +341,10 @@ export function createImportRouter() {
       fileType: file.fileType,
       headers: preview.headers,
       unmappedHeaders: preview.unmappedHeaders,
+      mappedHeaders: preview.mappedHeaders,
+      availableFields,
+      requiredFields,
+      missingFields: preview.missingFields,
       sheets: preview.sheets,
       selectedSheet: preview.selectedSheet,
       totalRows: file.rows.length,
@@ -383,6 +389,11 @@ export function createImportRouter() {
       throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
     }
     const report = readReport(current.report);
+    if (report.missingFields?.length) {
+      throw new AppError(409, "IMPORT_REQUIRED_COLUMNS", "Map all required columns before confirming the import", {
+        missingFields: report.missingFields,
+      });
+    }
     if (report.potentialDuplicates.length > 0 && !body.data.allowPossibleDuplicates) {
       throw new AppError(409, "IMPORT_DUPLICATES_REQUIRE_CONFIRMATION", "Possible name/species duplicates require explicit confirmation", {
         possibleDuplicates: report.potentialDuplicates,

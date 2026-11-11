@@ -5,6 +5,7 @@ import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { parseAnimalFile } from "../animals/animal-file-parser.js";
+import { resolveImportColumnMapping } from "../animals/import-column-mapping.js";
 
 const uploadBody = raw({
   type: ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"],
@@ -13,7 +14,11 @@ const uploadBody = raw({
 const entities = ["finance", "inventory", "reproductionCycles", "reproductiveEvents", "clutches", "eggs", "incubationLogs", "offspringBatches"] as const;
 type Entity = typeof entities[number];
 type Row = { rowNumber: number; record: Record<string, unknown> };
-type Report = { entityType: Entity; fileType: "csv" | "xlsx"; headers: string[]; selectedSheet: string | null; sheets: string[]; validRows: Row[]; errors: Array<{ row: number; column: string; reason: string }> };
+type Report = {
+  entityType: Entity; fileType: "csv" | "xlsx"; headers: string[]; selectedSheet: string | null; sheets: string[];
+  mappedHeaders: Record<string, string>; missingFields: string[][];
+  validRows: Row[]; errors: Array<{ row: number; column: string; reason: string }>;
+};
 
 const aliases: Record<string, string> = {
   animalid: "animalId", idanimale: "animalId", animalidentifier: "animalIdentifier", identificativo: "animalIdentifier", codiceanimale: "animalIdentifier",
@@ -132,6 +137,16 @@ const required: Record<Entity, string[][]> = {
   eggs: [["clutchId"]],
   incubationLogs: [["clutchId"], ["recordedAt"], ["eventType"]],
   offspringBatches: [["cycleId"], ["bornOn"], ["count"]],
+};
+const availableFields: Record<Entity, string[]> = {
+  finance: ["entryType", "occurredOn", "amountCents", "amountEUR", "currency", "category", "description", "animalId", "animalIdentifier", "documentId"],
+  inventory: ["name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive"],
+  reproductionCycles: ["name", "startedOn", "endedOn", "status", "parentAAnimalId", "parentAAnimalIdentifier", "parentBAnimalId", "parentBAnimalIdentifier", "notes"],
+  reproductiveEvents: ["cycleId", "eventType", "occurredAt", "animalId", "animalIdentifier", "details", "temperatureC", "humidityPct"],
+  clutches: ["cycleId", "laidOn", "eggCount", "status", "incubatorLabel", "incubationStartedAt", "notes"],
+  eggs: ["clutchId", "code", "status", "notes"],
+  incubationLogs: ["clutchId", "recordedAt", "temperatureC", "humidityPct", "eventType", "notes"],
+  offspringBatches: ["cycleId", "clutchId", "bornOn", "count", "notes"],
 };
 function sourceRecord(entity: Entity, values: Record<string, string>, map: Record<string, string>): Record<string, unknown> {
   const get = (key: string) => values[map[key] ?? ""]?.trim() ?? "";
@@ -298,18 +313,24 @@ export function createDomainImportRouter() {
     if (!Buffer.isBuffer(req.body)) throw new AppError(400, "IMPORT_FILE_REQUIRED", "Upload the CSV or XLSX file as the request body");
     const mime = (req.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const file = parseAnimalFile(req.body, mime, typeof req.query.sheet === "string" ? req.query.sheet : undefined);
-    const map: Record<string, string> = {};
-    const unmappedHeaders: string[] = [];
-    for (const header of file.headers) {
-      const field = aliases[norm(header)];
-      if (!field) { unmappedHeaders.push(header); continue; }
-      if (map[field]) throw new AppError(400, "IMPORT_HEADER_AMBIGUOUS", "More than one column maps to the same field", { field, columns: [map[field], header] });
-      map[field] = header;
+    let mapping;
+    try {
+      mapping = resolveImportColumnMapping(
+        file.headers, aliases, availableFields[entity as Entity], required[entity as Entity], req.query.mapping,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("IMPORT_MAPPING_")) {
+        throw new AppError(400, error.message, "The selected column mapping is invalid");
+      }
+      throw error;
     }
-    const missing = required[entity as Entity].filter((alternatives) => !alternatives.some((field) => map[field]));
-    if (missing.length) throw new AppError(400, "IMPORT_REQUIRED_COLUMNS", "Required columns are missing", { missingFields: missing.map((items) => items.join(" or ")), availableHeaders: file.headers });
+    const map = mapping.mappedHeaders;
+    const unmappedHeaders = mapping.unmappedHeaders;
+    const missing = mapping.missingFields;
 
-    const sourceRows = file.rows.map((row) => ({ rowNumber: row.rowNumber, record: sourceRecord(entity as Entity, row.values, map) }));
+    const sourceRows = (missing.length ? [] : file.rows).map((row) => ({
+      rowNumber: row.rowNumber, record: sourceRecord(entity as Entity, row.values, map),
+    }));
     const animalKeys = new Set<string>();
     const animalIdentifiers = new Set<string>();
     for (const row of sourceRows) {
@@ -401,7 +422,11 @@ export function createDomainImportRouter() {
       }
       if (!badDate) validRows.push({ rowNumber: row.rowNumber, record: data });
     }
-    const report: Report = { entityType: entity as Entity, fileType: file.fileType, headers: file.headers, selectedSheet: file.selectedSheet, sheets: file.sheets, validRows, errors };
+    const report: Report = {
+      entityType: entity as Entity, fileType: file.fileType, headers: file.headers,
+      selectedSheet: file.selectedSheet, sheets: file.sheets, mappedHeaders: map,
+      missingFields: missing, validRows, errors,
+    };
     const job = await prisma.importJob.create({
       data: { userId: auth.userId, entityType: entity, storageKey: "database-preview-report", status: "preview",
         totalRows: file.rows.length, skippedCount: errors.length, errorCount: errors.length, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -409,7 +434,9 @@ export function createDomainImportRouter() {
       select: { id: true, status: true, expiresAt: true },
     });
     res.status(201).json({ importId: job.id, entityType: entity, status: job.status, fileType: file.fileType, headers: file.headers,
-      unmappedHeaders, sheets: file.sheets, selectedSheet: file.selectedSheet, totalRows: file.rows.length, validRows: validRows.length,
+      unmappedHeaders, mappedHeaders: report.mappedHeaders, availableFields: availableFields[entity as Entity],
+      requiredFields: required[entity as Entity], missingFields: report.missingFields,
+      sheets: file.sheets, selectedSheet: file.selectedSheet, totalRows: file.rows.length, validRows: validRows.length,
       invalidRows: errors.length, errors, preview: validRows.slice(0, 20), expiresAt: job.expiresAt });
   });
 
@@ -421,6 +448,12 @@ export function createDomainImportRouter() {
     if (!entities.includes(current.entityType as Entity)) { next(); return; }
     if (current.status !== "preview" || current.expiresAt <= new Date()) {
       throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
+    }
+    const report = readReport(current.report);
+    if (report.missingFields?.length) {
+      throw new AppError(409, "IMPORT_REQUIRED_COLUMNS", "Map all required columns before confirming the import", {
+        missingFields: report.missingFields,
+      });
     }
     const queued = await prisma.importJob.updateMany({
       where: { id: jobId, userId: auth.userId, entityType: current.entityType, status: "preview", expiresAt: { gt: new Date() } },

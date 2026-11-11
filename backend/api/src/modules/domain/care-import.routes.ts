@@ -5,6 +5,7 @@ import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { parseAnimalFile } from "../animals/animal-file-parser.js";
+import { resolveImportColumnMapping } from "../animals/import-column-mapping.js";
 
 const supportedEntities = ["weights", "sheds", "notes", "feedings"] as const;
 type CareEntity = typeof supportedEntities[number];
@@ -15,6 +16,8 @@ type CareImportReport = {
   headers: string[];
   selectedSheet: string | null;
   sheets: string[];
+  mappedHeaders: Record<string, string>;
+  missingFields: string[][];
   validRows: PreviewRow[];
   errors: Array<{ row: number; column: string; reason: string }>;
 };
@@ -189,25 +192,33 @@ export function createCareImportRouter() {
     if (!Buffer.isBuffer(req.body)) throw new AppError(400, "IMPORT_FILE_REQUIRED", "Upload the CSV or XLSX file as the request body");
     const mime = (req.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const file = parseAnimalFile(req.body, mime, typeof req.query.sheet === "string" ? req.query.sheet : undefined);
-    const mapped: Record<string, string> = {};
-    const unmappedHeaders: string[] = [];
-    for (const header of file.headers) {
-      const field = aliases[normalize(header)];
-      if (!field) { unmappedHeaders.push(header); continue; }
-      if (mapped[field]) throw new AppError(400, "IMPORT_HEADER_AMBIGUOUS", "More than one column maps to the same field", { field, columns: [mapped[field], header] });
-      mapped[field] = header;
-    }
-    const animalKey = mapped.animalId ? "animalId" : mapped.animalIdentifier ? "animalIdentifier" : "";
-    if (!animalKey) throw new AppError(400, "IMPORT_ANIMAL_KEY_REQUIRED", "Provide an animalId or animalIdentifier column", { availableHeaders: file.headers });
-
-    const requiredFields: Record<CareEntity, string[]> = {
-      weights: ["measuredAt", "weightG"],
-      sheds: ["occurredAt"],
-      notes: ["occurredAt", "category", "body"],
-      feedings: ["performedAt"],
+    const availableFields: Record<CareEntity, string[]> = {
+      weights: ["animalId", "animalIdentifier", "measuredAt", "weightG", "notes"],
+      sheds: ["animalId", "animalIdentifier", "occurredAt", "outcome", "notes"],
+      notes: ["animalId", "animalIdentifier", "occurredAt", "title", "category", "body"],
+      feedings: ["animalId", "animalIdentifier", "performedAt", "outcome", "foodType", "foodSize", "foodWeightG", "notes"],
     };
-    const missing = requiredFields[entity as CareEntity].filter((field) => !mapped[field]);
-    if (missing.length) throw new AppError(400, "IMPORT_REQUIRED_COLUMNS", "Required columns are missing", { missingFields: missing });
+    const requiredFields: Record<CareEntity, string[][]> = {
+      weights: [["animalId", "animalIdentifier"], ["measuredAt"], ["weightG"]],
+      sheds: [["animalId", "animalIdentifier"], ["occurredAt"]],
+      notes: [["animalId", "animalIdentifier"], ["occurredAt"], ["category"], ["body"]],
+      feedings: [["animalId", "animalIdentifier"], ["performedAt"]],
+    };
+    let mapping;
+    try {
+      mapping = resolveImportColumnMapping(
+        file.headers, aliases, availableFields[entity as CareEntity], requiredFields[entity as CareEntity], req.query.mapping,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("IMPORT_MAPPING_")) {
+        throw new AppError(400, error.message, "The selected column mapping is invalid");
+      }
+      throw error;
+    }
+    const mapped = mapping.mappedHeaders;
+    const unmappedHeaders = mapping.unmappedHeaders;
+    const missing = mapping.missingFields;
+    const animalKey = mapped.animalId ? "animalId" : "animalIdentifier";
 
     const identifiers = file.rows.map((row) => row.values[mapped.animalIdentifier ?? ""]?.trim()).filter((value): value is string => Boolean(value));
     const normalizedIdentifiers = [...new Set(identifiers.map((value) => value.toLocaleLowerCase("it-IT")))];
@@ -223,7 +234,7 @@ export function createCareImportRouter() {
     const errors: CareImportReport["errors"] = [];
     const feedingSeen = new Set<string>();
     const schema = recordSchemas[entity as CareEntity];
-    for (const row of file.rows) {
+    for (const row of missing.length ? [] : file.rows) {
       const animalIdRaw = row.values[mapped.animalId ?? ""]?.trim() ?? "";
       const animalIdentifierRaw = row.values[mapped.animalIdentifier ?? ""]?.trim() ?? "";
       const animal = animalIdRaw
@@ -260,7 +271,11 @@ export function createCareImportRouter() {
       validRows.push({ rowNumber: row.rowNumber, record: parsed.data as Record<string, unknown> });
     }
 
-    const report: CareImportReport = { entityType: entity as CareEntity, fileType: file.fileType, headers: file.headers, selectedSheet: file.selectedSheet, sheets: file.sheets, validRows, errors };
+    const report: CareImportReport = {
+      entityType: entity as CareEntity, fileType: file.fileType, headers: file.headers,
+      selectedSheet: file.selectedSheet, sheets: file.sheets, mappedHeaders: mapped,
+      missingFields: missing, validRows, errors,
+    };
     const job = await prisma.importJob.create({
       data: {
         userId: auth.userId, entityType: report.entityType, storageKey: "database-preview-report", status: "preview",
@@ -271,7 +286,9 @@ export function createCareImportRouter() {
     });
     res.status(201).json({
       importId: job.id, entityType: report.entityType, status: job.status, fileType: report.fileType,
-      headers: report.headers, unmappedHeaders, sheets: report.sheets, selectedSheet: report.selectedSheet,
+      headers: report.headers, unmappedHeaders, mappedHeaders: report.mappedHeaders,
+      availableFields: availableFields[entity as CareEntity], requiredFields: requiredFields[entity as CareEntity],
+      missingFields: report.missingFields, sheets: report.sheets, selectedSheet: report.selectedSheet,
       totalRows: file.rows.length, validRows: validRows.length, invalidRows: errors.length, errors,
       preview: validRows.slice(0, 20), expiresAt: job.expiresAt,
     });
@@ -286,6 +303,12 @@ export function createCareImportRouter() {
     if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
     if (current.status !== "preview" || current.expiresAt <= new Date()) {
       throw new AppError(409, "IMPORT_NOT_CONFIRMABLE", "The import preview is no longer available");
+    }
+    const report = current.report as { missingFields?: unknown } | null;
+    if (Array.isArray(report?.missingFields) && report.missingFields.length > 0) {
+      throw new AppError(409, "IMPORT_REQUIRED_COLUMNS", "Map all required columns before confirming the import", {
+        missingFields: report.missingFields,
+      });
     }
     const queued = await prisma.importJob.updateMany({
       where: { id: jobId, userId: auth.userId, status: "preview", expiresAt: { gt: new Date() } },
