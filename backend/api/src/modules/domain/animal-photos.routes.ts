@@ -101,6 +101,11 @@ export function createAnimalPhotoRouter() {
     async (req, res) => {
       const auth = res.locals.auth as AuthContext;
       const animalId = parseAnimalId(req.params.id);
+      const ownedAnimal = await prisma.animal.findFirst({
+        where: { id: animalId, userId: auth.userId },
+        select: { id: true },
+      });
+      if (!ownedAnimal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
       if (!Buffer.isBuffer(req.body)) throw new AppError(400, "FILE_REQUIRED", "Upload the image bytes as the request body");
 
       const declaredMime = (req.get("content-type") ?? "application/octet-stream").split(";")[0]!.trim();
