@@ -99,6 +99,18 @@ function ImportPage({ locale }: { locale: Locale }) {
       .map(([field, header]) => [header, field]));
   }
 
+  function mapAssignments(value: unknown): Record<string, string> {
+    const result = mapFromResponse(
+      value && typeof value === "object" ? (value as Record<string, unknown>).mappedHeaders : null,
+    );
+    // Keep columns which were explicitly ignored (including recognized aliases)
+    // as empty assignments so subsequent mapping changes don't re-enable them.
+    for (const header of getArray<string>(value, "unmappedHeaders")) {
+      if (!(header in result)) result[header] = "";
+    }
+    return result;
+  }
+
   function fieldLabel(field: string) {
     return fieldLabels[field] || field.replace(/([a-z])([A-Z])/g, "$1 $2");
   }
@@ -124,7 +136,7 @@ function ImportPage({ locale }: { locale: Locale }) {
       setPreview(result);
       setJobId(getString(result, "importId"));
       setSelectedSheet(getString(result, "selectedSheet"));
-      setAssignments(mapFromResponse(result.mappedHeaders));
+      setAssignments(mapAssignments(result));
       setMappingDirty(false);
       setAllowDuplicates(false);
       show(t("previewReady"));

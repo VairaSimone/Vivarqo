@@ -6,6 +6,7 @@ const aliases = {
   species: "species",
   specie: "species",
   identifier: "identifier",
+  identificativo: "identifier",
 };
 
 describe("Import column mapping", () => {
@@ -53,6 +54,16 @@ describe("Import column mapping", () => {
     expect(result.mappedHeaders).toEqual({ species: "Specie" });
     expect(result.unmappedHeaders).toEqual(["Nome"]);
     expect(result.missingFields).toEqual([["name"]]);
+  });
+
+  it("rejects a header which is both mapped and explicitly ignored", () => {
+    expect(() => resolveImportColumnMapping(
+      ["Nome", "Specie"],
+      aliases,
+      ["name", "species"],
+      [["name"], ["species"]],
+      JSON.stringify({ fields: { name: "Nome" }, ignoredHeaders: ["Nome"] }),
+    )).toThrow("IMPORT_MAPPING_DUPLICATE_COLUMN");
   });
 
   it("reports required fields without failing the preview", () => {
