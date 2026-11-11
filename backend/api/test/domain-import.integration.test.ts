@@ -114,6 +114,46 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect(entry.amountCents).toBe(1999n);
   });
 
+  it("allows manual field mapping for domain imports and blocks confirmation until required fields are mapped", async () => {
+    const owner = await account();
+    const csv = "Tipo contabile,Data registrata,Valore EUR,Settore,Descrizione riga\n" +
+      "expense,2026-10-02,19.99,food,Manual mapped receipt\n";
+
+    const incomplete = await owner.agent.post("/api/v1/imports?entity=finance")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+    expect(incomplete.body.validRows).toBe(0);
+    expect(incomplete.body.missingFields).toHaveLength(5);
+    await owner.agent.post("/api/v1/imports/" + incomplete.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({}).expect(409);
+
+    const mapping = {
+      fields: {
+        entryType: "Tipo contabile",
+        occurredOn: "Data registrata",
+        amountEUR: "Valore EUR",
+        category: "Settore",
+        description: "Descrizione riga",
+      },
+      ignoredHeaders: [],
+    };
+    const preview = await owner.agent
+      .post("/api/v1/imports?entity=finance&mapping=" + encodeURIComponent(JSON.stringify(mapping)))
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+    expect(preview.body.validRows).toBe(1);
+    expect(preview.body.missingFields).toEqual([]);
+
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(202);
+    await dispatchImportJob(preview.body.importId);
+    const entry = await prisma.financeEntry.findFirstOrThrow({
+      where: { userId: owner.userId, description: "Manual mapped receipt" },
+    });
+    expect(entry.amountCents).toBe(1999n);
+  });
+
   it("rejects impossible calendar dates during preview", async () => {
     const owner = await account();
     const preview = await owner.agent.post("/api/v1/imports?entity=reproductionCycles")

@@ -323,6 +323,101 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(rejected.body.code).toBe("IMPORT_TOO_MANY_COLUMNS");
   });
 
+  it("allows manual mapping for animal imports and keeps explicitly ignored columns unmapped", async () => {
+    const owner = await account();
+    const csv = Buffer.from([
+      "Nome rettile,Specie animale,Identificativo,Colonna extra",
+      "Manual mapped animal,Python regius,MANUAL-IMPORT-1,ignore me",
+    ].join("\n"));
+
+    const incomplete = await owner.agent
+      .post("/api/v1/imports?entity=animals")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(csv)
+      .expect(201);
+    expect(incomplete.body.validRows).toBe(0);
+    expect(incomplete.body.missingFields).toEqual([["name"], ["species"]]);
+    await owner.agent
+      .post("/api/v1/imports/" + incomplete.body.importId + "/confirm")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(409);
+
+    const mapping = {
+      fields: {
+        name: "Nome rettile",
+        species: "Specie animale",
+      },
+      ignoredHeaders: ["Identificativo"],
+    };
+    const preview = await owner.agent
+      .post("/api/v1/imports?entity=animals&mapping=" + encodeURIComponent(JSON.stringify(mapping)))
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(csv)
+      .expect(201);
+    expect(preview.body.validRows).toBe(1);
+    expect(preview.body.missingFields).toEqual([]);
+    expect(preview.body.mappedHeaders).toMatchObject({ name: "Nome rettile", species: "Specie animale" });
+    expect(preview.body.unmappedHeaders).toContain("Identificativo");
+
+    await owner.agent
+      .post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(202);
+    await dispatchImportJob(preview.body.importId);
+    const completed = await owner.agent.get("/api/v1/imports/" + preview.body.importId).expect(200);
+    expect(completed.body.status).toBe("completed");
+    const imported = await prisma.animal.findFirstOrThrow({
+      where: { userId: owner.userId, name: "Manual mapped animal" },
+    });
+    expect(imported.identifier).toBeNull();
+  });
+
+  it("allows manual mapping for animal care imports before validating and confirming", async () => {
+    const owner = await account();
+    const animal = await createAnimal(owner, "Care mapping target", "CARE-MAP-1");
+    const csv = Buffer.from([
+      "Codice custodia,Quando,Grammatura,Annotazione",
+      "CARE-MAP-1,2026-10-15T10:00:00.000Z,345,Manual weigh-in",
+    ].join("\n"));
+    const mapping = {
+      fields: {
+        animalIdentifier: "Codice custodia",
+        measuredAt: "Quando",
+        weightG: "Grammatura",
+        notes: "Annotazione",
+      },
+      ignoredHeaders: [],
+    };
+    const preview = await owner.agent
+      .post("/api/v1/imports?entity=weights&mapping=" + encodeURIComponent(JSON.stringify(mapping)))
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(csv)
+      .expect(201);
+    expect(preview.body.validRows).toBe(1);
+    expect(preview.body.missingFields).toEqual([]);
+    await owner.agent
+      .post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(202);
+    await dispatchImportJob(preview.body.importId);
+    const weight = await prisma.weightMeasurement.findFirstOrThrow({
+      where: { animalId: animal.id, notes: "Manual weigh-in" },
+    });
+    expect(Number(weight.weightG)).toBe(345);
+  });
+
   it("commits bulk feedings in one transaction and forbids cross-account animals", async () => {
     const owner = await account();
     const other = await account();

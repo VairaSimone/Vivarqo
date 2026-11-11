@@ -55,6 +55,11 @@ export function resolveImportColumnMapping(
       if (typeof header !== "string" || !headers.includes(header)) throw new Error("IMPORT_MAPPING_INVALID");
       ignoredHeaders.add(header);
     }
+    const manualHeaders = Object.values(manual);
+    if (new Set(manualHeaders).size !== manualHeaders.length
+      || manualHeaders.some((header) => ignoredHeaders.has(header))) {
+      throw new Error("IMPORT_MAPPING_DUPLICATE_COLUMN");
+    }
   }
 
   const mappedHeaders: Record<string, string> = {};
