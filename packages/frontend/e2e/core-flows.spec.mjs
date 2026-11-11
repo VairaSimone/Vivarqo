@@ -877,7 +877,7 @@ for (const viewport of responsiveViewports) {
               await expect(button).toBeVisible();
               // Center each action in the usable viewport. scrollIntoViewIfNeeded()
               // considers viewport intersection but does not account for fixed overlays.
-              await button.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+              await button.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" }));
               const hitTarget = await button.evaluate((element) => {
                 const rect = element.getBoundingClientRect();
                 const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
