@@ -61,7 +61,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       const body = { title: form.title, description: form.description || null, category: form.category, dueAt: dateTimeInputToUtc(form.dueAt, timezone), animalId: form.animalId || null };
       if (editing) await api.patch(`/tasks/${getString(editing, "id")}`, body); else await api.post("/tasks", body);
       setModal(false); tasks.reload(); detail.reload(); show(t("saveSuccess"));
-    } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
   async function updateTask(task: TaskDto, action: "complete" | "dismiss" | "delete") {
@@ -90,7 +90,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       if (reminderEdit) await api.patch(`/tasks/reminder-rules/${getString(reminderEdit, "id")}`, body);
       else await api.post("/tasks/reminder-rules", body);
       setReminderModal(false); reminders.reload(); tasks.reload(); show(t("saveSuccess"));
-    } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
   async function toggleReminder(rule: ReminderRuleDto) {
