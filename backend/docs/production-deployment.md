@@ -78,6 +78,21 @@ docker compose --env-file .env.production -f backend/infra/docker/compose.produc
 
 Il firewall del provider e dell'host deve consentire pubblicamente solo 80/443 e l'accesso SSH amministrativo limitato. Non aprire 5432, 3000 o 8080. Caddy ottiene e rinnova i certificati automaticamente quando DNS e porte sono corretti.
 
+## Backup degli oggetti S3
+
+Il servizio `backup` descritto sopra esegue **soltanto il backup PostgreSQL**. Non copia i documenti, le immagini o gli altri oggetti presenti in `S3_BUCKET`: questi dati vivono fuori dal database.
+
+Prima del lancio, configurare direttamente sul provider S3-compatible:
+- Bucket di origine privato, cifratura server-side abilitata e access log/monitoraggio degli accessi.
+- Versioning del bucket e protezione contro cancellazioni/overwrite accidentali.
+- Replica o backup cifrato verso un secondo account e/o una seconda regione, con policy e credenziali indipendenti.
+- Retention coerente con la policy approvata e con quella del database; evitare che la normale retention o un lifecycle cancelli tutte le versioni recuperabili.
+- Test di ripristino di un oggetto usando la sua `storageKey` e verifica che il documento associato nel database ripristinato sia nuovamente scaricabile.
+
+Il ruolo S3 usato da API/worker deve essere limitato al bucket applicativo e alle operazioni necessarie al runtime. La replica/backup deve usare credenziali separate: non riutilizzare le chiavi applicative per amministrare il bucket di destinazione. La copia locale PostgreSQL, il versioning S3 e la replica off-site devono essere monitorati come tre controlli distinti.
+
+Non considerare completo il disaster recovery finché non sono stati provati insieme il ripristino del database e il recupero degli oggetti S3 corrispondenti allo stesso punto temporale. Il checksum SHA-256 dei dump PostgreSQL verifica l'integrità dell'archivio, ma non cifra i backup: il filesystem locale dei dump deve essere cifrato a riposo e la copia off-site deve usare cifratura end-to-end o del client di backup.
+
 ## Database e privilegi
 
 La password admin, quella del ruolo applicativo e quella del ruolo backup sono generate separatamente. All'inizializzazione del volume PostgreSQL, `init-app-role.sh` crea il ruolo app senza privilegi SUPERUSER/CREATEDB/CREATEROLE e gli assegna DML sulle tabelle e uso delle sequenze. Crea anche il ruolo backup, senza privilegi di scrittura o amministrativi, con accesso predefinito `pg_read_all_data`. Le migrazioni usano il ruolo admin perché possono creare tabelle, indici ed estensioni. API e worker usano esclusivamente il ruolo app; il container backup usa esclusivamente il ruolo read-only.
@@ -86,7 +101,7 @@ Gli script init PostgreSQL vengono eseguiti soltanto quando il volume dati viene
 
 ## Backup e disaster recovery
 
-Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. Lo script host `verify-production-backup-mount.sh` rifiuta una directory non montata o sullo stesso device del Docker data root. Il container usa un account database read-only dedicato e non monta la password dell'admin. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente e monitorata per spazio libero.
+Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. Lo script host `verify-production-backup-mount.sh` rifiuta una directory non montata o sullo stesso device del Docker data root. Il container usa un account database read-only dedicato e non monta la password dell'admin. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente cifrato a riposo e monitorata per spazio libero.
 
 **La copia su disco separato nello stesso host non è un backup off-site e da sola non basta per il disaster recovery.** Configurare una replica esterna cifrata (secret manager/backup agent aziendale, restic o equivalente) verso un account e una regione separati, verificare i checksum dopo il trasferimento e fare restore drill periodici su un host/cluster differente. Il repository non può creare credenziali o attivare l'off-site senza il provider scelto e i relativi segreti. Non considerare il rilascio pronto finché questa replica e il relativo ripristino non sono provati.
 

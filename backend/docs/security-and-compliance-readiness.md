@@ -77,6 +77,7 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Verificare cancellazione account, cancellazione effettiva di storage e routine dei backup; mantenere solo i dati che devono essere conservati per obbligo legale documentato.
 - [ ] Definire e provare il piano di risposta ai data breach con responsabilità, escalation e tempistiche.
 - [ ] Configurare e verificare TLS, storage/database/backup cifrati, regione UE ove richiesta, secret manager e accessi minimi.
+- [ ] Configurare versioning, retention e replica cifrata cross-account/region del bucket S3; il dump PostgreSQL non contiene i documenti e gli oggetti privati. Eseguire un restore test DB + oggetti.
 - [x] Il limite globale `300/15 minuti` su `/api/v1` usa `persistentRateLimit(300, "api-global")` e `PostgresRateLimitStore`: i contatori HMAC sono persistenti e condivisi tra repliche. Il test `rate-limit.integration.test.ts` verifica che istanze store indipendenti vedano lo stesso contatore.
 - [ ] Aggiungere test di sicurezza periodici, scansione delle dipendenze, patching e test di ripristino.
 - [ ] Valutare DSA per le schede pubbliche e implementare una procedura di segnalazione prima di promuovere la funzione.
@@ -110,4 +111,4 @@ La configurazione production/staging e le relative istruzioni sono in [productio
 
 Il limite generale API non è per-processo: `app.ts` monta `persistentRateLimit(300, "api-global")`, che utilizza il contatore PostgreSQL HMAC. La verifica d'integrazione crea due istanze store separate e dimostra la condivisione del contatore.
 
-La replica off-site cifrata dei backup, il secret manager effettivo, il rinnovo TLS sul dominio reale e il restore su host alternativo richiedono ancora configurazione e prove nell'infrastruttura scelta. Non considerarli verificati dal solo file Compose.
+La replica off-site cifrata dei dump PostgreSQL, il versioning/backup degli oggetti S3, il secret manager effettivo, il rinnovo TLS sul dominio reale e il restore DB + documenti su host alternativo richiedono ancora configurazione e prove nell'infrastruttura scelta. Non considerarli verificati dal solo file Compose.

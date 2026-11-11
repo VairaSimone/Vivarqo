@@ -327,7 +327,7 @@ Le risposte API e le email transazionali supportano italiano e inglese. La lingu
 
 ## Preparazione alla produzione, backup e ripristino
 
-Con NODE_ENV=production l'applicazione rifiuta di avviarsi se mancano origini HTTPS, un CSRF_SECRET non predefinito, credenziali email, configurazione Stripe, chiavi VAPID o storage S3. Le credenziali devono essere fornite tramite secret manager o variabili dell'ambiente e non devono essere inserite nel repository. Verificare /healthz per liveness e /readyz per la connessione PostgreSQL.
+Con NODE_ENV=production o staging l'applicazione rifiuta di avviarsi se mancano origini HTTPS, un CSRF_SECRET casuale, credenziali email, configurazione Stripe, chiavi VAPID o storage S3. Staging richiede Stripe Test Mode; produzione richiede Stripe Live. Le credenziali devono essere fornite tramite secret manager o variabili dell'ambiente e non devono essere inserite nel repository. Verificare /healthz per liveness e /readyz per la connessione PostgreSQL.
 
 - pnpm vapid:generate genera una coppia VAPID per sviluppo/staging. In produzione usare un secret manager e non rigenerare la coppia a ogni deploy.
 - `DATABASE_URL=... pnpm db:backup` crea un dump custom e il checksum SHA-256. Copiare entrambi in storage cifrato separato dal cluster.
@@ -362,4 +362,4 @@ Il manifest e il service worker rendono la shell installabile e conservano nella
 
 La configurazione pubblica è separata dal Compose locale: usare `backend/infra/docker/compose.production.yaml` con `.env.production` oppure `.env.staging`. Caddy è l'unico servizio che pubblica 80/443 e gestisce HTTPS; PostgreSQL, API e web restano su reti private. API e worker usano un ruolo PostgreSQL senza privilegi amministrativi; le migrazioni usano il ruolo admin e il backup un account distinto in sola lettura. I segreti sono file-backed e separati per ambiente.
 
-La guida completa, inclusi provisioning dei segreti, TLS, backup separato e requisiti off-site, è in [`backend/docs/production-deployment.md`](backend/docs/production-deployment.md). Il backup automatico scrive su storage host separato dal volume PostgreSQL, ma la replica off-site cifrata e il restore su host alternativo devono essere attivati e provati nell'infrastruttura scelta.
+La guida completa, inclusi provisioning dei segreti, TLS, backup separato e requisiti off-site, è in [`backend/docs/production-deployment.md`](backend/docs/production-deployment.md). Il backup automatico include PostgreSQL e scrive su storage host separato dal volume DB. Non include gli oggetti S3: per i documenti servono versioning/replica cifrata del bucket e un test di restore congiunto DB + file. La replica off-site e il restore su host alternativo devono essere attivati e provati nell'infrastruttura scelta.
