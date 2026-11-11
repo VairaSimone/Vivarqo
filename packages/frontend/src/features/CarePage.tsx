@@ -134,7 +134,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
         {sessions.map((session) => {
           const sessionEntries = getArray<Item>(session, "entries");
           return <article className="session-card" key={getString(session, "id")}>
-            <div className="session-date"><span>{formatDateTime(getString(session, "performedAt"), locale)}</span><Badge>{sessionEntries.length} {t("feedingEntries")}</Badge></div>
+            <div className="session-date"><span>{formatDateTime(getString(session, "performedAt"), locale, timezone)}</span><Badge>{sessionEntries.length} {t("feedingEntries")}</Badge></div>
             <div className="session-animals">{sessionEntries.map((entry) => {
               const animal = entry.animal as Item | undefined;
               const outcomeValue = getString(entry, "outcome");
