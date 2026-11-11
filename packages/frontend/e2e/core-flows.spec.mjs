@@ -875,6 +875,7 @@ for (const viewport of responsiveViewports) {
             for (let index = 0; index < await actionButtons.count(); index += 1) {
               const button = actionButtons.nth(index);
               await expect(button).toBeVisible();
+              await button.scrollIntoViewIfNeeded();
               const hitTarget = await button.evaluate((element) => {
                 const rect = element.getBoundingClientRect();
                 const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);

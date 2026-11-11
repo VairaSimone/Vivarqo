@@ -98,7 +98,7 @@ describe("animal photo upload lifecycle", () => {
   it("does not serve a public photo when the share allowlist excludes it", async () => {
     mocks.publicShareFindFirst.mockResolvedValue({
       visibleFields: ["name", "species"],
-      animal: { photoKey: "animal-photos/public-photo.jpg" },
+      animalId,
     });
 
     const response = await request(anonymousApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
@@ -110,8 +110,9 @@ describe("animal photo upload lifecycle", () => {
   it("serves a public photo only when the share explicitly includes photo", async () => {
     mocks.publicShareFindFirst.mockResolvedValue({
       visibleFields: ["name", "photo"],
-      animal: { photoKey: "animal-photos/public-photo.jpg" },
+      animalId,
     });
+    mocks.animalFindFirst.mockResolvedValue({ photoKey: "animal-photos/public-photo.jpg" });
 
     const response = await request(anonymousApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
 
@@ -120,6 +121,24 @@ describe("animal photo upload lifecycle", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-robots-tag"]).toBe("noindex");
     expect(mocks.openObject).toHaveBeenCalledWith("animal-photos/public-photo.jpg", 5 * 1024 * 1024);
+    expect(mocks.publicShareFindFirst).toHaveBeenCalledWith({
+      where: { slug: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", isEnabled: true, revokedAt: null },
+      select: { visibleFields: true, animalId: true },
+    });
+    expect(mocks.animalFindFirst).toHaveBeenCalledWith({
+      where: { id: animalId, archivedAt: null },
+      select: { photoKey: true },
+    });
+  });
+
+  it("does not serve a public photo for an archived animal", async () => {
+    mocks.publicShareFindFirst.mockResolvedValue({ visibleFields: ["photo"], animalId });
+    mocks.animalFindFirst.mockResolvedValue(null);
+
+    const response = await request(anonymousApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
+
+    expect(response.status).toBe(404);
+    expect(mocks.openObject).not.toHaveBeenCalled();
   });
 
   it("checks ownership before creating a private object", async () => {

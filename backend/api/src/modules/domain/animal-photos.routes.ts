@@ -63,22 +63,32 @@ export function createAnimalPhotoRouter() {
   const router = Router();
 
   router.get("/public/animals/:slug/photo", persistentRateLimit(60, "animal-photo-public"), async (req, res, next) => {
-    const slug = req.params.slug;
-    if (!slug || !/^[A-Za-z0-9_-]{32}$/.test(slug)) {
+    const slugParam = req.params.slug;
+    const slug = typeof slugParam === "string" ? slugParam : "";
+    if (!/^[A-Za-z0-9_-]{32}$/.test(slug)) {
       throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
     }
+
     const share = await prisma.publicShare.findFirst({
-      where: { slug, isEnabled: true, revokedAt: null, animal: { is: { archivedAt: null } } },
-      select: {
-        visibleFields: true,
-        animal: { select: { photoKey: true } },
-      },
+      where: { slug, isEnabled: true, revokedAt: null },
+      select: { visibleFields: true, animalId: true },
     });
     const visibleFields = Array.isArray(share?.visibleFields) ? share.visibleFields : [];
-    if (!share || !visibleFields.includes("photo") || !share.animal.photoKey) {
+    if (!share || !visibleFields.includes("photo")) {
       throw new AppError(404, "PUBLIC_PHOTO_NOT_FOUND", "Public photo not found");
     }
-    await sendPhoto(share.animal.photoKey, res, next, "public");
+
+    // Query the animal separately: this keeps the public-share lookup independent
+    // from relation projection and excludes archived animals from photo delivery.
+    const animal = await prisma.animal.findFirst({
+      where: { id: share.animalId, archivedAt: null },
+      select: { photoKey: true },
+    });
+    if (!animal?.photoKey) {
+      throw new AppError(404, "PUBLIC_PHOTO_NOT_FOUND", "Public photo not found");
+    }
+
+    await sendPhoto(animal.photoKey, res, next, "public");
   });
 
   router.get("/animals/:id/photo", requireSession, async (req, res, next) => {

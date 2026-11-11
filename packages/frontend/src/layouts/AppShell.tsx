@@ -230,7 +230,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
             : <span>{t(item.label)}</span>}
         </button>;
       })}
-      <button onClick={() => setMobileMenu(true)}><Icon name="more" size={18} /><span>{t("more")}</span></button>
+      <button type="button" aria-label={t("more")} onClick={() => setMobileMenu(true)}><Icon name="more" size={18} /><span>{t("more")}</span></button>
     </nav>
     {searchOpen && <Modal title={t("search")} onClose={closeSearch} wide>
       <div className="global-search-panel">
