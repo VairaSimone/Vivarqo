@@ -70,6 +70,7 @@ export function queryString(params: Record<string, string | number | boolean | n
   const result = search.toString();
   return result ? "?" + result : "";
 }
+function isDateOnlyValue(value: string): boolean { return /^\d{4}-\d{2}-\d{2}$/.test(value); }
 function validDateParts(value: string): [number, number, number] | null {
   // Date-only values are deliberately strict. An ISO timestamp must be
   // interpreted as an instant in the account timezone, never as YYYY-MM-DD.
@@ -100,6 +101,7 @@ function dateOnlyString(parts: Pick<ZonedDateParts, "year" | "month" | "day">): 
 export function formatDate(value: string | Date | null | undefined, locale: Locale, options: Intl.DateTimeFormatOptions = {}): string {
   if (!value) return "—";
   const parts = typeof value === "string" ? validDateParts(value) : null;
+  if (typeof value === "string" && isDateOnlyValue(value) && !parts) return "—";
   const date = parts ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12)) : value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   const timezone = parts ? "UTC" : activeDisplayPreferences.timezone;
@@ -171,6 +173,7 @@ export function dateForInput(value: string | null | undefined): string {
   if (!value) return "";
   const parts = validDateParts(value);
   if (parts) return dateOnlyString({ year: parts[0], month: parts[1], day: parts[2] });
+  if (isDateOnlyValue(value)) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return dateOnlyString(datePartsInTimezone(date, activeDisplayPreferences.timezone));
