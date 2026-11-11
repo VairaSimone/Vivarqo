@@ -236,7 +236,7 @@ export function App() {
   let page;
   if (route === "/today" || route === "/") page = <DashboardPage locale={locale} timezone={timezone} navigate={navigate} />;
   else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
-  else if (matches("/feeding")) page = <CarePage locale={locale} path={path} />;
+  else if (matches("/feeding")) page = <CarePage locale={locale} path={path} timezone={timezone} />;
   else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
