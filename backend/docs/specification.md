@@ -253,11 +253,12 @@ L’app mostra saldo, movimenti e avviso di scorta bassa quando il saldo è mino
 14.1 Documenti privati
 I documenti possono essere associati ad animale o ciclo riproduttivo. Ogni documento conserva nome originale, tipo MIME, dimensione, chiave di storage, data di caricamento, categoria e nota.
 I file sono privati per impostazione predefinita. Il server crea URL firmati a scadenza per download autorizzati. Il nome del file non viene utilizzato come percorso fisico.
+Le fotografie principali degli animali sono oggetti privati separati dai documenti, con chiave casuale non esposta nelle API. Sono ammessi JPEG, PNG e WebP verificati tramite firma del contenuto, con dimensione massima di 5 MB. Upload, sostituzione, lettura e rimozione richiedono una sessione e la proprietà dell'animale; la sostituzione elimina il precedente oggetto. La pagina pubblica non riceve mai la chiave di storage e può mostrare la fotografia soltanto tramite la selezione esplicita nel campo photo della condivisione.
 Sono previsti controlli su estensione, MIME reale, dimensione massima configurata e contenuto ammesso. I documenti non sono analizzati o certificati legalmente da Vivarqo.
 14.2 Schede pubbliche e QR
 Un utente può abilitare una pagina pubblica per un animale e ottenere il relativo URL e QR code. Ogni pagina ha uno slug non prevedibile, stato abilitato/disabilitato e lista esplicita dei campi pubblicabili.
 Campi pubblicabili iniziali: nome scelto per la condivisione, specie, morph, sesso se consentito dall’utente, fotografia selezionata, descrizione pubblica e dati di nascita se espressamente attivati. Email, nome dell’account, note private, documenti privati, cronologia alimentare, peso e posizione non vengono pubblicati automaticamente.
-La pagina pubblica è servita da un endpoint pubblico separato, con rate limiting e senza restituire l’intero record privato dell’animale.
+La pagina pubblica è servita da un endpoint pubblico separato, con rate limiting e senza restituire l’intero record privato dell’animale. La fotografia è servita da un endpoint distinto che ricontrolla a ogni richiesta che la condivisione sia attiva, non revocata, riferita a un animale non archiviato e che il campo photo sia presente nella allowlist.
 15. Morph e dati genetici
 La scheda supporta il morph dichiarato dall’utente e righe di annotazione genetica: caratteristica, valore/testo, provenienza se nota, genitore collegato facoltativo e nota.
 La prima implementazione non calcola probabilità di ereditarietà, compatibilità di accoppiamento o genotipi dedotti. Non trasforma una nota inserita dall’utente in un dato scientificamente verificato.
