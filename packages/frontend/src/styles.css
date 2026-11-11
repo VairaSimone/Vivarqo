@@ -340,7 +340,8 @@ tbody tr:hover { background: var(--surface-soft); }
 .calendar-day { min-height: 102px; padding: 7px; border-top: 1px solid var(--border); border-right: 1px solid var(--border); }
 .calendar-day:nth-child(7n) { border-right: 0; }
 .week-grid .calendar-day { min-height: 220px; }
-.calendar-day.out-month { background: color-mix(in srgb, var(--surface-soft) 60%, transparent); opacity: .52; }
+.calendar-day.out-month { background: var(--surface-soft); }
+.calendar-day.out-month .calendar-day-number { color: var(--muted); }
 .calendar-day-number { display: grid; place-items: center; width: 24px; height: 24px; margin-bottom: 4px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 9px; cursor: pointer; }
 .calendar-day-number.today { background: var(--forest); color: white; }
 .calendar-day-items { display: flex; flex-direction: column; gap: 3px; }
