@@ -12,12 +12,12 @@ const RENEW_WHEN_REMAINING_MS = 7 * 24 * 60 * 60 * 1000;
 const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 export const SESSION_COOKIE_NAME =
-  env.NODE_ENV === "production" ? "__Host-vivarqo_session" : "vivarqo_session";
+  (env.NODE_ENV === "production" || env.NODE_ENV === "staging") ? "__Host-vivarqo_session" : "vivarqo_session";
 
 const sessionCookieOptions: CookieOptions = {
   path: "/",
   httpOnly: true,
-  secure: env.NODE_ENV === "production",
+  secure: env.NODE_ENV === "production" || env.NODE_ENV === "staging",
   sameSite: "lax",
 };
 

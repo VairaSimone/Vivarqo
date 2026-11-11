@@ -73,6 +73,8 @@ jobs:
         run: pnpm db:restore:drill
       - name: Build API
         run: pnpm build:api
+      - name: Validate production Docker Compose and secret mounts
+        run: bash backend/scripts/check-production-compose.sh
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
       - name: Docker build and validate frontend web target
