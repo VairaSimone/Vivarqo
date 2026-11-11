@@ -9,6 +9,7 @@ import { env } from "../../config/env.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { deletePrivateObject, openPrivateObjectStream, storePrivateObject, validatePrivateFile } from "./private-storage.js";
+import { assertDocumentCapacity } from "./billing-entitlements.js";
 
 const uploadBody = raw({
   type: ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/octet-stream"],
@@ -144,6 +145,7 @@ export function createDocumentShareRouter() {
     const storageKey = await storePrivateObject("documents", detected.extension as "pdf" | "jpg" | "png" | "webp", req.body);
     try {
       const document = await prisma.$transaction(async (tx) => {
+        await assertDocumentCapacity(tx, auth.userId, BigInt(req.body.length));
         const created = await tx.document.create({
           data: {
             userId: auth.userId, animalId: metadata.animalId ?? null, cycleId: metadata.cycleId ?? null,

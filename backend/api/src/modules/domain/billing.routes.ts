@@ -5,6 +5,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { getUserEntitlements } from "./billing-entitlements.js";
 
 type StripeObject = Record<string, unknown> & { id?: string; object?: string; metadata?: Record<string, unknown> };
 type StripeEvent = { id: string; type: string; data: { object: StripeObject } };
@@ -194,17 +195,17 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
 
   router.get("/billing/subscription", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: auth.userId },
-      select: { status: true, stripePriceId: true, currentPeriodStart: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, createdAt: true, updatedAt: true },
-    });
-    res.status(200).json({
-      configured: Boolean(secretKey && priceId && webhookSecret),
-      subscription,
-      entitlements: {
-        paidSubscription: Boolean(subscription && ["active", "trialing"].includes(subscription.status)),
-      },
-    });
+    const [subscription, entitlements] = await Promise.all([
+      prisma.subscription.findUnique({
+        where: { userId: auth.userId },
+        select: {
+          id: true, status: true, stripePriceId: true, currentPeriodStart: true,
+          currentPeriodEnd: true, cancelAtPeriodEnd: true, createdAt: true, updatedAt: true,
+        },
+      }),
+      getUserEntitlements(auth.userId, priceId),
+    ]);
+    res.status(200).json({ configured: Boolean(secretKey && priceId && webhookSecret), subscription, entitlements });
   });
 
   router.post("/webhooks/stripe", async (req, res) => {

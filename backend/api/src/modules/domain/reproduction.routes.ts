@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { assertAnimalCapacity } from "./billing-entitlements.js";
 
 import {
   createCycleSchema,
@@ -371,6 +372,7 @@ export function createReproductionRouter() {
     const identifiers = input.animals.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")).filter((v): v is string => Boolean(v));
     if (new Set(identifiers).size !== identifiers.length) throw new AppError(400, "DUPLICATE_IDENTIFIERS", "Identifiers must be unique in this request");
     const created = await prisma.$transaction(async (tx) => {
+      await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
       for (const animal of input.animals) {
         animals.push(await tx.animal.create({

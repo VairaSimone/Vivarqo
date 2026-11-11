@@ -26,6 +26,7 @@ import { createDocumentShareRouter } from "./modules/domain/documents-shares.rou
 import { createAnimalPhotoRouter } from "./modules/domain/animal-photos.routes.js";
 import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
 import { createBillingRouter, type BillingRouterOptions } from "./modules/domain/billing.routes.js";
+import { subscriptionAccessGuard } from "./modules/domain/billing-entitlements.js";
 import { createExportRouter } from "./modules/domain/exports.routes.js";
 import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
@@ -89,6 +90,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Validate browser intent before touching a server-side session.
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
+  app.use("/api/v1", subscriptionAccessGuard);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
   app.use("/api/v1/animals", createAnimalRouter());

@@ -9,6 +9,7 @@ import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { createAnimalSchema } from "./animals.schemas.js";
 import { parseAnimalFile } from "./animal-file-parser.js";
 import { resolveImportColumnMapping } from "./import-column-mapping.js";
+import { assertAnimalCapacity } from "../domain/billing-entitlements.js";
 
 const fileBody = raw({
   type: ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"],
@@ -186,6 +187,7 @@ export async function processQueuedAnimalImport(jobId: string, userId: string, l
       }
       return true;
     });
+    await assertAnimalCapacity(tx, userId, animalsToCreate.length);
     const createdAnimals = animalsToCreate.length
       ? await tx.animal.createManyAndReturn({
           data: animalsToCreate.map(({ animal: input }) => ({

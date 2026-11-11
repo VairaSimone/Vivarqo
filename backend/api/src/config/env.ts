@@ -41,6 +41,12 @@ const environmentSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_ID: z.string().optional(),
+  BILLING_ACCESS_MODE: z.enum(["unrestricted", "subscription_required"]).default("unrestricted"),
+  BILLING_PAST_DUE_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
+  // Zero means unlimited; configure positive values when free-plan quotas are launched.
+  BILLING_FREE_MAX_ANIMALS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  BILLING_FREE_MAX_DOCUMENTS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  BILLING_FREE_MAX_STORAGE_BYTES: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),

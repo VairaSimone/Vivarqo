@@ -32,20 +32,35 @@ export interface PushSubscriptionDto {
   createdAt: string;
 }
 
+export type BillingPlan = "free" | "paid";
+export type BillingAccessMode = "unrestricted" | "subscription_required";
+
 export interface BillingSubscriptionDto {
   id: string;
   status: string;
-  cancelAtPeriodEnd: boolean;
-  currentPeriodEnd: string | null;
   stripePriceId: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BillingEntitlementsDto {
-  plan?: string;
-  maxAnimals?: number | null;
-  maxDocuments?: number | null;
-  maxStorageBytes?: number | null;
-  features?: string[];
+  plan: BillingPlan;
+  paidSubscription: boolean;
+  accessMode: BillingAccessMode;
+  accessAllowed: boolean;
+  status: string | null;
+  gracePeriodEndsAt: string | null;
+  maxAnimals: number | null;
+  maxDocuments: number | null;
+  maxStorageBytes: number | null;
+  animalsUsed: number;
+  documentsUsed: number;
+  /** Exact decimal string to preserve PostgreSQL BigInt values. */
+  storageBytesUsed: string;
+  features: string[];
 }
 
 export interface SettingsUserDto {

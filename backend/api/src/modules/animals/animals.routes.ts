@@ -5,6 +5,7 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { logger } from "../../logger.js";
 import { deletePrivateObject } from "../domain/private-storage.js";
+import { assertAnimalCapacity } from "../domain/billing-entitlements.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema } from "./animals.schemas.js";
 
@@ -124,6 +125,7 @@ export function createAnimalRouter() {
     const input = parseBody(createAnimalSchema, req.body);
     try {
       const animal = await prisma.$transaction(async (tx) => {
+        await assertAnimalCapacity(tx, auth.userId, 1);
         const created = await tx.animal.create({ data: { ...toAnimalData(input), userId: auth.userId } });
         await tx.auditEvent.create({
           data: {
@@ -151,6 +153,7 @@ export function createAnimalRouter() {
     }
     try {
       const created = await prisma.$transaction(async (tx) => {
+        await assertAnimalCapacity(tx, auth.userId, input.animals.length);
         // PostgreSQL can insert and return the batch in one round-trip rather
         // than issuing one INSERT per animal inside the transaction.
         const animals = await tx.animal.createManyAndReturn({
