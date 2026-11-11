@@ -73,6 +73,18 @@ validate_environment() {
   node - "$output_file" <<'NODE'
 const fs = require("node:fs");
 const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const roleScript = fs.readFileSync("backend/infra/docker/init-app-role.sh", "utf8");
+const appRoleBlock = roleScript.split(":'app_user', :'app_password'")[0].slice(-180);
+const backupRoleBlock = roleScript.split(":'backup_user', :'backup_password'")[0].slice(-180);
+if (!appRoleBlock.includes("NOBYPASSRLS") || appRoleBlock.includes("BYPASSRLS")) {
+  throw new Error("Application DB role must not bypass row-level security");
+}
+if (!backupRoleBlock.includes("BYPASSRLS") || backupRoleBlock.includes("NOBYPASSRLS")) {
+  throw new Error("Read-only backup DB role must bypass row-level security so pg_dump cannot omit rows");
+}
+if (!roleScript.includes("GRANT pg_read_all_data TO :\"backup_user\"")) {
+  throw new Error("Backup role must receive read-only access to all database objects");
+}
 const services = config.services ?? {};
 const published = Object.entries(services)
   .filter(([, service]) => (service.ports ?? []).some((port) => port.published))
