@@ -17,6 +17,7 @@ export interface AnimalDto {
   locationLabel: string | null;
   status: AnimalStatusDto;
   notes: string | null;
+  photoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string | null;
