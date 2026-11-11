@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
-import { formatDateTime, formatWeight, getArray, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
+import { dateTimeInputToUtc, formatDateTime, formatWeight, getArray, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
@@ -9,7 +9,7 @@ import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, I
 type Item = Record<string, unknown>;
 type AnimalOption = { id: string; name: string; identifier?: string | null; species: string; status?: string };
 
-export function CarePage({ locale, path }: { locale: Locale; path: string }) {
+export function CarePage({ locale, path, timezone }: { locale: Locale; path: string; timezone: string }) {
   const t = (key: string) => translate(locale, key);
   const queryParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
   const [q, setQ] = useState("");
@@ -20,7 +20,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
   const [bulk, setBulk] = useState(queryParams.get("bulk") === "1" || (queryParams.get("create") === "1" && !queryParams.get("animalId")));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [performedAt, setPerformedAt] = useState(localDateTimeValue());
+  const [performedAt, setPerformedAt] = useState(localDateTimeValue(new Date(), timezone));
   const [sessionNotes, setSessionNotes] = useState("");
   const [animalSearch, setAnimalSearch] = useState("");
   const [animalPage, setAnimalPage] = useState(1);
@@ -42,13 +42,14 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
     if (queryParams.get("create") === "1" || queryParams.get("bulk") === "1") {
       setBulk(queryParams.get("bulk") === "1" || (queryParams.get("create") === "1" && !queryParams.get("animalId")));
       setSelected(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
+      setPerformedAt(localDateTimeValue(new Date(), timezone));
       setModal(true);
     }
-  }, [path]);
+  }, [path, timezone]);
 
   function openNew(isBulk: boolean) {
     setBulk(isBulk); setModal(true); setError(""); setSelected(animalId ? [animalId] : []);
-    setEntries({}); setPerformedAt(localDateTimeValue()); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
+    setEntries({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
   }
 
   function toggleAnimal(id: string) {
@@ -63,28 +64,39 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
   }
 
   async function saveSession(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    if (selected.length === 0) { setError(t("selectAnimals")); setBusy(false); return; }
-    const payload = {
-      performedAt: new Date(performedAt).toISOString(),
-      notes: sessionNotes || null,
-      entries: selected.map((id) => {
-        const entry = entries[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" };
-        return {
-          animalId: id,
-          outcome: entry.outcome,
-          foodType: entry.foodType || null,
-          foodSize: entry.foodSize || null,
-          foodWeightG: entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null,
-          notes: entry.notes || null
-        };
-      })
-    };
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    if (selected.length === 0) {
+      setError(t("selectAnimals"));
+      setBusy(false);
+      return;
+    }
     try {
+      const payload = {
+        performedAt: dateTimeInputToUtc(performedAt, timezone),
+        notes: sessionNotes || null,
+        entries: selected.map((id) => {
+          const entry = entries[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" };
+          return {
+            animalId: id,
+            outcome: entry.outcome,
+            foodType: entry.foodType || null,
+            foodSize: entry.foodSize || null,
+            foodWeightG: entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null,
+            notes: entry.notes || null
+          };
+        })
+      };
       await api.post("/feeding-sessions", payload);
-      setModal(false); resource.reload(); show(t("feedingCreated"));
-    } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
-    finally { setBusy(false); }
+      setModal(false);
+      resource.reload();
+      show(t("feedingCreated"));
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveEntry(event: FormEvent) {
