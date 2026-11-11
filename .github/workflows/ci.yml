@@ -65,6 +65,14 @@ jobs:
           sudo apt-get install -y postgresql-client-18
       - name: Verify empty, baseline, partial and drifted database initialization
         run: bash backend/scripts/schema-initialization-drill.sh
+      - name: Verify isolated application and read-only backup database roles
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: vivarqo
+          PGPASSWORD: vivarqo_dev
+          DATABASE_NAME: vivarqo
+        run: bash backend/scripts/backup-role-drill.sh
       - name: Type-check API
         run: pnpm typecheck:api
       - name: Test API
