@@ -9,7 +9,7 @@ import { AppError } from "../../errors/app-error.js";
 const root = resolve(process.cwd(), env.PRIVATE_STORAGE_PATH);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_EXPORT_BYTES = env.EXPORT_MAX_ARCHIVE_BYTES;
-type PrivateFolder = "documents" | "exports";
+type PrivateFolder = "documents" | "exports" | "animal-photos";
 type PrivateExtension = "pdf" | "jpg" | "png" | "webp" | "zip";
 type S3Config = { endpoint: string | undefined; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
 
@@ -141,6 +141,32 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
     reader.releaseLock();
   }
   return Buffer.concat(chunks, totalBytes);
+}
+
+const MAX_ANIMAL_PHOTO_BYTES = 5 * 1024 * 1024;
+export function validatePrivateImage(buffer: Buffer, declaredMime: string): { mimeType: string; extension: "jpg" | "png" | "webp" } {
+  if (buffer.length === 0) throw new AppError(400, "EMPTY_FILE", "The image is empty");
+  if (buffer.length > MAX_ANIMAL_PHOTO_BYTES) throw new AppError(413, "FILE_TOO_LARGE", "The image exceeds the 5 MB limit");
+
+  let mimeType: string | null = null;
+  let extension: "jpg" | "png" | "webp" | null = null;
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    mimeType = "image/jpeg";
+    extension = "jpg";
+  } else if (buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    mimeType = "image/png";
+    extension = "png";
+  } else if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+    mimeType = "image/webp";
+    extension = "webp";
+  }
+
+  if (!mimeType || !extension) throw new AppError(400, "IMAGE_FORMAT_NOT_ALLOWED", "Only JPEG, PNG and WebP images are accepted");
+  const normalizedDeclaredMime = declaredMime.trim().toLowerCase();
+  if (normalizedDeclaredMime && normalizedDeclaredMime !== mimeType && normalizedDeclaredMime !== "application/octet-stream") {
+    throw new AppError(400, "MIME_MISMATCH", "Declared content type does not match the image content");
+  }
+  return { mimeType, extension };
 }
 
 export function validatePrivateFile(buffer: Buffer, declaredMime: string): { mimeType: string; extension: string } {
