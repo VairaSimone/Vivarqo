@@ -1,3 +1,4 @@
+import { invalidateAllResourceCache } from "./resourceCache";
 const API_BASE = "/api/v1";
 let csrfToken: string | null = null;
 let csrfPromise: Promise<string> | null = null;
@@ -20,11 +21,15 @@ export class ApiError extends Error {
 export function setApiLocale(locale: string): void {
   apiLocale = locale === "en" ? "en" : "it";
 }
+export function getApiLocale(): string { return apiLocale; }
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 function notifyUnauthorized(path: string, status: number): void {
-  if (status === 401 && !path.startsWith("/auth/")) unauthorizedHandler?.();
+  if (status === 401 && !path.startsWith("/auth/")) {
+    invalidateAllResourceCache();
+    unauthorizedHandler?.();
+  }
 }
 export function clearCsrfCache(): void {
   csrfToken = null;
@@ -64,7 +69,7 @@ async function getCsrfToken(): Promise<string> {
   return csrfPromise;
 }
 
-async function request<T>(path: string, method: string, body?: unknown): Promise<T> {
+async function request<T>(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const mutating = !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
   const headers = new Headers({ "Accept": "application/json", "Accept-Language": apiLocale });
   if (body !== undefined) headers.set("Content-Type", "application/json");
@@ -73,7 +78,8 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
     method,
     credentials: "include",
     headers,
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {})
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(signal ? { signal } : {})
   });
   if (!response.ok) {
     const error = await parseError(response);
@@ -88,17 +94,17 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
 }
 
 export const api = {
-  get<T>(path: string): Promise<T> {
-    return request<T>(path, "GET");
+  get<T>(path: string, options: { signal?: AbortSignal } = {}): Promise<T> {
+    return request<T>(path, "GET", undefined, options.signal);
   },
   post<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "POST", body);
+    return request<T>(path, "POST", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   patch<T = void>(path: string, body: unknown): Promise<T> {
-    return request<T>(path, "PATCH", body);
+    return request<T>(path, "PATCH", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   delete<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "DELETE", body);
+    return request<T>(path, "DELETE", body).then((result) => { invalidateAllResourceCache(); return result; });
   },
   async upload<T>(path: string, file: File, extraHeaders: Record<string, string> = {}): Promise<T> {
     const headers = new Headers({
@@ -119,32 +125,18 @@ export const api = {
       notifyUnauthorized(path, error.status);
       throw error;
     }
+    invalidateAllResourceCache();
     return await response.json() as T;
   },
   async download(path: string, fallbackFilename = "download"): Promise<void> {
-    const response = await fetch(API_BASE + path, {
-      method: "GET",
-      credentials: "include",
-      headers: { "Accept-Language": apiLocale }
-    });
-    if (!response.ok) {
-      const error = await parseError(response);
-      notifyUnauthorized(path, error.status);
-      throw error;
-    }
-    const blob = await response.blob();
-    const disposition = response.headers.get("content-disposition") ?? "";
-    const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-    const plain = disposition.match(/filename="?([^";]+)"?/i)?.[1];
-    let filename = fallbackFilename;
-    try { if (encoded) filename = decodeURIComponent(encoded); else if (plain) filename = plain; } catch { /* keep a safe fallback */ }
-    const url = URL.createObjectURL(blob);
+    // Use a same-origin native download so large files stream directly to disk rather
+    // than being duplicated in JavaScript memory through response.blob().
     const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename.replace(/[\\/\r\n]/g, "_").slice(0, 180) || fallbackFilename;
+    anchor.href = API_BASE + path;
+    anchor.download = fallbackFilename.replace(/[\\/\r\n]/g, "_").slice(0, 180) || "download";
+    anchor.rel = "noopener";
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 };

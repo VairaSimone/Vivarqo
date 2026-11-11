@@ -50,6 +50,22 @@ const patchDocumentSchema = z.object({
 export function createDocumentShareRouter() {
   const router = Router();
 
+  router.get("/document-deletions", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const deletions = await prisma.documentDeletionJob.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true, documentId: true, status: true, attempts: true,
+        lastErrorCode: true, createdAt: true, completedAt: true,
+        document: { select: { originalFilename: true } },
+      },
+    });
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({ deletions });
+  });
+
   router.get("/documents", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const query = parseBody(z.object({
@@ -58,6 +74,7 @@ export function createDocumentShareRouter() {
       animalId: z.string().uuid().optional(),
       cycleId: z.string().uuid().optional(),
       category: z.string().trim().max(40).optional(),
+      q: z.string().trim().max(160).optional(),
     }), req.query);
     const where: Record<string, unknown> = { userId: auth.userId, deletedAt: null };
     if (query.animalId) {
@@ -71,6 +88,11 @@ export function createDocumentShareRouter() {
       where.cycleId = query.cycleId;
     }
     if (query.category) where.category = query.category;
+    if (query.q) where.OR = [
+      { originalFilename: { contains: query.q, mode: "insensitive" } },
+      { category: { contains: query.q, mode: "insensitive" } },
+      { note: { contains: query.q, mode: "insensitive" } },
+    ];
     const [total, documents] = await Promise.all([
       prisma.document.count({ where: where as never }),
       prisma.document.findMany({
@@ -81,10 +103,18 @@ export function createDocumentShareRouter() {
         select: {
           id: true, animalId: true, cycleId: true, originalFilename: true, mimeType: true, sizeBytes: true,
           category: true, note: true, createdAt: true,
+           animal: { select: { id: true, name: true } },
+           cycle: { select: { id: true, name: true } },
         },
       }),
     ]);
-    res.status(200).json({ documents, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
+    // Prisma returns BigInt for sizeBytes; JSON.stringify cannot serialize BigInt.
+    // Keep the wire contract consistent with POST/PATCH by exposing an exact decimal string.
+    const serializedDocuments = documents.map((document) => ({
+      ...document,
+      sizeBytes: document.sizeBytes.toString(),
+    }));
+    res.status(200).json({ documents: serializedDocuments, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/documents", requireSession, uploadBody, async (req, res) => {
@@ -194,27 +224,41 @@ export function createDocumentShareRouter() {
   router.delete("/documents/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const documentId = id(req.params.id, "document id");
-    const document = await prisma.document.findFirst({
-      where: { id: documentId, userId: auth.userId, deletedAt: null },
-    });
-    if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-
-    // Keep the database record visible/retryable if object storage is unavailable.
-    // Deleting an already-removed object is idempotent for both supported stores.
-    await deletePrivateObject(document.storageKey);
-    await prisma.$transaction(async (tx) => {
-      await tx.document.update({ where: { id: documentId }, data: { deletedAt: new Date() } });
-      await tx.auditEvent.create({
-        data: {
-          userId: auth.userId,
-          action: "document.deleted",
-          entityType: "document",
-          entityId: documentId,
-          requestId: requestId(res),
-        },
+    const deletion = await prisma.$transaction(async (tx) => {
+      const document = await tx.document.findFirst({
+        where: { id: documentId, userId: auth.userId, deletedAt: null },
+        select: { id: true, storageKey: true },
       });
+      if (!document) return null;
+
+      const deletedAt = new Date();
+      await tx.document.update({ where: { id: documentId }, data: { deletedAt } });
+      const job = await tx.documentDeletionJob.create({
+        data: { userId: auth.userId, documentId, storageKey: document.storageKey, status: "queued", nextAttemptAt: deletedAt },
+        select: { id: true, documentId: true, status: true, attempts: true, createdAt: true },
+      });
+      await tx.auditEvent.create({
+        data: { userId: auth.userId, action: "document.deletion_queued", entityType: "document", entityId: documentId, requestId: requestId(res) },
+      });
+      return job;
     });
-    res.status(204).send();
+    if (!deletion) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
+    res.status(202).json({ deletion });
+  });
+
+  router.post("/document-deletions/:id/retry", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const deletionId = id(req.params.id, "document deletion id");
+    const retried = await prisma.documentDeletionJob.updateMany({
+      where: { id: deletionId, userId: auth.userId, status: "failed" },
+      data: { status: "queued", attempts: 0, nextAttemptAt: new Date(), processingStartedAt: null, leaseToken: null, lastErrorCode: null },
+    });
+    if (retried.count !== 1) throw new AppError(409, "DOCUMENT_DELETION_NOT_RETRYABLE", "This document deletion is not in a retryable state");
+    const deletion = await prisma.documentDeletionJob.findFirst({
+      where: { id: deletionId, userId: auth.userId },
+      select: { id: true, documentId: true, status: true, attempts: true, createdAt: true },
+    });
+    res.status(202).json({ deletion });
   });
 
 

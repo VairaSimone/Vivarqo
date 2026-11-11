@@ -1,0 +1,37 @@
+{
+  "name": "@vivarqo/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./reproduction": {
+      "types": "./dist/reproduction.d.ts",
+      "import": "./dist/reproduction.js"
+    },
+    "./inventory": {
+      "types": "./dist/inventory.d.ts",
+      "import": "./dist/inventory.js"
+    },
+    "./animals": {
+      "types": "./dist/animals.d.ts",
+      "import": "./dist/animals.js"
+    },
+    "./operations": {
+      "types": "./dist/operations.d.ts",
+      "import": "./dist/operations.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

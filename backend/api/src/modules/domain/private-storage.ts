@@ -8,7 +8,7 @@ import { AppError } from "../../errors/app-error.js";
 
 const root = resolve(process.cwd(), env.PRIVATE_STORAGE_PATH);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_ZIP32_ARCHIVE_BYTES = 0xffff_ffff;
+const MAX_EXPORT_BYTES = env.EXPORT_MAX_ARCHIVE_BYTES;
 type PrivateFolder = "documents" | "exports";
 type PrivateExtension = "pdf" | "jpg" | "png" | "webp" | "zip";
 type S3Config = { endpoint: string | undefined; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
@@ -111,8 +111,8 @@ async function s3Request(config: S3Config, method: "PUT" | "GET" | "DELETE", key
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage is unavailable");
   }
   if (response.status === 404 && method === "GET") throw new AppError(404, "FILE_NOT_FOUND", "Stored file is no longer available");
+  if (response.status === 404 && method === "DELETE") return Buffer.alloc(0);
   if (!response.ok) {
-    if (method === "DELETE" && response.status === 404) return Buffer.alloc(0);
     throw new AppError(503, "PRIVATE_STORAGE_UNAVAILABLE", "Private object storage could not complete the request", { providerStatus: response.status });
   }
   if (method !== "GET") return Buffer.alloc(0);
@@ -193,7 +193,7 @@ export async function storePrivateObjectFromFile(
   extension: PrivateExtension,
   sourcePath: string,
 ): Promise<string> {
-  const maximum = folder === "exports" ? MAX_ZIP32_ARCHIVE_BYTES : MAX_FILE_BYTES;
+  const maximum = folder === "exports" ? MAX_EXPORT_BYTES : MAX_FILE_BYTES;
   const fileInfo = await stat(sourcePath);
   if (!fileInfo.isFile() || fileInfo.size === 0 || fileInfo.size > maximum) {
     throw new AppError(413, "FILE_TOO_LARGE", "File exceeds the storage limit");
@@ -242,7 +242,7 @@ export async function storePrivateObject(folder: PrivateFolder, extension: Priva
   return key;
 }
 
-const MAX_OBJECT_STREAM_BYTES = MAX_ZIP32_ARCHIVE_BYTES;
+const MAX_OBJECT_STREAM_BYTES = env.EXPORT_MAX_ARCHIVE_BYTES;
 
 function enforceStreamLimit(source: Readable, maximumBytes: number): Readable {
   let totalBytes = 0;

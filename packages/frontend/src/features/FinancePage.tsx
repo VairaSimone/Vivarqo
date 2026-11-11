@@ -4,6 +4,7 @@ import { amountToCents, formatDate, formatMoneyCents, getString, queryString, to
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, useToast } from "../components/ui";
 
 type Item = Record<string, unknown>;
@@ -27,8 +28,6 @@ export function FinancePage({ locale }: { locale: Locale }) {
   const summary = useResource<{ currency: string; incomeCents: string; expenseCents: string; balanceCents: string; categories: Item[] }>(
     "/finance/summary" + queryString({ from, to, currency: "EUR" })
   );
-  const animals = useResource<{ animals: Item[] }>("/animals?page=1&pageSize=100&status=all&sort=name");
-  const documents = useResource<{ documents: Item[] }>("/documents?page=1&pageSize=100");
 
   function openForm(entry?: Item) {
     setEditing(entry ?? null);
@@ -111,8 +110,10 @@ export function FinancePage({ locale }: { locale: Locale }) {
         <Field label={t("amount")}><Input required inputMode="decimal" placeholder="0,00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field><Field label={t("currency")}><Input required minLength={3} maxLength={3} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></Field></div>
         <Field label={t("category")}><Input required maxLength={80} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></Field>
         <Field label={t("descriptionFinance")}><Input required maxLength={240} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-        <div className="form-grid"><Field label={t("animalDetail")}><Select value={form.animalId} onChange={(e) => setForm({ ...form, animalId: e.target.value })}><option value="">—</option>{(animals.data?.animals ?? []).map((animal) => <option key={getString(animal, "id")} value={getString(animal, "id")}>{getString(animal, "name")}</option>)}</Select></Field>
-        <Field label={t("documentsTab")}><Select value={form.documentId} onChange={(e) => setForm({ ...form, documentId: e.target.value })}><option value="">—</option>{(documents.data?.documents ?? []).map((doc) => <option key={getString(doc, "id")} value={getString(doc, "id")}>{getString(doc, "originalFilename")}</option>)}</Select></Field></div>
+        <div className="form-grid">
+          <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => setForm({ ...form, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+          <RemoteSelect label={t("documentsTab")} value={form.documentId} onChange={(documentId) => setForm({ ...form, documentId })} endpoint="/documents" responseKey="documents" labelKey="originalFilename" locale={locale} />
+        </div>
         <p className="muted-note">{locale === "it" ? "Gli importi vengono inviati al backend come centesimi interi. Questo registro è gestionale e non sostituisce la contabilità fiscale." : "Amounts are sent to the API as integer cents. This log is for management and is not a tax accounting system."}</p>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>

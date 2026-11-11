@@ -34,6 +34,7 @@ model User {
   reproductionCycles      ReproductionCycle[]
   inventoryItems          InventoryItem[]
   documents               Document[]
+  documentDeletionJobs    DocumentDeletionJob[]
   publicShares            PublicShare[]
   importJobs              ImportJob[]
   exportJobs              ExportJob[]
@@ -445,10 +446,32 @@ model Document {
   animal           Animal?            @relation(fields: [animalId], references: [id], onDelete: Restrict)
   cycle            ReproductionCycle? @relation(fields: [cycleId], references: [id], onDelete: Restrict)
   financeEntries   FinanceEntry[]
+  deletionJob      DocumentDeletionJob?
   @@index([userId, createdAt(sort: Desc)], map: "documents_user_created_idx")
   @@index([animalId], map: "documents_animal_idx")
   @@index([cycleId], map: "documents_cycle_idx")
   @@map("documents")
+}
+
+model DocumentDeletionJob {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  documentId          String    @unique @map("document_id") @db.Uuid
+  storageKey          String    @map("storage_key")
+  status              String    @default("queued") @db.VarChar(20)
+  attempts            Int       @default(0)
+  nextAttemptAt       DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  processingStartedAt DateTime? @map("processing_started_at") @db.Timestamptz(6)
+  leaseToken          String?   @map("lease_token") @db.Uuid
+  lastErrorCode       String?   @map("last_error_code") @db.VarChar(80)
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document            Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@index([status, nextAttemptAt], map: "document_deletion_jobs_status_next_attempt_idx")
+  @@index([userId, createdAt(sort: Desc)], map: "document_deletion_jobs_user_created_idx")
+  @@map("document_deletion_jobs")
 }
 
 model PublicShare {

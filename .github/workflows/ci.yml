@@ -2,9 +2,13 @@ name: Vivarqo CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, frontend/rebuild]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,6 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public
       NODE_ENV: test
+      CSRF_SECRET: ci-api-only-secret-never-use-outside-test-environment-2026
       RUN_DB_INTEGRATION: "true"
     services:
       postgres:
@@ -41,12 +46,14 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+      - name: Verify OpenAPI routes and specification structure
+        run: pnpm check:openapi
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Apply PostgreSQL migration
-        run: pnpm db:migrate:deploy
+        run: pnpm db:ensure
       - name: Install PostgreSQL 18 client tools
         run: |
           sudo apt-get update
@@ -56,6 +63,8 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
+      - name: Verify empty, baseline, partial and drifted database initialization
+        run: bash backend/scripts/schema-initialization-drill.sh
       - name: Type-check API
         run: pnpm typecheck:api
       - name: Test API
@@ -91,3 +100,110 @@ jobs:
         run: pnpm test:frontend
       - name: Build frontend
         run: pnpm build:frontend
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo_e2e?schema=public
+      NODE_ENV: test
+      APP_ORIGIN: http://127.0.0.1:4173
+      API_ORIGIN: http://127.0.0.1:3000
+      PORT: 3000
+      CSRF_SECRET: ci-e2e-only-secret-never-use-outside-test-environment-2026
+      PRIVATE_STORAGE_PATH: /tmp/vivarqo-e2e-private
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: vivarqo_e2e
+          POSTGRES_USER: vivarqo
+          POSTGRES_PASSWORD: vivarqo_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vivarqo -d vivarqo_e2e"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.20.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Apply migrations to isolated E2E database
+        run: pnpm db:ensure
+      - name: Build shared contracts for runtime API and worker
+        run: pnpm contracts:build
+      - name: Seed isolated browser accounts
+        run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts
+      - name: Start real API
+        run: |
+          nohup pnpm dev:api > /tmp/vivarqo-api.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/readyz; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/vivarqo-api.log
+          exit 1
+      - name: Start real background worker
+        run: |
+          nohup pnpm dev:worker > /tmp/vivarqo-worker.log 2>&1 &
+          worker_pid=$!
+          sleep 3
+          if ! kill -0 "$worker_pid" 2>/dev/null; then
+            cat /tmp/vivarqo-worker.log
+            exit 1
+          fi
+      - name: Build production frontend for PWA verification
+        run: pnpm build:frontend
+      - name: Start production Vite preview
+        run: |
+          nohup pnpm --filter @vivarqo/frontend exec vite preview --host 0.0.0.0 --port 4173 > /tmp/vivarqo-frontend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/vivarqo-frontend.log
+          exit 1
+      - name: Install pinned Playwright runner and Chromium
+        run: |
+          npm install --global @playwright/test@1.56.1
+          playwright install --with-deps chromium
+      - name: Syntax-check browser E2E suite
+        run: node --check packages/frontend/e2e/core-flows.spec.mjs
+      - name: Run real-browser E2E and responsive screenshots
+        working-directory: packages/frontend
+        run: |
+          export PLAYWRIGHT_TEST_MODULE="$(npm root -g)/@playwright/test/index.mjs"
+          playwright test -c playwright.config.mjs
+      - name: Clean isolated E2E accounts
+        if: always()
+        continue-on-error: true
+        run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts --cleanup
+      - name: Upload browser screenshots, traces and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vivarqo-e2e-browser-artifacts
+          path: |
+            packages/frontend/test-results/
+            packages/frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Show API and frontend logs on failure
+        if: failure()
+        run: |
+          cat /tmp/vivarqo-api.log || true
+          cat /tmp/vivarqo-frontend.log || true
+          cat /tmp/vivarqo-worker.log || true

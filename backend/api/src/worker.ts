@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { prisma } from "./db/prisma.js";
-import { ensureDatabaseSchema } from "./db/schema-integrity.js";
+import { verifyDatabaseSchema } from "./db/schema-integrity.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
 import { startNotificationWorker } from "./modules/domain/notification-worker.js";
 import { startRetentionWorker } from "./modules/domain/retention-worker.js";
@@ -33,7 +33,7 @@ async function writeHeartbeat(): Promise<void> {
 }
 
 async function start(): Promise<void> {
-  await ensureDatabaseSchema();
+  await verifyDatabaseSchema();
   if (env.NODE_ENV === "production") getVapidCredentials();
   await writeHeartbeat();
   stopNotificationWorker = startNotificationWorker();

@@ -17,20 +17,21 @@ cp .env.example .env
 docker compose -f backend/infra/docker/compose.yaml up -d postgres
 pnpm install
 pnpm db:generate
+pnpm db:ensure
 pnpm dev:api
 ```
 
-Questa modalità avvia l'API sul computer e PostgreSQL in Docker. In un secondo terminale avvia il processo dedicato ai job con `pnpm dev:worker`; in un terzo terminale avvia il frontend con `pnpm dev:frontend` (Vite su `http://localhost:5173`, proxy `/api` verso l'API su `http://localhost:3000`). Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
+Questa modalità avvia PostgreSQL in Docker. Applica prima le migrazioni con `pnpm db:ensure`, poi avvia l'API sul computer. In un secondo terminale avvia il processo dedicato ai job con `pnpm dev:worker`; in un terzo terminale avvia il frontend con `pnpm dev:frontend` (Vite su `http://localhost:5173`, proxy `/api` verso l'API su `http://localhost:3000`). Dopo aver applicato la migrazione, in alternativa puoi eseguire anche l'API in container con:
 
 ```bash
 docker compose -f backend/infra/docker/compose.yaml up -d --build api
 ```
 
-La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione; l'API, prima di aprire la porta HTTP, applica automaticamente le migrazioni e verifica la completezza dello schema.
+La configurazione Compose dell'API legge le variabili da `.env` ma sovrascrive `DATABASE_URL` per usare il servizio `postgres` della rete Docker. Il servizio PostgreSQL crea il database `vivarqo` alla prima inizializzazione. Il servizio one-shot `migrate` applica le migrazioni e verifica lo schema prima che `api` e `worker` possano avviarsi; i processi applicativi eseguono soltanto una verifica in lettura e non applicano DDL.
 
 Lo schema SQL consolidato di riferimento è versionato in [`backend/database/schema.sql`](backend/database/schema.sql); le migrazioni incrementali eseguibili sono raccolte in `backend/prisma/migrations/` e il modello ORM in `backend/prisma/schema.prisma`. Per ogni modifica futura aggiungere una nuova migrazione versionata: non modificare una migrazione già applicata e non usare `prisma db push` in produzione.
 
-All'avvio l'API aspetta PostgreSQL, esegue `prisma migrate deploy` e controlla tabelle, colonne, indici, vincoli nominati, trigger, funzioni ed estensione `citext`. Se lo schema SQL completo è già stato applicato manualmente ma manca la cronologia Prisma, l'app lo registra come baseline solo dopo la verifica integrale. Se trova uno schema parziale non tracciato o una migrazione già applicata ma con oggetti mancanti, interrompe l'avvio senza cancellare o sovrascrivere dati: in quel caso va fatto un backup e va corretta la deriva con una migrazione revisionata.
+Il job `migrate` aspetta PostgreSQL, esegue `prisma migrate deploy` e controlla tabelle, colonne, tipi PostgreSQL, nullabilità, lunghezze/precisione, indici validi, vincoli validati, trigger attivi, funzioni ed estensione `citext`. API e worker si limitano alla verifica in lettura. Se lo schema SQL completo è già stato applicato manualmente ma manca la cronologia Prisma, l'app lo registra come baseline solo dopo la verifica integrale. Se trova uno schema parziale non tracciato o una migrazione già applicata ma con oggetti mancanti, interrompe l'avvio senza cancellare o sovrascrivere dati: in quel caso va fatto un backup e va corretta la deriva con una migrazione revisionata.
 
 **Il database PostgreSQL indicato in `DATABASE_URL` deve già esistere** (Compose lo crea; nei servizi gestiti va creato nel provider). L'avvio automatico crea/aggiorna lo schema dentro quel database, non crea un server PostgreSQL né un database mancante sul provider. Il comando manuale `pnpm db:migrate:deploy` resta disponibile ed è idempotente.
 
@@ -88,7 +89,8 @@ Copia .env.example in .env. Le chiavi provider sono vuote o segnaposto dimostrat
 | `pnpm dev:frontend` | Avvia Vite per il frontend React |
 | `pnpm build` | Compila API backend e frontend React |
 | `pnpm db:generate` | Genera il client Prisma |
-| `pnpm db:migrate:deploy` | Applica le migrazioni versionate |
+| `pnpm db:migrate:deploy` | Applica le migrazioni versionate tramite Prisma |
+| `pnpm db:ensure` | Esegue il job esplicito di migrazione e verifica dello schema |
 | `pnpm db:migrate:dev` | Crea/applica una migrazione in sviluppo; solo su DB di sviluppo |
 | `pnpm test` | Esegue i test API e frontend |
 | `pnpm test:api` / `pnpm test:frontend` | Esegue i test del singolo pacchetto |

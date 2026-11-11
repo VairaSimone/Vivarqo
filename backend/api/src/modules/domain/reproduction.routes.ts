@@ -4,14 +4,22 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 
-const statuses = ["planned", "active", "completed", "cancelled"] as const;
-const eventTypes = ["pairing", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "loss", "other"] as const;
-const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const nullableUuid = z.string().uuid().nullable().optional();
-const pageSchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(100),
-});
+import {
+  createCycleSchema,
+  patchCycleSchema,
+  createEventSchema,
+  patchEventSchema,
+  createClutchSchema,
+  patchClutchSchema,
+  eggSchema,
+  patchEggSchema,
+  incubationSchema,
+  offspringSchema,
+  patchOffspringSchema,
+  newAnimalSchema,
+  reproductionPageSchema as pageSchema,
+  reproductionCycleStatusSchema,
+} from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -48,92 +56,18 @@ async function ownedClutch(userId: string, clutchId: string) {
   if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found");
   return clutch;
 }
-const createCycleSchema = z.object({
-  name: z.string().trim().max(160).nullable().optional(),
-  startedOn: dateOnly,
-  endedOn: dateOnly.nullable().optional(),
-  status: z.enum(statuses).default("planned"),
-  parentAAnimalId: nullableUuid,
-  parentBAnimalId: nullableUuid,
-  notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict().superRefine((v, ctx) => {
-  if (v.endedOn && v.endedOn < v.startedOn) ctx.addIssue({ code: "custom", path: ["endedOn"], message: "End date cannot precede start date" });
-  if (v.parentAAnimalId && v.parentAAnimalId === v.parentBAnimalId) ctx.addIssue({ code: "custom", path: ["parentBAnimalId"], message: "Parents must be different animals" });
-});
-const patchCycleSchema = z.object({
-  name: z.string().trim().max(160).nullable().optional(),
-  startedOn: dateOnly.optional(),
-  endedOn: dateOnly.nullable().optional(),
-  status: z.enum(statuses).optional(),
-  parentAAnimalId: nullableUuid,
-  parentBAnimalId: nullableUuid,
-  notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
-const createEventSchema = z.object({
-  eventType: z.enum(eventTypes),
-  occurredAt: z.string().datetime({ offset: true }),
-  animalId: nullableUuid,
-  details: z.string().trim().max(20_000).nullable().optional(),
-  temperatureC: z.coerce.number().min(-100).max(100).nullable().optional(),
-  humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
-}).strict();
-const createClutchSchema = z.object({
-  cycleId: z.string().uuid(),
-  laidOn: dateOnly,
-  eggCount: z.coerce.number().int().min(0).max(10_000),
-  status: z.string().trim().min(1).max(20).default("active"),
-  incubatorLabel: z.string().trim().max(120).nullable().optional(),
-  incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
-  notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict();
-const patchClutchSchema = z.object({
-  laidOn: dateOnly.optional(),
-  eggCount: z.coerce.number().int().min(0).max(10_000).optional(),
-  status: z.string().trim().min(1).max(20).optional(),
-  incubatorLabel: z.string().trim().max(120).nullable().optional(),
-  incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
-  notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
-const eggSchema = z.object({
-  code: z.string().trim().max(80).nullable().optional(),
-  status: z.string().trim().min(1).max(20).default("unknown"),
-  notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict();
-const patchEggSchema = z.object({
-  code: z.string().trim().max(80).nullable().optional(),
-  status: z.string().trim().min(1).max(20).optional(),
-  notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
-const incubationSchema = z.object({
-  recordedAt: z.string().datetime({ offset: true }),
-  temperatureC: z.coerce.number().min(-100).max(100).nullable().optional(),
-  humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
-  eventType: z.string().trim().min(1).max(24),
-  notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict();
-const offspringSchema = z.object({
-  cycleId: z.string().uuid(),
-  clutchId: z.string().uuid().nullable().optional(),
-  bornOn: dateOnly,
-  count: z.coerce.number().int().min(0).max(10_000),
-  notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict();
-const newAnimalSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  identifier: z.string().trim().max(120).nullable().optional(),
-  species: z.string().trim().min(1).max(160),
-  sex: z.enum(["male", "female", "unknown"]).default("unknown"),
-  morph: z.string().trim().max(200).nullable().optional(),
-  birthDate: dateOnly.nullable().optional(),
-}).strict();
-
 export function createReproductionRouter() {
   const router = Router();
 
   router.get("/reproduction-cycles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: z.enum(statuses).or(z.literal("all")).default("all") }), req.query);
-    const where = { userId: auth.userId, ...(page.status === "all" ? {} : { status: page.status }) };
+    const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: reproductionCycleStatusSchema.or(z.literal("all")).default("all") }), req.query);
+    const search = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
+    const where = {
+      userId: auth.userId,
+      ...(page.status === "all" ? {} : { status: page.status }),
+      ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}),
+    };
     const [total, cycles] = await Promise.all([
       prisma.reproductionCycle.count({ where }),
       prisma.reproductionCycle.findMany({
@@ -456,14 +390,7 @@ export function createReproductionRouter() {
   router.patch("/reproductive-events/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const eventId = routeUuid(req.params.id, "reproductive event id");
-    const input = parseBody(z.object({
-      eventType: z.enum(eventTypes).optional(),
-      occurredAt: z.string().datetime({ offset: true }).optional(),
-      animalId: nullableUuid,
-      details: z.string().trim().max(20_000).nullable().optional(),
-      temperatureC: z.coerce.number().min(-100).max(100).nullable().optional(),
-      humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
-    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const input = parseBody(patchEventSchema, req.body);
     const existing = await prisma.reproductiveEvent.findFirst({
       where: { id: eventId, cycle: { is: { userId: auth.userId } } },
     });
@@ -537,12 +464,7 @@ export function createReproductionRouter() {
   router.patch("/offspring-batches/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const batchId = routeUuid(req.params.id, "offspring batch id");
-    const input = parseBody(z.object({
-      clutchId: nullableUuid,
-      bornOn: dateOnly.optional(),
-      count: z.coerce.number().int().min(0).max(10_000).optional(),
-      notes: z.string().trim().max(20_000).nullable().optional(),
-    }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
+    const input = parseBody(patchOffspringSchema, req.body);
     const existing = await prisma.offspringBatch.findFirst({
       where: { id: batchId, cycle: { is: { userId: auth.userId } } },
     });

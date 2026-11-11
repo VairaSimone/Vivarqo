@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { Router } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { env } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { deletePrivateObject, openPrivateObjectStream, storePrivateObjectFromFile } from "./private-storage.js";
-import { MAX_ZIP32_ARCHIVE_BYTES, singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
+import { singleBufferChunk, writeStreamingZip, type StreamingZipEntry } from "./streaming-zip.js";
 
 const EXPORT_PAGE_SIZE = 250;
 
@@ -373,7 +374,7 @@ export function createExportRouter() {
     if (job.status === "failed") throw new AppError(409, "EXPORT_FAILED", "The export could not be generated; request a new export");
     if (job.status !== "completed" || !job.storageKey) throw new AppError(409, "EXPORT_NOT_READY", "The export is still being generated");
 
-    const stored = await openPrivateObjectStream(job.storageKey, MAX_ZIP32_ARCHIVE_BYTES);
+    const stored = await openPrivateObjectStream(job.storageKey, env.EXPORT_MAX_ARCHIVE_BYTES);
     res.setHeader("Content-Type", "application/zip");
     if (stored.sizeBytes !== null) res.setHeader("Content-Length", stored.sizeBytes);
     res.setHeader("Content-Disposition", `attachment; filename="vivarqo-export-${job.id}.zip"`);

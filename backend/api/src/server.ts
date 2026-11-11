@@ -1,7 +1,7 @@
 import { env } from "./config/env.js";
 import { logger } from "./logger.js";
 import { prisma } from "./db/prisma.js";
-import { ensureDatabaseSchema } from "./db/schema-integrity.js";
+import { verifyDatabaseSchema } from "./db/schema-integrity.js";
 import { createApp } from "./app.js";
 import { getVapidCredentials } from "./modules/domain/web-push.js";
 import type { Server } from "node:http";
@@ -13,7 +13,7 @@ async function startServer(): Promise<void> {
   if (env.NODE_ENV === "production") getVapidCredentials();
 
   // Never accept HTTP traffic before pending migrations and schema verification finish.
-  await ensureDatabaseSchema();
+  await verifyDatabaseSchema();
   if (shuttingDown) return;
 
   const app = createApp();

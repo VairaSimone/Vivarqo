@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToCents, centsToAmount, formatDate, formatMoneyCents, getString, queryString } from "./domain";
+import { amountToCents, centsToAmount, formatDate, formatMoneyCents, getString, queryString, setDisplayPreferences, weightToGrams, gramsToWeight, temperatureToCelsius, celsiusToTemperature } from "./domain";
 
 describe("monetary helpers", () => {
   it("converts decimal euro amounts to integer cents without floating point drift", () => {
@@ -17,6 +17,19 @@ describe("monetary helpers", () => {
 describe("domain formatting helpers", () => {
   it("formats date-only values without shifting the day through UTC", () => {
     expect(formatDate("2026-11-02", "it")).toContain("2026");
+  });
+
+  it("converts account units while retaining canonical gram and Celsius storage", () => {
+    expect(weightToGrams(1, "lb")).toBeCloseTo(453.59237, 5);
+    expect(gramsToWeight(1000, "kg")).toBe(1);
+    expect(temperatureToCelsius(32, "f")).toBe(0);
+    expect(celsiusToTemperature(100, "f")).toBe(212);
+  });
+
+  it("applies explicit account date formats without shifting date-only values", () => {
+    setDisplayPreferences({ dateFormat: "dd/MM/yyyy", timezone: "Europe/Rome" });
+    expect(formatDate("2026-11-02", "it")).toBe("02/11/2026");
+    setDisplayPreferences({ dateFormat: "locale", weightUnit: "g", temperatureUnit: "c", compactTables: false });
   });
 
   it("omits empty query string fields and preserves falsy numeric values", () => {

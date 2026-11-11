@@ -96,7 +96,8 @@ async function processOne(now: Date): Promise<boolean> {
       p256dh: attempt.pushSubscription.p256dh,
       authSecret: attempt.pushSubscription.authSecret,
     }, {
-      title: attempt.notification.title,
+      // Push alerts may appear on a locked device. Never expose user-entered task titles there.
+      title: attempt.notification.category === "task_due" ? "Promemoria Vivarqo" : "Vivarqo",
       body: attempt.notification.body,
       url: attempt.notification.targetPath ?? "/",
       category: attempt.notification.category,

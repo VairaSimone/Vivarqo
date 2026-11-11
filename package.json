@@ -7,15 +7,16 @@
     "node": ">=24.11.0 <25"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @vivarqo/api dev",
-    "dev:worker": "pnpm --filter @vivarqo/api exec tsx src/worker.ts",
+    "dev:api": "pnpm contracts:build && pnpm --filter @vivarqo/api dev",
+    "dev:worker": "pnpm contracts:build && pnpm --filter @vivarqo/api exec tsx src/worker.ts",
     "db:generate": "prisma generate --config backend/prisma.config.ts",
     "db:migrate:deploy": "prisma migrate deploy --config backend/prisma.config.ts",
     "db:migrate:dev": "prisma migrate dev --config backend/prisma.config.ts",
+    "check:openapi": "node backend/scripts/check-openapi.mjs && npx --yes @redocly/cli@2.76.0 lint --extends=minimal docs/openapi.yaml",
     "test": "pnpm test:api && pnpm test:frontend",
     "typecheck": "pnpm typecheck:api && pnpm typecheck:frontend",
     "build": "pnpm build:api && pnpm build:frontend",
-    "build:api": "pnpm --filter @vivarqo/api build",
+    "build:api": "pnpm contracts:build && pnpm --filter @vivarqo/api build",
     "db:backup": "bash backend/scripts/backup-postgres.sh",
     "db:restore": "bash backend/scripts/restore-postgres.sh",
     "vapid:generate": "node backend/scripts/generate-vapid-keys.mjs",
@@ -23,11 +24,13 @@
     "verify:stripe:test": "node backend/scripts/verify-stripe-test-mode.mjs",
     "verify:web-push:live": "pnpm --filter @vivarqo/api exec tsx ../scripts/verify-web-push-live.ts",
     "dev:frontend": "pnpm --filter @vivarqo/frontend dev",
-    "test:api": "pnpm --filter @vivarqo/api test",
-    "test:frontend": "pnpm --filter @vivarqo/frontend test",
-    "typecheck:api": "pnpm --filter @vivarqo/api typecheck",
-    "typecheck:frontend": "pnpm --filter @vivarqo/frontend typecheck",
-    "build:frontend": "pnpm --filter @vivarqo/frontend build"
+    "test:api": "pnpm contracts:build && pnpm --filter @vivarqo/api test",
+    "test:frontend": "pnpm contracts:build && pnpm --filter @vivarqo/frontend test",
+    "typecheck:api": "pnpm contracts:build && pnpm --filter @vivarqo/api typecheck",
+    "typecheck:frontend": "pnpm contracts:build && pnpm --filter @vivarqo/frontend typecheck",
+    "build:frontend": "pnpm contracts:build && pnpm --filter @vivarqo/frontend build",
+    "db:ensure": "pnpm --filter @vivarqo/api exec tsx src/migrate.ts",
+    "contracts:build": "pnpm --filter @vivarqo/contracts build"
   },
   "dependencies": {
     "dotenv": "^17.2.3",

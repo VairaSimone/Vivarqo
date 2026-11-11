@@ -271,10 +271,15 @@ export function createNotificationRouter() {
 
   router.get("/notification-preferences", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const prefs = await prisma.notificationPreferences.upsert({
+    // Concurrent page shells may request notification settings at the same time.
+    // INSERT ... ON CONFLICT DO NOTHING avoids the create/create unique-key race
+    // that can surface when an ORM upsert is emulated client-side.
+    await prisma.notificationPreferences.createMany({
+      data: [{ userId: auth.userId }],
+      skipDuplicates: true,
+    });
+    const prefs = await prisma.notificationPreferences.findUniqueOrThrow({
       where: { userId: auth.userId },
-      create: { userId: auth.userId },
-      update: {},
     });
     res.status(200).json({
       preferences: {
@@ -318,7 +323,7 @@ export function createNotificationRouter() {
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId: auth.userId },
       orderBy: { createdAt: "desc" },
-      select: { id: true, userAgent: true, createdAt: true, lastSuccessAt: true },
+      select: { id: true, endpoint: true, userAgent: true, createdAt: true, lastSuccessAt: true },
     });
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({ subscriptions });

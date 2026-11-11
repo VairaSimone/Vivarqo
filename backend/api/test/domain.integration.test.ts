@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
 import { deletePrivateObject } from "../src/modules/domain/private-storage.js";
-import { dispatchExportJob, dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
+import { dispatchDocumentDeletionJob, dispatchExportJob, dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
 
 const enabled = process.env.RUN_DB_INTEGRATION === "true";
 const origin = "http://localhost:5173";
@@ -194,6 +194,22 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send(pdf)
       .expect(201);
     const docId = upload.body.document.id as string;
+    expect(upload.body.document.sizeBytes).toBe(String(pdf.length));
+    const storedDocument = await prisma.document.findUniqueOrThrow({
+      where: { id: docId },
+      select: { storageKey: true },
+    });
+    await expect(prisma.documentDeletionJob.create({
+      data: {
+        userId: other.userId,
+        documentId: docId,
+        storageKey: storedDocument.storageKey,
+      },
+    })).rejects.toThrow();
+    const listedDocuments = await owner.agent.get(`/api/v1/documents?animalId=${animal.id}`).expect(200);
+    const listedDocument = listedDocuments.body.documents.find((document: { id: string }) => document.id === docId);
+    expect(listedDocument).toBeDefined();
+    expect(listedDocument.sizeBytes).toBe(String(pdf.length));
     const docDownload = await other.agent.get(`/api/v1/documents/${docId}/download`).expect(404);
     expect(docDownload.body.code).toBe("DOCUMENT_NOT_FOUND");
     const downloaded = await owner.agent.get(`/api/v1/documents/${docId}/download`).expect(200);
@@ -214,6 +230,22 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ revoke: true })
       .expect(200);
     await request(app).get(`/api/v1${publicPath}`).expect(404);
+
+    const queuedDeletion = await owner.agent.delete(`/api/v1/documents/${docId}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .expect(202);
+    expect(queuedDeletion.body.deletion.status).toBe("queued");
+    expect((await owner.agent.get(`/api/v1/documents?animalId=${animal.id}`).expect(200)).body.documents)
+      .toHaveLength(0);
+    const jobs = await owner.agent.get("/api/v1/document-deletions").expect(200);
+    const job = jobs.body.deletions.find((entry: { id: string }) => entry.id === queuedDeletion.body.deletion.id);
+    expect(job).toBeDefined();
+    if (!job) throw new Error("Document deletion job was not returned");
+    expect(job.status).toBe("queued");
+    expect(await dispatchDocumentDeletionJob(job.id)).toBe(true);
+    const completedDeletion = await prisma.documentDeletionJob.findUnique({ where: { id: job.id } });
+    expect(completedDeletion?.status).toBe("completed");
+    await owner.agent.get(`/api/v1/documents/${docId}/download`).expect(404);
   });
 
   it("records finance in integer cents, reports summaries, and isolates in-app notifications/preferences", async () => {
@@ -235,6 +267,12 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const denied = await other.agent.patch(`/api/v1/finance/entries/${created.body.entry.id}`)
       .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({ description: "hack" }).expect(404);
     expect(denied.body.code).toBe("FINANCE_ENTRY_NOT_FOUND");
+
+    const concurrentPreferences = await Promise.all([
+      owner.agent.get("/api/v1/notification-preferences").expect(200),
+      owner.agent.get("/api/v1/notification-preferences").expect(200),
+    ]);
+    expect(concurrentPreferences.every((response) => response.body.preferences.userId === owner.userId)).toBe(true);
 
     const notification = await prisma.notification.create({
       data: { userId: owner.userId, category: "billing", title: "Subscription update", body: "Subscription status updated" },

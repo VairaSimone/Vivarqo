@@ -15,6 +15,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@vivarqo/contracts": "workspace:*",
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "cors": "^2.8.5",

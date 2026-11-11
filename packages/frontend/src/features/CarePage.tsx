@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
-import { formatDateTime, getArray, getString, localDateTimeValue, queryString } from "../lib/domain";
+import { formatDateTime, formatWeight, getArray, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
@@ -33,7 +33,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
   const listUrl = "/feeding-sessions" + queryString({ page, pageSize: 25, animalId, outcome, q });
   const resource = useResource<{ sessions: Item[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(listUrl);
   const animalsResource = useResource<{ animals: AnimalOption[]; pagination: { total: number; page: number; totalPages: number } }>(
-    modal ? "/animals" + queryString({ page: animalPage, pageSize: 100, q: animalSearch, status: "active", sort: "name" }) : null
+    modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, status: "active", sort: "name" }) : null
   );
 
   useEffect(() => { if (animalSearch) setAnimalPage(1); }, [animalSearch]);
@@ -75,7 +75,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
           outcome: entry.outcome,
           foodType: entry.foodType || null,
           foodSize: entry.foodSize || null,
-          foodWeightG: entry.foodWeightG ? Number(entry.foodWeightG) : null,
+          foodWeightG: entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null,
           notes: entry.notes || null
         };
       })
@@ -91,7 +91,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
     event.preventDefault(); if (!editEntry) return; setBusy(true); setError("");
     const payload = {
       outcome: editData.outcome, foodType: editData.foodType || null, foodSize: editData.foodSize || null,
-      foodWeightG: editData.foodWeightG ? Number(editData.foodWeightG) : null, notes: editData.notes || null
+      foodWeightG: editData.foodWeightG ? weightToGrams(editData.foodWeightG) : null, notes: editData.notes || null
     };
     try { await api.patch(`/feeding-entries/${getString(editEntry, "id")}`, payload); setEditEntry(null); resource.reload(); show(t("saveSuccess")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -128,8 +128,19 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
               const outcomeValue = getString(entry, "outcome");
               return <div className="feeding-entry" key={getString(entry, "id")}>
                 <div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{getString(animal, "name") || t("noRecords")}</strong><small>{getString(animal, "species")}</small></span></div>
-                <div className="feeding-detail"><Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge><span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>{entry.foodWeightG ? <small>{String(entry.foodWeightG)} g</small> : null}</div>
-                <div className="row-actions"><IconButton label={t("edit")} onClick={() => { setError(""); setEditData({ outcome: outcomeValue, foodType: getString(entry, "foodType"), foodSize: getString(entry, "foodSize"), foodWeightG: getString(entry, "foodWeightG"), notes: getString(entry, "notes") }); setEditEntry(entry); }}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEntry(entry)}><Icon name="trash" size={15} /></IconButton></div>
+                <div className="feeding-detail"><Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge><span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>{entry.foodWeightG ? <small>{formatWeight(String(entry.foodWeightG), locale)}</small> : null}</div>
+                <div className="row-actions"><IconButton label={t("edit")} onClick={() => {
+                  setError("");
+                  const foodWeightValue = getString(entry, "foodWeightG");
+                  setEditData({
+                    outcome: outcomeValue,
+                    foodType: getString(entry, "foodType"),
+                    foodSize: getString(entry, "foodSize"),
+                    foodWeightG: foodWeightValue ? String(gramsToWeight(foodWeightValue)) : "",
+                    notes: getString(entry, "notes"),
+                  });
+                  setEditEntry(entry);
+                }}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEntry(entry)}><Icon name="trash" size={15} /></IconButton></div>
               </div>;
             })}</div>
             {getString(session, "notes") && <p className="muted-note">{getString(session, "notes")}</p>}
@@ -161,7 +172,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
                 <Field label={t("outcome")}><Select value={entry.outcome} onChange={(e) => updateEntry(id, "outcome", e.target.value)}><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select></Field>
                 <Field label={t("foodType")}><Input value={entry.foodType} onChange={(e) => updateEntry(id, "foodType", e.target.value)} /></Field>
                 <Field label={t("foodSize")}><Input value={entry.foodSize} onChange={(e) => updateEntry(id, "foodSize", e.target.value)} /></Field>
-                <Field label={t("foodWeight")}><Input type="number" min="0.01" step="0.01" value={entry.foodWeightG} onChange={(e) => updateEntry(id, "foodWeightG", e.target.value)} /></Field>
+                <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={entry.foodWeightG} onChange={(e) => updateEntry(id, "foodWeightG", e.target.value)} /></Field>
               </div>
             </div>;
           })}
@@ -175,7 +186,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
         <Field label={t("outcome")}><Select value={editData.outcome} onChange={(e) => setEditData({ ...editData, outcome: e.target.value })}><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select></Field>
         <Field label={t("foodType")}><Input value={editData.foodType} onChange={(e) => setEditData({ ...editData, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input value={editData.foodSize} onChange={(e) => setEditData({ ...editData, foodSize: e.target.value })} /></Field>
-        <Field label={t("foodWeight")}><Input type="number" min="0.01" step="0.01" value={editData.foodWeightG} onChange={(e) => setEditData({ ...editData, foodWeightG: e.target.value })} /></Field>
+        <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={editData.foodWeightG} onChange={(e) => setEditData({ ...editData, foodWeightG: e.target.value })} /></Field>
         <Field label={t("notes")}><Textarea rows={3} value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
