@@ -15,6 +15,7 @@ export function PublicAnimalPage({ slug, locale }: { slug: string; locale: Local
   return <div className="public-page">
     <header className="public-header"><span className="brand-mark"><Icon name="leaf" /></span><strong>vivarqo</strong><span className="public-badge"><Icon name="shield" size={13} />{locale === "it" ? "Scheda condivisa" : "Shared profile"}</span></header>
     <main className="public-animal-card">
+      {getString(animal, "photoUrl") && <img className="public-animal-photo" src={getString(animal, "photoUrl")} alt={getString(animal, "name")} />}
       <span className="eyebrow">{getString(animal, "species")}</span>
       <h1>{getString(animal, "name")}</h1>
       {getString(resource.data, "description") && <p className="public-description">{getString(resource.data, "description")}</p>}
