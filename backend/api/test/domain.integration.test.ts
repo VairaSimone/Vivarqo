@@ -526,6 +526,10 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await owner.agent.get(`/api/v1/documents/${documentId}/download`).expect(200);
     const ownerTraits = await owner.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(200);
     expect(ownerTraits.body.traits.map((item: { id: string }) => item.id)).toContain(traitId);
+    await owner.agent.delete(`/api/v1/genetic-traits/${traitId}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    const traitsAfterDelete = await owner.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(200);
+    expect(traitsAfterDelete.body.traits).toHaveLength(0);
   });
 
 });

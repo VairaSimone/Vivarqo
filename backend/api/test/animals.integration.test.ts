@@ -416,6 +416,22 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       where: { animalId: animal.id, notes: "Manual weigh-in" },
     });
     expect(Number(weight.weightG)).toBe(345);
+
+    const missingOutcome = await owner.agent
+      .post("/api/v1/imports?entity=feedings")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(Buffer.from("animalIdentifier,performedAt\\nCARE-MAP-1,2026-10-16T10:00:00.000Z\\n", "utf8"))
+      .expect(201);
+    expect(missingOutcome.body.validRows).toBe(0);
+    expect(missingOutcome.body.missingFields).toContainEqual(["outcome"]);
+    await owner.agent
+      .post("/api/v1/imports/" + missingOutcome.body.importId + "/confirm")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(409);
   });
 
   it("commits bulk feedings in one transaction and forbids cross-account animals", async () => {
