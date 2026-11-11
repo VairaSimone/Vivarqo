@@ -57,7 +57,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   await cancelStripeSubscription(userId);
 
   const [animals, cycles, documents, exports, imports] = await Promise.all([
-    prisma.animal.findMany({ where: { userId }, select: { id: true } }),
+    prisma.animal.findMany({ where: { userId }, select: { id: true, photoKey: true } }),
     prisma.reproductionCycle.findMany({ where: { userId }, select: { id: true } }),
     prisma.document.findMany({ where: { userId }, select: { storageKey: true } }),
     prisma.exportJob.findMany({ where: { userId, storageKey: { not: null } }, select: { storageKey: true } }),
@@ -66,6 +66,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   const animalIds = animals.map((animal) => animal.id);
   const cycleIds = cycles.map((cycle) => cycle.id);
   const storageKeys = [
+    ...animals.flatMap((animal) => animal.photoKey ? [animal.photoKey] : []),
     ...documents.map((document) => document.storageKey),
     ...exports.flatMap((job) => job.storageKey ? [job.storageKey] : []),
     ...imports.map((job) => job.storageKey),
