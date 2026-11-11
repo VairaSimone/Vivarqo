@@ -889,3 +889,217 @@ table, th, td {
 @media (max-width: 767px) {
   .import-mapping-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
+
+
+/* Data tables: preserve readable desktop columns and switch to labelled cards
+   on phone-sized screens. Horizontal scroll is announced only when needed. */
+.table-wrap {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--forest-2) var(--surface-soft);
+}
+
+.table-wrap[data-overflow="true"] {
+  border-radius: 7px;
+  box-shadow: inset -18px 0 14px -18px var(--forest-2);
+}
+
+.table-wrap:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 3px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.table-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.table-scroll-hint[hidden] {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .main-column,
+  .sidebar-collapsed .main-column {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .table-wrap {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .table-wrap:focus-visible {
+    outline: none;
+  }
+
+  .data-table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .data-table tbody {
+    display: grid;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .data-table tbody tr:not(.data-table-empty) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    min-width: 0;
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .data-table tbody tr:not(.data-table-empty):hover {
+    background: var(--surface);
+  }
+
+  .data-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(74px, 30%) minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+
+  .data-table tbody td::before {
+    content: attr(data-label);
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table tbody tr:not(.data-table-empty) td:last-child {
+    border-bottom: 0;
+  }
+
+  .data-table tbody td[data-actions="true"] {
+    align-items: center;
+  }
+
+  .data-table tbody td[data-actions="true"]::before {
+    align-self: center;
+  }
+
+  .data-table tbody td[data-empty-state="true"] {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .data-table tbody td[data-empty-state="true"]::before {
+    content: none;
+  }
+
+  .data-table tbody tr.data-table-empty {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .data-table tbody tr.data-table-empty td {
+    display: block;
+    border: 0;
+  }
+
+  .data-table tbody tr.data-table-empty td::before {
+    content: none;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .row-actions .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-bottom-nav {
+    min-height: calc(62px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 5px max(6px, env(safe-area-inset-left)) calc(5px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-right));
+  }
+
+  .mobile-bottom-nav button {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    padding: 3px 1px;
+    gap: 4px;
+    font-size: 12px !important;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .mobile-bottom-nav button > span {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-nav-label-short {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .mobile-bottom-nav .mobile-nav-label-full {
+    display: none;
+  }
+
+  .mobile-bottom-nav .mobile-nav-label-short {
+    display: inline;
+  }
+}

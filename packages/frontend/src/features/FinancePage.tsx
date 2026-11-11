@@ -87,14 +87,14 @@ export function FinancePage({ locale }: { locale: Locale }) {
     </div>
     <Panel className="filters-panel"><div className="filter-row">
       <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-      <Select aria-label={locale === "it" ? "Tipo di registrazione" : "Entry type"} value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }}><option value="">{t("all")}</option><option value="income">{t("income")}</option><option value="expense">{t("expense")}</option></Select>
+      <Select aria-label={t("type")} value={entryType} onChange={(e) => { setEntryType(e.target.value); setPage(1); }}><option value="">{t("all")}</option><option value="income">{t("income")}</option><option value="expense">{t("expense")}</option></Select>
       <Input placeholder={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} />
       <Input aria-label={t("from")} type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
       <Input aria-label={t("to")} type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
     </div></Panel>
     <div className="finance-grid">
       <Panel><div className="list-meta"><span>{resource.data?.pagination.total ?? 0} {t("rows")}</span><Button size="sm" variant="ghost" onClick={resource.reload}><Icon name="refresh" />{t("refresh")}</Button></div>
-        {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("date"), t("description"), t("category"), t("amount"), t("actions")]} rows={rows} empty={t("noFinance")} />}
+        {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("date"), t("description"), t("type"), t("amount"), t("actions")]} rows={rows} empty={t("noFinance")} />}
         {resource.data?.pagination && <Pagination page={page} totalPages={resource.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
       </Panel>
       <Panel><PanelHeader title={locale === "it" ? "Ripartizione per categoria" : "Category breakdown"} />
@@ -106,7 +106,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
     </div>
     {modal && <Modal title={editing ? t("edit") : t("newEntry")} onClose={() => setModal(false)} wide>
       <form className="form-stack" onSubmit={save}>{error && <Alert tone="danger">{error}</Alert>}
-        <div className="form-grid"><Field label={t("category")}><Select value={form.entryType} onChange={(e) => setForm({ ...form, entryType: e.target.value })}><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></Field><Field label={t("date")}><Input required type="date" value={form.occurredOn} onChange={(e) => setForm({ ...form, occurredOn: e.target.value })} /></Field>
+        <div className="form-grid"><Field label={t("type")}><Select value={form.entryType} onChange={(e) => setForm({ ...form, entryType: e.target.value })}><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></Field><Field label={t("date")}><Input required type="date" value={form.occurredOn} onChange={(e) => setForm({ ...form, occurredOn: e.target.value })} /></Field>
         <Field label={t("amount")}><Input required inputMode="decimal" placeholder="0,00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field><Field label={t("currency")}><Input required minLength={3} maxLength={3} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></Field></div>
         <Field label={t("category")}><Input required maxLength={80} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></Field>
         <Field label={t("descriptionFinance")}><Input required maxLength={240} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>

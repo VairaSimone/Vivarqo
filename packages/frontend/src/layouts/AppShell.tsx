@@ -214,7 +214,22 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         { path: "/animals", label: "navAnimals", icon: "snake" as const },
         { path: "/feeding", label: "navFeeding", icon: "feed" as const },
         { path: "/tasks", label: "navTasks", icon: "check" as const }
-      ].map((item) => <button key={item.path} onClick={() => onNavigate(item.path)} className={route === item.path || route.startsWith(item.path + "/") ? "active" : ""}><Icon name={item.icon} size={18} /><span>{t(item.label)}</span></button>)}
+      ].map((item) => {
+        const active = route === item.path || route.startsWith(item.path + "/");
+        return <button
+          type="button"
+          key={item.path}
+          onClick={() => onNavigate(item.path)}
+          className={active ? "active" : ""}
+          aria-current={active ? "page" : undefined}
+          aria-label={t(item.label)}
+        >
+          <Icon name={item.icon} size={18} />
+          {item.path === "/feeding"
+            ? <span><span className="mobile-nav-label-full">{t(item.label)}</span><span className="mobile-nav-label-short">{t("navFeedingShort")}</span></span>
+            : <span>{t(item.label)}</span>}
+        </button>;
+      })}
       <button onClick={() => setMobileMenu(true)}><Icon name="more" size={18} /><span>{t("more")}</span></button>
     </nav>
     {searchOpen && <Modal title={t("search")} onClose={closeSearch} wide>

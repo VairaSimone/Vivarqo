@@ -438,8 +438,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect((await completedTasksResponse.json()).tasks.some((item) => item.id === task.id && item.status === "completed")).toBe(true);
 
   await page.goto("/finance");
+  await expect(page.locator(".table-wrap thead th").nth(2)).toHaveText("Tipo");
   await page.getByRole("button", { name: "Nuova voce" }).click();
   const financeDialog = page.getByRole("dialog");
+  await expect(financeDialog.getByLabel("Tipo")).toBeVisible();
+  await expect(financeDialog.getByLabel("Categoria", { exact: true })).toBeVisible();
   await financeDialog.getByLabel("Importo (€)").fill("12.50");
   await financeDialog.getByLabel("Valuta").fill("EUR");
   await financeDialog.getByLabel("Categoria", { exact: true }).fill("Test E2E");
@@ -834,6 +837,101 @@ for (const viewport of responsiveViewports) {
         }
         await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
         if (route === "feeding?create=1") await expect(page.getByRole("dialog")).toBeVisible();
+
+        if (route === "animals" || route === "finance") {
+          const table = page.locator(".table-wrap .data-table");
+          await expect(table).toBeVisible({ timeout: 10_000 });
+          await expect.poll(() => page.locator(".table-wrap").evaluate((wrapper) =>
+            (wrapper.scrollWidth > wrapper.clientWidth + 2) === (wrapper.getAttribute("data-overflow") === "true")
+          )).toBe(true);
+
+          if (route === "animals") {
+            await page.getByRole("combobox", { name: "Stato" }).selectOption("all");
+            await expect.poll(() => page.locator(".table-wrap tbody tr:not(.data-table-empty)").count()).toBeGreaterThan(0);
+          }
+
+          const tableLayout = await page.locator(".table-wrap").evaluate((wrapper) => {
+            const tableElement = wrapper.querySelector("table");
+            const firstRow = wrapper.querySelector("tbody tr:not(.data-table-empty)");
+            return {
+              overflow: wrapper.getAttribute("data-overflow"),
+              wrapperTabIndex: wrapper.tabIndex,
+              tableDisplay: tableElement ? getComputedStyle(tableElement).display : "",
+              rowDisplay: firstRow ? getComputedStyle(firstRow).display : "",
+              labels: Array.from(firstRow?.querySelectorAll("td[data-label]") ?? []).map((cell) => ({
+                label: cell.getAttribute("data-label"),
+                visualLabel: getComputedStyle(cell, "::before").content
+              }))
+            };
+          });
+
+          if (viewport.width <= 760) {
+            expect(tableLayout.tableDisplay, "mobile tables must use the card layout").toBe("block");
+            expect(tableLayout.rowDisplay, "each table row must be a card").toBe("grid");
+            expect(tableLayout.labels.length, "each mobile cell must expose its column label").toBeGreaterThan(0);
+            expect(tableLayout.labels.every((cell) => cell.label && cell.visualLabel.includes(cell.label))).toBe(true);
+
+            const actionButtons = page.locator(".table-wrap .row-actions button");
+            for (let index = 0; index < await actionButtons.count(); index += 1) {
+              const button = actionButtons.nth(index);
+              await expect(button).toBeVisible();
+              const hitTarget = await button.evaluate((element) => {
+                const rect = element.getBoundingClientRect();
+                const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                return {
+                  width: rect.width,
+                  height: rect.height,
+                  insideViewport: rect.left >= 0 && rect.right <= document.documentElement.clientWidth,
+                  receivesPointer: Boolean(hit && element.contains(hit))
+                };
+              });
+              expect(hitTarget.width, "table action target width").toBeGreaterThanOrEqual(44);
+              expect(hitTarget.height, "table action target height").toBeGreaterThanOrEqual(44);
+              expect(hitTarget.insideViewport, "table action must stay within the viewport").toBe(true);
+              expect(hitTarget.receivesPointer, "table action must not be covered by another element").toBe(true);
+            }
+          } else if (tableLayout.overflow === "true") {
+            await expect(page.locator(".table-scroll-hint")).toBeVisible();
+            expect(tableLayout.wrapperTabIndex).toBe(0);
+          }
+
+          if (route === "animals" && viewport.width === 1024) {
+            expect(tableLayout.overflow).toBe("true");
+            await expect(page.locator(".table-scroll-hint")).toBeVisible();
+          }
+        }
+
+        if (viewport.width <= 760) {
+          const bottomNav = page.locator(".mobile-bottom-nav");
+          await expect(bottomNav).toBeVisible();
+          const navButtons = bottomNav.locator("button");
+          const navGeometry = await navButtons.evaluateAll((buttons) => buttons.map((button) => {
+            const rect = button.getBoundingClientRect();
+            const label = button.querySelector("span:last-child");
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
+              text: label?.textContent?.trim() ?? "",
+              accessibleName: button.getAttribute("aria-label")
+            };
+          }));
+          expect(navGeometry).toHaveLength(5);
+          for (const item of navGeometry) {
+            expect(item.width, "bottom navigation hit target width").toBeGreaterThanOrEqual(44);
+            expect(item.height, "bottom navigation hit target height").toBeGreaterThanOrEqual(44);
+            expect(item.text.length, "bottom navigation label must remain present").toBeGreaterThan(0);
+            expect(item.accessibleName, "bottom navigation must have an accessible full label").toBeTruthy();
+          }
+          for (let index = 1; index < navGeometry.length; index += 1) {
+            expect(navGeometry[index - 1].right, "bottom navigation buttons must not overlap").toBeLessThanOrEqual(navGeometry[index].left + 1);
+          }
+          const bottomPadding = await page.locator(".main-column").evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom));
+          const navHeight = await bottomNav.evaluate((element) => element.getBoundingClientRect().height);
+          expect(bottomPadding, "page content must clear the fixed bottom navigation").toBeGreaterThanOrEqual(navHeight);
+        }
+
         const dimensions = await page.evaluate(() => ({
           viewport: document.documentElement.clientWidth,
           document: document.documentElement.scrollWidth

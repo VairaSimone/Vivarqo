@@ -119,12 +119,65 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
 }
 export function DataTable({ headers, rows, empty = "No records" }: { headers: string[]; rows: ReactNode[][]; empty?: string }) {
   const regionLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Records table" : "Tabella dei record";
-  return <div className="table-wrap" role="region" aria-label={regionLabel} tabIndex={0}>
-    <table>
-      <thead><tr>{headers.map((header,index) => <th key={header + index} scope="col">{header}</th>)}</tr></thead>
-      <tbody>{rows.length ? rows.map((row,index) => <tr key={index}>{row.map((cell,cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}><EmptyState title={empty} /></td></tr>}</tbody>
-    </table>
-  </div>;
+  const scrollHintId = useId();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const table = tableRef.current;
+    if (!wrapper || !table) return;
+
+    const measureOverflow = () => {
+      const next = wrapper.scrollWidth > wrapper.clientWidth + 2;
+      setHasOverflow((current) => current === next ? current : next);
+    };
+
+    measureOverflow();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measureOverflow) : null;
+    observer?.observe(wrapper);
+    observer?.observe(table);
+    window.addEventListener("resize", measureOverflow, { passive: true });
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measureOverflow);
+    };
+  }, [headers.length, rows.length]);
+
+  const isEnglish = typeof document !== "undefined" && document.documentElement.lang === "en";
+  return <>
+    <div
+      ref={wrapperRef}
+      className="table-wrap"
+      data-overflow={hasOverflow ? "true" : "false"}
+      role="region"
+      aria-label={regionLabel}
+      aria-describedby={hasOverflow ? scrollHintId : undefined}
+      tabIndex={hasOverflow ? 0 : -1}
+    >
+      <table ref={tableRef} className="data-table" style={{ minWidth: \`\${Math.max(760, headers.length * 126)}px\` }}>
+        <thead><tr>{headers.map((header, index) => <th key={header + index} scope="col">{header}</th>)}</tr></thead>
+        <tbody>
+          {rows.length
+            ? rows.map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => (
+                <td
+                  key={cellIndex}
+                  data-label={headers[cellIndex] ?? ""}
+                  data-column-index={cellIndex}
+                  data-actions={cellIndex === headers.length - 1 ? "true" : undefined}
+                >{cell}</td>
+              ))}</tr>)
+            : <tr className="data-table-empty"><td data-empty-state="true" colSpan={headers.length}><EmptyState title={empty} /></td></tr>}
+        </tbody>
+      </table>
+    </div>
+    <p className="table-scroll-hint" id={scrollHintId} hidden={!hasOverflow}>
+      <Icon name="arrow" size={14} />
+      {isEnglish ? "Scroll horizontally to see all columns" : "Scorri orizzontalmente per visualizzare tutte le colonne"}
+    </p>
+  </>;
 }
 export function Pagination({ page, totalPages, onChange, label = "Page" }: { page: number; totalPages: number; onChange: (page: number) => void; label?: string }) {
   if (totalPages <= 1) return null;
