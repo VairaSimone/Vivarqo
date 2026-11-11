@@ -36,7 +36,8 @@ export function resolveBillingEntitlements(
 ) {
   const status = subscription?.status ?? null;
   const periodEnd = subscription?.currentPeriodEnd ?? null;
-  const priceMatches = !policy.expectedPriceId || subscription?.stripePriceId === policy.expectedPriceId;
+  // Fail closed: without a configured paid price there is no valid paid entitlement.
+  const priceMatches = Boolean(policy.expectedPriceId) && subscription?.stripePriceId === policy.expectedPriceId;
   let paidSubscription = false;
   let gracePeriodEndsAt: Date | null = null;
   if (subscription && priceMatches) {

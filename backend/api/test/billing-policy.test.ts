@@ -83,6 +83,16 @@ describe("billing entitlement policy", () => {
     });
   });
 
+  it("fails closed when the paid plan price is not configured", () => {
+    const result = resolveBillingEntitlements({
+      status: "active", stripePriceId: "price_anything", currentPeriodEnd: new Date("2026-12-01T00:00:00.000Z"),
+    }, { ...policy, expectedPriceId: undefined }, now);
+    expect(result).toMatchObject({
+      plan: "free", paidSubscription: false, accessAllowed: false,
+      maxAnimals: 10, maxDocuments: 25, maxStorageBytes: 1_000_000,
+    });
+  });
+
   it("treats zero limits as unlimited and supports the initial free-first access mode", () => {
     const result = resolveBillingEntitlements(null, {
       ...policy, accessMode: "unrestricted", freeMaxAnimals: 0, freeMaxDocuments: 0, freeMaxStorageBytes: 0,
