@@ -4,15 +4,16 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../errors/app-error.js";
 import { readCookie } from "../../http/cookies.js";
 
+const secureCookies = env.NODE_ENV === "production" || env.NODE_ENV === "staging";
 export const CSRF_COOKIE_NAME =
-  env.NODE_ENV === "production" ? "__Host-vivarqo_csrf" : "vivarqo_csrf";
+  secureCookies ? "__Host-vivarqo_csrf" : "vivarqo_csrf";
 const CSRF_TTL_MS = 24 * 60 * 60 * 1000;
 const csrfCookieOptions: CookieOptions = {
   path: "/",
   // The API returns the matching token in the /csrf response body, so frontend
   // code does not need to read the cookie directly.
   httpOnly: true,
-  secure: env.NODE_ENV === "production",
+  secure: secureCookies,
   sameSite: "lax",
   maxAge: CSRF_TTL_MS,
 };

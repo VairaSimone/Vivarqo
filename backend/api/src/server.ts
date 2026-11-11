@@ -10,7 +10,7 @@ let server: Server | undefined;
 let shuttingDown = false;
 
 async function startServer(): Promise<void> {
-  if (env.NODE_ENV === "production") getVapidCredentials();
+  if (env.NODE_ENV === "production" || env.NODE_ENV === "staging") getVapidCredentials();
 
   // Never accept HTTP traffic before pending migrations and schema verification finish.
   await verifyDatabaseSchema();

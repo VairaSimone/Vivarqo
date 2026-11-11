@@ -65,33 +65,59 @@ if (!parsedEnvironment.success) {
 }
 
 const runtimeEnvironment = parsedEnvironment.data;
-if (runtimeEnvironment.NODE_ENV === "production") {
-  const productionProblems: string[] = [];
-  if (new URL(runtimeEnvironment.APP_ORIGIN).protocol !== "https:") productionProblems.push("APP_ORIGIN must use HTTPS in production");
-  if (new URL(runtimeEnvironment.API_ORIGIN).protocol !== "https:") productionProblems.push("API_ORIGIN must use HTTPS in production");
-  if (runtimeEnvironment.CSRF_SECRET.toLowerCase().includes("replace-with") || runtimeEnvironment.CSRF_SECRET.length < 32) {
-    productionProblems.push("CSRF_SECRET must be a unique random secret with at least 32 characters");
+const deployedEnvironment = runtimeEnvironment.NODE_ENV === "production" || runtimeEnvironment.NODE_ENV === "staging";
+if (deployedEnvironment) {
+  const deploymentProblems: string[] = [];
+  const stripeMode = runtimeEnvironment.NODE_ENV === "production" ? "live" : "test";
+  if (new URL(runtimeEnvironment.APP_ORIGIN).protocol !== "https:") deploymentProblems.push("APP_ORIGIN must use HTTPS in deployed environments");
+  if (new URL(runtimeEnvironment.API_ORIGIN).protocol !== "https:") deploymentProblems.push("API_ORIGIN must use HTTPS in deployed environments");
+  if (
+    new URL(runtimeEnvironment.APP_ORIGIN).hostname.endsWith(".example.com") ||
+    new URL(runtimeEnvironment.API_ORIGIN).hostname.endsWith(".example.com")
+  ) {
+    deploymentProblems.push("APP_ORIGIN and API_ORIGIN must use real deployment hostnames, not example.com placeholders");
+  }
+  if (
+    runtimeEnvironment.CSRF_SECRET.length < 32 ||
+    /replace|change[-_ ]?me|example/i.test(runtimeEnvironment.CSRF_SECRET)
+  ) {
+    deploymentProblems.push("CSRF_SECRET must be a unique random secret with at least 32 characters");
   }
   if (!runtimeEnvironment.RESEND_API_KEY || !runtimeEnvironment.EMAIL_FROM) {
-    productionProblems.push("RESEND_API_KEY and EMAIL_FROM are required in production");
+    deploymentProblems.push("RESEND_API_KEY and EMAIL_FROM are required in deployed environments");
+  } else if (runtimeEnvironment.EMAIL_FROM.toLowerCase().includes("example.com")) {
+    deploymentProblems.push("EMAIL_FROM must use a verified sender domain, not example.com");
   }
   if (!runtimeEnvironment.STRIPE_SECRET_KEY || !runtimeEnvironment.STRIPE_WEBHOOK_SECRET || !runtimeEnvironment.STRIPE_PRICE_ID) {
-    productionProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID are required in production");
+    deploymentProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID are required in deployed environments");
   } else {
-    if (!/^sk_live_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_SECRET_KEY)) productionProblems.push("STRIPE_SECRET_KEY must be a Stripe Live secret key in production");
-    if (!/^whsec_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_WEBHOOK_SECRET)) productionProblems.push("STRIPE_WEBHOOK_SECRET must be a Stripe Live webhook secret in production");
-    if (!runtimeEnvironment.STRIPE_PRICE_ID.startsWith("price_")) productionProblems.push("STRIPE_PRICE_ID must be a valid Stripe Price identifier in production");
+    const expectedStripePrefix = stripeMode === "live" ? "sk_live_" : "sk_test_";
+    if (!runtimeEnvironment.STRIPE_SECRET_KEY.startsWith(expectedStripePrefix)) {
+      deploymentProblems.push(`STRIPE_SECRET_KEY must use Stripe ${stripeMode.toUpperCase()} credentials in this environment`);
+    }
+    if (!/^whsec_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_WEBHOOK_SECRET)) {
+      deploymentProblems.push("STRIPE_WEBHOOK_SECRET must be a valid Stripe webhook signing secret");
+    }
+    if (!/^price_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_PRICE_ID)) {
+      deploymentProblems.push("STRIPE_PRICE_ID must be a real Stripe Price identifier");
+    }
   }
   if (!runtimeEnvironment.VAPID_PUBLIC_KEY || !runtimeEnvironment.VAPID_PRIVATE_KEY || !runtimeEnvironment.VAPID_SUBJECT) {
-    productionProblems.push("VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are required in production");
+    deploymentProblems.push("VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are required in deployed environments");
+  } else if (/replace|example/i.test(runtimeEnvironment.VAPID_PUBLIC_KEY) || runtimeEnvironment.VAPID_SUBJECT.toLowerCase().includes("example.com")) {
+    deploymentProblems.push("VAPID_PUBLIC_KEY and VAPID_SUBJECT must contain real environment-specific values");
   }
   if (!runtimeEnvironment.S3_BUCKET || !runtimeEnvironment.S3_ACCESS_KEY_ID || !runtimeEnvironment.S3_SECRET_ACCESS_KEY || !runtimeEnvironment.S3_REGION) {
-    productionProblems.push("S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required in production");
+    deploymentProblems.push("S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required in deployed environments");
+  } else if (/replace|example/i.test(runtimeEnvironment.S3_BUCKET)) {
+    deploymentProblems.push("S3_BUCKET must identify a real private bucket");
   }
   if (runtimeEnvironment.S3_ENDPOINT && new URL(runtimeEnvironment.S3_ENDPOINT).protocol !== "https:") {
-    productionProblems.push("S3_ENDPOINT must use HTTPS in production");
+    deploymentProblems.push("S3_ENDPOINT must use HTTPS in deployed environments");
   }
-  if (productionProblems.length) throw new Error(`Invalid production environment: ${productionProblems.join("; ")}`);
+  if (deploymentProblems.length) {
+    throw new Error(`Invalid ${runtimeEnvironment.NODE_ENV} environment: ${deploymentProblems.join("; ")}`);
+  }
 }
 const vapidValues = [
   runtimeEnvironment.VAPID_PUBLIC_KEY,
