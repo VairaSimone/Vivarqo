@@ -41,8 +41,10 @@ export function resolveBillingEntitlements(
   let gracePeriodEndsAt: Date | null = null;
   if (subscription && priceMatches) {
     if (status === "active" || status === "trialing") {
+      // Fail closed until Stripe has synchronized a verifiable paid-through date.
+      // In particular, checkout.session.completed does not contain subscription period dates.
       // A scheduled cancellation remains active through the already-paid period.
-      paidSubscription = periodEnd === null || periodEnd.getTime() > now.getTime();
+      paidSubscription = periodEnd !== null && periodEnd.getTime() > now.getTime();
     } else if (status === "past_due" && periodEnd) {
       gracePeriodEndsAt = new Date(periodEnd.getTime() + policy.pastDueGraceDays * 86_400_000);
       paidSubscription = now.getTime() <= gracePeriodEndsAt.getTime();

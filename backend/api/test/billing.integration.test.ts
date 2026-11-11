@@ -103,7 +103,13 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect(completion.status, `Webhook returned ${completion.status}: ${completion.text}`).toBe(200);
     expect(completion.body.received).toBe(true);
     const subscription = await prisma.subscription.findUnique({ where: { userId: owner.userId } });
-    expect(subscription).toMatchObject({ stripeCustomerId: "cus_test_vivarqo", stripeSubscriptionId: "sub_test_vivarqo", status: "active" });
+    expect(subscription).toMatchObject({ stripeCustomerId: "cus_test_vivarqo", stripeSubscriptionId: "sub_test_vivarqo", status: "incomplete" });
+    const pendingBillingState = await owner.agent.get("/api/v1/billing/subscription").expect(200);
+    expect(pendingBillingState.body.entitlements).toMatchObject({
+      paidSubscription: false,
+      accessAllowed: false,
+      status: "incomplete",
+    });
 
     const portal = await owner.agent.post("/api/v1/billing/portal")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);

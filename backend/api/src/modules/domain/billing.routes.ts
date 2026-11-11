@@ -131,7 +131,10 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       stripePriceId: priceId ?? null,
-      status: normalizedStatus(object.payment_status === "paid" ? "active" : "incomplete"),
+      // Checkout Session does not carry current_period_end. Keep the subscription
+      // pending until customer.subscription.created/updated supplies the authoritative
+      // status and paid-through date; otherwise a missing date could grant access forever.
+      status: "incomplete",
     };
     await tx.subscription.upsert({ where: { userId: userRaw }, create: { userId: userRaw, ...data }, update: data });
     return;

@@ -28,6 +28,17 @@ describe("billing entitlement policy", () => {
     }
   });
 
+  it("fails closed for active or trialing subscriptions without a synchronized period end", () => {
+    for (const status of ["active", "trialing"]) {
+      const result = resolveBillingEntitlements({
+        status, stripePriceId: policy.expectedPriceId, currentPeriodEnd: null,
+      }, policy, now);
+      expect(result).toMatchObject({
+        plan: "free", paidSubscription: false, accessAllowed: false,
+      });
+    }
+  });
+
   it("keeps scheduled cancellation active through the paid period, then revokes access", () => {
     const active = resolveBillingEntitlements({
       status: "active", stripePriceId: policy.expectedPriceId, currentPeriodEnd: new Date("2026-11-12T00:00:00.000Z"),
