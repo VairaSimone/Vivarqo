@@ -62,6 +62,25 @@ function sendPhoto(
 export function createAnimalPhotoRouter() {
   const router = Router();
 
+  router.get("/public/animals/:slug/photo", async (req, res, next) => {
+    const slug = req.params.slug;
+    if (!slug || !/^[A-Za-z0-9_-]{32}$/.test(slug)) {
+      throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
+    }
+    const share = await prisma.publicShare.findFirst({
+      where: { slug, isEnabled: true, revokedAt: null, animal: { is: { archivedAt: null } } },
+      select: {
+        visibleFields: true,
+        animal: { select: { photoKey: true } },
+      },
+    });
+    const visibleFields = Array.isArray(share?.visibleFields) ? share.visibleFields : [];
+    if (!share || !visibleFields.includes("photo") || !share.animal.photoKey) {
+      throw new AppError(404, "PUBLIC_PHOTO_NOT_FOUND", "Public photo not found");
+    }
+    await sendPhoto(share.animal.photoKey, res, next, "public");
+  });
+
   router.get("/animals/:id/photo", requireSession, async (req, res, next) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseAnimalId(req.params.id);
