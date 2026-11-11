@@ -135,6 +135,15 @@ describe("animal photo upload lifecycle", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("does not stream a photo when the requested animal is not owned by the account", async () => {
+    mocks.animalFindFirst.mockResolvedValue(null);
+
+    const response = await request(authenticatedApp()).get("/animals/" + animalId + "/photo");
+
+    expect(response.status).toBe(404);
+    expect(mocks.openObject).not.toHaveBeenCalled();
+  });
+
   it("uploads the validated image and records the photo URL without exposing its storage key", async () => {
     const response = await request(authenticatedApp())
       .post("/animals/" + animalId + "/photo")
@@ -164,6 +173,16 @@ describe("animal photo upload lifecycle", () => {
     expect(response.status).toBe(200);
     expect(mocks.deleteObject).toHaveBeenCalledOnce();
     expect(mocks.deleteObject).toHaveBeenCalledWith("animal-photos/old-photo.jpg");
+  });
+
+  it("does not clear or delete a photo when the animal is not owned by the account", async () => {
+    mocks.animalFindFirst.mockResolvedValue(null);
+
+    const response = await request(authenticatedApp()).delete("/animals/" + animalId + "/photo");
+
+    expect(response.status).toBe(404);
+    expect(mocks.animalUpdate).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
   });
 
   it("clears the photo reference and deletes the stored object", async () => {
