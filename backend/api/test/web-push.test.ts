@@ -11,9 +11,15 @@ import {
 function keyPair() {
   const curve = createECDH("prime256v1");
   curve.generateKeys();
+  const rawPrivateKey = curve.getPrivateKey();
+  // OpenSSL may omit leading zero octets from a scalar. P-256 private keys
+  // are fixed-width 32-byte values when encoded for VAPID/JWK.
+  const privateKey = Buffer.alloc(32);
+  if (rawPrivateKey.length > privateKey.length) throw new Error("Unexpected P-256 private key length");
+  rawPrivateKey.copy(privateKey, privateKey.length - rawPrivateKey.length);
   return {
     publicKey: curve.getPublicKey(undefined, "uncompressed"),
-    privateKey: curve.getPrivateKey(),
+    privateKey,
   };
 }
 
