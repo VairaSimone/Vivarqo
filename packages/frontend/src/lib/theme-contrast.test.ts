@@ -13,6 +13,15 @@ function contrast(foreground: string, background: string): number {
   return (values[0]! + 0.05) / (values[1]! + 0.05);
 }
 
+function blend(background: string, foreground: string, opacity: number): string {
+  const channels = [1, 3, 5].map((offset) => {
+    const bg = parseInt(background.slice(offset, offset + 2), 16);
+    const fg = parseInt(foreground.slice(offset, offset + 2), 16);
+    return Math.round(bg * (1 - opacity) + fg * opacity).toString(16).padStart(2, "0");
+  });
+  return "#" + channels.join("");
+}
+
 describe("WCAG AA theme contrast", () => {
   const css = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
   const lightStart = css.indexOf(":root {");
@@ -49,6 +58,18 @@ describe("WCAG AA theme contrast", () => {
   it("keeps light dashboard text readable on the forest surface", () => {
     expect(contrast("#f3f5ef", light.forest!)).toBeGreaterThanOrEqual(4.5);
     expect(contrast("#9fb1a5", light.forest!)).toBeGreaterThanOrEqual(4.5);
+  });
+
+
+  it("keeps sidebar navigation and profile text readable on solid and translucent surfaces", () => {
+    for (const tokens of [light, dark]) {
+      check(tokens, "sidebar-muted", "sidebar");
+      const profileSurface = blend(tokens.sidebar!, "#ffffff", 0.06);
+      expect(
+        contrast(tokens["sidebar-muted"]!, profileSurface),
+        `sidebar-muted on translucent profile surface must meet 4.5:1; actual ${contrast(tokens["sidebar-muted"]!, profileSurface).toFixed(2)}:1`
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("keeps dark theme text and status colors readable", () => {

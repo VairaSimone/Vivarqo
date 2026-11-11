@@ -118,7 +118,13 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
   return <div className="error-state" role="alert"><Icon name="alert" size={19} /><span>{message}</span>{retry && <Button size="sm" variant="secondary" onClick={retry}>{retryLabel}</Button>}</div>;
 }
 export function DataTable({ headers, rows, empty = "No records" }: { headers: string[]; rows: ReactNode[][]; empty?: string }) {
-  return <div className="table-wrap"><table><thead><tr>{headers.map((header,index) => <th key={header + index}>{header}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row,index) => <tr key={index}>{row.map((cell,cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}><EmptyState title={empty} /></td></tr>}</tbody></table></div>;
+  const regionLabel = (typeof document !== "undefined" && document.documentElement.lang === "en" ? "Table: " : "Tabella: ") + headers.join(", ");
+  return <div className="table-wrap" role="region" aria-label={regionLabel} tabIndex={0}>
+    <table>
+      <thead><tr>{headers.map((header,index) => <th key={header + index} scope="col">{header}</th>)}</tr></thead>
+      <tbody>{rows.length ? rows.map((row,index) => <tr key={index}>{row.map((cell,cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}><EmptyState title={empty} /></td></tr>}</tbody>
+    </table>
+  </div>;
 }
 export function Pagination({ page, totalPages, onChange, label = "Page" }: { page: number; totalPages: number; onChange: (page: number) => void; label?: string }) {
   if (totalPages <= 1) return null;

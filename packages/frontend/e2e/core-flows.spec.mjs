@@ -30,7 +30,11 @@ async function expectNoA11yViolations(page, context) {
     id: violation.id,
     impact: violation.impact,
     help: violation.help,
-    targets: violation.nodes.map((node) => node.target)
+    nodes: violation.nodes.map((node) => ({
+      target: node.target,
+      failureSummary: node.failureSummary,
+      any: node.any.map((check) => ({ message: check.message, data: check.data }))
+    }))
   }));
   expect(violations, `WCAG 2.2 AA axe scan failed on ${context}: ${JSON.stringify(violations)}`).toEqual([]);
 }
@@ -44,7 +48,16 @@ test("WCAG 2.2 AA automated accessibility and keyboard interaction baseline", as
   await page.keyboard.press("Enter");
   await expect(page.locator("#main-content")).toBeFocused();
 
-  for (const route of ["/today", "/animals", "/feeding", "/settings"]) {
+  test.setTimeout(180_000);
+  // Audit each principal application route (not just the dashboard) using the
+  // WCAG 2.0/2.1/2.2 A and AA axe rule sets.
+  const auditedRoutes = [
+    "/today", "/animals", "/feeding", "/tasks", "/calendar",
+    "/reproduction", "/clutches", "/inventory", "/documents",
+    "/finance", "/settings", "/settings/notifications",
+    "/notifications", "/billing", "/imports", "/exports"
+  ];
+  for (const route of auditedRoutes) {
     await page.goto(route);
     await expect(page.locator("#main-content")).toBeVisible();
     await expectNoA11yViolations(page, route);
