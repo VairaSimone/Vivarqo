@@ -157,7 +157,7 @@ export function DataTable({ headers, rows, empty = "No records" }: { headers: st
       aria-describedby={hasOverflow ? scrollHintId : undefined}
       tabIndex={hasOverflow ? 0 : -1}
     >
-      <table ref={tableRef} className="data-table" style={{ minWidth: \`\${Math.max(760, headers.length * 126)}px\` }}>
+      <table ref={tableRef} className="data-table" style={{ minWidth: `${Math.max(760, headers.length * 126)}px` }}>
         <thead><tr>{headers.map((header, index) => <th key={header + index} scope="col">{header}</th>)}</tr></thead>
         <tbody>
           {rows.length
