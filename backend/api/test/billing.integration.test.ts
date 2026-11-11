@@ -186,6 +186,14 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
         items: { data: [{ price: { id: "price_test_vivarqo" } }] },
       } },
     };
+    const staleDeletedEvent = {
+      ...deletedEvent,
+      id: `evt_vivarqo_${randomUUID()}`,
+      data: { object: { ...deletedEvent.data.object, id: "sub_old_vivarqo" } },
+    };
+    await sendEvent(owner.agent, staleDeletedEvent).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("active");
+
     await sendEvent(owner.agent, deletedEvent).expect(200);
     expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("canceled");
 

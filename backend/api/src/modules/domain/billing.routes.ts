@@ -111,8 +111,13 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     const current = await tx.subscription.findUnique({
       where: { userId }, select: { stripeSubscriptionId: true, status: true },
     });
-    // Do not let a delayed subscription.created/updated event revive a subscription
-    // after Stripe has already delivered customer.subscription.deleted for this ID.
+    // Do not let a delayed event for an older subscription overwrite the account's
+    // newer subscription. A newly-created subscription may replace a terminal old one.
+    if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== stripeSubscriptionId) {
+      const previousIsTerminal = ["canceled", "unpaid", "incomplete_expired"].includes(current.status);
+      if (!previousIsTerminal || eventType === "customer.subscription.deleted") return;
+    }
+    // Do not let delayed update/create events revive a deleted subscription with the same ID.
     if (current?.stripeSubscriptionId === stripeSubscriptionId &&
         current.status === "canceled" && eventType !== "customer.subscription.deleted") return;
     const price = object.items && typeof object.items === "object" && "data" in object.items && Array.isArray((object.items as { data?: unknown }).data)
