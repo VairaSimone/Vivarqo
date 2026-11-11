@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import { downloadQrSvg, qrMatrix } from "../../lib/qr";
-import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
+import { dateForInput, dateTimeInputToUtc, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
 import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, GeneticTraitDto, PublicShareDto, ShedDto, WeightDto } from "@vivarqo/contracts/animals";
 
@@ -80,7 +80,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   function openRecord(kind: "weight" | "shed" | "note", existing?: CareRecordDto) {
     setRecordKind(kind); setRecordEdit(existing ?? null); setFormError("");
     setRecordForm({
-      date: existing ? dateForInput(getString(existing, kind === "weight" ? "measuredAt" : "occurredAt")) : new Date().toISOString().slice(0, 10),
+      date: existing ? dateForInput(getString(existing, kind === "weight" ? "measuredAt" : "occurredAt")) : todayDate(),
       weight: existing ? String(gramsToWeight(getString(existing, "weightG"))) : "",
       outcome: existing ? getString(existing, "outcome", "complete") : "complete",
       category: existing ? getString(existing, "category", "general") : "general",
@@ -96,13 +96,13 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     const recordId = getString(recordEdit, "id");
     try {
       if (recordKind === "weight") {
-        const payload = { measuredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), weightG: weightToGrams(recordForm.weight), notes: recordForm.notes || null };
+        const payload = { measuredAt: dateTimeInputToUtc(recordForm.date + "T12:00"), weightG: weightToGrams(recordForm.weight), notes: recordForm.notes || null };
         if (isEdit) await api.patch(`/weights/${recordId}`, payload); else await api.post(`/animals/${id}/weights`, payload);
       } else if (recordKind === "shed") {
-        const payload = { occurredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), outcome: recordForm.outcome, notes: recordForm.notes || null };
+        const payload = { occurredAt: dateTimeInputToUtc(recordForm.date + "T12:00"), outcome: recordForm.outcome, notes: recordForm.notes || null };
         if (isEdit) await api.patch(`/sheds/${recordId}`, payload); else await api.post(`/animals/${id}/sheds`, payload);
       } else if (recordKind === "note") {
-        const payload = { occurredAt: new Date(`${recordForm.date}T12:00:00`).toISOString(), title: recordForm.title || null, category: recordForm.category, body: recordForm.body };
+        const payload = { occurredAt: dateTimeInputToUtc(recordForm.date + "T12:00"), title: recordForm.title || null, category: recordForm.category, body: recordForm.body };
         if (isEdit) await api.patch(`/animal-notes/${recordId}`, payload); else await api.post(`/animals/${id}/notes`, payload);
       }
       setRecordKind(null); weights.reload(); sheds.reload(); notes.reload(); animalResource.reload(); show(t("saveSuccess"));
