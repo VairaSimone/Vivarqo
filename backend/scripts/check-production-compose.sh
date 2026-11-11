@@ -74,12 +74,13 @@ validate_environment() {
 const fs = require("node:fs");
 const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const roleScript = fs.readFileSync("backend/infra/docker/init-app-role.sh", "utf8");
-const appRoleBlock = roleScript.split(":'app_user', :'app_password'")[0].slice(-180);
-const backupRoleBlock = roleScript.split(":'backup_user', :'backup_password'")[0].slice(-180);
-if (!/\bNOBYPASSRLS\b/.test(appRoleBlock) || /\bBYPASSRLS\b/.test(appRoleBlock)) {
+const appRoleFlags = [...roleScript.matchAll(/'(?:CREATE|ALTER) ROLE %I LOGIN PASSWORD %L ([^']+)',\s*\n\s*:'app_user'/g)].map((match) => match[1]);
+const backupRoleFlags = [...roleScript.matchAll(/'(?:CREATE|ALTER) ROLE %I LOGIN PASSWORD %L ([^']+)',\s*\n\s*:'backup_user'/g)].map((match) => match[1]);
+const hasFlag = (flags, expected) => flags.split(/\s+/).includes(expected);
+if (appRoleFlags.length !== 2 || appRoleFlags.some((flags) => !hasFlag(flags, "NOBYPASSRLS") || hasFlag(flags, "BYPASSRLS"))) {
   throw new Error("Application DB role must not bypass row-level security");
 }
-if (!/\bBYPASSRLS\b/.test(backupRoleBlock) || /\bNOBYPASSRLS\b/.test(backupRoleBlock)) {
+if (backupRoleFlags.length !== 2 || backupRoleFlags.some((flags) => !hasFlag(flags, "BYPASSRLS") || hasFlag(flags, "NOBYPASSRLS"))) {
   throw new Error("Read-only backup DB role must bypass row-level security so pg_dump cannot omit rows");
 }
 if (!roleScript.includes("GRANT pg_read_all_data TO :\"backup_user\"")) {
