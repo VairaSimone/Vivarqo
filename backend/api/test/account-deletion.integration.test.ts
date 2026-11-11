@@ -4,6 +4,7 @@ import type { Express } from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
+import { deletePrivateObject, readPrivateObject, storePrivateObject } from "../src/modules/domain/private-storage.js";
 import { prisma } from "../src/db/prisma.js";
 
 const integrationEnabled = process.env.RUN_DB_INTEGRATION === "true";
@@ -13,6 +14,7 @@ const password = "Correct-Horse-Battery-42!";
 describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL integration", () => {
   let app: Express;
   const userIds = new Set<string>();
+  const photoKeys = new Set<string>();
 
   beforeAll(() => {
     app = createApp({ checkDatabase: async () => undefined });
@@ -20,6 +22,7 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
 
   afterAll(async () => {
     if (userIds.size) await prisma.user.deleteMany({ where: { id: { in: [...userIds] } } });
+    await Promise.all([...photoKeys].map((key) => deletePrivateObject(key).catch(() => undefined)));
     await prisma.$disconnect();
   });
 
@@ -39,6 +42,12 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
       select: { id: true, email: true },
     });
     userIds.add(user.id);
+
+    const photoKey = await storePrivateObject("animal-photos", "jpg", Buffer.from([0xff, 0xd8, 0xff, 0x00]));
+    photoKeys.add(photoKey);
+    await prisma.animal.create({
+      data: { userId: user.id, name: "Photo cleanup", species: "Test species", photoKey },
+    });
 
     const agent = request.agent(app);
     const csrf = (await agent.get("/api/v1/auth/csrf").expect(200)).body.csrfToken as string;
@@ -79,5 +88,6 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(tombstone?.email).toBe(`deleted+${user.id}@accounts-deleted.invalid`);
     expect(tombstone?.deletedAt).toBeInstanceOf(Date);
     expect(await prisma.userSession.count({ where: { userId: user.id } })).toBe(0);
+    await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
 });
