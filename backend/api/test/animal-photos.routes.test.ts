@@ -1,10 +1,12 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
+import { errorHandler } from "../src/middleware/error-handler.js";
 import { createAnimalPhotoRouter } from "../src/modules/domain/animal-photos.routes.js";
 
 const app = express();
 app.use(createAnimalPhotoRouter());
+app.use(errorHandler);
 
 describe("animal photo route access control", () => {
   const animalId = "9a8c4514-8958-4e0b-a5f0-b68c2c7a2c3d";
