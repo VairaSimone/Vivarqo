@@ -68,6 +68,8 @@ services:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      disable: true
     init: true
 
   api:
@@ -155,6 +157,8 @@ services:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      disable: true
     init: true
     stop_grace_period: 30s
 

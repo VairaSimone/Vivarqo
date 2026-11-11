@@ -99,8 +99,14 @@ if (services.api.environment?.DATABASE_USER === services.migrate.environment?.DA
 if (services.api.environment?.DATABASE_PASSWORD_FILE !== "/run/secrets/postgres_app_password") {
   throw new Error("API must use the application database password secret");
 }
+if (services.worker.environment?.DATABASE_PASSWORD_FILE !== "/run/secrets/postgres_app_password") {
+  throw new Error("Worker must use the application database password secret");
+}
 if (services.migrate.environment?.DATABASE_PASSWORD_FILE !== "/run/secrets/postgres_admin_password") {
   throw new Error("Migrations must use the separate database administration secret");
+}
+if (services.worker.healthcheck?.disable !== true || services.migrate.healthcheck?.disable !== true) {
+  throw new Error("Worker and one-shot migrations must not inherit the API HTTP healthcheck");
 }
 for (const name of [
   "postgres_admin_password", "postgres_app_password", "csrf_secret", "resend_api_key",

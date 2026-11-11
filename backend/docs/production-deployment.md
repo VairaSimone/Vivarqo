@@ -4,7 +4,7 @@ Questa configurazione separa sviluppo locale, staging e produzione. È una confi
 
 ## Architettura e superficie esposta
 
-Usare `backend/infra/docker/compose.production.yaml` sia per staging sia per produzione, con file environment, progetto Docker, database, segreti e backup distinti.
+Usare `backend/infra/docker/compose.production.yaml` sia per staging sia per produzione, con file environment, progetto Docker, database, segreti e backup distinti. Per impostazione predefinita eseguire staging e produzione su host distinti: entrambe le istanze pubblicano 80/443 tramite Caddy. Per co-localizzarle serve un unico ingress/proxy edge condiviso e una configurazione Caddy centralizzata, non due stack che tentano di occupare le stesse porte.
 
 - Solo Caddy pubblica le porte TCP 80/443 (UDP 443 è opzionale per HTTP/3). Caddy gestisce TLS/ACME e inoltra a Nginx.
 - Nginx serve la PWA e inoltra `/api` al backend. L'header `X-Forwarded-Proto` originale viene conservato fino a Express.
@@ -75,9 +75,9 @@ Gli script init PostgreSQL vengono eseguiti soltanto quando il volume dati viene
 
 ## Backup e disaster recovery
 
-Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente e monitorata per spazio libero.
+Il servizio `backup` esegue `pg_dump` giornaliero (intervallo configurabile), valida il dump con `pg_restore --list`, calcola SHA-256 e applica la retention locale. Lo script host `verify-production-backup-mount.sh` rifiuta una directory non montata o sullo stesso device del Docker data root. La directory `VIVARQO_BACKUP_DIR` è un bind mount host indipendente dal volume `postgres-data`; deve essere montata su un secondo disco/volume persistente e monitorata per spazio libero.
 
-**La copia su disco separato nello stesso host non è un backup off-site.** Configurare una replica esterna cifrata (secret manager/backup agent aziendale, restic o equivalente) verso un account e una regione separati, verificare i checksum dopo il trasferimento e fare restore drill periodici su un host/cluster differente. Il repository non può creare credenziali o attivare l'off-site senza il provider scelto e i relativi segreti. Non considerare il rilascio pronto finché questa replica e il relativo ripristino non sono provati.
+**La copia su disco separato nello stesso host non è un backup off-site e da sola non basta per il disaster recovery.** Configurare una replica esterna cifrata (secret manager/backup agent aziendale, restic o equivalente) verso un account e una regione separati, verificare i checksum dopo il trasferimento e fare restore drill periodici su un host/cluster differente. Il repository non può creare credenziali o attivare l'off-site senza il provider scelto e i relativi segreti. Non considerare il rilascio pronto finché questa replica e il relativo ripristino non sono provati.
 
 Verificare localmente un dump trasferito:
 
