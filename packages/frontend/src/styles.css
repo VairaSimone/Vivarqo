@@ -813,3 +813,63 @@ table, th, td {
     gap: 14px;
   }
 }
+
+
+
+/* Animal photographs: responsive thumbnails backed by authenticated/private
+   API URLs. The browser never receives a raw storage key. */
+.animal-avatar {
+  overflow: hidden;
+}
+.animal-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.animal-profile-avatar {
+  overflow: hidden;
+}
+.animal-profile-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.animal-photo-editor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.animal-photo-editor > img {
+  display: block;
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 9px;
+}
+.public-animal-photo {
+  display: block;
+  width: min(100%, 360px);
+  max-height: 360px;
+  aspect-ratio: 1;
+  margin: 0 auto 22px;
+  object-fit: cover;
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+@media (max-width: 520px) {
+  .animal-photo-editor > img {
+    width: 72px;
+    height: 72px;
+  }
+  .public-animal-photo {
+    max-height: 280px;
+  }
+}
