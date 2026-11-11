@@ -52,6 +52,13 @@ function authenticatedApp() {
   return app;
 }
 
+function anonymousApp() {
+  const app = express();
+  app.use(createAnimalPhotoRouter());
+  app.use(errorHandler);
+  return app;
+}
+
 describe("animal photo upload lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -94,7 +101,7 @@ describe("animal photo upload lifecycle", () => {
       animal: { photoKey: "animal-photos/public-photo.jpg" },
     });
 
-    const response = await request(authenticatedApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
+    const response = await request(anonymousApp()).get("/public/animals/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/photo");
 
     expect(response.status).toBe(404);
     expect(mocks.openObject).not.toHaveBeenCalled();
