@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useState, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 type Tone = "success" | "warning" | "danger" | "info" | "primary" | "neutral";
 export function Icon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
@@ -55,8 +55,39 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
 export function Alert({ children, tone = "info" }: { children: ReactNode; tone?: "success" | "warning" | "danger" | "info" }) {
   return <div className={"alert " + (tone === "info" ? "" : "alert-" + tone)} role={tone === "danger" ? "alert" : "status"}><Icon name={tone === "success" ? "checkCircle" : "alert"} size={15} />{children}</div>;
 }
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return <label className="field"><span className="field-label">{label}</span>{children}{hint && <small className="field-hint">{hint}</small>}</label>;
+type AccessibleControlProps = {
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean | "true" | "false";
+};
+
+export function Field({ label, hint, error, children }: {
+  label: string;
+  hint?: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  const generatedId = useId();
+  const hintId = generatedId + "-hint";
+  const errorId = generatedId + "-error";
+  const control = isValidElement<AccessibleControlProps>(children)
+    ? cloneElement(children, {
+        id: children.props.id ?? generatedId + "-control",
+        "aria-describedby": [
+          children.props["aria-describedby"],
+          hint ? hintId : undefined,
+          error ? errorId : undefined
+        ].filter(Boolean).join(" ") || undefined,
+        "aria-invalid": error ? true : children.props["aria-invalid"]
+      })
+    : children;
+
+  return <label className="field">
+    <span className="field-label">{label}</span>
+    {control}
+    {hint && <small id={hintId} className="field-hint">{hint}</small>}
+    {error && <small id={errorId} className="field-error" role="alert">{error}</small>}
+  </label>;
 }
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={["control", props.className].filter(Boolean).join(" ")} />;
@@ -97,6 +128,7 @@ export function Pagination({ page, totalPages, onChange, label = "Page" }: { pag
 export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const closeLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Chiudi";
   const dialogRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
@@ -105,12 +137,18 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const dialog = dialogRef.current;
-    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusableSelector = 'a[href], area[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
     const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
-      .filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
-    focusable()[0]?.focus();
-    if (!focusable().length) dialog?.focus();
+      .filter((element) =>
+        !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
+        element.getClientRects().length > 0
+      );
+    const first = () => focusable()[0] ?? dialog;
+    first()?.focus();
 
+    const onFocusIn = (event: FocusEvent) => {
+      if (dialog && event.target instanceof Node && !dialog.contains(event.target)) first()?.focus();
+    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -124,26 +162,28 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
         dialog?.focus();
         return;
       }
-      const first = elements[0]!;
-      const last = elements[elements.length - 1]!;
-      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
+      const firstElement = elements[0]!;
+      const lastElement = elements[elements.length - 1]!;
+      if (event.shiftKey && (document.activeElement === firstElement || !dialog?.contains(document.activeElement))) {
         event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) {
+        lastElement.focus();
+      } else if (!event.shiftKey && (document.activeElement === lastElement || !dialog?.contains(document.activeElement))) {
         event.preventDefault();
-        first.focus();
+        firstElement.focus();
       }
     };
 
+    document.addEventListener("focusin", onFocusIn);
     window.addEventListener("keydown", onKey);
     return () => {
+      document.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, []);
 
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}><section ref={dialogRef} tabIndex={-1} className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-label={title}><header className="modal-header"><h2>{title}</h2><IconButton label={closeLabel} onClick={onClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}><section ref={dialogRef} tabIndex={-1} className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}><header className="modal-header"><h2 id={titleId}>{title}</h2><IconButton label={closeLabel} onClick={onClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
 }
 export function useToast() {
   const [message, setMessage] = useState("");

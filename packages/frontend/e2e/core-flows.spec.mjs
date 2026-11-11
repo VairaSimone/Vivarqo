@@ -2,6 +2,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const { test, expect } = await import(process.env.PLAYWRIGHT_TEST_MODULE);
+const { AxeBuilder } = await import(process.env.AXE_PLAYWRIGHT_MODULE);
 
 const owner = { email: "e2e-owner@vivarqo.test", password: "Vivarqo-E2E-Only-2026!" };
 const other = { email: "e2e-other@vivarqo.test", password: "Vivarqo-E2E-Only-2026!" };
@@ -19,6 +20,76 @@ async function signIn(page, account) {
   await page.waitForURL(/\/today(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
+
+
+async function expectNoA11yViolations(page, context) {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  const violations = results.violations.map((violation) => ({
+    id: violation.id,
+    impact: violation.impact,
+    help: violation.help,
+    targets: violation.nodes.map((node) => node.target)
+  }));
+  expect(violations, `WCAG 2.2 AA axe scan failed on ${context}: ${JSON.stringify(violations)}`).toEqual([]);
+}
+
+test("WCAG 2.2 AA automated accessibility and keyboard interaction baseline", async ({ page }) => {
+  await signIn(page, owner);
+
+  // Keyboard users must reach the main landmark before the application navigation.
+  await page.keyboard.press("Tab");
+  await expect(page.locator(".skip-link")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+
+  for (const route of ["/today", "/animals", "/feeding", "/settings"]) {
+    await page.goto(route);
+    await expect(page.locator("#main-content")).toBeVisible();
+    await expectNoA11yViolations(page, route);
+  }
+
+  // The mobile navigation drawer is keyboard-contained and restores focus on close.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menuTrigger = page.locator(".mobile-menu-button");
+  await menuTrigger.click();
+  const sidebarDialog = page.locator("#application-sidebar");
+  await expect(sidebarDialog).toHaveAttribute("role", "dialog");
+  await expect(sidebarDialog.getByRole("button").first()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(sidebarDialog).not.toHaveAttribute("role", "dialog");
+  await expect(menuTrigger).toBeFocused();
+
+  // Modal naming, focus wrapping, Escape handling and focus restoration.
+  await page.goto("/animals");
+  const createAnimalTrigger = page.getByRole("button", { name: "Nuovo animale" });
+  await createAnimalTrigger.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expectNoA11yViolations(page, "animal creation dialog");
+  const focusable = dialog.locator('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+  await focusable.last().focus();
+  await page.keyboard.press("Tab");
+  await expect(focusable.first()).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(createAnimalTrigger).toBeFocused();
+
+  // Verify the live computed sizes, not only the CSS source declarations.
+  const sizes = await page.evaluate(() => {
+    const read = (selector) => [...document.querySelectorAll(selector)]
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => ({ selector, size: Number.parseFloat(getComputedStyle(element).fontSize) }));
+    return [
+      ...read(".field-label, .field-hint, .field-error, .badge, th, td, .nav-caption, .mobile-bottom-nav button"),
+      ...read(".btn, .btn-sm").map((item) => ({ ...item, minimum: 14 })),
+      ...read(".control").map((item) => ({ ...item, minimum: 16 }))
+    ];
+  });
+  expect(sizes.length, "the audited page must contain real UI text").toBeGreaterThan(0);
+  expect(sizes.filter((item) => item.size < (item.minimum ?? 12))).toEqual([]);
+});
 
 test("real API authentication, CSRF, animal persistence, account isolation and responsive smoke", async ({ browser, page }) => {
   const pageErrors = [];

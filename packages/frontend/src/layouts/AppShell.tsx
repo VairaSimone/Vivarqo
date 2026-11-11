@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
 import { Icon, IconButton, Input, Modal } from "../components/ui";
 import { getArray, getString, queryString } from "../lib/domain";
@@ -56,9 +56,55 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; subtitle: string; group: string; path: string }>>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
   const route = path.split("?")[0] || "/today";
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
+
+  useEffect(() => {
+    if (!mobileMenu) return;
+    const sidebar = document.getElementById("application-sidebar");
+    const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () => Array.from(sidebar?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])
+      .filter((element) => !element.closest('[hidden], [inert], [aria-hidden="true"]') && element.getClientRects().length > 0);
+    const first = () => focusable()[0] ?? sidebar;
+    first()?.focus();
+
+    const onFocusIn = (event: FocusEvent) => {
+      if (sidebar && event.target instanceof Node && !sidebar.contains(event.target)) first()?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileMenu(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      if (!elements.length) {
+        event.preventDefault();
+        sidebar?.focus();
+        return;
+      }
+      const firstElement = elements[0]!;
+      const lastElement = elements[elements.length - 1]!;
+      if (event.shiftKey && (document.activeElement === firstElement || !sidebar?.contains(document.activeElement))) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && (document.activeElement === lastElement || !sidebar?.contains(document.activeElement))) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener("focusin", onFocusIn);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener("keydown", onKeyDown);
+      mobileMenuTriggerRef.current?.focus();
+    };
+  }, [mobileMenu]);
 
   useEffect(() => {
     const query = searchTerm.trim();
@@ -123,7 +169,8 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   }
 
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
-    <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={t("navWorkspace")}>
+    <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to main content" : "Vai al contenuto principale"}</a>
+    <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={t("navWorkspace")} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
       <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Vivarqo home">
         <span className="brand-mark"><Icon name="leaf" size={21} /></span>
         <span className="brand-copy"><strong>vivarqo</strong><small>{t("brandTagline")}</small></span>
@@ -147,10 +194,10 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       </div>
       <IconButton className="collapse-button" label={collapsed ? t("expand") : t("collapse")} onClick={() => setCollapsed((value) => !value)}><Icon name="chevron" size={15} /></IconButton>
     </aside>
-    {mobileMenu && <button className="mobile-scrim" aria-label={t("close")} onClick={() => setMobileMenu(false)} />}
-    <div className="main-column">
+    {mobileMenu && <button className="mobile-scrim" aria-label={t("close")} tabIndex={-1} onClick={() => setMobileMenu(false)} />}
+    <div className="main-column" inert={mobileMenu}>
       <header className="topbar">
-        <button className="mobile-menu-button" onClick={() => setMobileMenu(true)} aria-label={t("expand")} aria-expanded={mobileMenu} aria-controls="application-sidebar"><Icon name="menu" /></button>
+        <button ref={mobileMenuTriggerRef} className="mobile-menu-button" onClick={() => setMobileMenu(true)} aria-label={t("expand")} aria-expanded={mobileMenu} aria-controls="application-sidebar"><Icon name="menu" /></button>
         <div className="topbar-context"><span className="topbar-dot" />{t(titleKey)}</div>
         <div className="topbar-actions">
           <button className="global-search" onClick={() => setSearchOpen(true)} aria-label={t("search")} aria-haspopup="dialog"><Icon name="search" size={16} /><span>{t("search")}</span></button>
@@ -158,10 +205,10 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
           <button className="topbar-avatar" onClick={() => onNavigate("/settings")} aria-label={t("profile")}>{user.displayName.trim().slice(0, 1).toUpperCase() || "V"}</button>
         </div>
       </header>
-      <main className="page-content">{children}</main>
+      <main id="main-content" className="page-content" tabIndex={-1}>{children}</main>
       <footer className="app-footer"><span>Vivarqo</span><span>{new Date().getFullYear()}</span></footer>
     </div>
-    <nav className="mobile-bottom-nav" aria-label={t("navWorkspace")}>
+    <nav className="mobile-bottom-nav" aria-label={t("navWorkspace")} inert={mobileMenu}>
       {[
         { path: "/today", label: "navToday", icon: "home" as const },
         { path: "/animals", label: "navAnimals", icon: "snake" as const },

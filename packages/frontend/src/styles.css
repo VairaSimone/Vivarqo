@@ -653,3 +653,162 @@ tbody tr:hover { background: var(--surface-soft); }
 .global-search-result-group { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .global-search-result strong { font-size: 13px; }
 .global-search-result small { color: var(--muted); font-size: 11px; }
+
+
+/* Accessibility release baseline: visible operational text must remain readable.
+   Table compaction may reduce whitespace, never the text size or hit target. */
+body {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+small,
+.brand-copy small, .nav-caption, .nav-count, .profile-copy strong, .profile-copy small,
+.sidebar-tools .nav-item, .language-code, .topbar-context, .global-search, kbd,
+.app-footer, .eyebrow, .panel-header p, .metric-label, .dashboard-intro p,
+.task-main strong, .task-main small, .badge, .quick-action strong,
+.simple-row strong, .simple-row small, .activity-copy strong, .activity-copy small,
+.muted-note, .empty-state p, .error-state, .alert, .offline-banner,
+.global-alert > button, .toast, .field-label, .field-hint, .field-error,
+.checkbox-field, table, th, td, .list-meta, .pagination, .animal-name-cell strong,
+.item-name strong, .document-name strong, .animal-name-cell small, .item-name small,
+.document-name small, .animal-profile-main span, .tabs-line button, .detail-field span,
+.detail-field strong, .detail-copy, .text-link, .record-row strong, .record-row small,
+.record-row p, .chart-caption, .cycle-title span, .cycle-parents,
+.cycle-card-bottom > span, .cycle-parent span, .cycle-parent small, .cycle-stats,
+.timeline-copy span, .timeline-copy small, .timeline-copy strong, .timeline-copy p,
+.clutch-card strong, .clutch-card small, .egg-card strong, .animal-mini strong,
+.animal-mini small, .feeding-detail, .session-date, .selector-header strong,
+.selector-header small, .animal-option strong, .animal-option small, .segmented button,
+.calendar-weekday-row span, .calendar-day-number, .calendar-event,
+.calendar-day-items > small, .calendar-legend, .calendar-date-block small,
+.calendar-item-copy strong, .calendar-item-copy small, .movement-summary span,
+.category-bar-row > div:first-child, .category-bar-row strong, .toggle-row strong,
+.toggle-row small, .notification-copy strong, .notification-copy p,
+.notification-copy small, .billing-card p, .billing-card small, .export-intro p,
+.status-row, .import-errors h3, .import-preview h3, .import-errors > div,
+.import-preview pre, .auth-visual-foot, .auth-top, .auth-top button,
+.auth-subtitle, .auth-links button, .auth-legal, .public-badge,
+.public-fields span, .public-fields strong, .public-animal-card footer,
+.share-link-box > span, .mobile-bottom-nav button, .qr-share strong,
+.qr-share small, .global-search-result-group, .global-search-result small {
+  font-size: max(12px, .75rem) !important;
+}
+
+.btn, .btn-sm,
+.nav-item, .sidebar-tools .nav-item, .global-search, .tabs-line button,
+.segmented button, .mobile-menu-button {
+  font-size: 14px !important;
+}
+
+.btn, .btn-sm {
+  min-height: 40px;
+}
+
+.mobile-menu-button,
+.icon-button,
+.collapse-button,
+.topbar-avatar {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.control, .search-control input {
+  font-size: 16px !important;
+}
+
+.control {
+  min-height: 44px;
+  line-height: 1.4;
+}
+
+.field-label {
+  font-size: 13px !important;
+}
+
+table, th, td {
+  font-size: 13px !important;
+  line-height: 1.45;
+}
+
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap:focus-visible {
+  outline: 3px solid var(--terracotta);
+  outline-offset: 2px;
+}
+
+:root[data-compact-tables="true"] th {
+  padding-block: 8px;
+}
+
+:root[data-compact-tables="true"] td {
+  min-height: 40px;
+  padding-block: 8px;
+}
+
+:root[data-compact-tables="true"] .record-row,
+:root[data-compact-tables="true"] .task-row {
+  padding-block: 8px;
+}
+
+.mobile-bottom-nav button {
+  min-height: 44px;
+  font-size: 12px !important;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 120;
+  top: 8px;
+  left: 8px;
+  transform: translateY(calc(-100% - 12px));
+  padding: 10px 14px;
+  border: 2px solid var(--forest);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-modal);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid var(--terracotta);
+  outline-offset: 3px;
+}
+
+#main-content {
+  scroll-margin-top: 76px;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    visibility: hidden;
+    transition: transform .2s ease, visibility 0s linear .2s;
+  }
+
+  .sidebar.mobile-open {
+    visibility: visible;
+    transition: transform .2s ease;
+  }
+}
+
+@media (max-width: 390px) {
+  .form-grid-small {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid,
+  .form-grid-small {
+    gap: 14px;
+  }
+}
