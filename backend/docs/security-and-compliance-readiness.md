@@ -36,7 +36,7 @@ Il Garante spiega che le violazioni vanno documentate e che la notifica entro 72
 
 ## 3. Cookie, ePrivacy e consenso
 
-Il repository non contiene attualmente un frontend né un sistema di analytics/advertising. Non è quindi possibile verificare quali cookie o tracker verranno installati dalla nuova UI o da eventuali script di terze parti.
+Il frontend React/PWA è presente in `packages/frontend`. Il codice non dimostra quali cookie, SDK o tracker siano effettivamente caricati dal dominio pubblico o aggiunti dall'infrastruttura: verificare build distribuita, richieste di rete e storage in browser pulito.
 
 Prima del rilascio:
 - documentare i cookie strettamente necessari (sessione e CSRF) e le loro finalità nella policy pertinente;
@@ -77,7 +77,7 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Verificare cancellazione account, cancellazione effettiva di storage e routine dei backup; mantenere solo i dati che devono essere conservati per obbligo legale documentato.
 - [ ] Definire e provare il piano di risposta ai data breach con responsabilità, escalation e tempistiche.
 - [ ] Configurare e verificare TLS, storage/database/backup cifrati, regione UE ove richiesta, secret manager e accessi minimi.
-- [ ] Valutare la necessità di rate limiting distribuito per il limite generale API in ambienti multi-replica; il limite globale resta per-processo. I limiti di autenticazione, creazione/importazione e conferma degli import, e creazione di link pubblici usano invece contatori persistenti PostgreSQL.
+- [x] Il limite globale `300/15 minuti` su `/api/v1` usa `persistentRateLimit(300, "api-global")` e `PostgresRateLimitStore`: i contatori HMAC sono persistenti e condivisi tra repliche. Il test `rate-limit.integration.test.ts` verifica che istanze store indipendenti vedano lo stesso contatore.
 - [ ] Aggiungere test di sicurezza periodici, scansione delle dipendenze, patching e test di ripristino.
 - [ ] Valutare DSA per le schede pubbliche e implementare una procedura di segnalazione prima di promuovere la funzione.
 - [ ] Far revisionare il contratto di abbonamento e i diritti del consumatore da un professionista competente.
@@ -102,3 +102,12 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - Il workflow manuale staging richiede `STAGING_DATABASE_URL` e un ruolo autorizzato a creare/eliminare database; ripristina solo nel database temporaneo e non modifica il database sorgente.
 - Gli script Stripe Test Mode e Web Push effettuano chiamate reali solo quando eseguiti esplicitamente con chiavi e sottoscrizioni di test. Non sono eseguiti automaticamente dalla CI.
 - Le bozze in `docs/legal/` contengono segnaposto per informazioni che il codice non può conoscere. Non pubblicarle né dichiarare conformità prima di compilazione, verifica dei provider e revisione professionale.
+
+
+## Aggiornamento 11 novembre 2026 — deployment e rate limiting
+
+La configurazione production/staging e le relative istruzioni sono in [production-deployment.md](production-deployment.md). Il Compose locale è development-only; lo stack production/staging usa file-backed secrets, Caddy per TLS, reti interne, ruoli PostgreSQL separati (admin per migrazioni/backup, ruolo DML non-superuser per API/worker) e un servizio backup verso un bind mount host indipendente dal volume DB.
+
+Il limite generale API non è per-processo: `app.ts` monta `persistentRateLimit(300, "api-global")`, che utilizza il contatore PostgreSQL HMAC. La verifica d'integrazione crea due istanze store separate e dimostra la condivisione del contatore.
+
+La replica off-site cifrata dei backup, il secret manager effettivo, il rinnovo TLS sul dominio reale e il restore su host alternativo richiedono ancora configurazione e prove nell'infrastruttura scelta. Non considerarli verificati dal solo file Compose.

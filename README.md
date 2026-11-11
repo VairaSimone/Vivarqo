@@ -315,7 +315,7 @@ Il file può usare le colonne `animalIdentifier,measuredAt,weightG,notes`; il si
 
 ## Sicurezza e privacy: configurazione di produzione
 
-- I limiti di registrazione/login/reset/verifica sono persistenti su PostgreSQL e condivisi tra repliche. Il rate limit generale API è ancora per-processo: se si scala a più repliche, configurare un rate limit distribuito al gateway/ingress.
+- I limiti di registrazione/login/reset/verifica e il limite globale API (`300/15 minuti`) sono persistenti su PostgreSQL e condivisi tra repliche tramite `PostgresRateLimitStore`. Il test `rate-limit.integration.test.ts` verifica la condivisione del contatore fra istanze store indipendenti.
 - `TRUST_PROXY_HOPS=0` è il default sicuro. Impostarlo a un valore superiore solo se l'API è raggiungibile esclusivamente attraverso una catena nota di proxy fidati; non esporre direttamente l'API mantenendo una fiducia indiscriminata negli header forwarded.
 - Le risposte API e le schede pubbliche non sono memorizzate nelle cache HTTP (`Cache-Control: no-store`). Gli access log registrano il template della rotta e non il percorso grezzo, per evitare di registrare slug di condivisione e identificativi presenti nella URL.
 - Il worker di retention cancella token scaduti/consumati, sessioni scadute, anteprime di import scadute, contatori di rate limit scaduti ed export scaduti. Questo non sostituisce una policy documentata per log, backup, documenti cancellati e dati amministrativi.
@@ -356,3 +356,10 @@ Il frontend vive in `packages/frontend` e usa React 19, TypeScript e Vite. Le sc
 Per lo sviluppo locale avviare `pnpm dev:api` e `pnpm dev:frontend`. Vite espone `http://localhost:5173` e inoltra `/api` a `http://localhost:3000`. La build statica viene generata in `packages/frontend/dist`; il web server di produzione deve servire gli asset e applicare il fallback SPA a `index.html` per le route client-side.
 
 Il manifest e il service worker rendono la shell installabile e conservano nella cache gli asset statici già caricati. Le richieste `/api/*` non vengono cache-ate: l'app non promette modifiche offline o sync differita. Web Push continua a usare la registrazione e l'invio server-side documentati nella sezione notifiche.
+
+
+## Deployment production e staging
+
+La configurazione pubblica è separata dal Compose locale: usare `backend/infra/docker/compose.production.yaml` con `.env.production` oppure `.env.staging`. Caddy è l'unico servizio che pubblica 80/443 e gestisce HTTPS; PostgreSQL, API e web restano su reti private. API e worker usano un ruolo PostgreSQL senza privilegi amministrativi; le migrazioni e i backup usano un ruolo distinto. I segreti sono file-backed e separati per ambiente.
+
+La guida completa, inclusi provisioning dei segreti, TLS, backup separato e requisiti off-site, è in [`backend/docs/production-deployment.md`](backend/docs/production-deployment.md). Il backup automatico scrive su storage host separato dal volume PostgreSQL, ma la replica off-site cifrata e il restore su host alternativo devono essere attivati e provati nell'infrastruttura scelta.
