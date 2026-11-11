@@ -118,7 +118,7 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
   return <div className="error-state" role="alert"><Icon name="alert" size={19} /><span>{message}</span>{retry && <Button size="sm" variant="secondary" onClick={retry}>{retryLabel}</Button>}</div>;
 }
 export function DataTable({ headers, rows, empty = "No records" }: { headers: string[]; rows: ReactNode[][]; empty?: string }) {
-  const regionLabel = (typeof document !== "undefined" && document.documentElement.lang === "en" ? "Table: " : "Tabella: ") + headers.join(", ");
+  const regionLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Records table" : "Tabella dei record";
   return <div className="table-wrap" role="region" aria-label={regionLabel} tabIndex={0}>
     <table>
       <thead><tr>{headers.map((header,index) => <th key={header + index} scope="col">{header}</th>)}</tr></thead>

@@ -113,7 +113,7 @@ export function CarePage({ locale, path }: { locale: Locale; path: string }) {
     <PageHeader eyebrow={t("navAnimals")} title={t("feedingsTitle")} description={t("feedingsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => openNew(false)}><Icon name="plus" size={15} />{t("registerFeeding")}</Button><Button onClick={() => openNew(true)}><Icon name="feed" size={15} />{t("bulkFeeding")}</Button></div>} />
     <Panel className="filters-panel"><div className="filter-row">
       <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-      <Select value={outcome} onChange={(e) => { setOutcome(e.target.value); setPage(1); }}><option value="">{t("outcome")} · {t("all")}</option><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select>
+      <Select aria-label={t("outcome")} value={outcome} onChange={(e) => { setOutcome(e.target.value); setPage(1); }}><option value="">{t("outcome")} · {t("all")}</option><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select>
       <Input placeholder={t("animalDetail")} value={animalId} onChange={(e) => { setAnimalId(e.target.value); setPage(1); }} />
     </div></Panel>
     <Panel>
