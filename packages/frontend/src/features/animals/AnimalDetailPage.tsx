@@ -191,6 +191,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
             const file = e.target.files?.[0] ?? null;
             if (!file) { setPhotoFile(null); return; }
             if (file.size > 5 * 1024 * 1024 || (file.type && !["image/jpeg", "image/png", "image/webp"].includes(file.type))) {
+              setPhotoFile(null);
               setAnimalEditError(t("photoValidation"));
               e.target.value = "";
               return;
