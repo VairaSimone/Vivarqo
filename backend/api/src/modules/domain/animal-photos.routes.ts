@@ -62,7 +62,7 @@ function sendPhoto(
 export function createAnimalPhotoRouter() {
   const router = Router();
 
-  router.get("/public/animals/:slug/photo", async (req, res, next) => {
+  router.get("/public/animals/:slug/photo", persistentRateLimit(60, "animal-photo-public"), async (req, res, next) => {
     const slug = req.params.slug;
     if (!slug || !/^[A-Za-z0-9_-]{32}$/.test(slug)) {
       throw new AppError(404, "PUBLIC_PAGE_NOT_FOUND", "Public page not found");
