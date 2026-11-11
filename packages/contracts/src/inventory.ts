@@ -59,13 +59,13 @@ export interface InventoryDocumentRecordDto {
   isActive?: boolean;
   notes?: string | null;
   occurredAt?: string;
-  movementType?: string;
+  movementType?: "in" | "out" | "adjustment";
   quantity?: number;
   unitCost?: number | null;
   reference?: string | null;
   note?: string | null;
   originalFilename?: string;
-  sizeBytes?: number;
+  sizeBytes?: string;
   createdAt?: string;
   animalId?: string | null;
   status?: string;
