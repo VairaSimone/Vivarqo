@@ -34,8 +34,8 @@ create_environment() {
     chmod 0444 "$secrets_dir/$secret"
   done
 
-  cat > ".$environment" <<EOF
-VIVARQO_ENV_FILE=../../../.$environment
+  cat > ".env.$environment" <<EOF
+VIVARQO_ENV_FILE=../../../.env.$environment
 COMPOSE_PROJECT_NAME=$project
 VIVARQO_NODE_ENV=$node_environment
 VIVARQO_SECRETS_DIR=$secrets_dir
@@ -62,7 +62,7 @@ EXPORT_MAX_ENTRIES=100000
 BACKUP_RETENTION_DAYS=$retention
 BACKUP_INTERVAL_SECONDS=86400
 EOF
-  chmod 600 ".$environment"
+  chmod 600 ".env.$environment"
 }
 
 validate_environment() {

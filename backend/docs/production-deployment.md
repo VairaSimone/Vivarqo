@@ -40,6 +40,17 @@ La chiave VAPID pubblica, il Price ID e le configurazioni dei provider non segre
 
 Il loader applicativo supporta `VARIABLE_FILE`; legge i file a runtime e non inserisce i percorsi *_FILE o i valori dei segreti nell'ambiente del processo. Il container Caddy riceve soltanto dominio pubblico ed email ACME, non l'intera configurazione applicativa. La password DB viene usata per costruire la URL PostgreSQL in memoria. Le chiavi Stripe Test Mode sono rifiutate quando `VIVARQO_NODE_ENV=production`.
 
+## Verifica obbligatoria del filesystem backup
+
+Prima di avviare ogni stack, crea e monta il filesystem dedicato indicato da `VIVARQO_BACKUP_DIR`. Il path deve essere il mountpoint stesso, non una sottocartella sul disco del Docker data root.
+
+```bash
+sudo backend/scripts/verify-production-backup-mount.sh /mnt/vivarqo-staging-backups
+sudo backend/scripts/verify-production-backup-mount.sh /mnt/vivarqo-prod-backups
+```
+
+Il controllo richiede un mountpoint e rifiuta lo stesso device filesystem del Docker data root. Se staging e produzione sono su host differenti, eseguilo su ciascun host. Questo dimostra la separazione locale; non sostituisce replica off-site cifrata e restore drill su un host indipendente.
+
 ## Avvio staging
 
 ```bash
