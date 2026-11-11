@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "./prisma.js";
 import { logger } from "../logger.js";
+import { env } from "../config/env.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const prismaSchemaPath = resolve(projectRoot, "backend/prisma/schema.prisma");
@@ -501,7 +502,10 @@ function runPrismaMigrationCommand(args: string[]): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(process.execPath, [cliPath, "migrate", ...args, "--config", configPath], {
       cwd: projectRoot,
-      env: { ...process.env, PRISMA_HIDE_UPDATE_MESSAGE: "1" },
+      // Prisma CLI reads DATABASE_URL from process.env via prisma.config.ts.
+      // Resolve file-backed secrets once in the parent and pass the URL only to
+      // this short-lived migration subprocess; never mutate the API process env.
+      env: { ...process.env, DATABASE_URL: env.DATABASE_URL, PRISMA_HIDE_UPDATE_MESSAGE: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
