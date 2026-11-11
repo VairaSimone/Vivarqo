@@ -1,3 +1,5 @@
+# DEVELOPMENT ONLY. Do not deploy this file to a public environment.
+# Production/staging use compose.production.yaml with file-backed secrets and private networks.
 services:
   postgres:
     image: postgres:18
@@ -25,7 +27,7 @@ services:
     env_file:
       - ../../../.env
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
       PRIVATE_STORAGE_PATH: /app/var/private
     volumes:
@@ -42,7 +44,7 @@ services:
     env_file:
       - ../../../.env
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: "3000"
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
       PRIVATE_STORAGE_PATH: /app/var/private
@@ -77,7 +79,7 @@ services:
     env_file:
       - ../../../.env
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@postgres:5432/vivarqo?schema=public
       PRIVATE_STORAGE_PATH: /app/var/private
     volumes:

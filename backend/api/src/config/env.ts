@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { resolveSecretEnvironment } from "./secret-files.js";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -55,7 +56,7 @@ const environmentSchema = z.object({
   EXPORT_MAX_ENTRIES: z.coerce.number().int().min(1).max(1_000_000).default(100_000),
 });
 
-const parsedEnvironment = environmentSchema.safeParse(process.env);
+const parsedEnvironment = environmentSchema.safeParse(resolveSecretEnvironment(process.env));
 if (!parsedEnvironment.success) {
   const issues = parsedEnvironment.error.issues
     .map((issue) => `${issue.path.join(".") || "environment"}: ${issue.message}`)
@@ -76,6 +77,10 @@ if (runtimeEnvironment.NODE_ENV === "production") {
   }
   if (!runtimeEnvironment.STRIPE_SECRET_KEY || !runtimeEnvironment.STRIPE_WEBHOOK_SECRET || !runtimeEnvironment.STRIPE_PRICE_ID) {
     productionProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID are required in production");
+  } else {
+    if (!/^sk_live_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_SECRET_KEY)) productionProblems.push("STRIPE_SECRET_KEY must be a Stripe Live secret key in production");
+    if (!/^whsec_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_WEBHOOK_SECRET)) productionProblems.push("STRIPE_WEBHOOK_SECRET must be a Stripe Live webhook secret in production");
+    if (!runtimeEnvironment.STRIPE_PRICE_ID.startsWith("price_")) productionProblems.push("STRIPE_PRICE_ID must be a valid Stripe Price identifier in production");
   }
   if (!runtimeEnvironment.VAPID_PUBLIC_KEY || !runtimeEnvironment.VAPID_PRIVATE_KEY || !runtimeEnvironment.VAPID_SUBJECT) {
     productionProblems.push("VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT are required in production");

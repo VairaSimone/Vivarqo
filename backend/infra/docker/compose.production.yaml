@@ -1,0 +1,251 @@
+x-application-environment: &application-environment
+  NODE_ENV: ${VIVARQO_NODE_ENV:-production}
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: ${DATABASE_NAME:?Set DATABASE_NAME in the selected environment file}
+  DATABASE_USER: ${DATABASE_USER:?Set DATABASE_USER in the selected environment file}
+  DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+  CSRF_SECRET_FILE: /run/secrets/csrf_secret
+  RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+  STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+  STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+  VAPID_PRIVATE_KEY_FILE: /run/secrets/vapid_private_key
+  S3_ACCESS_KEY_ID_FILE: /run/secrets/s3_access_key_id
+  S3_SECRET_ACCESS_KEY_FILE: /run/secrets/s3_secret_access_key
+  PRIVATE_STORAGE_PATH: /app/var/private
+
+services:
+  # PostgreSQL is private; the API and workers use a separate, unprivileged DB role.
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:?Set DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_ADMIN_USER:?Set DATABASE_ADMIN_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+      DATABASE_USER: ${DATABASE_USER:?Set DATABASE_USER}
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+    secrets:
+      - postgres_admin_password
+      - postgres_app_password
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./init-app-role.sh:/docker-entrypoint-initdb.d/10-create-app-role.sh:ro
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER} -d \${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    stop_grace_period: 1m
+
+  migrate:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+    command: ["node", "backend/api/dist/migrate.js"]
+    restart: "no"
+    env_file:
+      - ${VIVARQO_ENV_FILE:?Set VIVARQO_ENV_FILE}
+    environment:
+      <<: *application-environment
+      DATABASE_USER: ${DATABASE_ADMIN_USER:?Set DATABASE_ADMIN_USER}
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    secrets:
+      - postgres_admin_password
+      - csrf_secret
+      - resend_api_key
+      - stripe_secret_key
+      - stripe_webhook_secret
+      - vapid_private_key
+      - s3_access_key_id
+      - s3_secret_access_key
+    networks:
+      - database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    init: true
+
+  api:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${VIVARQO_ENV_FILE:?Set VIVARQO_ENV_FILE}
+    environment:
+      <<: *application-environment
+      PORT: "3000"
+    secrets:
+      - postgres_app_password
+      - csrf_secret
+      - resend_api_key
+      - stripe_secret_key
+      - stripe_webhook_secret
+      - vapid_private_key
+      - s3_access_key_id
+      - s3_secret_access_key
+    volumes:
+      - private-data:/app/var/private
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    networks:
+      - backend
+      - database
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    stop_grace_period: 30s
+
+  web:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+      target: web-runtime
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build:
+      context: ../../..
+      dockerfile: backend/Dockerfile
+    command: ["node", "backend/api/dist/worker.js"]
+    restart: unless-stopped
+    env_file:
+      - ${VIVARQO_ENV_FILE:?Set VIVARQO_ENV_FILE}
+    environment: *application-environment
+    secrets:
+      - postgres_app_password
+      - csrf_secret
+      - resend_api_key
+      - stripe_secret_key
+      - stripe_webhook_secret
+      - vapid_private_key
+      - s3_access_key_id
+      - s3_secret_access_key
+    volumes:
+      - private-data:/app/var/private
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    networks:
+      - backend
+      - database
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    stop_grace_period: 30s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    env_file:
+      - ${VIVARQO_ENV_FILE:?Set VIVARQO_ENV_FILE}
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+      - frontend
+    depends_on:
+      web:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  # Dumps go to a separate host-mounted disk, never to postgres-data.
+  backup:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-loop.sh"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${DATABASE_NAME:?Set DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_ADMIN_USER:?Set DATABASE_ADMIN_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    secrets:
+      - postgres_admin_password
+    volumes:
+      - ./backup-loop.sh:/usr/local/bin/backup-loop.sh:ro
+      - type: bind
+        source: ${VIVARQO_BACKUP_DIR:?Set VIVARQO_BACKUP_DIR to dedicated backup storage}
+        target: /backups
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    read_only: true
+    networks:
+      - database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    init: true
+
+secrets:
+  postgres_admin_password:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/postgres_admin_password
+  postgres_app_password:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/postgres_app_password
+  csrf_secret:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/csrf_secret
+  resend_api_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/resend_api_key
+  stripe_secret_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/stripe_secret_key
+  stripe_webhook_secret:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/stripe_webhook_secret
+  vapid_private_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/vapid_private_key
+  s3_access_key_id:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/s3_access_key_id
+  s3_secret_access_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/s3_secret_access_key
+
+volumes:
+  postgres-data:
+  private-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:
+  frontend:
+    internal: true
+  backend:
+  database:
+    internal: true

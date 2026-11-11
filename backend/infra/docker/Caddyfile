@@ -1,0 +1,6 @@
+{$PUBLIC_DOMAIN} {
+    encode zstd gzip
+    tls {$ACME_EMAIL}
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy web:80
+}

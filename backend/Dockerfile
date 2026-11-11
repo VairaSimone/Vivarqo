@@ -8,7 +8,7 @@ RUN corepack enable \
 WORKDIR /app
 
 FROM base AS dependencies
-ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
+ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
@@ -31,7 +31,7 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
 
 FROM base AS production-dependencies
-ENV DATABASE_URL="postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo?schema=public"
+ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY backend/prisma.config.ts backend/prisma.config.ts
 COPY backend/prisma ./backend/prisma
