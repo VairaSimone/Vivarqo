@@ -16,6 +16,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [animalEditModal, setAnimalEditModal] = useState(false);
   const [animalEditBusy, setAnimalEditBusy] = useState(false);
   const [animalEditError, setAnimalEditError] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [animalEditForm, setAnimalEditForm] = useState({
     name: "", identifier: "", species: "", sex: "unknown", morph: "", geneticsNotes: "",
     birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "",
@@ -37,6 +38,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
 
   function openAnimalEdit() {
     if (!animal) return;
+    setPhotoFile(null);
     setAnimalEditForm({
       name: getString(animal, "name"), identifier: getString(animal, "identifier"),
       species: getString(animal, "species"), sex: getString(animal, "sex", "unknown"),
@@ -71,7 +73,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     };
     try {
       await api.patch("/animals/" + id, body);
-      setAnimalEditModal(false); animalResource.reload(); show(t("animalUpdated"));
+      if (photoFile) await api.upload("/animals/" + id + "/photo", photoFile);
+      setAnimalEditModal(false);
+      setPhotoFile(null);
+      animalResource.reload();
+      show(t("animalUpdated"));
     } catch (reason) {
       setAnimalEditError(reason instanceof ApiError ? reason.message : t("operationFailed"));
     } finally { setAnimalEditBusy(false); }
@@ -130,7 +136,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     <div className="back-row"><button className="text-link" onClick={() => navigate("/animals")}>← {t("navAnimals")}</button></div>
     <PageHeader eyebrow={getString(animal, "species")} title={animalName} description={getString(animal, "identifier") || getString(animal, "morph")} action={<Button variant="secondary" onClick={openAnimalEdit}><Icon name="edit" size={16} />{t("edit")}</Button>} />
     <div className="animal-profile-head">
-      <div className="animal-profile-avatar"><Icon name="snake" size={30} /></div>
+      <div className="animal-profile-avatar">{getString(animal, "photoUrl") ? <img src={getString(animal, "photoUrl")} alt="" /> : <Icon name="snake" size={30} />}</div>
       <div className="animal-profile-main"><strong>{animalName}</strong><span>{getString(animal, "species")} · {getString(animal, "sex") ? t(getString(animal, "sex")) : "—"} · {getString(animal, "morph") || "—"}</span></div>
       <Badge tone={getString(animal, "status") === "active" ? "success" : "neutral"}>{t(`animalStatus_${getString(animal, "status")}`)}</Badge>
       <div className="animal-profile-actions"><Button variant="ghost" size="sm" onClick={() => navigate(`/feeding?animalId=${id}&create=1`)}><Icon name="feed" size={15} />{t("newFeeding")}</Button><Button variant="ghost" size="sm" onClick={() => openRecord("weight")}><Icon name="weight" size={15} />{t("addWeight")}</Button></div>
@@ -176,10 +182,39 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     }}><Icon name="plus" size={15} />{t("add")}</Button>} />
       {traits.data?.traits?.length ? traits.data.traits.map((trait) => <div className="simple-row" key={getString(trait, "id")}><span className="simple-row-icon"><Icon name="leaf" /></span><div><strong>{getString(trait, "traitName")}</strong><small>{getString(trait, "traitValue")}{getString(trait, "confidenceNote") ? ` · ${getString(trait, "confidenceNote")}` : ""}</small></div><IconButton label={t("delete")} onClick={() => { if (window.confirm(t("confirmDelete"))) void api.delete(`/genetic-traits/${getString(trait, "id")}`).then(() => traits.reload()); }}><Icon name="trash" size={15} /></IconButton></div>) : <EmptyState title={t("noRecords")} />}</Panel>}
 
-    {tab === "share" && <PublicSharePanel animalId={id} locale={locale} resource={share.data?.share ?? null} reload={share.reload} show={show} />}
+    {tab === "share" && <PublicSharePanel animalId={id} locale={locale} hasPhoto={Boolean(getString(animal, "photoUrl"))} resource={share.data?.share ?? null} reload={share.reload} show={show} />}
     {animalEditModal && <Modal title={t("animalEdit")} onClose={() => setAnimalEditModal(false)} wide>
       <form className="form-stack" onSubmit={saveAnimalEdit}>
         {animalEditError && <Alert tone="danger">{animalEditError}</Alert>}
+        <Field label={t("animalPhoto")} hint={t("animalPhotoHint")}>
+          <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            if (!file) { setPhotoFile(null); return; }
+            if (file.size > 5 * 1024 * 1024 || (file.type && !["image/jpeg", "image/png", "image/webp"].includes(file.type))) {
+              setAnimalEditError(t("photoValidation"));
+              e.target.value = "";
+              return;
+            }
+            setAnimalEditError("");
+            setPhotoFile(file);
+          }} />
+        </Field>
+        {photoFile && <p className="muted-note">{photoFile.name}</p>}
+        {getString(animal, "photoUrl") && <div className="animal-photo-editor">
+          <img src={getString(animal, "photoUrl")} alt={t("animalPhoto")} />
+          <Button type="button" size="sm" variant="danger" disabled={animalEditBusy} onClick={async () => {
+            if (!window.confirm(t("confirmDelete"))) return;
+            setAnimalEditBusy(true);
+            try {
+              await api.delete("/animals/" + id + "/photo");
+              setPhotoFile(null);
+              animalResource.reload();
+              show(t("photoRemoved"));
+            } catch (reason) {
+              setAnimalEditError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+            } finally { setAnimalEditBusy(false); }
+          }}>{t("removePhoto")}</Button>
+        </div>}
         <div className="form-grid">
           <Field label={t("name")}><Input required maxLength={120} value={animalEditForm.name} onChange={(e) => setAnimalEditForm({ ...animalEditForm, name: e.target.value })} /></Field>
           <Field label={t("identifier")}><Input maxLength={120} value={animalEditForm.identifier} onChange={(e) => setAnimalEditForm({ ...animalEditForm, identifier: e.target.value })} /></Field>
@@ -230,7 +265,7 @@ function WeightChart({ weights, locale }: { weights: WeightDto[]; locale: Locale
   return <div className="chart-wrap"><svg viewBox="0 0 300 100" role="img" aria-label={translate(locale, "weightHistory")}><path d="M8 84H292" stroke="currentColor" opacity=".15" /><polyline points={coords} fill="none" stroke="var(--forest)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />{points.map((value, index) => <circle key={index} cx={8 + index * (284 / (points.length - 1))} cy={84 - ((value - min) / range) * 64} r="3.5" fill="var(--terracotta)" />)}</svg><div className="chart-caption"><span>{formatWeight(min, locale)}</span><span>{formatWeight(max, locale)}</span></div></div>;
 }
 
-function PublicSharePanel({ animalId, locale, resource, reload, show }: { animalId: string; locale: Locale; resource: PublicShareDto | null; reload: () => void; show: (message: string) => void }) {
+function PublicSharePanel({ animalId, locale, hasPhoto, resource, reload, show }: { animalId: string; locale: Locale; hasPhoto: boolean; resource: PublicShareDto | null; reload: () => void; show: (message: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const share = resource;
   const visible = share?.visibleFields ?? ["name", "species", "morph"];
@@ -239,7 +274,7 @@ function PublicSharePanel({ animalId, locale, resource, reload, show }: { animal
   const [enabled, setEnabled] = useState(Boolean(share?.isEnabled));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const options = ["name", "species", "morph", "sex", "birthDate"];
+  const options = ["name", "species", "morph", "sex", "birthDate", "photo"];
   const url = getString(share, "url");
   const qr = useMemo(() => {
     if (!url) return null;
@@ -268,7 +303,7 @@ function PublicSharePanel({ animalId, locale, resource, reload, show }: { animal
   return <Panel><PanelHeader title={t("publicShare")} description={locale === "it" ? "Scegli in modo esplicito quali campi rendere pubblici." : "Explicitly choose which fields can be shared publicly."} />
     {error && <Alert tone="danger">{error}</Alert>}
     <Field label={t("publicDescription")}><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-    <div className="field"><span className="field-label">{t("visibleFields")}</span><div className="checkbox-grid">{options.map((field) => <label className="checkbox-field" key={field}><input type="checkbox" checked={fields.includes(field)} onChange={(e) => setFields(e.target.checked ? [...fields, field] : fields.filter((item) => item !== field))} />{t(field)}</label>)}</div></div>
+    <div className="field"><span className="field-label">{t("visibleFields")}</span><div className="checkbox-grid">{options.map((field) => <label className="checkbox-field" key={field}><input type="checkbox" checked={fields.includes(field)} disabled={field === "photo" && !hasPhoto} onChange={(e) => setFields(e.target.checked ? [...fields, field] : fields.filter((item) => item !== field))} />{t(field)}</label>)}</div></div>
     <label className="checkbox-field"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />{t("enableShare")}</label>
     <div className="inline-actions"><Button onClick={() => void save()} disabled={busy}>{busy ? t("loading") : t("save")}</Button>{share && <Button variant="danger" onClick={() => void revoke()}>{t("revokeShare")}</Button>}</div>
     {url && <div className="share-link-box"><span>{url}</span><Button size="sm" variant="secondary" onClick={() => { void navigator.clipboard.writeText(url).then(() => show(t("copied"))); }}><Icon name="copy" size={14} />{t("copyLink")}</Button><Button size="sm" variant="ghost" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}><Icon name="external" size={14} />{t("publicPreview")}</Button></div>}
