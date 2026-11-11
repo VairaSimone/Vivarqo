@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
-import { formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString, todayDate } from "../../lib/domain";
+import { dateTimeInputToUtc, dateTimeInputValue, formatDate, formatDateTime, getArray, getString, localDateTimeValue, queryString } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
 import type { CalendarItemDto, ReminderRuleDto, TaskDto } from "@vivarqo/contracts/operations";
-import { dateString } from "./date-utils";
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
@@ -26,7 +25,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   // A route opened directly with ?create=1 must be ready for submission too.
   // Keeping dueAt empty here made native required-field validation block the
   // form before the API request was ever sent.
-  const [form, setForm] = useState({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" });
+  const [form, setForm] = useState({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
   useEffect(() => {
     const currentParams = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
     setQ(currentParams.get("q") ?? "");
@@ -34,13 +33,13 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     setPage(1);
     if (currentParams.has("create")) {
       setEditing(null);
-      setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" });
+      setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
       setError("");
       setModal(true);
     } else {
       setModal(false);
     }
-  }, [path]);
+  }, [path, timezone]);
   const [reminderForm, setReminderForm] = useState({ title: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
   const [reminderModal, setReminderModal] = useState(false);
   const [reminderEdit, setReminderEdit] = useState<ReminderRuleDto | null>(null);
@@ -50,17 +49,16 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   const detail = useResource<{ task: TaskDto }>(taskId ? `/tasks/${encodeURIComponent(taskId)}` : null);
   const { toast, show } = useToast();
 
-  function openCreate() { setEditing(null); setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(), animalId: "" }); setError(""); setModal(true); }
+  function openCreate() { setEditing(null); setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" }); setError(""); setModal(true); }
   function openEdit(task: TaskDto) {
     setEditing(task);
-    const due = new Date(getString(task, "dueAt"));
-    setForm({ title: getString(task, "title"), description: getString(task, "description"), category: getString(task, "category", "custom"), dueAt: Number.isNaN(due.getTime()) ? "" : `${dateString(due)}T${String(due.getHours()).padStart(2, "0")}:${String(due.getMinutes()).padStart(2, "0")}`, animalId: getString(task, "animalId") });
+    setForm({ title: getString(task, "title"), description: getString(task, "description"), category: getString(task, "category", "custom"), dueAt: dateTimeInputValue(getString(task, "dueAt"), timezone), animalId: getString(task, "animalId") });
     setError(""); setModal(true);
   }
   async function saveTask(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const body = { title: form.title, description: form.description || null, category: form.category, dueAt: new Date(form.dueAt).toISOString(), animalId: form.animalId || null };
+      const body = { title: form.title, description: form.description || null, category: form.category, dueAt: dateTimeInputToUtc(form.dueAt, timezone), animalId: form.animalId || null };
       if (editing) await api.patch(`/tasks/${getString(editing, "id")}`, body); else await api.post("/tasks", body);
       setModal(false); tasks.reload(); detail.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -80,7 +78,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     setReminderForm({
       title: getString(rule, "title"), category: getString(rule, "category", "custom"),
       intervalDays: getString(rule, "intervalDays", "7"),
-      nextDueAt: rule ? localDateTimeValue(new Date(getString(rule, "nextDueAt"))) : localDateTimeValue(),
+      nextDueAt: rule ? dateTimeInputValue(getString(rule, "nextDueAt"), timezone) : localDateTimeValue(new Date(), timezone),
       animalId: getString(rule, "animalId")
     });
     setError(""); setReminderModal(true);
@@ -88,7 +86,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   async function saveReminder(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const body = { ...reminderForm, intervalDays: Number(reminderForm.intervalDays), nextDueAt: new Date(reminderForm.nextDueAt).toISOString(), animalId: reminderForm.animalId || null, isEnabled: true };
+      const body = { ...reminderForm, intervalDays: Number(reminderForm.intervalDays), nextDueAt: dateTimeInputToUtc(reminderForm.nextDueAt, timezone), animalId: reminderForm.animalId || null, isEnabled: true };
       if (reminderEdit) await api.patch(`/tasks/reminder-rules/${getString(reminderEdit, "id")}`, body);
       else await api.post("/tasks/reminder-rules", body);
       setReminderModal(false); reminders.reload(); tasks.reload(); show(t("saveSuccess"));
