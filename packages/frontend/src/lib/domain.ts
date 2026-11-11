@@ -71,29 +71,50 @@ export function queryString(params: Record<string, string | number | boolean | n
   return result ? "?" + result : "";
 }
 function validDateParts(value: string): [number, number, number] | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  // Date-only values are deliberately strict. An ISO timestamp must be
+  // interpreted as an instant in the account timezone, never as YYYY-MM-DD.
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
   const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
   const check = new Date(Date.UTC(year, month - 1, day));
   return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day ? [year, month, day] : null;
+}
+type ZonedDateParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+function datePartsInTimezone(date: Date, timezone: string): ZonedDateParts {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
+  return {
+    year: values.year!, month: values.month!, day: values.day!,
+    hour: values.hour!, minute: values.minute!, second: values.second!
+  };
+}
+function pad2(value: number): string { return String(value).padStart(2, "0"); }
+function dateOnlyString(parts: Pick<ZonedDateParts, "year" | "month" | "day">): string {
+  return String(parts.year).padStart(4, "0") + "-" + pad2(parts.month) + "-" + pad2(parts.day);
 }
 export function formatDate(value: string | Date | null | undefined, locale: Locale, options: Intl.DateTimeFormatOptions = {}): string {
   if (!value) return "—";
   const parts = typeof value === "string" ? validDateParts(value) : null;
   const date = parts ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12)) : value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
+  const timezone = parts ? "UTC" : activeDisplayPreferences.timezone;
   if (!Object.keys(options).length && activeDisplayPreferences.dateFormat !== "locale") {
     const values = new Intl.DateTimeFormat("en-CA", {
-      timeZone: parts ? "UTC" : activeDisplayPreferences.timezone,
-      year: "numeric", month: "2-digit", day: "2-digit"
+      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit"
     }).formatToParts(date);
     const pick = (type: string) => values.find((part) => part.type === type)?.value ?? "";
     const year = pick("year"), month = pick("month"), day = pick("day");
-    return activeDisplayPreferences.dateFormat === "dd/MM/yyyy" ? `${day}/${month}/${year}` : `${year}-${month}-${day}`;
+    return activeDisplayPreferences.dateFormat === "dd/MM/yyyy" ? day + "/" + month + "/" + year : year + "-" + month + "-" + day;
   }
-  const formatterOptions: Intl.DateTimeFormatOptions = Object.keys(options).length > 0
-    ? { ...options, ...(parts && !options.timeZone ? { timeZone: "UTC" } : {}) }
-    : { dateStyle: "medium", ...(parts ? { timeZone: "UTC" } : {}) };
+  const formatterOptions: Intl.DateTimeFormatOptions = {
+    ...(Object.keys(options).length > 0 ? options : { dateStyle: "medium" }),
+    timeZone: options.timeZone ?? timezone
+  };
   return new Intl.DateTimeFormat(locale, formatterOptions).format(date);
 }
 export function formatDateTime(value: string | null | undefined, locale: Locale, timezone = activeDisplayPreferences.timezone): string {
@@ -102,24 +123,64 @@ export function formatDateTime(value: string | null | undefined, locale: Locale,
   if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(date);
 }
+/** Formats a stored instant for a datetime-local control in the account timezone. */
+export function dateTimeInputValue(value: string | Date | null | undefined, timezone = activeDisplayPreferences.timezone): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = datePartsInTimezone(date, timezone);
+  return dateOnlyString(parts) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute);
+}
+/**
+ * Converts an account-local datetime-local value to an ISO UTC instant.
+ * Non-existent wall-clock times during the spring DST transition are rejected.
+ * For the repeated hour in autumn, the same later/standard-time occurrence as
+ * the backend's zonedDateTimeToUtc implementation is selected deterministically.
+ */
+export function dateTimeInputToUtc(value: string, timezone = activeDisplayPreferences.timezone): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (!match) throw new RangeError("Enter a valid local date and time");
+  const [year, month, day, hour, minute, second] = match.slice(1).map((part) => Number(part ?? 0));
+  const calendarCheck = new Date(Date.UTC(year!, month! - 1, day!, hour!, minute!, second!));
+  if (
+    calendarCheck.getUTCFullYear() !== year || calendarCheck.getUTCMonth() !== month! - 1 ||
+    calendarCheck.getUTCDate() !== day || hour! > 23 || minute! > 59 || second! > 59
+  ) throw new RangeError("Enter a valid local date and time");
+
+  const wallClockAsUtc = Date.UTC(year!, month! - 1, day!, hour!, minute!, second!);
+  let candidate = wallClockAsUtc;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const represented = datePartsInTimezone(new Date(candidate), timezone);
+    const representedAsUtc = Date.UTC(
+      represented.year, represented.month - 1, represented.day,
+      represented.hour, represented.minute, represented.second
+    );
+    const correction = representedAsUtc - wallClockAsUtc;
+    if (correction === 0) break;
+    candidate -= correction;
+  }
+
+  const resolved = datePartsInTimezone(new Date(candidate), timezone);
+  if (
+    resolved.year !== year || resolved.month !== month || resolved.day !== day ||
+    resolved.hour !== hour || resolved.minute !== minute || resolved.second !== second
+  ) throw new RangeError("This local time does not exist because the account timezone changes clocks");
+  return new Date(candidate).toISOString();
+}
 export function dateForInput(value: string | null | undefined): string {
   if (!value) return "";
   const parts = validDateParts(value);
-  if (parts) return [String(parts[0]).padStart(4, "0"), String(parts[1]).padStart(2, "0"), String(parts[2]).padStart(2, "0")].join("-");
+  if (parts) return dateOnlyString({ year: parts[0], month: parts[1], day: parts[2] });
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+  return dateOnlyString(datePartsInTimezone(date, activeDisplayPreferences.timezone));
 }
-export function todayDate(now = new Date()): string {
-  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+export function todayDate(now = new Date(), timezone = activeDisplayPreferences.timezone): string {
+  return dateOnlyString(datePartsInTimezone(now, timezone));
 }
-export function localDateTimeValue(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
-  return year + "-" + month + "-" + day + "T" + hour + ":" + minute;
+/** Formats an instant as the account-local value expected by datetime-local. */
+export function localDateTimeValue(date = new Date(), timezone = activeDisplayPreferences.timezone): string {
+  return dateTimeInputValue(date, timezone);
 }
 export function amountToCents(value: string): number {
   const normalized = value.trim().replace(",", ".");
