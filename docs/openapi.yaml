@@ -4427,6 +4427,16 @@ components:
           },
           "species": {
             "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "sold",
+              "transferred",
+              "deceased",
+              "archived"
+            ]
           }
         }
       }
@@ -4438,7 +4448,9 @@ components:
           "id",
           "animalId",
           "measuredAt",
-          "weightG"
+          "weightG",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4466,6 +4478,10 @@ components:
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4477,7 +4493,9 @@ components:
           "id",
           "animalId",
           "occurredAt",
-          "outcome"
+          "outcome",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4509,6 +4527,10 @@ components:
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4521,7 +4543,10 @@ components:
           "animalId",
           "occurredAt",
           "category",
-          "body"
+          "body",
+          "createdAt",
+          "updatedAt",
+          "archivedAt"
         ],
         "properties": {
           "id": {
@@ -4555,6 +4580,13 @@ components:
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }
@@ -4564,11 +4596,18 @@ components:
         "additionalProperties": false,
         "required": [
           "id",
+          "sessionId",
           "animalId",
-          "outcome"
+          "outcome",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sessionId": {
             "type": "string",
             "format": "uuid"
           },
@@ -4577,7 +4616,14 @@ components:
             "format": "uuid"
           },
           "animal": {
-            "$ref": "#/components/schemas/AnimalSummaryDto"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnimalSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "outcome": {
             "type": "string",
@@ -4610,6 +4656,45 @@ components:
             "type": [
               "string",
               "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "session": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "performedAt"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "performedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         }
@@ -4724,6 +4809,34 @@ components:
             ],
             "format": "uuid"
           },
+          "reminderRule": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "intervalDays",
+                  "isEnabled"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "intervalDays": {
+                    "type": "integer"
+                  },
+                  "isEnabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -4803,7 +4916,9 @@ components:
           "id",
           "cycleId",
           "eventType",
-          "occurredAt"
+          "occurredAt",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4828,6 +4943,16 @@ components:
             ],
             "format": "uuid"
           },
+          "animal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnimalSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "details": {
             "type": [
               "string",
@@ -4845,6 +4970,14 @@ components:
               "number",
               "null"
             ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4855,7 +4988,9 @@ components:
         "required": [
           "id",
           "startedOn",
-          "status"
+          "status",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4901,6 +5036,67 @@ components:
               "string",
               "null"
             ]
+          },
+          "parentA": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnimalSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parentB": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnimalSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReproductiveEventDto"
+            }
+          },
+          "clutches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClutchDto"
+            }
+          },
+          "offspringBatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OffspringBatchDto"
+            }
+          },
+          "_count": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "events": {
+                "type": "integer"
+              },
+              "clutches": {
+                "type": "integer"
+              },
+              "offspringBatches": {
+                "type": "integer"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4913,7 +5109,9 @@ components:
           "cycleId",
           "laidOn",
           "eggCount",
-          "status"
+          "status",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4953,6 +5151,69 @@ components:
               "string",
               "null"
             ]
+          },
+          "cycle": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "status"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eggs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EggDto"
+            }
+          },
+          "incubationLogs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncubationLogDto"
+            }
+          },
+          "_count": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "eggs": {
+                "type": "integer"
+              },
+              "incubationLogs": {
+                "type": "integer"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4963,7 +5224,9 @@ components:
         "required": [
           "id",
           "clutchId",
-          "status"
+          "status",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -4988,6 +5251,14 @@ components:
               "string",
               "null"
             ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -4999,7 +5270,8 @@ components:
           "id",
           "clutchId",
           "recordedAt",
-          "eventType"
+          "eventType",
+          "createdAt"
         ],
         "properties": {
           "id": {
@@ -5034,6 +5306,10 @@ components:
               "string",
               "null"
             ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -5045,7 +5321,9 @@ components:
           "id",
           "cycleId",
           "bornOn",
-          "count"
+          "count",
+          "createdAt",
+          "updatedAt"
         ],
         "properties": {
           "id": {
@@ -5076,6 +5354,79 @@ components:
               "string",
               "null"
             ]
+          },
+          "cycle": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clutch": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "laidOn",
+                  "eggCount"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "laidOn": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "eggCount": {
+                    "type": "integer"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "originAnimals": {
+                "type": "integer"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
@@ -6125,38 +6476,232 @@ components:
           }
         }
       }
-    CareHistoryResponse:
+    CareHistoryItemDto:
       {
-        "allOf": [
+        "oneOf": [
           {
-            "$ref": "#/components/schemas/PaginationEnvelope"
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "occurredAt",
+              "record"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "feeding"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "record": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "sessionId",
+                  "animalId",
+                  "outcome",
+                  "createdAt",
+                  "updatedAt",
+                  "session"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "animalId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "ate",
+                      "refused",
+                      "not_offered",
+                      "unknown"
+                    ]
+                  },
+                  "foodType": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "foodSize": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "foodWeightG": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "session": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "performedAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "performedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "notes": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           {
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "items"
+              "type",
+              "occurredAt",
+              "record"
             ],
             "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/WeightDto"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ShedDto"
-                    },
-                    {
-                      "$ref": "#/components/schemas/AnimalNoteDto"
-                    }
-                  ]
-                }
+              "type": {
+                "type": "string",
+                "const": "weight"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "record": {
+                "$ref": "#/components/schemas/WeightDto"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "occurredAt",
+              "record"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "shed"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "record": {
+                "$ref": "#/components/schemas/ShedDto"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "occurredAt",
+              "record"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "note"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "record": {
+                "$ref": "#/components/schemas/AnimalNoteDto"
               }
             }
           }
         ]
+      }
+    CareHistoryResponse:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CareHistoryItemDto"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "pageSize",
+              "total",
+              "truncated"
+            ],
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       }
     TaskListResponse:
       {
@@ -6465,6 +7010,16 @@ components:
           },
           "targetPath": {
             "type": "string"
+          },
+          "animal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AnimalSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "record": {
             "type": "object"
@@ -6825,7 +7380,23 @@ components:
         ],
         "properties": {
           "item": {
-            "$ref": "#/components/schemas/InventoryItemDto"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InventoryItemDto"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "movements": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/InventoryMovementDto"
+                    }
+                  }
+                }
+              }
+            ]
           },
           "lowStock": {
             "type": "boolean"
