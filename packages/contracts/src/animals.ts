@@ -59,11 +59,20 @@ export interface AnimalDocumentDto {
   createdAt: string;
 }
 
+export interface GeneticTraitSourceAnimalDto {
+  id: string;
+  name: string;
+  identifier: string | null;
+  species: string;
+}
+
 export interface GeneticTraitDto {
   id: string;
   animalId: string;
   traitName: string;
   traitValue: string;
+  sourceAnimalId: string | null;
+  sourceAnimal?: GeneticTraitSourceAnimalDto | null;
   confidenceNote: string | null;
 }
 

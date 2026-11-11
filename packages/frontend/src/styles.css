@@ -409,6 +409,18 @@ tbody tr:hover { background: var(--surface-soft); }
 .import-errors > div { display: grid; grid-template-columns: 52px 120px minmax(0,1fr); gap: 8px; padding: 7px; border-radius: 6px; background: var(--danger-bg); font-size: 9px; }
 .import-errors small { color: var(--danger); }
 .import-preview pre { max-height: 220px; overflow: auto; padding: 10px; border-radius: 7px; background: var(--surface-soft); color: var(--muted); font-size: 9px; }
+.import-mapping { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.import-mapping-list { display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow: auto; }
+.import-mapping-row { display: grid; grid-template-columns: minmax(120px,1fr) minmax(190px,1fr); align-items: center; gap: 12px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.import-mapping-row.is-unmapped { border-style: dashed; background: var(--surface-soft); }
+.import-mapping-source { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.import-mapping-source strong { overflow-wrap: anywhere; font-size: 12px; }
+.import-mapping-source small { color: var(--muted); font-size: 11px; }
+.import-mapping-row .field { margin: 0; }
+.genetic-trait-row { align-items: flex-start; border-bottom: 1px solid var(--border); }
+.genetic-trait-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.genetic-trait-copy > span { font-size: 12px; }
+.genetic-trait-copy small { line-height: 1.5; }
 .auth-page { display: grid; grid-template-columns: minmax(300px,.92fr) minmax(420px,1.08fr); min-height: 100vh; background: var(--surface); }
 .auth-visual { position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; overflow: hidden; padding: 34px 8%; background: #183a34; color: #f1f3ec; }
 .auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }

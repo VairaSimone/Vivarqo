@@ -493,6 +493,9 @@ Copertura minima obbligatoria per:
 •	Un campo non incluso nella allowlist pubblica non viene restituito anche se presente nel DB.
 •	Il reset password è monouso e scade.
 •	Le importazioni non generano record fuori dall’account proprietario.
+•	L'importazione guidata consente di selezionare il foglio XLSX, associare manualmente intestazioni a campi per tutte le entità supportate e rigenerare l'anteprima prima della conferma.
+•	La conferma di un'importazione viene rifiutata dal backend finché mancano mappature obbligatorie.
+•	I tratti genetici possono essere creati, modificati e cancellati dalla scheda animale, includendo animale di origine e nota di provenienza/affidabilità.
 25.3 Test end-to-end
 1.	Registrazione, verifica email e login.
 2.	Creazione animale e registrazione di peso/muta.

@@ -1494,6 +1494,11 @@ paths:
           schema: { type: string }
         - name: sheet
           in: query
+          description: Nome del foglio XLSX da importare; se omesso viene usato il primo foglio.
+          schema: { type: string }
+        - name: mapping
+          in: query
+          description: JSON object con chiavi campo Vivarqo e valori intestazione sorgente (es. {"name":"Nome rettile","species":"Specie animale"}). Le mappature esplicite sovrascrivono il riconoscimento automatico.
           schema: { type: string }
       requestBody:
         required: true

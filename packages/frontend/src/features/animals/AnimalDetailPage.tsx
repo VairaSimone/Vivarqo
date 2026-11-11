@@ -11,6 +11,7 @@ import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
 type FeedingItem = Record<string, unknown>;
+const sourceAnimalDetailEndpoint = (sourceId: string) => "/animals/" + encodeURIComponent(sourceId);
 
 export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
@@ -29,6 +30,13 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [recordEdit, setRecordEdit] = useState<CareRecordDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
+  const [traitModal, setTraitModal] = useState(false);
+  const [traitEdit, setTraitEdit] = useState<GeneticTraitDto | null>(null);
+  const [traitBusy, setTraitBusy] = useState(false);
+  const [traitError, setTraitError] = useState("");
+  const [traitForm, setTraitForm] = useState({
+    traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "",
+  });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
   const [feedingPage, setFeedingPage] = useState(1);
   const [feedingEditEntry, setFeedingEditEntry] = useState<FeedingItem | null>(null);
@@ -198,6 +206,61 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     }
   }
 
+  function openGeneticTrait(existing?: GeneticTraitDto) {
+    setTraitEdit(existing ?? null);
+    setTraitError("");
+    setTraitForm({
+      traitName: existing?.traitName ?? "",
+      traitValue: existing?.traitValue ?? "",
+      sourceAnimalId: existing?.sourceAnimalId ?? "",
+      confidenceNote: existing?.confidenceNote ?? "",
+    });
+    setTraitModal(true);
+  }
+
+  async function saveGeneticTrait(event: FormEvent) {
+    event.preventDefault();
+    if (!traitForm.traitName.trim() || !traitForm.traitValue.trim()) {
+      setTraitError(t("formRequired"));
+      return;
+    }
+    if (traitForm.sourceAnimalId === id) {
+      setTraitError(t("geneticSelfSourceError"));
+      return;
+    }
+    setTraitBusy(true);
+    setTraitError("");
+    const payload = {
+      traitName: traitForm.traitName.trim(),
+      traitValue: traitForm.traitValue.trim(),
+      sourceAnimalId: traitForm.sourceAnimalId || null,
+      confidenceNote: traitForm.confidenceNote.trim() || null,
+    };
+    try {
+      if (traitEdit) await api.patch("/genetic-traits/" + traitEdit.id, payload);
+      else await api.post("/animals/" + id + "/genetic-traits", payload);
+      setTraitModal(false);
+      setTraitEdit(null);
+      traits.reload();
+      show(t("saveSuccess"));
+    } catch (reason) {
+      setTraitError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally {
+      setTraitBusy(false);
+    }
+  }
+
+  async function deleteGeneticTrait(trait: GeneticTraitDto) {
+    if (!window.confirm(t("confirmDelete"))) return;
+    try {
+      await api.delete("/genetic-traits/" + trait.id);
+      traits.reload();
+      show(t("delete"));
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+
   if (animalResource.loading && !animal) return <LoadingState />;
   if (animalResource.error || !animal) return <ErrorState message={animalResource.error?.message ?? t("noRecords")} retry={animalResource.reload} />;
   const animalName = getString(animal, "name");
@@ -280,14 +343,55 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <div className="row-actions"><IconButton label={t("download")} onClick={() => void api.download(`/documents/${getString(doc, "id")}/download`, getString(doc, "originalFilename", "document"))}><Icon name="download" /></IconButton></div>
       ])} empty={t("noDocuments")} /> : <EmptyState title={t("noDocuments")} description={t("emptyHint")} />}</Panel>}
 
-    {tab === "traits" && <Panel><PanelHeader title={t("traits")} action={<Button onClick={() => {
-      const traitName = window.prompt(t("traitName")); if (!traitName) return;
-      const traitValue = window.prompt(t("traitValue")); if (!traitValue) return;
-      void api.post(`/animals/${id}/genetic-traits`, { traitName, traitValue }).then(() => traits.reload()).catch((reason) => show(reason instanceof ApiError ? reason.message : t("operationFailed")));
-    }}><Icon name="plus" size={15} />{t("add")}</Button>} />
-      {traits.data?.traits?.length ? traits.data.traits.map((trait) => <div className="simple-row" key={getString(trait, "id")}><span className="simple-row-icon"><Icon name="leaf" /></span><div><strong>{getString(trait, "traitName")}</strong><small>{getString(trait, "traitValue")}{getString(trait, "confidenceNote") ? ` · ${getString(trait, "confidenceNote")}` : ""}</small></div><IconButton label={t("delete")} onClick={() => { if (window.confirm(t("confirmDelete"))) void api.delete(`/genetic-traits/${getString(trait, "id")}`).then(() => traits.reload()); }}><Icon name="trash" size={15} /></IconButton></div>) : <EmptyState title={t("noRecords")} />}</Panel>}
+    {tab === "traits" && <Panel>
+      <PanelHeader title={t("traits")} action={<Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button>} />
+      {traits.loading && !traits.data ? <LoadingState /> : traits.error ? <ErrorState message={traits.error.message} retry={traits.reload} /> : traits.data?.traits?.length ? traits.data.traits.map((trait) => (
+        <div className="simple-row genetic-trait-row" key={trait.id}>
+          <span className="simple-row-icon"><Icon name="leaf" /></span>
+          <div className="genetic-trait-copy">
+            <strong>{trait.traitName}</strong>
+            <span>{trait.traitValue}</span>
+            <small>{t("geneticSourceAnimal")}: {trait.sourceAnimal
+              ? trait.sourceAnimal.name + (trait.sourceAnimal.identifier ? " · " + trait.sourceAnimal.identifier : "")
+              : t("geneticSourceUnknown")}</small>
+            {trait.confidenceNote && <small>{t("geneticConfidenceNote")}: {trait.confidenceNote}</small>}
+          </div>
+          <div className="row-actions">
+            <IconButton label={t("edit")} onClick={() => openGeneticTrait(trait)}><Icon name="edit" size={15} /></IconButton>
+            <IconButton label={t("delete")} onClick={() => void deleteGeneticTrait(trait)}><Icon name="trash" size={15} /></IconButton>
+          </div>
+        </div>
+      )) : <EmptyState title={t("noRecords")} />}
+    </Panel>}
 
     {tab === "share" && <PublicSharePanel animalId={id} locale={locale} hasPhoto={Boolean(getString(animal, "photoUrl"))} resource={share.data?.share ?? null} reload={share.reload} show={show} />}
+    {traitModal && <Modal title={traitEdit ? t("editGeneticTrait") : t("addGeneticTrait")} onClose={() => setTraitModal(false)}>
+      <form className="form-stack" onSubmit={saveGeneticTrait}>
+        {traitError && <Alert tone="danger">{traitError}</Alert>}
+        <Field label={t("traitName")}><Input required maxLength={160} value={traitForm.traitName} onChange={(e) => setTraitForm({ ...traitForm, traitName: e.target.value })} /></Field>
+        <Field label={t("traitValue")}><Input required maxLength={240} value={traitForm.traitValue} onChange={(e) => setTraitForm({ ...traitForm, traitValue: e.target.value })} /></Field>
+        <RemoteSelect
+          label={t("geneticSourceAnimal")}
+          value={traitForm.sourceAnimalId}
+          onChange={(sourceAnimalId) => setTraitForm({ ...traitForm, sourceAnimalId })}
+          endpoint="/animals"
+          responseKey="animals"
+          labelKey="name"
+          secondaryKey="identifier"
+          detailEndpoint={sourceAnimalDetailEndpoint}
+          detailKey="animal"
+          locale={locale}
+        />
+        {traitForm.sourceAnimalId === id && <Alert tone="danger">{t("geneticSelfSourceError")}</Alert>}
+        <Field label={t("geneticConfidenceNote")} hint={t("geneticConfidenceHint")}>
+          <Textarea rows={4} maxLength={10000} value={traitForm.confidenceNote} onChange={(e) => setTraitForm({ ...traitForm, confidenceNote: e.target.value })} />
+        </Field>
+        <div className="modal-actions">
+          <Button variant="secondary" type="button" onClick={() => setTraitModal(false)}>{t("cancel")}</Button>
+          <Button type="submit" disabled={traitBusy || traitForm.sourceAnimalId === id}>{traitBusy ? t("loading") : t("save")}</Button>
+        </div>
+      </form>
+    </Modal>}
     {feedingEditEntry && <Modal title={t("edit")} onClose={() => setFeedingEditEntry(null)}>
       <form className="form-stack" onSubmit={saveFeedingEdit}>
         {feedingFormError && <Alert tone="danger">{feedingFormError}</Alert>}
