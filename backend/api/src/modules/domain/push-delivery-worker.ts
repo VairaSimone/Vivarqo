@@ -1,7 +1,7 @@
 import { logger } from "../../logger.js";
 import { captureException } from "../../middleware/observability.js";
 import { prisma } from "../../db/prisma.js";
-import { getVapidCredentials, sendWebPush } from "./web-push.js";
+import { getVapidCredentials, isWithinQuietHours, sendWebPush } from "./web-push.js";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
@@ -86,6 +86,49 @@ async function processOne(now: Date): Promise<boolean> {
     await prisma.pushDeliveryAttempt.updateMany({
       where: { id, status: "processing" },
       data: { status: "failed", errorCode: "related_record_missing" },
+    });
+    return true;
+  }
+
+  // Preferences are checked at dispatch time as well as enqueue time. A queued
+  // notification must not bypass a later opt-out or quiet-hours change.
+  const [preferences, user] = await Promise.all([
+    prisma.notificationPreferences.findUnique({
+      where: { userId: attempt.userId },
+      select: { pushEnabled: true, categories: true, quietHoursStart: true, quietHoursEnd: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: attempt.userId },
+      select: { timezone: true, accountStatus: true, deletedAt: true },
+    }),
+  ]);
+  if (!user || user.deletedAt !== null || user.accountStatus !== "active") {
+    await prisma.pushDeliveryAttempt.updateMany({
+      where: { id, status: "processing" },
+      data: { status: "failed", errorCode: "account_inactive" },
+    });
+    return true;
+  }
+  const categoryEnabled = (preferences?.categories as Record<string, unknown> | null)?.[attempt.notification.category];
+  if (!preferences?.pushEnabled || categoryEnabled === false) {
+    await prisma.pushDeliveryAttempt.updateMany({
+      where: { id, status: "processing" },
+      data: { status: "failed", errorCode: "notifications_disabled" },
+    });
+    return true;
+  }
+  if (isWithinQuietHours(now, user.timezone, preferences.quietHoursStart, preferences.quietHoursEnd)) {
+    // Keep the same logical attempt and retry counter; this is a deferral, not
+    // a provider failure. Recheck periodically until quiet hours have ended.
+    await prisma.pushDeliveryAttempt.updateMany({
+      where: { id, status: "processing" },
+      data: {
+        status: "queued",
+        scheduledAt: new Date(now.getTime() + 15 * 60_000),
+        attemptedAt: null,
+        nextAttemptAt: null,
+        errorCode: "quiet_hours",
+      },
     });
     return true;
   }
