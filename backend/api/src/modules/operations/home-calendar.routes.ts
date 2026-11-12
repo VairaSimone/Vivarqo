@@ -13,7 +13,7 @@ export function createHomeCalendarRouter() {
     const now = new Date();
     const today = localDateFor(now, auth.timezone);
     const bounds = localDayBounds(today, auth.timezone);
-    const reminderLimit = new Date(bounds.end.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nextWeekLimit = localDayBounds(addCalendarDays(today, 8), auth.timezone).start;
 
     const [
       dueToday,
@@ -51,13 +51,13 @@ export function createHomeCalendarRouter() {
         include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
       prisma.task.findMany({
-        where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: reminderLimit } },
+        where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: nextWeekLimit } },
         orderBy: { dueAt: "asc" },
         take: 100,
         include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
       prisma.reminderRule.findMany({
-        where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: reminderLimit } },
+        where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } },
         orderBy: { nextDueAt: "asc" },
         take: 20,
         include: { animal: { select: { id: true, name: true, identifier: true } } },
@@ -97,8 +97,8 @@ export function createHomeCalendarRouter() {
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { lt: now } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } } }),
-      prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: reminderLimit } } }),
-      prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: reminderLimit } } }),
+      prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: nextWeekLimit } } }),
+      prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } } }),
     ]);
 
     const recentEvents = [
