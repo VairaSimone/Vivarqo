@@ -105,7 +105,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Syntax-check Dev Manager
-        run: pnpm check:dev-manager
+        run: |
+          pnpm check:dev-manager
+          node --check scripts/dev-manager-process.mjs
+          node --check scripts/dev-manager-security.mjs
+      - name: Test Dev Manager diagnostics, process shutdown and dashboard isolation on Linux
+        run: |
+          pnpm test:dev-manager
+          pnpm test:dev-manager:integration
       - name: Type-check frontend
         run: pnpm typecheck:frontend
       - name: Test frontend helpers
@@ -133,8 +140,10 @@ jobs:
         run: |
           node --check scripts/dev-manager.mjs
           node --check scripts/dev-manager-core.mjs
-      - name: Run diagnostic unit tests on Windows
-        run: pnpm test:dev-manager
+      - name: Run diagnostic and process integration tests on Windows
+        run: |
+          pnpm test:dev-manager
+          pnpm test:dev-manager:integration
       - name: Exercise Windows command, notification and process tools
         run: node --test scripts/dev-manager.windows.test.mjs
       - name: Verify PowerShell notification dependencies
