@@ -113,6 +113,21 @@ jobs:
       - name: Build frontend
         run: pnpm build:frontend
 
+  dev-manager-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Syntax-check and test Dev Manager diagnostics
+        run: |
+          node --check scripts/dev-manager.mjs
+          node --check scripts/dev-manager-core.mjs
+          node --test scripts/dev-manager.test.mjs
+
   e2e:
     runs-on: ubuntu-24.04
     env:
