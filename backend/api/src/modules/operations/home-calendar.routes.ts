@@ -28,8 +28,8 @@ export function createHomeCalendarRouter() {
       recentReproductionEvents,
       dueTodayCount,
       overdueCount,
-      upcomingTaskCount,
       completedTodayCount,
+      upcomingTaskCount,
       imminentReminderCount,
     ] = await Promise.all([
       prisma.task.findMany({
