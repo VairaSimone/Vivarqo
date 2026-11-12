@@ -48,6 +48,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   });
   const { toast, show } = useToast();
   const animal = animalResource.data?.animal;
+  const summaryWeights = useResource<{ weights: WeightDto[] }>(animal && tab === "overview" ? `/animals/${id}/weights?page=1&pageSize=1` : null);
+  const summaryFeedings = useResource<FeedingSessionsResponseDto>(animal && tab === "overview" ? "/feeding-sessions" + queryString({ animalId: id, page: 1, pageSize: 1 }) : null, parseFeedingSessionsResponse);
   const weights = useResource<{ weights: WeightDto[] }>(animal && tab === "history" ? `/animals/${id}/weights?page=1&pageSize=100` : null);
   const sheds = useResource<{ sheds: ShedDto[] }>(animal && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
   const notes = useResource<{ notes: AnimalNoteDto[] }>(animal && tab === "history" ? `/animals/${id}/notes?page=1&pageSize=100` : null);
@@ -81,7 +83,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       originDescription: getString(animal, "originDescription"),
       previousBreeder: getString(animal, "previousBreeder"),
       locationLabel: getString(animal, "locationLabel"),
-      status: getString(animal, "status") === "archived" ? "active" : getString(animal, "status", "active"),
+      status: getString(animal, "status", "active"),
       notes: getString(animal, "notes")
     });
     setAnimalEditError("");
@@ -262,19 +264,58 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   if (animalResource.loading && !animal) return <LoadingState />;
   if (animalResource.error || !animal) return <ErrorState message={animalResource.error?.message ?? t("noRecords")} retry={animalResource.reload} />;
   const animalName = getString(animal, "name");
+  const isArchived = getString(animal, "status") === "archived";
+  const latestWeight = summaryWeights.data?.weights?.[0];
+  const latestFeedingSession = summaryFeedings.data?.sessions?.[0];
+  const latestFeedingEntry = latestFeedingSession?.entries.find((entry) => getString(entry, "animalId") === id);
   const tabItems = [
     ["overview", t("overview")], ["history", t("careHistory")], ["documents", t("documentsTab")],
     ["traits", t("traits")], ["share", t("publicShare")]
   ];
 
-  return <div className="page-stack">
+  async function restoreAnimal() {
+    if (!window.confirm(t("confirmRestoreAnimal"))) return;
+    try {
+      await api.post(`/animals/${encodeURIComponent(id)}/restore`);
+      animalResource.reload();
+      show(t("animalRestored"));
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+
+  return <div className="page-stack animal-detail-page">
     <div className="back-row"><button className="text-link" onClick={() => navigate("/animals")}>← {t("navAnimals")}</button></div>
-    <PageHeader eyebrow={getString(animal, "species")} title={animalName} description={getString(animal, "identifier") || getString(animal, "morph")} action={<Button variant="secondary" onClick={openAnimalEdit}><Icon name="edit" size={16} />{t("edit")}</Button>} />
-    <div className="animal-profile-head">
-      <div className="animal-profile-avatar">{getString(animal, "photoUrl") ? <img src={getString(animal, "photoUrl")} alt="" /> : <Icon name="snake" size={30} />}</div>
-      <div className="animal-profile-main"><strong>{animalName}</strong><span>{getString(animal, "species")} · {getString(animal, "sex") ? t(getString(animal, "sex")) : "—"} · {getString(animal, "morph") || "—"}</span></div>
-      <Badge tone={getString(animal, "status") === "active" ? "success" : "neutral"}>{t(`animalStatus_${getString(animal, "status")}`)}</Badge>
-      <div className="animal-profile-actions"><Button variant="ghost" size="sm" onClick={() => navigate(`/feeding?animalId=${id}&create=1`)}><Icon name="feed" size={15} />{t("newFeeding")}</Button><Button variant="ghost" size="sm" onClick={() => openRecord("weight")}><Icon name="weight" size={15} />{t("addWeight")}</Button></div>
+    <section className="animal-hero">
+      <div className="animal-hero-identity">
+        <div className="animal-profile-avatar">{getString(animal, "photoUrl") ? <img src={getString(animal, "photoUrl")} alt="" /> : <Icon name="snake" size={30} />}</div>
+        <div className="animal-profile-main">
+          <div className="animal-hero-title"><h1>{animalName}</h1><Badge tone={getString(animal, "status") === "active" ? "success" : "neutral"}>{t(`animalStatus_${getString(animal, "status")}`)}</Badge></div>
+          <p className="animal-hero-meta">{getString(animal, "species") || "—"} <span>·</span> {getString(animal, "sex") ? t(getString(animal, "sex")) : "—"} <span>·</span> {getString(animal, "identifier") || t("identifierMissing")}</p>
+          {getString(animal, "morph") && <p className="animal-hero-morph">{getString(animal, "morph")}</p>}
+        </div>
+      </div>
+      <div className="animal-hero-actions">
+        <Button variant="secondary" onClick={openAnimalEdit}><Icon name="edit" size={16} />{t("edit")}</Button>
+        {isArchived && <Button onClick={() => void restoreAnimal()}><Icon name="restore" size={16} />{t("restoreAnimal")}</Button>}
+      </div>
+    </section>
+    {isArchived && <Alert tone="warning">{t("archivedAnimalNotice")}</Alert>}
+    <section className="animal-summary-grid" aria-label={t("recentActivity")}>
+      <article className="animal-summary-card">
+        <span>{t("lastWeight")}</span>
+        {summaryWeights.loading && !summaryWeights.data ? <strong>…</strong> : latestWeight ? <><strong>{formatWeight(latestWeight.weightG, locale)}</strong><small>{formatDate(latestWeight.measuredAt, locale)}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
+      </article>
+      <article className="animal-summary-card">
+        <span>{t("lastFeeding")}</span>
+        {summaryFeedings.loading && !summaryFeedings.data ? <strong>…</strong> : latestFeedingSession && latestFeedingEntry ? <><strong>{formatDate(latestFeedingSession.performedAt, locale)}</strong><small>{t(getString(latestFeedingEntry, "outcome") === "unknown" ? "feedingUnknown" : getString(latestFeedingEntry, "outcome"))}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
+      </article>
+    </section>
+    <div className="animal-profile-actions animal-quick-actions">
+      <Button variant="secondary" disabled={isArchived} onClick={() => navigate(`/feeding?animalId=${encodeURIComponent(id)}&create=1`)}><Icon name="feed" size={15} />{t("newFeeding")}</Button>
+      <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("weight")}><Icon name="weight" size={15} />{t("addWeight")}</Button>
+      <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("shed")}><Icon name="refresh" size={15} />{t("addShed")}</Button>
+      <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("note")}><Icon name="file" size={15} />{t("addNote")}</Button>
     </div>
     <div className="tabs-line" role="tablist">{tabItems.map(([key, label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
 
@@ -286,13 +327,13 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Detail label={t("location")} value={getString(animal, "locationLabel")} /><Detail label={t("previousBreeder")} value={getString(animal, "previousBreeder")} />
       </div></Panel>
       <Panel><PanelHeader title={t("genetics")} /><p className="detail-copy">{getString(animal, "geneticsNotes") || t("noRecords")}</p><PanelHeader title={t("origin")} /><p className="detail-copy">{getString(animal, "originDescription") || t("noRecords")}</p><PanelHeader title={t("animalNotes")} /><p className="detail-copy">{getString(animal, "notes") || t("noRecords")}</p></Panel>
-      <Panel><PanelHeader title={t("quickActions")} /><div className="quick-action-grid"><button className="quick-action" onClick={() => openRecord("weight")}><span><Icon name="weight" /></span><strong>{t("addWeight")}</strong><Icon name="plus" /></button><button className="quick-action" onClick={() => openRecord("shed")}><span><Icon name="refresh" /></span><strong>{t("addShed")}</strong><Icon name="plus" /></button><button className="quick-action" onClick={() => openRecord("note")}><span><Icon name="file" /></span><strong>{t("addNote")}</strong><Icon name="plus" /></button></div></Panel>
+
     </div>}
 
     {tab === "history" && <div className="page-stack">
       <div className="detail-grid">
         <Panel>
-          <PanelHeader title={t("feedingHistory")} action={getString(animal, "status") === "active" ? <Button size="sm" onClick={() => navigate("/feeding?animalId=" + encodeURIComponent(id) + "&create=1")}><Icon name="feed" size={14} />{t("newFeeding")}</Button> : undefined} />
+          <PanelHeader title={t("feedingHistory")} action={!isArchived ? <Button size="sm" onClick={() => navigate("/feeding?animalId=" + encodeURIComponent(id) + "&create=1")}><Icon name="feed" size={14} />{t("newFeeding")}</Button> : undefined} />
           {feedings.loading && !feedings.data ? <LoadingState /> : feedings.error ? <ErrorState message={feedings.error.message} retry={feedings.reload} /> : feedings.data?.sessions.length ? <div className="session-list">
             {feedings.data.sessions.map((session) => {
               const entries = session.entries;
@@ -322,14 +363,14 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           </div> : <EmptyState title={t("noFeedings")} description={t("emptyHint")} />}
           {feedings.data?.pagination && <Pagination page={feedings.data.pagination.page} totalPages={feedings.data.pagination.totalPages} onChange={setFeedingPage} label={t("page")} />}
         </Panel>
-        <Panel><PanelHeader title={t("weightHistory")} action={<Button size="sm" onClick={() => openRecord("weight")}><Icon name="plus" size={14} />{t("addWeight")}</Button>} />
+        <Panel><PanelHeader title={t("weightHistory")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("weight")}><Icon name="plus" size={14} />{t("addWeight")}</Button> : undefined} />
           <WeightChart weights={weights.data?.weights ?? []} locale={locale} />
           <RecordList records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
         </Panel>
-        <Panel><PanelHeader title={t("addShed")} action={<Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button>} />
+        <Panel><PanelHeader title={t("addShed")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
           <RecordList records={sheds.data?.sheds ?? []} kind="shed" locale={locale} onEdit={(record) => openRecord("shed", record)} onDelete={(record) => void deleteRecord("shed", record)} />
         </Panel>
-        <Panel><PanelHeader title={t("animalNotes")} action={<Button size="sm" onClick={() => openRecord("note")}><Icon name="plus" size={14} />{t("add")}</Button>} />
+        <Panel><PanelHeader title={t("animalNotes")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("note")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
           <RecordList records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
         </Panel>
       </div>
@@ -342,7 +383,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       ])} empty={t("noDocuments")} /> : <EmptyState title={t("noDocuments")} description={t("emptyHint")} />}</Panel>}
 
     {tab === "traits" && <Panel>
-      <PanelHeader title={t("traits")} action={<Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button>} />
+      <PanelHeader title={t("traits")} action={{!isArchived && <Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button>}} />
       {traits.loading && !traits.data ? <LoadingState /> : traits.error ? <ErrorState message={traits.error.message} retry={traits.reload} /> : traits.data?.traits?.length ? traits.data.traits.map((trait) => (
         <div className="simple-row genetic-trait-row" key={trait.id}>
           <span className="simple-row-icon"><Icon name="leaf" /></span>
