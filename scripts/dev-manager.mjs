@@ -245,6 +245,7 @@ function notifyDesktop(title, message) {
   child.once("close", () => notificationProcesses.delete(child));
 }
 async function checkWorkerHeartbeat() {
+  if (process.env.VIVARQO_MANAGER_TEST_POSTGRES === "1") return true;
   const sql = "SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());";
   const result = await run(exe("docker"), ["compose", "-f", COMPOSE, "exec", "-T", "postgres", "psql", "-U", "vivarqo", "-d", "vivarqo", "-tA", "-c", sql], true);
   return result.stdout.trim().toLowerCase() === "t";
@@ -471,13 +472,18 @@ async function testModeMain() {
   await loadPersistentLogs();
   await startDashboard();
   await log("INFO", "MANAGER", "Avvio harness di resilienza isolato.");
+  if (process.env.VIVARQO_MANAGER_TEST_POSTGRES === "1") {
+    services.set("postgres", { name: "postgres", state: "running", restarts: 0, child: null, lastCheck: "PostgreSQL drill" });
+  }
   start("api");
   await waitHttp("API", API_URL);
   start("worker");
   start("frontend");
   await waitHttp("FRONTEND", WEB_URL);
   status();
-  await Promise.all([monitor()]);
+  const monitors = [monitor()];
+  if (process.env.VIVARQO_MANAGER_TEST_POSTGRES === "1") monitors.push(monitorInfrastructure());
+  await Promise.all(monitors);
 }
 async function productionMain() {
   await mkdir(LOG_DIR, { recursive: true });
