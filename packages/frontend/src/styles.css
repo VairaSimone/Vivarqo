@@ -1847,3 +1847,8 @@ svg {
   .modal-content .modal-actions { gap: 9px; }
   .modal-content .modal-actions .btn { min-height: 44px; }
 }
+
+.feeding-selected-animals { display: flex; flex-wrap: wrap; gap: 7px; padding: 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.feeding-selected-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 32px; padding: 3px 5px 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; }
+.feeding-selected-chip button { display: inline-grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border: 0; border-radius: 50%; background: var(--surface-soft); color: var(--muted); cursor: pointer; }
+.feeding-selected-chip button:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 2px; }
