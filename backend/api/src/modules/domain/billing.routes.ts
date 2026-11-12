@@ -140,22 +140,15 @@ async function replayPendingInvoiceEvents(
     id: string;
     eventType: string;
     stripeEventCreatedAt: Date;
-    payload: StripeObject;
   }>>`SELECT id,
             event_type AS "eventType",
-            stripe_event_created_at AS "stripeEventCreatedAt",
-            payload
+            stripe_event_created_at AS "stripeEventCreatedAt"
        FROM stripe_webhook_events
       WHERE result = 'pending'
         AND event_type IN ('invoice.payment_failed', 'invoice.paid')
         AND stripe_event_created_at IS NOT NULL
-        AND COALESCE(payload#>>'{customer,id}', payload->>'customer') = ${customerId}
-        AND COALESCE(
-          payload#>>'{subscription,id}',
-          payload->>'subscription',
-          payload#>>'{parent,subscription_details,subscription,id}',
-          payload#>>'{parent,subscription_details,subscription}'
-        ) = ${subscriptionId}
+        AND stripe_customer_id = ${customerId}
+        AND stripe_subscription_id = ${subscriptionId}
       ORDER BY stripe_event_created_at ASC, id ASC
       FOR UPDATE`;
   for (const item of pending) {
@@ -362,7 +355,12 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
             stripeEventId: event.id,
             eventType: event.type,
             stripeEventCreatedAt: timestamp(event.created),
-            payload: event.data.object as never,
+            stripeCustomerId: event.type === "invoice.payment_failed" || event.type === "invoice.paid"
+              ? stringId(event.data.object.customer)
+              : null,
+            stripeSubscriptionId: event.type === "invoice.payment_failed" || event.type === "invoice.paid"
+              ? invoiceSubscriptionId(event.data.object)
+              : null,
             result: "pending",
           },
         });
