@@ -68,7 +68,7 @@ interface PreviewReport {
   potentialDuplicates: PotentialDuplicate[];
 }
 
-function normalizeDate(value: string): string {
+export function normalizeImportDate(value: string): string {
   const text = value.trim();
   if (!text) return text;
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
@@ -76,7 +76,8 @@ function normalizeDate(value: string): string {
   if (/^\d+(\.\d+)?$/.test(text)) {
     const serial = Number(text);
     if (serial >= 1 && serial <= 100_000) {
-      const milliseconds = Math.round(serial) * 86_400_000 + Date.UTC(1899, 11, 30);
+      // Excel serials may include a fractional time component. These fields are date-only.
+      const milliseconds = Math.floor(serial) * 86_400_000 + Date.UTC(1899, 11, 30);
       return new Date(milliseconds).toISOString().slice(0, 10);
     }
   }
@@ -85,7 +86,7 @@ function normalizeDate(value: string): string {
 
 function convertValue(field: string, value: string): unknown {
   const trimmed = value.trim();
-  if (field === "birthDate" || field === "acquiredDate") return trimmed ? normalizeDate(trimmed) : undefined;
+  if (field === "birthDate" || field === "acquiredDate") return trimmed ? normalizeImportDate(trimmed) : undefined;
   if (field === "birthDateEstimated") {
     if (!trimmed) return false;
     const normalized = normalizeHeader(trimmed);
