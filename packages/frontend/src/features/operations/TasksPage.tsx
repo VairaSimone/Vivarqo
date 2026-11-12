@@ -40,7 +40,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       setModal(false);
     }
   }, [path, timezone]);
-  const [reminderForm, setReminderForm] = useState({ title: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
+  const [reminderForm, setReminderForm] = useState({ title: "", description: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
   const [reminderModal, setReminderModal] = useState(false);
   const [reminderEdit, setReminderEdit] = useState<ReminderRuleDto | null>(null);
   const taskUrl = "/tasks" + queryString({ page, pageSize: 25, status, category, q });
@@ -76,7 +76,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   function openReminder(rule?: ReminderRuleDto) {
     setReminderEdit(rule ?? null);
     setReminderForm({
-      title: getString(rule, "title"), category: getString(rule, "category", "custom"),
+      title: getString(rule, "title"), description: getString(rule, "description"), category: getString(rule, "category", "custom"),
       intervalDays: getString(rule, "intervalDays", "7"),
       nextDueAt: rule ? dateTimeInputValue(getString(rule, "nextDueAt"), timezone) : localDateTimeValue(new Date(), timezone),
       animalId: getString(rule, "animalId")
@@ -86,7 +86,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   async function saveReminder(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const body = { ...reminderForm, intervalDays: Number(reminderForm.intervalDays), nextDueAt: dateTimeInputToUtc(reminderForm.nextDueAt, timezone), animalId: reminderForm.animalId || null, isEnabled: true };
+      const body = { ...reminderForm, description: reminderForm.description.trim() || null, intervalDays: Number(reminderForm.intervalDays), nextDueAt: dateTimeInputToUtc(reminderForm.nextDueAt, timezone), animalId: reminderForm.animalId || null, isEnabled: true };
       if (reminderEdit) await api.patch(`/tasks/reminder-rules/${getString(reminderEdit, "id")}`, body);
       else await api.post("/tasks/reminder-rules", body);
       setReminderModal(false); reminders.reload(); tasks.reload(); show(t("saveSuccess"));
@@ -133,6 +133,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     {reminderModal && <Modal title={reminderEdit ? t("edit") : t("createReminder")} onClose={() => setReminderModal(false)}>
       <form className="form-stack" onSubmit={saveReminder}>{error && <Alert tone="danger">{error}</Alert>}
         <Field label={t("taskTitle")}><Input required value={reminderForm.title} onChange={(e) => setReminderForm({ ...reminderForm, title: e.target.value })} /></Field>
+        <Field label={t("description")}><Textarea rows={3} value={reminderForm.description} onChange={(e) => setReminderForm({ ...reminderForm, description: e.target.value })} /></Field>
         <div className="form-grid"><Field label={t("category")}><Select value={reminderForm.category} onChange={(e) => setReminderForm({ ...reminderForm, category: e.target.value })}>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
         <Field label={t("intervalDays")}><Input required type="number" min="1" max="3650" value={reminderForm.intervalDays} onChange={(e) => setReminderForm({ ...reminderForm, intervalDays: e.target.value })} /></Field>
         <Field label={t("nextDueAt")}><Input required type="datetime-local" value={reminderForm.nextDueAt} onChange={(e) => setReminderForm({ ...reminderForm, nextDueAt: e.target.value })} /></Field></div>
