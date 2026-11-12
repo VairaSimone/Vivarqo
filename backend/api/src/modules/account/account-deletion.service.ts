@@ -55,9 +55,6 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   }
   if (!validPassword) throw new AppError(401, "INVALID_CREDENTIALS", "The current password is incorrect");
 
-  // Stop recurring charges before removing the local customer association.
-  await cancelStripeSubscription(userId);
-
   const [animals, cycles, documents, exports, imports] = await Promise.all([
     prisma.animal.findMany({ where: { userId }, select: { id: true, photoKey: true } }),
     prisma.reproductionCycle.findMany({ where: { userId }, select: { id: true } }),
@@ -71,7 +68,8 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     ...animals.flatMap((animal) => animal.photoKey ? [animal.photoKey] : []),
     ...documents.map((document) => document.storageKey),
     ...exports.flatMap((job) => job.storageKey ? [job.storageKey] : []),
-    ...imports.map((job) => job.storageKey),
+    // Import previews are persisted in PostgreSQL; this sentinel is not an object key.
+    ...imports.flatMap((job) => job.storageKey !== "database-preview-report" ? [job.storageKey] : []),
   ];
 
   // Do not erase database references if private-object deletion fails. Retrying is safe:
@@ -81,6 +79,10 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   } catch {
     throw new AppError(503, "ACCOUNT_DELETION_STORAGE_FAILED", "Private files could not all be removed. The account has not yet been erased; retry the request or contact support.");
   }
+
+  // Only contact Stripe after every fallible private-object cleanup has succeeded.
+  // This avoids cancelling billing when a local/S3 storage failure keeps the account intact.
+  await cancelStripeSubscription(userId);
 
   const anonymizedEmail = `deleted+${userId}@accounts-deleted.invalid`;
   const unusablePasswordHash = await argon2.hash(randomBytes(64).toString("hex"), {
