@@ -6,7 +6,7 @@ import type { Locale } from "../../lib/domain";
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function DocumentsPage({ locale, path, navigate }: { locale: Locale; path: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const params = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
@@ -76,12 +76,14 @@ export function DocumentsPage({ locale, path, navigate }: { locale: Locale; path
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navResources")} title={t("documentsTitle")} description={t("documentsSubtitle")} action={<Button onClick={() => setUploadModal(true)}><Icon name="upload" />{t("uploadDocument")}</Button>} />
-    <Panel className="filters-panel"><div className="form-grid">
-      <RemoteSelect label={t("animalDetail")} value={animalId} onChange={(value) => { setAnimalId(value); setPage(1); setCycleId(""); }} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} emptyLabel={t("all")} />
-      <RemoteSelect label={t("cycles")} value={cycleId} onChange={(value) => { setCycleId(value); setPage(1); setAnimalId(""); }} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => `/reproduction-cycles/${encodeURIComponent(id)}`} detailKey="cycle" locale={locale} emptyLabel={t("all")} />
-      <label className="search-control"><Icon name="search" size={14} /><Input type="search" aria-label={locale === "it" ? "Cerca documenti" : "Search documents"} placeholder={t("search")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
-    </div></Panel>
-    <Panel><div className="list-meta"><span>{resource.data?.pagination.total ?? 0} {t("rows")}</span><span className="muted-note">{t("privateStorage")}</span></div>
+    <Panel>
+      <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
+        filters={<><RemoteSelect label={t("animalDetail")} value={animalId} onChange={(value) => { setAnimalId(value); setPage(1); setCycleId(""); }} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => "/animals/" + encodeURIComponent(id)} detailKey="animal" locale={locale} emptyLabel={t("all")} />
+        <RemoteSelect label={t("cycles")} value={cycleId} onChange={(value) => { setCycleId(value); setPage(1); setAnimalId(""); }} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => "/reproduction-cycles/" + encodeURIComponent(id)} detailKey="cycle" locale={locale} emptyLabel={t("all")} /></>}
+        activeFilterCount={[search, animalId, cycleId].filter(Boolean).length}
+        onClearFilters={() => { setSearch(""); setAnimalId(""); setCycleId(""); setPage(1); }}
+        resultCount={resource.data?.pagination.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
+      <div className="list-meta"><span className="muted-note">{t("privateStorage")}</span></div>
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("file"), t("documentCategory"), t("date"), t("animalDetail"), t("actions")]} rows={(resource.data?.documents ?? []).map((document) => [
         <div className="document-name"><span className="item-symbol"><Icon name="file" /></span><span><strong>{getString(document, "originalFilename")}</strong><small>{formatNumber(getString(document, "sizeBytes"), locale, 0)} bytes</small></span></div>,
         getString(document, "category"), formatDate(getString(document, "createdAt"), locale),
