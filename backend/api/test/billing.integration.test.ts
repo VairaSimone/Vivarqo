@@ -175,6 +175,19 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
     const failedEventCreated = lastEventCreated;
 
+    const stalePaidInvoiceForCurrentSubscription = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: failedEventCreated - 1,
+      type: "invoice.paid",
+      data: { object: {
+        id: "in_test_stale_paid_current",
+        customer: "cus_test_vivarqo",
+        subscription: "sub_test_vivarqo",
+      } },
+    };
+    await sendEvent(owner.agent, stalePaidInvoiceForCurrentSubscription).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
+
     // A late Checkout completion is not authoritative and must not reset past_due.
     const lateCheckoutAfterFailure = {
       ...checkoutEvent,
@@ -224,6 +237,19 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     const paidAgain = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
     expect(paidAgain.status).toBe("active");
     expect(paidAgain.cancelAtPeriodEnd).toBe(true);
+
+    const staleFailureAfterPaid = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: failedEventCreated,
+      type: "invoice.payment_failed",
+      data: { object: {
+        id: "in_test_stale_failure_after_paid",
+        customer: "cus_test_vivarqo",
+        subscription: "sub_test_vivarqo",
+      } },
+    };
+    await sendEvent(owner.agent, staleFailureAfterPaid).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("active");
 
     const duplicate = await sendEvent(owner.agent, updatedEvent).expect(200);
     expect(duplicate.body).toMatchObject({ received: true, duplicate: true });
