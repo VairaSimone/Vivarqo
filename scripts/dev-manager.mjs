@@ -144,6 +144,27 @@ function scheduleRestart(name) {
   void log("WARN", name, "Riavvio " + service.restarts + "/8 tra " + Math.ceil(wait / 1000) + "s.");
   setTimeout(() => { if (!STOP.requested && service.state === "restarting") start(name); }, wait).unref();
 }
+function broadcast(payload) {
+  const data = "data: " + JSON.stringify(payload) + "\n\n";
+  for (const client of eventClients) { try { client.write(data); } catch { eventClients.delete(client); } }
+}
+function serviceSnapshot() {
+  const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend" };
+  return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
+}
+function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: diagnosticEvents.slice(-100), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
+async function startDashboard() {
+  const html = await readFile(DASHBOARD_FILE, "utf8");
+  dashboardServer = createServer((req, res) => {
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (req.method === "GET" && url.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); res.end(html); return; }
+    if (req.method === "GET" && url.pathname === "/api/state") { res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(dashboardState())); return; }
+    if (req.method === "GET" && url.pathname === "/events") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); eventClients.add(res); req.on("close", () => eventClients.delete(res)); return; }
+    res.writeHead(404); res.end("Not found");
+  });
+  await new Promise((resolve, reject) => { dashboardServer.once("error", reject); dashboardServer.listen(DASHBOARD_PORT, "127.0.0.1", resolve); });
+  await log("INFO", "DASHBOARD", "Dashboard disponibile su http://127.0.0.1:" + DASHBOARD_PORT);
+}
 async function waitHttp(label, url, timeout = 90_000) {
   const startAt = Date.now(); let last = "nessuna risposta";
   while (Date.now() - startAt < timeout && !STOP.requested) {
