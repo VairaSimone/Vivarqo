@@ -6,7 +6,7 @@ import type { CalendarItemDto, ReminderRuleDto, TaskDto } from "@vivarqo/contrac
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
-import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 const categories = ["feeding", "weighing", "shed_check", "cleaning", "reproduction", "document", "inventory", "custom"] as const;
 
 export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path: string; timezone: string; navigate: (path: string) => void }) {
@@ -115,16 +115,17 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     <PageHeader eyebrow={t("navWorkspace")} title={t("tasksTitle")} description={t("tasksSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => navigate("/calendar")}><Icon name="calendar" />{t("calendarTitle")}</Button><Button onClick={tab === "reminders" ? () => openReminder() : openCreate}><Icon name="plus" size={15} />{tab === "reminders" ? t("createReminder") : t("addTask")}</Button></div>} />
     <div className="tabs-line"><button className={tab === "tasks" ? "selected" : ""} onClick={() => navigate("/tasks")}>{t("tasksTitle")}</button><button className={tab === "reminders" ? "selected" : ""} onClick={() => navigate("/tasks?tab=reminders")}>{t("reminders")}</button></div>
     {tab === "tasks" ? <>
-      <Panel className="filters-panel"><div className="filter-row">
-        <label className="search-control"><Icon name="search" /><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder={t("search")} /></label>
-        <Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="open">{t("open")}</option><option value="all">{t("all")}</option><option value="completed">{t("completed")}</option><option value="dismissed">{t("dismissed")}</option></Select>
-        <Select aria-label={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select>
-      </div></Panel>
-      {tasks.loading && !tasks.data ? <LoadingState /> : tasks.error ? <ErrorState message={tasks.error.message} retry={tasks.reload} /> :
-        <Panel><div className="list-meta"><span>{tasks.data?.pagination.total ?? 0} {t("rows")}</span><Button size="sm" variant="ghost" onClick={tasks.reload}><Icon name="refresh" />{t("refresh")}</Button></div>
-          {list.length ? <div className="task-list">{list.map((task) => <TaskRow key={getString(task, "id")} task={task} locale={locale} timezone={timezone} onComplete={() => void updateTask(task, "complete")} onDismiss={() => void updateTask(task, "dismiss")} onEdit={() => openEdit(task)} onDelete={() => void updateTask(task, "delete")} onOpen={() => navigate(`/tasks/${getString(task, "id")}`)} t={t} />)}</div> : <EmptyState title={t("noTasksList")} description={t("emptyHint")} action={<Button onClick={openCreate}>{t("addTask")}</Button>} />}
-          {tasks.data?.pagination && <Pagination page={tasks.data.pagination.page} totalPages={tasks.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
-        </Panel>}
+      <Panel>
+        <ListToolbar searchValue={q} onSearchChange={(value) => { setQ(value); setPage(1); }} searchPlaceholder={t("search")}
+          filters={<><Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="open">{t("open")}</option><option value="all">{t("all")}</option><option value="completed">{t("completed")}</option><option value="dismissed">{t("dismissed")}</option></Select>
+          <Select aria-label={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{categories.map((value) => <option value={value} key={value}>{t("category" + value[0]!.toUpperCase() + value.slice(1))}</option>)}</Select></>}
+          activeFilterCount={[q, status !== "open" ? status : "", category].filter(Boolean).length}
+          onClearFilters={() => { setQ(""); setStatus("open"); setCategory(""); setPage(1); }}
+          resultCount={tasks.data?.pagination.total ?? 0} onRefresh={tasks.reload} loading={tasks.loading} />
+        {tasks.loading && !tasks.data ? <LoadingState /> : tasks.error ? <ErrorState message={tasks.error.message} retry={tasks.reload} /> :
+          <div className="task-list">{list.length ? list.map((task) => <TaskRow key={getString(task, "id")} task={task} locale={locale} timezone={timezone} onComplete={() => void updateTask(task, "complete")} onDismiss={() => void updateTask(task, "dismiss")} onEdit={() => openEdit(task)} onDelete={() => void updateTask(task, "delete")} onOpen={() => navigate("/tasks/" + getString(task, "id"))} t={t} />) : <EmptyState title={t("noTasksList")} description={t("emptyHint")} action={<Button onClick={openCreate}>{t("addTask")}</Button>} />}</div>}
+        {tasks.data?.pagination && <Pagination page={tasks.data.pagination.page} totalPages={tasks.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
+      </Panel>
     </> : <Panel><PanelHeader title={t("reminders")} action={<Button onClick={() => openReminder()}><Icon name="plus" />{t("createReminder")}</Button>} />
       {reminders.loading && !reminders.data ? <LoadingState /> : reminders.error ? <ErrorState message={reminders.error.message} retry={reminders.reload} /> : reminders.data?.reminderRules.length ? <div className="task-list">{reminders.data.reminderRules.map((rule) => <div className="task-row reminder-row" key={getString(rule, "id")}><span className="task-check muted"><Icon name="clock" /></span><div className="task-main"><strong>{getString(rule, "title")}</strong><small>{formatDateTime(getString(rule, "nextDueAt"), locale, timezone)} · {getString(rule, "intervalDays")} {locale === "it" ? "giorni" : "days"}</small></div><Badge tone={Boolean(rule.isEnabled) ? "success" : "neutral"}>{Boolean(rule.isEnabled) ? t("enabled") : t("disabled")}</Badge><div className="row-actions"><IconButton label={t("edit")} onClick={() => openReminder(rule)}><Icon name="edit" /></IconButton><Button size="sm" variant="secondary" onClick={() => void toggleReminder(rule)}>{Boolean(rule.isEnabled) ? t("disabled") : t("enabled")}</Button></div></div>)}</div> : <EmptyState title={t("noTasksList")} />}
     </Panel>}
