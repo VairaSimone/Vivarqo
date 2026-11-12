@@ -252,7 +252,11 @@ async function monitorInfrastructure() {
       if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
       if (postgresAvailable && workerFailures === 2 && worker && worker.child && worker.state !== "restarting") {
         await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker.");
-        worker.state = "restarting"; killTree(worker.child); scheduleRestart("worker");
+        const previousChild = worker.child;
+        worker.state = "restarting";
+        await terminateProcessTree(previousChild);
+        if (worker.child === previousChild) worker.child = null;
+        scheduleRestart("worker");
       }
     }
     broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
@@ -286,7 +290,11 @@ async function monitor() {
         const count = (misses.get(item.name) || 0) + 1; misses.set(item.name, count);
         if (count === 3) {
           await log("ERROR", item.name, "Tre health check consecutivi falliti: " + e.message + ". Riavvio.");
-          service.state = "restarting"; killTree(service.child); scheduleRestart(item.name);
+          const previousChild = service.child;
+          service.state = "restarting";
+          await terminateProcessTree(previousChild);
+          if (service.child === previousChild) service.child = null;
+          scheduleRestart(item.name);
         }
       }
     }
@@ -354,14 +362,20 @@ async function monitorProduction(composeArgs) {
           if (worker) { worker.state = "running"; worker.lastCheck = "heartbeat DB valido"; }
         } else throw new Error("heartbeat worker assente/scaduto");
       } catch (error) {
-        workerFailures++;
         const worker = services.get("worker");
         if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
-        if (workerFailures >= 2) {
-          await log("ERROR", "worker", "Heartbeat non valido; richiedo il riavvio del container.");
-          await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
-          if (worker) { worker.restarts++; worker.state = "restarting"; }
+        const migrationsReady = services.get("migrate")?.state === "completed";
+        const databaseReady = services.get("postgres")?.state === "running";
+        if (!migrationsReady || !databaseReady) {
           workerFailures = 0;
+        } else {
+          workerFailures++;
+          if (workerFailures >= 2 && worker?.state !== "missing") {
+            await log("ERROR", "worker", "Heartbeat assente con DB e migrazioni pronti; richiedo il riavvio del container.");
+            await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
+            if (worker) { worker.restarts++; worker.state = "restarting"; }
+            workerFailures = 0;
+          }
         }
       }
       for (const name of names.filter(n => n !== "migrate")) {
