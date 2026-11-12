@@ -209,28 +209,24 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     if (lockedSubscription.lastStripeEventCreatedAt &&
         eventCreatedAt <= lockedSubscription.lastStripeEventCreatedAt) return;
 
-    // Invoice events share the same chronology as subscription lifecycle events.
-    if (eventType === "invoice.payment_failed") {
-      if (!["active", "trialing", "past_due"].includes(lockedSubscription.status)) return;
-      await tx.subscription.updateMany({
-        where: {
-          userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
-          status: { in: ["active", "trialing", "past_due"] },
-        },
-        data: { status: "past_due", lastStripeEventCreatedAt: eventCreatedAt },
-      });
-      return;
+    // Even when an invoice event does not change the current status (for example,
+    // an initial failed payment while the subscription is incomplete), persist its
+    // timestamp. Otherwise an older subscription snapshot could still be applied.
+    let nextStatus = lockedSubscription.status;
+    if (eventType === "invoice.payment_failed" &&
+        ["active", "trialing", "past_due"].includes(lockedSubscription.status)) {
+      nextStatus = "past_due";
+    } else if (eventType === "invoice.paid" && lockedSubscription.status === "past_due") {
+      nextStatus = "active";
     }
-    if (!["active", "trialing", "past_due"].includes(lockedSubscription.status)) return;
     await tx.subscription.updateMany({
       where: {
-        userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
-        status: { in: ["active", "trialing", "past_due"] },
+        userId: current.userId,
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        status: lockedSubscription.status,
       },
-      data: {
-        status: lockedSubscription.status === "past_due" ? "active" : lockedSubscription.status,
-        lastStripeEventCreatedAt: eventCreatedAt,
-      },
+      data: { status: nextStatus, lastStripeEventCreatedAt: eventCreatedAt },
     });
   }
 }
