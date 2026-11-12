@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { decimalToScaledInteger, hasMaximumDecimalPlaces } from "./decimal-precision.js";
 
 const categories = ["food", "substrate", "material", "equipment", "other"] as const;
 const movementTypes = ["in", "out", "adjustment"] as const;
@@ -21,7 +22,8 @@ function routeUuid(value: string | string[] | undefined): string {
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid inventory id");
   return id;
 }
-const quantity = z.coerce.number().finite().min(0).max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places");
+const quantity = z.coerce.number().finite().min(0).max(999_999_999.999)
+  .refine((value) => hasMaximumDecimalPlaces(value, 3), "Quantity supports at most 3 decimal places");
 const createItemSchema = z.object({
   name: z.string().trim().min(1).max(160),
   category: z.enum(categories),
@@ -40,7 +42,8 @@ const patchItemSchema = z.object({
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 const movementSchema = z.object({
   movementType: z.enum(movementTypes),
-  quantity: z.coerce.number().finite().min(0).max(999_999_999.999).refine((n) => Number.isInteger(n * scale), "Quantity supports at most 3 decimal places"),
+  quantity: z.coerce.number().finite().min(0).max(999_999_999.999)
+    .refine((value) => hasMaximumDecimalPlaces(value, 3), "Quantity supports at most 3 decimal places"),
   occurredAt: z.string().datetime({ offset: true }),
   unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
   reference: z.string().trim().max(160).nullable().optional(),
@@ -56,8 +59,8 @@ const movementSchema = z.object({
 });
 
 function asMilli(value: string | number): number {
-  const parsed = Math.round(Number(value) * scale);
-  if (!Number.isSafeInteger(parsed)) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Quantity exceeds supported precision");
+  const parsed = decimalToScaledInteger(value, 3);
+  if (parsed === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Quantity exceeds supported precision");
   return parsed;
 }
 
