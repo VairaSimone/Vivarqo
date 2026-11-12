@@ -9,6 +9,7 @@ type DueTask = {
   title: string;
   category: string;
   dueAt: Date;
+  locale: string;
 };
 
 export interface ReminderDispatchSummary {
@@ -44,13 +45,16 @@ async function createDueNotification(task: DueTask, now: Date): Promise<{ id: st
     const categories = preferences?.categories as Record<string, unknown> | null;
     if ((!inAppEnabled && !pushEnabled) || categories?.task_due === false) return null;
 
+    const english = task.locale === "en";
     const lateness = Math.max(0, now.getTime() - task.dueAt.getTime());
-    const dueText = lateness < 60_000 ? "È in scadenza." : "È scaduta.";
+    const dueText = english
+      ? (lateness < 60_000 ? "It is due now." : "It is overdue.")
+      : (lateness < 60_000 ? "È in scadenza." : "È scaduta.");
     const notification = await tx.notification.create({
       data: {
         userId: task.userId,
         category: "task_due",
-        title: `Attività da completare: ${task.title}`.slice(0, 160),
+        title: (english ? `Task to complete: ${task.title}` : `Attività da completare: ${task.title}`).slice(0, 160),
         body: dueText,
         targetPath: path,
       },
@@ -86,7 +90,8 @@ async function createDueNotification(task: DueTask, now: Date): Promise<{ id: st
  */
 export async function dispatchDueTaskNotifications(now = new Date()): Promise<ReminderDispatchSummary> {
   const tasks = await prisma.$queryRaw<DueTask[]>`
-    SELECT t.id::text AS "id", t.user_id::text AS "userId", t.title, t.category, t.due_at AS "dueAt"
+    SELECT t.id::text AS "id", t.user_id::text AS "userId", t.title, t.category, t.due_at AS "dueAt",
+      u.locale AS "locale"
     FROM tasks t
     JOIN users u ON u.id = t.user_id
     WHERE t.status = 'open'
