@@ -20,6 +20,7 @@ const DASHBOARD_FILE = path.join(ROOT, "packages", "dev-manager", "dashboard.htm
 const recentLogs = [];
 const diagnosticEvents = [];
 const eventClients = new Set();
+const notificationTimes = new Map();
 let dashboardServer;
 const STOP = { requested: false };
 const services = new Map();
@@ -176,6 +177,9 @@ async function startDashboard() {
 }
 function notifyDesktop(title, message) {
   if (!windows || process.env.VIVARQO_DISABLE_TOAST === "1") return;
+  const now = Date.now();
+  if (now - (notificationTimes.get(title) || 0) < 20_000) return;
+  notificationTimes.set(title, now);
   const t = String("Vivarqo - " + title).replace(/\x27/g, "\x27\x27").slice(0, 80);
   const m = String(message).replace(/\x27/g, "\x27\x27").slice(0, 220);
   const ps = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Warning; $n.Visible=$true; $n.BalloonTipTitle=\x27" + t + "\x27; $n.BalloonTipText=\x27" + m + "\x27; $n.ShowBalloonTip(8000); Start-Sleep -Seconds 9; $n.Dispose()";
