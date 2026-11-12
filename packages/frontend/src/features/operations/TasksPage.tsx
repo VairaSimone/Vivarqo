@@ -31,13 +31,22 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
     setQ(currentParams.get("q") ?? "");
     setStatus(currentParams.has("q") ? "all" : "open");
     setPage(1);
-    if (currentParams.has("create")) {
+    if (currentParams.get("tab") === "reminders" && currentParams.has("create")) {
+      setModal(false);
+      setEditing(null);
+      setReminderEdit(null);
+      setReminderForm({ title: "", description: "", category: "custom", intervalDays: "7", nextDueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
+      setError("");
+      setReminderModal(true);
+    } else if (currentParams.has("create")) {
+      setReminderModal(false);
       setEditing(null);
       setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
       setError("");
       setModal(true);
     } else {
       setModal(false);
+      setReminderModal(false);
     }
   }, [path, timezone]);
   const [reminderForm, setReminderForm] = useState({ title: "", description: "", category: "custom", intervalDays: "7", nextDueAt: "", animalId: "" });
