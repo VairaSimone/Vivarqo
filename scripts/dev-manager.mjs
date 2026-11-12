@@ -27,9 +27,12 @@ let packageManager = "pnpm";
 
 const stamp = () => new Date().toISOString();
 async function log(level, source, message) {
-  const line = stamp() + " [" + level + "] [" + source + "] " + message;
-  console.log(line);
-  await appendFile(LOG_FILE, line + "\n", "utf8").catch(() => {});
+  const item = { timestamp: stamp(), level, service: source, message: String(message).slice(0, 4000) };
+  recentLogs.push(item); if (recentLogs.length > 1000) recentLogs.shift();
+  if (["ERROR", "FATAL", "WARN"].includes(level)) { diagnosticEvents.push(item); if (diagnosticEvents.length > 500) diagnosticEvents.shift(); }
+  const line = item.timestamp + " [" + level + "] [" + source + "] " + item.message;
+  console.log(line); await appendFile(LOG_FILE, line + "\n", "utf8").catch(() => {});
+  broadcast({ type: "log", item });
 }
 function exe(name) { return name; }
 function run(command, args, capture = false) {
