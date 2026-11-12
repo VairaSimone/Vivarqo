@@ -15,6 +15,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   const taskId = path.match(/^\/tasks\/([^/?]+)/)?.[1] ?? params.get("open");
   const tab = params.get("tab") === "reminders" ? "reminders" : "tasks";
   const [page, setPage] = useState(1);
+  const [reminderPage, setReminderPage] = useState(1);
   const [status, setStatus] = useState(params.has("q") ? "all" : "open");
   const [category, setCategory] = useState("");
   const [q, setQ] = useState(params.get("q") ?? "");
@@ -54,7 +55,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   const [reminderEdit, setReminderEdit] = useState<ReminderRuleDto | null>(null);
   const taskUrl = "/tasks" + queryString({ page, pageSize: 25, status, category, q });
   const tasks = useResource<{ tasks: TaskDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(tab === "tasks" ? taskUrl : null);
-  const reminders = useResource<{ reminderRules: ReminderRuleDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>("/tasks/reminder-rules?page=1&pageSize=100&enabled=all");
+  const reminders = useResource<{ reminderRules: ReminderRuleDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>("/tasks/reminder-rules?page=" + reminderPage + "&pageSize=25&enabled=all");
   const detail = useResource<{ task: TaskDto }>(taskId ? `/tasks/${encodeURIComponent(taskId)}` : null);
   const { toast, show } = useToast();
 
@@ -128,6 +129,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       </Panel>
     </> : <Panel><PanelHeader title={t("reminders")} action={<Button onClick={() => openReminder()}><Icon name="plus" />{t("createReminder")}</Button>} />
       {reminders.loading && !reminders.data ? <LoadingState /> : reminders.error ? <ErrorState message={reminders.error.message} retry={reminders.reload} /> : reminders.data?.reminderRules.length ? <div className="task-list">{reminders.data.reminderRules.map((rule) => <div className="task-row reminder-row" key={getString(rule, "id")}><span className="task-check muted"><Icon name="clock" /></span><div className="task-main"><strong>{getString(rule, "title")}</strong><small>{formatDateTime(getString(rule, "nextDueAt"), locale, timezone)} · {getString(rule, "intervalDays")} {locale === "it" ? "giorni" : "days"}</small></div><Badge tone={Boolean(rule.isEnabled) ? "success" : "neutral"}>{Boolean(rule.isEnabled) ? t("enabled") : t("disabled")}</Badge><div className="row-actions"><IconButton label={t("edit")} onClick={() => openReminder(rule)}><Icon name="edit" /></IconButton><Button size="sm" variant="secondary" onClick={() => void toggleReminder(rule)}>{Boolean(rule.isEnabled) ? t("disabled") : t("enabled")}</Button></div></div>)}</div> : <EmptyState title={t("noTasksList")} />}
+      {reminders.data?.pagination && <Pagination page={reminders.data.pagination.page} totalPages={reminders.data.pagination.totalPages} onChange={setReminderPage} label={t("page")} />}
     </Panel>}
 
     {modal && <Modal title={editing ? t("edit") : t("addTask")} onClose={() => setModal(false)}>
