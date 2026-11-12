@@ -80,10 +80,6 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     throw new AppError(503, "ACCOUNT_DELETION_STORAGE_FAILED", "Private files could not all be removed. The account has not yet been erased; retry the request or contact support.");
   }
 
-  // Only contact Stripe after every fallible private-object cleanup has succeeded.
-  // This avoids cancelling billing when a local/S3 storage failure keeps the account intact.
-  await cancelStripeSubscription(userId);
-
   const anonymizedEmail = `deleted+${userId}@accounts-deleted.invalid`;
   const unusablePasswordHash = await argon2.hash(randomBytes(64).toString("hex"), {
     type: argon2.argon2id,
@@ -92,6 +88,10 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     parallelism: 1,
   });
   const now = new Date();
+
+  // Only contact Stripe after every fallible local preparation and private-object
+  // cleanup has succeeded. Stripe DELETE is idempotent, so a DB retry is safe.
+  await cancelStripeSubscription(userId);
 
   await prisma.$transaction(async (tx) => {
     // Remove restrictive references before their parent records. Historical business
