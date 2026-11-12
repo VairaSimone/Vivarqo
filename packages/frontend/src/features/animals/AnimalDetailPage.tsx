@@ -93,8 +93,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   async function saveAnimalEdit(event: FormEvent) {
     event.preventDefault();
     setAnimalEditBusy(true); setAnimalEditError("");
+    const { status: editedStatus, ...editableAnimalFields } = animalEditForm;
     const body = {
-      ...animalEditForm,
+      ...editableAnimalFields,
+      ...(getString(animal, "status") === "archived" ? {} : { status: editedStatus }),
       identifier: animalEditForm.identifier || null,
       morph: animalEditForm.morph || null,
       geneticsNotes: animalEditForm.geneticsNotes || null,
