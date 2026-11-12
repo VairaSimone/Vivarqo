@@ -33,6 +33,7 @@ export function RemoteSelect({
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retryVersion, setRetryVersion] = useState(0);
   const requestId = useRef(0);
   const filtersKey = JSON.stringify(filters ?? {});
 
@@ -67,7 +68,7 @@ export function RemoteSelect({
       controller.abort();
       if (requestId.current === current) requestId.current++;
     };
-  }, [endpoint, responseKey, filtersKey, search, page, locale]);
+  }, [endpoint, responseKey, filtersKey, search, page, locale, retryVersion]);
 
   useEffect(() => {
     if (!value || options.some((item) => getString(item, "id") === value)
@@ -90,7 +91,7 @@ export function RemoteSelect({
     return secondary ? primary + " · " + secondary : primary;
   };
 
-  return <div className="field remote-select">
+  return <div className="field remote-select" aria-busy={loading}>
     <span className="field-label">{label}</span>
     <label className="search-control">
       <Icon name="search" size={14} />
@@ -98,7 +99,7 @@ export function RemoteSelect({
         value={search} placeholder={locale === "it" ? "Cerca per nome…" : "Search by name…"}
         onChange={(event) => { setSearch(event.target.value); setPage(1); }} disabled={disabled} />
     </label>
-    <select className="control" aria-label={label} value={value} disabled={disabled} onChange={(event) => {
+    <select className="control" aria-label={label} aria-busy={loading} value={value} disabled={disabled} onChange={(event) => {
       const next = event.target.value;
       setSelectedOption(options.find((item) => getString(item, "id") === next) ?? null);
       onChange(next);
@@ -107,8 +108,9 @@ export function RemoteSelect({
       {value && !options.some((item) => getString(item, "id") === value) && <option value={value}>{selectedLabel || value}</option>}
       {options.map((item) => <option key={getString(item, "id")} value={getString(item, "id")}>{optionLabel(item)}</option>)}
     </select>
-    {error && <span className="field-error" role="alert">{error}</span>}
-    {totalPages > page && <Button type="button" size="sm" variant="ghost" disabled={loading} onClick={() => setPage((currentPage) => currentPage + 1)}>
+    {loading && <span className="remote-select-status" role="status">{locale === "it" ? "Caricamento risultati…" : "Loading results…"}</span>}
+    {error && <div className="remote-select-error" role="alert"><span className="field-error">{error}</span><Button type="button" size="sm" variant="secondary" disabled={loading} onClick={() => setRetryVersion((version) => version + 1)}>{locale === "it" ? "Riprova" : "Retry"}</Button></div>}
+    {totalPages > page && <Button type="button" size="sm" variant="ghost" disabled={loading || disabled} onClick={() => setPage((currentPage) => currentPage + 1)}>
       {loading ? (locale === "it" ? "Caricamento…" : "Loading…") : (locale === "it" ? "Carica altri risultati" : "Load more results")}
     </Button>}
   </div>;
