@@ -34,7 +34,7 @@ function nextOccurrenceAt(dueAt: Date, intervalDays: number, now: Date, timezone
   }
   return nextDueAt;
 }
-async function lockReminderRule(tx: typeof prisma, userId: string, reminderRuleId: string): Promise<void> {
+async function lockReminderRule(tx: Pick<typeof prisma, "$queryRaw">, userId: string, reminderRuleId: string): Promise<void> {
   await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM reminder_rules WHERE id = ${reminderRuleId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`;
 }
 function routeId(value: string | string[] | undefined, name: string): string {
@@ -190,6 +190,7 @@ export function createTasksRouter() {
       const existing = await tx.task.findFirst({ where: { id, userId: auth.userId } });
       if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
       if (existing.status !== "open") throw new AppError(409, "TASK_NOT_OPEN", "Only open tasks can be completed");
+      if (existing.reminderRuleId) await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
 
       const claimed = await tx.task.updateMany({
         where: { id, userId: auth.userId, status: "open" },
