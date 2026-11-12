@@ -151,7 +151,14 @@ volumes:
 
     await stopManager(manager);
     manager = undefined;
-    const rows = compose(["ps", "--all", "--format", "json"]).split("\n").map(x => x.trim()).filter(Boolean).map(x => JSON.parse(x));
+    const psOutput = compose(["ps", "--all", "--format", "json"]).trim();
+    let rows;
+    try {
+      const parsed = JSON.parse(psOutput);
+      rows = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      rows = psOutput.split("\n").map(x => x.trim()).filter(Boolean).map(x => JSON.parse(x));
+    }
     assert.ok(rows.some(row => row.Service === "postgres" && row.State === "running"),
       "chiudere il manager non deve arrestare i container di produzione");
     console.log("PASS: Production Manager Linux ha recuperato PostgreSQL, preservato i dati e lasciato lo stack attivo allo shutdown.");
