@@ -38,8 +38,12 @@ export function summarizeDiagnostics(entries) {
     grouped.set(item.signature, current);
   }
   return [...grouped.values()].map(item => {
-    const persistent = item.classification === "likely-persistent" && item.count >= 3;
-    const repeatedTransient = item.classification === "transient" && item.count >= 5;
+    const firstAt = Date.parse(item.firstSeen || "");
+    const lastAt = Date.parse(item.lastSeen || "");
+    const recentBurst = Number.isFinite(firstAt) && Number.isFinite(lastAt) &&
+      lastAt >= firstAt && lastAt - firstAt <= 5 * 60 * 1000;
+    const persistent = item.classification === "likely-persistent" && item.count >= 3 && recentBurst;
+    const repeatedTransient = item.classification === "transient" && item.count >= 5 && recentBurst;
     return {
       ...item,
       classification: persistent ? "persistent" :
