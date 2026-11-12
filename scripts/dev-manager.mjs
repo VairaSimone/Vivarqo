@@ -139,9 +139,15 @@ function start(name) {
   if (old && old.child && old.state === "running") return old;
   const service = old || { name: name, restarts: 0, failures: 0, state: "stopped", child: null };
   service.state = "starting";
-  const child = spawn(exe(packageManager), pnpmArgs(commands[name]), {
+  const testMode = process.env.VIVARQO_MANAGER_TEST_MODE === "1";
+  const testPort = name === "api" ? process.env.VIVARQO_TEST_API_PORT : process.env.VIVARQO_TEST_WEB_PORT;
+  const executable = testMode ? process.execPath : exe(packageManager);
+  const args = testMode
+    ? [path.join(ROOT, "scripts", "dev-manager-fixture.mjs"), name, String(testPort || "0")]
+    : pnpmArgs(commands[name]);
+  const child = spawn(executable, args, {
     cwd: ROOT, env: { ...process.env, FORCE_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true, shell: windows, detached: !windows
+    windowsHide: true, shell: windows && !testMode, detached: !windows
   });
   service.child = child; service.state = "running"; service.startedAt = Date.now(); services.set(name, service);
   child.stdout.on("data", c => appendServiceLog(name, c));
@@ -406,6 +412,19 @@ async function monitorProduction(composeArgs) {
     await delay(10_000);
   }
 }
+async function testModeMain() {
+  await mkdir(LOG_DIR, { recursive: true });
+  await loadPersistentLogs();
+  await startDashboard();
+  await log("INFO", "MANAGER", "Avvio harness di resilienza isolato.");
+  start("api");
+  await waitHttp("API", API_URL);
+  start("worker");
+  start("frontend");
+  await waitHttp("FRONTEND", WEB_URL);
+  status();
+  await Promise.all([monitor()]);
+}
 async function productionMain() {
   await mkdir(LOG_DIR, { recursive: true });
   await loadPersistentLogs();
@@ -434,6 +453,7 @@ async function shutdown(reason) {
   await log("INFO", "MANAGER", "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
 }
 async function main() {
+  if (process.env.VIVARQO_MANAGER_TEST_MODE === "1") return testModeMain();
   if (process.env.VIVARQO_MANAGER_MODE === "production") return productionMain();
   await mkdir(LOG_DIR, { recursive: true });
   await loadPersistentLogs();
