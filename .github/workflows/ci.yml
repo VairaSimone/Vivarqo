@@ -104,6 +104,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Syntax-check Dev Manager
+        run: pnpm check:dev-manager
       - name: Type-check frontend
         run: pnpm typecheck:frontend
       - name: Test frontend helpers
