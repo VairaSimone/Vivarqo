@@ -60,6 +60,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; subtitle: string; group: string; path: string }>>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
+  const [searchRetry, setSearchRetry] = useState(0);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
   const route = path.split("?")[0] || "/today";
@@ -154,7 +155,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [searchOpen, searchTerm, locale]);
+  }, [searchOpen, searchTerm, locale, searchRetry]);
 
   function closeSearch() {
     setSearchOpen(false);
@@ -165,7 +166,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   function renderItem(item: NavItem) {
     const active = route === item.path || (item.path !== "/today" && route.startsWith(item.path + "/"))
       || (item.path === "/reproduction" && (route.startsWith("/reproduction-cycles") || route.startsWith("/clutches")));
-    return <button key={item.path} className={`nav-item ${active ? "active" : ""}`} onClick={() => { onNavigate(item.path); setMobileMenu(false); }} title={collapsed ? t(item.label) : undefined} aria-current={active ? "page" : undefined}>
+    return <button key={item.path} className={`nav-item ${active ? "active" : ""}`} aria-label={t(item.label)} onClick={() => { onNavigate(item.path); setMobileMenu(false); }} title={collapsed ? t(item.label) : undefined} aria-current={active ? "page" : undefined}>
       <Icon name={item.icon} size={18} />
       <span>{t(item.label)}</span>
       {item.path === "/notifications" && unreadCount > 0 && <i className="nav-count">{unreadCount > 9 ? "9+" : unreadCount}</i>}
@@ -174,7 +175,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
 
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to main content" : "Vai al contenuto principale"}</a>
-    <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={t("navWorkspace")} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
+    <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={locale === "it" ? "Navigazione principale" : "Main navigation"} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
       <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Vivarqo home">
         <span className="brand-mark"><Icon name="leaf" size={21} /></span>
         <span className="brand-copy"><strong>vivarqo</strong><small>{t("brandTagline")}</small></span>
@@ -242,7 +243,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         {searchTerm.trim().length < 2
           ? <p className="muted-note">{t("searchMinChars")}</p>
           : searchLoading ? <p className="muted-note" role="status">{t("loading")}</p>
-          : searchFailed ? <p className="muted-note" role="alert">{t("searchFailed")}</p>
+          : searchFailed ? <div className="remote-select-error" role="alert"><p className="muted-note">{t("searchFailed")}</p><button type="button" className="btn btn-secondary btn-sm" onClick={() => setSearchRetry((value) => value + 1)}>{locale === "it" ? "Riprova" : "Retry"}</button></div>
           : searchResults.length ? <div className="global-search-results" role="list">
               {searchResults.map((result) => <button type="button" role="listitem" className="global-search-result" key={result.group + result.id}
                 onClick={() => { onNavigate(result.path); closeSearch(); }}>
