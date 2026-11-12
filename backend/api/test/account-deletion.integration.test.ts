@@ -48,6 +48,16 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     await prisma.animal.create({
       data: { userId: user.id, name: "Photo cleanup", species: "Test species", photoKey },
     });
+    await prisma.importJob.createMany({
+      data: ["animals", "feedings", "inventory"].map((entityType) => ({
+        userId: user.id,
+        entityType,
+        storageKey: "database-preview-report",
+        status: "preview",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        report: { validRows: [], errors: [] },
+      })),
+    });
 
     const agent = request.agent(app);
     const csrf = (await agent.get("/api/v1/auth/csrf").expect(200)).body.csrfToken as string;
@@ -88,6 +98,7 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(tombstone?.email).toBe(`deleted+${user.id}@accounts-deleted.invalid`);
     expect(tombstone?.deletedAt).toBeInstanceOf(Date);
     expect(await prisma.userSession.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.importJob.count({ where: { userId: user.id } })).toBe(0);
     await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
 });
