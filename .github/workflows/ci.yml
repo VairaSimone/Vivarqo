@@ -158,6 +158,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
       - name: Recover PostgreSQL after a real container stop and verify persisted data
         env:
           VIVARQO_MANAGER_POSTGRES_DRILL: "1"
@@ -165,6 +169,8 @@ jobs:
           touch .env
           docker compose -f backend/infra/docker/compose.yaml up -d postgres
           bash scripts/dev-manager-postgres-drill.sh
+          pnpm --version || true
+          node scripts/dev-manager-postgres-manager.test.mjs
       - name: Stop isolated PostgreSQL container
         if: always()
         run: docker compose -f backend/infra/docker/compose.yaml down -v
