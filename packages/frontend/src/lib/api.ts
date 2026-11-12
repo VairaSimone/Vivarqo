@@ -132,10 +132,10 @@ export const api = {
     return request<T>(path, "POST", body).then((result) => { invalidateAfterMutation(path); return result; });
   },
   patch<T = void>(path: string, body: unknown): Promise<T> {
-    return request<T>(path, "PATCH", body).then((result) => { invalidateAllResourceCache(); return result; });
+    return request<T>(path, "PATCH", body).then((result) => { invalidateAfterMutation(path); return result; });
   },
   delete<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "DELETE", body).then((result) => { invalidateAllResourceCache(); return result; });
+    return request<T>(path, "DELETE", body).then((result) => { invalidateAfterMutation(path); return result; });
   },
   async upload<T>(path: string, file: File, extraHeaders: Record<string, string> = {}): Promise<T> {
     const headers = new Headers({
