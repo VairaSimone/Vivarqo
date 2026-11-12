@@ -9,14 +9,21 @@ type PendingEntry = {
 
 const cache = new Map<string, CacheEntry>();
 const pending = new Map<string, PendingEntry>();
-const invalidationListeners = new Set<() => void>();
+const invalidationListeners = new Set<(key?: string) => void>();
 const TTL_MS = 12_000;
 const MAX_ENTRIES = 100;
 let generation = 0;
 
-/** Remove one cached response so an explicit reload always reaches the server. */
+/** Invalidate both the cached value and any in-flight request for this key. */
 export function invalidateResourceCacheEntry(key: string): void {
   cache.delete(key);
+  const active = pending.get(key);
+  if (active) {
+    // Detach before aborting so the next consumer cannot attach to this request.
+    pending.delete(key);
+    active.controller.abort();
+  }
+  invalidationListeners.forEach((listener) => listener(key));
 }
 
 function remember(key: string, value: unknown): void {
@@ -46,7 +53,6 @@ export function loadCachedResource<T>(
 
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
-    // Refresh insertion order so the least recently used entry is evicted first.
     cache.delete(key);
     cache.set(key, cached);
     return Promise.resolve(cached.value as T);
@@ -54,9 +60,6 @@ export function loadCachedResource<T>(
   if (cached) cache.delete(key);
 
   let entry = pending.get(key);
-  // React Strict Effects can unsubscribe the last consumer and immediately
-  // mount a replacement before the aborted loader's rejection microtask runs.
-  // Never let that replacement subscribe to an already-aborted request.
   if (entry && (entry.controller.signal.aborted || entry.settled)) {
     if (pending.get(key) === entry) pending.delete(key);
     entry = undefined;
@@ -72,7 +75,14 @@ export function loadCachedResource<T>(
       generation: requestGeneration
     };
     created.promise = loader(controller.signal).then((value) => {
-      if (generation === requestGeneration) remember(key, value);
+      // An invalidated request must neither repopulate the cache nor resolve
+      // with stale data, even if its loader ignores AbortSignal.
+      if (
+        controller.signal.aborted ||
+        generation !== requestGeneration ||
+        pending.get(key) !== created
+      ) throw abortError();
+      remember(key, value);
       return value;
     }).finally(() => {
       created.settled = true;
@@ -91,33 +101,41 @@ export function loadCachedResource<T>(
     const unsubscribe = () => {
       if (complete) return;
       complete = true;
-      consumerSignal.removeEventListener("abort", onAbort);
+      consumerSignal.removeEventListener("abort", onConsumerAbort);
+      activeEntry.controller.signal.removeEventListener("abort", onSharedAbort);
       activeEntry.subscribers.delete(subscriber);
       if (!activeEntry.settled && activeEntry.subscribers.size === 0) {
-        // Remove it before aborting so a new consumer can immediately create
-        // a fresh request instead of racing the old promise's finally handler.
         if (pending.get(key) === activeEntry) pending.delete(key);
         activeEntry.controller.abort();
       }
     };
-    const onAbort = () => {
+    const onConsumerAbort = () => {
       unsubscribe();
       reject(abortError());
     };
-    consumerSignal.addEventListener("abort", onAbort, { once: true });
+    const onSharedAbort = () => {
+      unsubscribe();
+      reject(abortError());
+    };
+    consumerSignal.addEventListener("abort", onConsumerAbort, { once: true });
+    activeEntry.controller.signal.addEventListener("abort", onSharedAbort, { once: true });
+    if (consumerSignal.aborted || activeEntry.controller.signal.aborted) {
+      onConsumerAbort();
+      return;
+    }
     activeEntry.promise.then((value) => {
-      if (consumerSignal.aborted) return;
+      if (consumerSignal.aborted || activeEntry.controller.signal.aborted) return;
       unsubscribe();
       resolve(value as T);
     }, (error: unknown) => {
-      if (consumerSignal.aborted) return;
+      if (consumerSignal.aborted || activeEntry.controller.signal.aborted) return;
       unsubscribe();
       reject(error);
     });
   });
 }
 
-export function subscribeResourceInvalidation(listener: () => void): () => void {
+export function subscribeResourceInvalidation(listener: (key?: string) => void): () => void {
   invalidationListeners.add(listener);
   return () => invalidationListeners.delete(listener);
 }
@@ -126,5 +144,8 @@ export function subscribeResourceInvalidation(listener: () => void): () => void 
 export function invalidateAllResourceCache(): void {
   generation++;
   cache.clear();
+  const activeEntries = [...pending.values()];
+  pending.clear();
+  for (const entry of activeEntries) entry.controller.abort();
   invalidationListeners.forEach((listener) => listener());
 }
