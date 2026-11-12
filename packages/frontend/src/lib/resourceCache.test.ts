@@ -144,6 +144,7 @@ describe("resource cache", () => {
   it("aborts matching in-flight requests without touching unrelated resources", async () => {
     let inventorySignal: AbortSignal | undefined;
     let animalSignal: AbortSignal | undefined;
+    const animalConsumer = new AbortController();
     const inventory = loadCachedResource("/inventory/items|locale:it", (signal) => {
       inventorySignal = signal;
       return new Promise<string>(() => undefined);
