@@ -237,6 +237,7 @@ model Task {
   @@index([userId, status, dueAt], map: "tasks_user_status_due_idx")
   @@index([animalId], map: "tasks_animal_idx")
   @@index([reminderRuleId], map: "tasks_reminder_rule_idx")
+  @@unique([reminderRuleId], where: raw("\"status\" = 'open'"), map: "tasks_one_open_per_reminder_rule_idx")
   @@map("tasks")
 }
 
