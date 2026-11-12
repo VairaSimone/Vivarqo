@@ -19,6 +19,7 @@ export function createHomeCalendarRouter() {
       dueToday,
       overdue,
       completedToday,
+      upcomingTasks,
       reminders,
       recentFeedings,
       recentWeights,
@@ -27,6 +28,7 @@ export function createHomeCalendarRouter() {
       recentReproductionEvents,
       dueTodayCount,
       overdueCount,
+      upcomingTaskCount,
       completedTodayCount,
       imminentReminderCount,
     ] = await Promise.all([
@@ -45,6 +47,12 @@ export function createHomeCalendarRouter() {
       prisma.task.findMany({
         where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } },
         orderBy: { completedAt: "desc" },
+        take: 100,
+        include: { animal: { select: { id: true, name: true, identifier: true } } },
+      }),
+      prisma.task.findMany({
+        where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: reminderLimit } },
+        orderBy: { dueAt: "asc" },
         take: 100,
         include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
@@ -89,6 +97,7 @@ export function createHomeCalendarRouter() {
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { lt: now } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } } }),
+      prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: reminderLimit } } }),
       prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: reminderLimit } } }),
     ]);
 
@@ -103,17 +112,19 @@ export function createHomeCalendarRouter() {
     res.status(200).json({
       date: today,
       timezone: auth.timezone,
-      tasks: { dueToday, overdue, completedToday },
+      tasks: { dueToday, overdue, completedToday, upcoming: upcomingTasks },
       counts: {
         dueToday: dueTodayCount,
         overdue: overdueCount,
         completedToday: completedTodayCount,
+        upcoming: upcomingTaskCount,
         imminentReminders: imminentReminderCount,
       },
       truncated: {
         dueToday: dueTodayCount > dueToday.length,
         overdue: overdueCount > overdue.length,
         completedToday: completedTodayCount > completedToday.length,
+        upcoming: upcomingTaskCount > upcomingTasks.length,
         imminentReminders: imminentReminderCount > reminders.length,
       },
       imminentReminders: reminders,
