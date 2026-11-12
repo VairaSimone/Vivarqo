@@ -101,41 +101,109 @@ async function lockBillingUser(tx: BillingTransaction, userId: string): Promise<
   // delivery is at-least-once and events are not guaranteed to arrive in order.
   await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
 }
-async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<void> {
+async function applyInvoiceEvent(
+  tx: BillingTransaction,
+  userId: string,
+  customerId: string,
+  subscriptionId: string,
+  eventType: string,
+  eventCreatedAt: Date,
+): Promise<void> {
+  await lockBillingUser(tx, userId);
+  const current = await tx.subscription.findFirst({
+    where: { userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId },
+    select: { status: true, lastStripeEventCreatedAt: true },
+  });
+  if (!current) return;
+  if (current.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return;
+
+  let nextStatus = current.status;
+  if (eventType === "invoice.payment_failed" &&
+      ["active", "trialing", "past_due"].includes(current.status)) {
+    nextStatus = "past_due";
+  } else if (eventType === "invoice.paid" && current.status === "past_due") {
+    nextStatus = "active";
+  }
+  await tx.subscription.updateMany({
+    where: { userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId, status: current.status },
+    data: { status: nextStatus, lastStripeEventCreatedAt: eventCreatedAt },
+  });
+}
+
+async function replayPendingInvoiceEvents(
+  tx: BillingTransaction,
+  customerId: string,
+  subscriptionId: string,
+): Promise<void> {
+  const pending = await tx.$queryRaw<Array<{
+    id: string;
+    eventType: string;
+    stripeEventCreatedAt: Date;
+    payload: StripeObject;
+  }>>`SELECT id,
+            event_type AS "eventType",
+            stripe_event_created_at AS "stripeEventCreatedAt",
+            payload
+       FROM stripe_webhook_events
+      WHERE result = 'pending'
+        AND event_type IN ('invoice.payment_failed', 'invoice.paid')
+        AND stripe_event_created_at IS NOT NULL
+        AND COALESCE(payload->>'customer', payload#>>'{customer,id}') = ${customerId}
+        AND COALESCE(
+          payload->>'subscription',
+          payload#>>'{subscription,id}',
+          payload#>>'{parent,subscription_details,subscription}',
+          payload#>>'{parent,subscription_details,subscription,id}'
+        ) = ${subscriptionId}
+      ORDER BY stripe_event_created_at ASC, id ASC
+      FOR UPDATE`;
+  for (const item of pending) {
+    await applyInvoiceEvent(tx, (await tx.subscription.findUniqueOrThrow({
+      where: { stripeSubscriptionId: subscriptionId },
+      select: { userId: true },
+    })).userId, customerId, subscriptionId, item.eventType, item.stripeEventCreatedAt);
+    await tx.stripeWebhookEvent.update({
+      where: { id: item.id },
+      data: { result: "processed", processedAt: new Date() },
+    });
+  }
+}
+
+async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<boolean> {
   const object = event.data.object;
   const eventType = event.type;
   const eventCreatedAt = timestamp(event.created);
-  if (!eventCreatedAt) return;
+  if (!eventCreatedAt) return false;
 
   if (eventType.startsWith("customer.subscription.")) {
     const stripeSubscriptionId = stringId(object.id);
     const customerId = stringId(object.customer);
-    if (!stripeSubscriptionId || !customerId) return;
+    if (!stripeSubscriptionId || !customerId) return false;
     let userId = typeof object.metadata?.user_id === "string" ? object.metadata.user_id : null;
     if (userId && !z.string().uuid().safeParse(userId).success) userId = null;
     if (!userId) {
       const current = await tx.subscription.findFirst({ where: { stripeCustomerId: customerId }, select: { userId: true } });
       userId = current?.userId ?? null;
     }
-    if (!userId) return;
+    if (!userId) return false;
     const account = await tx.user.findFirst({ where: { id: userId, deletedAt: null, accountStatus: "active" }, select: { id: true } });
-    if (!account) return;
+    if (!account) return false;
     await lockBillingUser(tx, userId);
     const current = await tx.subscription.findUnique({
       where: { userId }, select: { stripeSubscriptionId: true, status: true, lastStripeEventCreatedAt: true },
     });
     // Stripe timestamps have second-level precision. Reject older or equal-time
     // events so a delayed snapshot cannot overwrite a state already applied.
-    if (current?.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return;
+    if (current?.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return false;
     // Do not let a delayed event for an older subscription overwrite the account's
     // newer subscription. A newly-created subscription may replace a terminal old one.
     if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== stripeSubscriptionId) {
       const previousIsTerminal = ["canceled", "unpaid", "incomplete_expired"].includes(current.status);
-      if (!previousIsTerminal || eventType === "customer.subscription.deleted") return;
+      if (!previousIsTerminal || eventType === "customer.subscription.deleted") return false;
     }
     // Do not let delayed update/create events revive a deleted subscription with the same ID.
     if (current?.stripeSubscriptionId === stripeSubscriptionId &&
-        current.status === "canceled" && eventType !== "customer.subscription.deleted") return;
+        current.status === "canceled" && eventType !== "customer.subscription.deleted") return false;
     const price = object.items && typeof object.items === "object" && "data" in object.items && Array.isArray((object.items as { data?: unknown }).data)
       ? ((object.items as { data: Array<Record<string, unknown>> }).data[0]?.price as Record<string, unknown> | undefined)?.id
       : undefined;
@@ -150,18 +218,19 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       lastStripeEventCreatedAt: eventCreatedAt,
     };
     await tx.subscription.upsert({ where: { userId }, create: { userId, ...data }, update: data });
-    return;
+    await replayPendingInvoiceEvents(tx, customerId, stripeSubscriptionId);
+    return false;
   }
 
   if (eventType === "checkout.session.completed") {
     const userRaw = typeof object.client_reference_id === "string" ? object.client_reference_id :
       typeof object.metadata?.user_id === "string" ? object.metadata.user_id : null;
-    if (!userRaw || !z.string().uuid().safeParse(userRaw).success) return;
+    if (!userRaw || !z.string().uuid().safeParse(userRaw).success) return false;
     const account = await tx.user.findFirst({ where: { id: userRaw, deletedAt: null, accountStatus: "active" }, select: { id: true } });
-    if (!account) return;
+    if (!account) return false;
     const customerId = stringId(object.customer);
     const subscriptionId = stringId(object.subscription);
-    if (!customerId || !subscriptionId) return;
+    if (!customerId || !subscriptionId) return false;
     await lockBillingUser(tx, userRaw);
     const current = await tx.subscription.findUnique({
       where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true },
@@ -170,8 +239,8 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     // subscription-state event. Never overwrite any state for the same subscription.
     // A different subscription may replace only a terminal historical subscription.
     if (current?.stripeSubscriptionId) {
-      if (current.stripeSubscriptionId === subscriptionId) return;
-      if (!["canceled", "unpaid", "incomplete_expired"].includes(current.status)) return;
+      if (current.stripeSubscriptionId === subscriptionId) return false;
+      if (!["canceled", "unpaid", "incomplete_expired"].includes(current.status)) return false;
     }
     const data = {
       stripeCustomerId: customerId,
@@ -184,50 +253,39 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       lastStripeEventCreatedAt: null,
     };
     await tx.subscription.upsert({ where: { userId: userRaw }, create: { userId: userRaw, ...data }, update: data });
-    return;
+    return false;
   }
 
   if (eventType === "invoice.payment_failed" || eventType === "invoice.paid") {
     const customerId = stringId(object.customer);
     const subscriptionId = invoiceSubscriptionId(object);
-    // A customer can have more than one historical subscription. Invoice events
-    // must only mutate the exact subscription they refer to, never whichever one
-    // currently happens to be attached to that Stripe customer.
-    if (!customerId || !subscriptionId) return;
+    if (!customerId || !subscriptionId) return false;
+
     const current = await tx.subscription.findFirst({
       where: { stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId },
       select: { userId: true },
     });
-    if (!current) return;
-    await lockBillingUser(tx, current.userId);
-    const lockedSubscription = await tx.subscription.findFirst({
-      where: { userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId },
-      select: { status: true, lastStripeEventCreatedAt: true },
-    });
-    if (!lockedSubscription) return;
-    if (lockedSubscription.lastStripeEventCreatedAt &&
-        eventCreatedAt <= lockedSubscription.lastStripeEventCreatedAt) return;
-
-    // Even when an invoice event does not change the current status (for example,
-    // an initial failed payment while the subscription is incomplete), persist its
-    // timestamp. Otherwise an older subscription snapshot could still be applied.
-    let nextStatus = lockedSubscription.status;
-    if (eventType === "invoice.payment_failed" &&
-        ["active", "trialing", "past_due"].includes(lockedSubscription.status)) {
-      nextStatus = "past_due";
-    } else if (eventType === "invoice.paid" && lockedSubscription.status === "past_due") {
-      nextStatus = "active";
+    if (current) {
+      await applyInvoiceEvent(tx, current.userId, customerId, subscriptionId, eventType, eventCreatedAt);
+      return false;
     }
-    await tx.subscription.updateMany({
-      where: {
-        userId: current.userId,
-        stripeCustomerId: customerId,
-        stripeSubscriptionId: subscriptionId,
-        status: lockedSubscription.status,
-      },
-      data: { status: nextStatus, lastStripeEventCreatedAt: eventCreatedAt },
+
+    // Stripe can deliver an invoice before the subscription/checkout event that
+    // establishes the local customer-to-account mapping. Keep it pending and replay
+    // it once the matching subscription has been synchronized.
+    const customerSubscription = await tx.subscription.findFirst({
+      where: { stripeCustomerId: customerId },
+      select: { stripeSubscriptionId: true, status: true },
     });
+    if (!customerSubscription ||
+        ["canceled", "unpaid", "incomplete_expired"].includes(customerSubscription.status)) {
+      return true;
+    }
+    // A non-terminal current subscription with a different ID means this invoice
+    // belongs to an older subscription that is no longer tracked.
+    return false;
   }
+  return false;
 }
 
 export function createBillingRouter(options: BillingRouterOptions = {}) {
