@@ -180,7 +180,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     const validImport = await owner.agent.post("/api/v1/imports?entity=inventory")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "text/csv")
-      .send(Buffer.from("name,category,unit,quantityOnHand,minimumQuantity\\nCSV precision,food,kg,1.001,1.005\\n", "utf8"))
+      .send(Buffer.from("name,category,unit,quantityOnHand,minimumQuantity\nCSV precision,food,kg,1.001,1.005\n", "utf8"))
       .expect(201);
     expect(validImport.body.validRows).toBe(1);
     expect(validImport.body.invalidRows).toBe(0);
@@ -188,7 +188,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     const invalidImport = await owner.agent.post("/api/v1/imports?entity=inventory")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "text/csv")
-      .send(Buffer.from("name,category,unit,quantityOnHand\\nToo precise,food,kg,1.0001\\n", "utf8"))
+      .send(Buffer.from("name,category,unit,quantityOnHand\nToo precise,food,kg,1.0001\n", "utf8"))
       .expect(201);
     expect(invalidImport.body.validRows).toBe(0);
     expect(invalidImport.body.invalidRows).toBe(1);
