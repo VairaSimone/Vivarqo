@@ -1822,3 +1822,28 @@ svg {
 @media (max-width: 760px) {
   .modal-actions .btn, .modal-content .btn[type="submit"] { min-height: 44px; }
 }
+
+/* Consistent form controls and modal behavior across feature screens. */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-label { display: inline-flex; align-items: baseline; gap: 2px; color: var(--text); font-size: 14px; font-weight: 650; line-height: 1.35; }
+.field-required { color: var(--danger); font-weight: 750; }
+.field-hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.field-error { display: block; color: var(--danger); font-size: 12px; font-weight: 600; line-height: 1.4; }
+.field .control { width: 100%; min-width: 0; min-height: 44px; padding: 9px 11px; border-radius: 9px; font: inherit; font-size: 15px; line-height: 1.4; }
+.field .control[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 20%, transparent); }
+.field .control:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 2px; }
+.field textarea.control { min-height: 92px; resize: vertical; }
+.modal { max-height: min(88dvh, 900px); display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { flex: 0 0 auto; }
+.modal-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.modal-content > .form-stack { min-height: 0; }
+.modal-content .modal-actions { position: sticky; bottom: -1px; z-index: 2; padding: 12px 0 max(4px, env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
+.form-stack { gap: 16px; }
+.form-grid { align-items: start; gap: 14px; }
+@media (max-width: 680px) {
+  .modal-backdrop { align-items: end; padding: 0; }
+  .modal, .modal.modal-wide { width: 100%; max-width: none; max-height: 92dvh; border-radius: 18px 18px 0 0; }
+  .modal-content { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .modal-content .modal-actions { gap: 9px; }
+  .modal-content .modal-actions .btn { min-height: 44px; }
+}
