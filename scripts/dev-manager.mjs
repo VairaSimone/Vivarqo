@@ -34,9 +34,18 @@ const stamp = () => new Date().toISOString();
 async function loadPersistentLogs() {
   try {
     const content = await readFile(LOG_FILE, "utf8");
-    for (const line of content.split(/\\r?\\n/).filter(Boolean).slice(-1000)) {
-      const match = line.match(/^(\\S+) \\[([A-Z]+)\\] \\[([^\\]]+)\\] (.*)$/);
-      if (match) recentLogs.push({ timestamp: match[1], level: match[2], service: match[3], message: match[4] });
+    for (const line of content.split("\n").map(value => value.trim()).filter(Boolean).slice(-1000)) {
+      const first = line.indexOf(" [");
+      const second = line.indexOf("] [", first + 2);
+      const third = line.indexOf("] ", second + 3);
+      if (first > 0 && second > first && third > second) {
+        recentLogs.push({
+          timestamp: line.slice(0, first),
+          level: line.slice(first + 2, second),
+          service: line.slice(second + 3, third),
+          message: line.slice(third + 2)
+        });
+      }
     }
   } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
@@ -299,7 +308,7 @@ async function prepareProduction() {
   return ["compose", "--env-file", absoluteEnvFile, "-f", PRODUCTION_COMPOSE];
 }
 async function productionRun(composeArgs, args, capture = false) {
-  return run("docker", [...composeArgs.slice(1), ...args], capture);
+  return run("docker", [...composeArgs, ...args], capture);
 }
 async function monitorProduction(composeArgs) {
   const names = ["postgres", "api", "worker", "web", "caddy", "backup", "migrate"];
@@ -307,7 +316,7 @@ async function monitorProduction(composeArgs) {
   while (!STOP.requested) {
     try {
       const result = await productionRun(composeArgs, ["ps", "--all", "--format", "json"], true);
-      const rows = result.stdout.split(/\\r?\\n/).filter(Boolean).map(line => JSON.parse(line));
+      const rows = result.stdout.split("\n").map(line => line.trim()).filter(Boolean).map(line => JSON.parse(line));
       for (const row of rows) {
         const name = row.Service || row.service;
         if (!name) continue;
