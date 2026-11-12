@@ -91,8 +91,13 @@ test("riavvia API, worker e frontend dopo terminazione forzata e non lascia proc
     }
   } finally {
     if (manager.exitCode === null && manager.signalCode === null) {
-      manager.kill("SIGTERM");
-      await waitForExit(manager).catch(() => killPid(manager.pid));
+      manager.kill(process.platform === "win32" ? "SIGINT" : "SIGTERM");
+      try {
+        await waitForExit(manager);
+      } catch (error) {
+        killPid(manager.pid);
+        throw error;
+      }
     }
   }
   for (const pid of observedPids) {
