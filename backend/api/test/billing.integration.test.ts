@@ -299,6 +299,65 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect(stripeFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("replays an invoice failure delivered before checkout and subscription events", async () => {
+    const owner = await account();
+    const baseTime = Math.floor(Date.now() / 1000);
+    const invoiceEvent = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: baseTime + 20,
+      type: "invoice.payment_failed",
+      data: { object: {
+        id: "in_test_pending_before_subscription",
+        customer: "cus_pending_vivarqo",
+        subscription: "sub_pending_vivarqo",
+      } },
+    };
+    await sendEvent(owner.agent, invoiceEvent).expect(200);
+    const pendingRecord = await prisma.stripeWebhookEvent.findUniqueOrThrow({
+      where: { stripeEventId: invoiceEvent.id },
+    });
+    expect(pendingRecord.result).toBe("pending");
+
+    await sendEvent(owner.agent, {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: baseTime + 21,
+      type: "checkout.session.completed",
+      data: { object: {
+        id: "cs_pending_vivarqo",
+        client_reference_id: owner.userId,
+        customer: "cus_pending_vivarqo",
+        subscription: "sub_pending_vivarqo",
+        metadata: { user_id: owner.userId },
+      } },
+    }).expect(200);
+
+    // This subscription snapshot predates the failed invoice, despite arriving later.
+    await sendEvent(owner.agent, {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: baseTime + 19,
+      type: "customer.subscription.updated",
+      data: { object: {
+        id: "sub_pending_vivarqo",
+        customer: "cus_pending_vivarqo",
+        metadata: { user_id: owner.userId },
+        status: "active",
+        current_period_start: baseTime,
+        current_period_end: baseTime + 2_592_000,
+        cancel_at_period_end: false,
+        items: { data: [{ price: { id: "price_test_vivarqo" } }] },
+      } },
+    }).expect(200);
+
+    const subscription = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(subscription.status).toBe("past_due");
+    expect(subscription.lastStripeEventCreatedAt?.getTime()).toBe((baseTime + 20) * 1000);
+    const replayed = await prisma.stripeWebhookEvent.findUniqueOrThrow({
+      where: { stripeEventId: invoiceEvent.id },
+    });
+    expect(replayed.result).toBe("processed");
+    expect(replayed.processedAt).toBeTruthy();
+  });
+
   it("rejects expired and invalid webhook signatures without persisting the event", async () => {
     const owner = await account();
     const event = {
