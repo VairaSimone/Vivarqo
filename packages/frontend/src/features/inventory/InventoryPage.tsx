@@ -116,7 +116,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
         <Button type="submit" disabled={busy}>{t("addMovement")}</Button>
       </form>
       <div className="panel-separator" /><PanelHeader title={t("movements")} />
-      {movements.loading ? <LoadingState /> : movements.error ? <ErrorState message={movements.error.message} retry={movements.reload} /> : <DataTable headers={[t("date"), t("movementType"), t("quantity"), t("notes")]} rows={(movements.data?.movements ?? []).map((movement) => [formatDate(getString(movement, "occurredAt"), locale), t(getString(movement, "movementType")), formatNumber(getString(movement, "quantity"), locale, 3), getString(movement, "notes") || "—"])} empty={t("noRecords")} />}
+      {movements.loading ? <LoadingState /> : movements.error ? <ErrorState message={movements.error.message} retry={movements.reload} /> : <DataTable headers={[t("date"), t("movementType"), t("quantity"), t("notes")]} rows={(movements.data?.movements ?? []).map((movement) => [formatDate(getString(movement, "occurredAt"), locale), t(getString(movement, "movementType")), formatNumber(getString(movement, "quantity"), locale, 3), getString(movement, "notes") || "—"])} empty={t("noRecords")} mobileLayout="scroll" />}
     </Modal>}
     {toast}
   </div>;
