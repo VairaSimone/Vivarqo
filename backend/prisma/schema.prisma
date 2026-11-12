@@ -610,9 +610,12 @@ model StripeWebhookEvent {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   stripeEventId String    @unique @map("stripe_event_id") @db.VarChar(128)
   eventType     String    @map("event_type") @db.VarChar(120)
+  stripeEventCreatedAt DateTime? @map("stripe_event_created_at") @db.Timestamptz(6)
+  payload       Json?     @db.JsonB
   processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
   result        String    @default("pending") @db.VarChar(20)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@index([result, eventType, stripeEventCreatedAt], where: { result: "pending" }, map: "stripe_webhook_events_pending_idx")
   @@map("stripe_webhook_events")
 }
 
