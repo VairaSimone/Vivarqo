@@ -23,7 +23,9 @@ async function cancelStripeSubscription(userId: string): Promise<void> {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-        "Idempotency-Key": `vivarqo-account-delete-${userId}`,
+        // Scope retries to the exact Stripe subscription: a later subscription
+        // on the same account must not reuse the cached result for an older DELETE.
+        "Idempotency-Key": `vivarqo-account-delete-${userId}-${subscription.stripeSubscriptionId}`,
       },
       signal: AbortSignal.timeout(15_000),
       redirect: "error",
