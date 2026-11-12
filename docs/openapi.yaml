@@ -2955,6 +2955,10 @@ components:
             "minLength": 1,
             "maxLength": 160
           },
+          "description": {
+            "type": ["string", "null"],
+            "maxLength": 10000
+          },
           "category": {
             "type": "string",
             "enum": [
@@ -2999,6 +3003,10 @@ components:
             "type": "string",
             "minLength": 1,
             "maxLength": 160
+          },
+          "description": {
+            "type": ["string", "null"],
+            "maxLength": 10000
           },
           "category": {
             "type": "string",
@@ -4854,6 +4862,7 @@ components:
         "required": [
           "id",
           "title",
+          "description",
           "category",
           "intervalDays",
           "nextDueAt",
@@ -4866,6 +4875,9 @@ components:
           },
           "title": {
             "type": "string"
+          },
+          "description": {
+            "type": ["string", "null"]
           },
           "category": {
             "type": "string"
