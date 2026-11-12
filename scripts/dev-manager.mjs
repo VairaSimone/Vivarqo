@@ -28,6 +28,15 @@ const windows = process.platform === "win32";
 let packageManager = "pnpm";
 
 const stamp = () => new Date().toISOString();
+async function loadPersistentLogs() {
+  try {
+    const content = await readFile(LOG_FILE, "utf8");
+    for (const line of content.split(/\\r?\\n/).filter(Boolean).slice(-1000)) {
+      const match = line.match(/^(\\S+) \\[([A-Z]+)\\] \\[([^\\]]+)\\] (.*)$/);
+      if (match) recentLogs.push({ timestamp: match[1], level: match[2], service: match[3], message: match[4] });
+    }
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+}
 async function log(level, source, message) {
   const item = { timestamp: stamp(), level, service: source, message: String(message).slice(0, 4000) };
   recentLogs.push(item); if (recentLogs.length > 1000) recentLogs.shift();
@@ -110,10 +119,24 @@ function appendServiceLog(name, chunk) {
     void appendFile(LOG_FILE, line + "\n", "utf8"); broadcast({ type: "log", item });
   }
 }
-function killTree(child) {
+function signalTree(child, force = false) {
   if (!child || !child.pid) return;
-  if (windows) spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-  else { try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} } }
+  if (windows) {
+    const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", ...(force ? ["/F"] : [])], { stdio: "ignore", windowsHide: true });
+    killer.on("error", () => {});
+  } else {
+    try { process.kill(-child.pid, force ? "SIGKILL" : "SIGTERM"); }
+    catch { try { child.kill(force ? "SIGKILL" : "SIGTERM"); } catch {} }
+  }
+}
+async function terminateTree(child, timeoutMs = 5000) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  signalTree(child, false);
+  await Promise.race([new Promise(resolve => child.once("close", resolve)), delay(timeoutMs)]);
+  if (child.exitCode === null && child.signalCode === null) {
+    signalTree(child, true);
+    await Promise.race([new Promise(resolve => child.once("close", resolve)), delay(2000)]);
+  }
 }
 const commands = { api: ["dev:api"], worker: ["dev:worker"], frontend: ["dev:frontend"] };
 
@@ -131,11 +154,13 @@ function start(name) {
   child.stderr.on("data", c => appendServiceLog(name, c));
   child.once("error", e => { service.state = "crashed"; void log("ERROR", name, "Errore processo: " + e.message); });
   child.once("close", (code, signal) => {
+    if (service.child !== child) return;
     service.child = null;
     if (STOP.requested) { service.state = "stopped"; return; }
     if (service.state === "restarting") return;
     service.state = "crashed"; service.failures++;
-    void log("ERROR", name, "Processo terminato: code=" + code + ", signal=" + signal);
+    service.lastExit = "code=" + code + ", signal=" + signal;
+    void log("ERROR", name, "Processo terminato: " + service.lastExit);
     scheduleRestart(name);
   });
   void log("INFO", name, "Avviato (PID " + (child.pid || "n/d") + ").");
@@ -166,6 +191,14 @@ function dashboardState() { return { services: serviceSnapshot(), logs: recentLo
 async function startDashboard() {
   const html = await readFile(DASHBOARD_FILE, "utf8");
   dashboardServer = createServer((req, res) => {
+    const remote = req.socket.remoteAddress || "";
+    const loopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+    const host = String(req.headers.host || "").toLowerCase();
+    if (!loopback || !["127.0.0.1:" + DASHBOARD_PORT, "localhost:" + DASHBOARD_PORT, "[::1]:" + DASHBOARD_PORT].includes(host)) {
+      res.writeHead(403, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+      res.end("Forbidden");
+      return;
+    }
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); res.end(html); return; }
     if (req.method === "GET" && url.pathname === "/api/state") { res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(dashboardState())); return; }
@@ -183,7 +216,7 @@ function notifyDesktop(title, message) {
   const t = String("Vivarqo - " + title).replace(/\x27/g, "\x27\x27").slice(0, 80);
   const m = String(message).replace(/\x27/g, "\x27\x27").slice(0, 220);
   const ps = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Warning; $n.Visible=$true; $n.BalloonTipTitle=\x27" + t + "\x27; $n.BalloonTipText=\x27" + m + "\x27; $n.ShowBalloonTip(8000); Start-Sleep -Seconds 9; $n.Dispose()";
-  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true, stdio: "ignore" });
+  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true, stdio: "ignore" });
   child.on("error", () => {});
 }
 async function checkWorkerHeartbeat() {
@@ -279,9 +312,9 @@ async function shutdown(reason) {
   if (STOP.requested) return;
   STOP.requested = true;
   await log("WARN", "MANAGER", "Arresto richiesto: " + reason);
-  for (const s of services.values()) if (s.child) { s.state = "stopping"; killTree(s.child); }
-  await delay(1200);
-  for (const s of services.values()) s.state = "stopped";
+  const children = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
+  await Promise.all(children.map(child => terminateTree(child)));
+  for (const s of services.values()) { s.child = null; s.state = "stopped"; }
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
   if (dashboardServer) await new Promise(resolve => dashboardServer.close(resolve));
@@ -289,6 +322,7 @@ async function shutdown(reason) {
 }
 async function main() {
   await mkdir(LOG_DIR, { recursive: true });
+  await loadPersistentLogs();
   await startDashboard();
   await log("INFO", "MANAGER", "Avvio Vivarqo Dev Manager.");
   await prepare();
