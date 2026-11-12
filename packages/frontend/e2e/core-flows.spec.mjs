@@ -991,7 +991,49 @@ for (const viewport of responsiveViewports) {
           await page.goto("/" + route);
         }
         await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
-        if (route === "feeding?create=1") await expect(page.getByRole("dialog")).toBeVisible();
+        if (route === "feeding?create=1") {
+          const dialog = page.getByRole("dialog");
+          await expect(dialog).toBeVisible();
+          const dialogLayout = await dialog.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            const content = element.querySelector(".modal-content");
+            const formGrid = element.querySelector(".form-grid");
+            return {
+              height: rect.height,
+              viewportHeight: document.documentElement.clientHeight,
+              contentOverflowY: content ? getComputedStyle(content).overflowY : "",
+              gridColumns: formGrid ? getComputedStyle(formGrid).gridTemplateColumns.split(" ").length : 0
+            };
+          });
+          expect(dialogLayout.height).toBeLessThanOrEqual(dialogLayout.viewportHeight + 1);
+          expect(["auto", "scroll"]).toContain(dialogLayout.contentOverflowY);
+          if (viewport.width <= 760) expect(dialogLayout.gridColumns).toBe(1);
+          const submit = dialog.getByRole("button", { name: "Registra sessione" }).last();
+          const submitSize = await submit.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+          });
+          expect(submitSize.height).toBeGreaterThanOrEqual(44);
+        }
+
+        if (route === "inventory") {
+          const movementAction = page.getByRole("button", { name: "Movimenti" }).first();
+          if (await movementAction.count()) {
+            await movementAction.click();
+            const movementDialog = page.getByRole("dialog");
+            const movementTable = movementDialog.locator('.table-wrap[data-mobile-layout="scroll"]');
+            await expect(movementTable).toBeVisible();
+            if (viewport.width <= 760) {
+              const tableLayout = await movementTable.evaluate((wrapper) => ({
+                overflowX: getComputedStyle(wrapper).overflowX,
+                tableDisplay: getComputedStyle(wrapper.querySelector("table")).display
+              }));
+              expect(tableLayout.overflowX).toBe("auto");
+              expect(tableLayout.tableDisplay).toBe("table");
+            }
+            await movementDialog.getByRole("button", { name: "Chiudi" }).click();
+          }
+        }
 
         if (route === "animals" || route === "finance") {
           const table = page.locator(".table-wrap .data-table");
