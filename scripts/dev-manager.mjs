@@ -151,6 +151,7 @@ function appendServiceLog(name, chunk) {
 const commands = { api: ["dev:api"], worker: ["dev:worker"], frontend: ["dev:frontend"] };
 
 function start(name) {
+  if (STOP.requested) return null;
   const old = services.get(name);
   if (old && old.child && old.state === "running") return old;
   const service = old || { name: name, restarts: 0, failures: 0, state: "stopped", child: null };
