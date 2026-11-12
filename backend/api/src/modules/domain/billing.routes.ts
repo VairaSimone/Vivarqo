@@ -132,6 +132,7 @@ async function applyInvoiceEvent(
 
 async function replayPendingInvoiceEvents(
   tx: BillingTransaction,
+  userId: string,
   customerId: string,
   subscriptionId: string,
 ): Promise<void> {
@@ -158,10 +159,7 @@ async function replayPendingInvoiceEvents(
       ORDER BY stripe_event_created_at ASC, id ASC
       FOR UPDATE`;
   for (const item of pending) {
-    await applyInvoiceEvent(tx, (await tx.subscription.findUniqueOrThrow({
-      where: { stripeSubscriptionId: subscriptionId },
-      select: { userId: true },
-    })).userId, customerId, subscriptionId, item.eventType, item.stripeEventCreatedAt);
+    await applyInvoiceEvent(tx, userId, customerId, subscriptionId, item.eventType, item.stripeEventCreatedAt);
     await tx.stripeWebhookEvent.update({
       where: { id: item.id },
       data: { result: "processed", processedAt: new Date() },
@@ -218,7 +216,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       lastStripeEventCreatedAt: eventCreatedAt,
     };
     await tx.subscription.upsert({ where: { userId }, create: { userId, ...data }, update: data });
-    await replayPendingInvoiceEvents(tx, customerId, stripeSubscriptionId);
+    await replayPendingInvoiceEvents(tx, userId, customerId, stripeSubscriptionId);
     return false;
   }
 
