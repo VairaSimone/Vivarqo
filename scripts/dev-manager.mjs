@@ -385,7 +385,7 @@ async function monitorProduction(composeArgs) {
       }
       try {
         const heartbeat = await productionRun(composeArgs, ["exec", "-T", "postgres", "sh", "-lc",
-          "psql -U \\"$POSTGRES_USER\\" -d \\"$POSTGRES_DB\\" -tA -c \\"SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());\\""], true);
+          "psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -tA -c \"SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());\""], true);
         if (heartbeat.stdout.trim().toLowerCase() === "t") {
           workerFailures = 0;
           const worker = services.get("worker");
