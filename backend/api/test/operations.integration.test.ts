@@ -189,6 +189,79 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
     expect(disabled.body.reminderRules.some((rule: { id: string }) => rule.id === created.body.rule.id)).toBe(true);
   });
 
+  it("keeps recurring rule templates synchronized and replaces deleted or dismissed occurrences", async () => {
+    const owner = await account();
+    const pet = await animal(owner, "Recurring edit animal");
+    const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const created = await owner.agent
+      .post("/api/v1/tasks/reminder-rules")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        title: "Original reminder",
+        description: "Original instructions",
+        category: "cleaning",
+        intervalDays: 3,
+        nextDueAt: dueAt.toISOString(),
+        animalId: pet.id,
+      })
+      .expect(201);
+
+    const editedDueAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    await owner.agent
+      .patch(`/api/v1/tasks/${created.body.task.id}`)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        title: "Updated reminder",
+        description: "Updated instructions",
+        category: "weighing",
+        dueAt: editedDueAt.toISOString(),
+      })
+      .expect(200);
+
+    let rules = await owner.agent.get("/api/v1/tasks/reminder-rules?enabled=true").expect(200);
+    let rule = rules.body.reminderRules.find((item: { id: string }) => item.id === created.body.rule.id);
+    expect(rule).toMatchObject({
+      title: "Updated reminder",
+      description: "Updated instructions",
+      category: "weighing",
+      intervalDays: 3,
+    });
+    expect(new Date(rule.nextDueAt).getTime()).toBe(editedDueAt.getTime());
+
+    await owner.agent
+      .delete(`/api/v1/tasks/${created.body.task.id}`)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .expect(204);
+
+    let openTasks = await owner.agent.get("/api/v1/tasks?status=open&pageSize=100").expect(200);
+    let nextTask = openTasks.body.tasks.find((item: { reminderRuleId: string }) => item.reminderRuleId === created.body.rule.id);
+    expect(nextTask).toBeTruthy();
+    expect(nextTask).toMatchObject({
+      title: "Updated reminder",
+      description: "Updated instructions",
+      category: "weighing",
+    });
+    expect(new Date(nextTask.dueAt).getTime()).toBeGreaterThan(editedDueAt.getTime());
+
+    await owner.agent
+      .patch(`/api/v1/tasks/${nextTask.id}`)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({ status: "dismissed" })
+      .expect(200);
+
+    openTasks = await owner.agent.get("/api/v1/tasks?status=open&pageSize=100").expect(200);
+    const replacement = openTasks.body.tasks.find((item: { reminderRuleId: string }) => item.reminderRuleId === created.body.rule.id);
+    expect(replacement).toBeTruthy();
+    expect(replacement.id).not.toBe(nextTask.id);
+    rules = await owner.agent.get("/api/v1/tasks/reminder-rules?enabled=true").expect(200);
+    rule = rules.body.reminderRules.find((item: { id: string }) => item.id === created.body.rule.id);
+    expect(new Date(rule.nextDueAt).getTime()).toBe(new Date(replacement.dueAt).getTime());
+  });
+
   it("builds Today and calendar data in the account timezone and does not leak other accounts' events", async () => {
     const owner = await account();
     const other = await account();
