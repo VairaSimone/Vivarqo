@@ -35,6 +35,7 @@ export const patchTaskSchema = z.object({
 
 export const createReminderRuleSchema = z.object({
   title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(10_000).nullable().optional(),
   category: z.enum(taskCategories),
   intervalDays: z.coerce.number().int().min(1).max(3650),
   nextDueAt: dateTimeWithOffset,
@@ -44,6 +45,7 @@ export const createReminderRuleSchema = z.object({
 
 export const patchReminderRuleSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
+  description: z.string().trim().max(10_000).nullable().optional(),
   category: z.enum(taskCategories).optional(),
   intervalDays: z.coerce.number().int().min(1).max(3650).optional(),
   nextDueAt: dateTimeWithOffset.optional(),
