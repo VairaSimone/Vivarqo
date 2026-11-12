@@ -393,8 +393,10 @@ export function createNotificationRouter() {
       data: {
         userId: auth.userId,
         category: "system",
-        title: "Test notifiche Vivarqo",
-        body: "Le notifiche push sono configurate correttamente.",
+        title: auth.locale === "en" ? "Vivarqo notification test" : "Test notifiche Vivarqo",
+        body: auth.locale === "en"
+          ? "Push notifications are configured correctly."
+          : "Le notifiche push sono configurate correttamente.",
         targetPath: "/settings/notifications",
       },
     });
