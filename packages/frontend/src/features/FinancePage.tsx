@@ -22,6 +22,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
   const [form, setForm] = useState({ entryType: "expense", occurredOn: todayDate(), amount: "", currency: "EUR", category: "", description: "", animalId: "", documentId: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [formDirty, setFormDirty] = useState(false);
   const { toast, show } = useToast();
   const url = "/finance/entries" + queryString({ page, pageSize: 25, entryType, category, q, from, to });
   const resource = useResource<FinanceEntriesResponseDto>(url, parseFinanceEntriesResponse);
@@ -41,10 +42,10 @@ export function FinancePage({ locale }: { locale: Locale }) {
       animalId: getString(entry, "animalId"),
       documentId: getString(entry, "documentId")
     });
-    setError(""); setModal(true);
+    setError(""); setFormDirty(false); setModal(true);
   }
   async function save(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); if (busy) return; setBusy(true); setError("");
     try {
       const body = {
         entryType: form.entryType,
@@ -58,7 +59,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
       };
       if (editing) await api.patch(`/finance/entries/${getString(editing, "id")}`, body);
       else await api.post("/finance/entries", body);
-      setModal(false); resource.reload(); summary.reload(); show(t("saveSuccess"));
+      setModal(false); setFormDirty(false); resource.reload(); summary.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof Error ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
@@ -104,18 +105,18 @@ export function FinancePage({ locale }: { locale: Locale }) {
         })}</div> : <EmptyState title={t("noRecords")} />}
       </Panel>
     </div>
-    {modal && <Modal title={editing ? t("edit") : t("newEntry")} onClose={() => setModal(false)} wide>
+    {modal && <Modal title={editing ? t("edit") : t("newEntry")} onClose={() => { setModal(false); setFormDirty(false); }} hasUnsavedChanges={formDirty} discardMessage={locale === "en" ? "Discard unsaved financial entry?" : "Scartare la registrazione finanziaria non salvata?"} wide>
       <form className="form-stack" onSubmit={save}>{error && <Alert tone="danger">{error}</Alert>}
-        <div className="form-grid"><Field label={t("type")}><Select value={form.entryType} onChange={(e) => setForm({ ...form, entryType: e.target.value })}><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></Field><Field label={t("date")}><Input required type="date" value={form.occurredOn} onChange={(e) => setForm({ ...form, occurredOn: e.target.value })} /></Field>
-        <Field label={t("amount")}><Input required inputMode="decimal" placeholder="0,00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field><Field label={t("currency")}><Input required minLength={3} maxLength={3} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></Field></div>
-        <Field label={t("category")}><Input required maxLength={80} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></Field>
-        <Field label={t("descriptionFinance")}><Input required maxLength={240} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+        <div className="form-grid"><Field label={t("type")}><Select value={form.entryType} onChange={(e) => { setForm({ ...form, entryType: e.target.value }); setFormDirty(true); }}><option value="expense">{t("expense")}</option><option value="income">{t("income")}</option></Select></Field><Field label={t("date")}><Input required type="date" value={form.occurredOn} onChange={(e) => { setForm({ ...form, occurredOn: e.target.value }); setFormDirty(true); }} /></Field>
+        <Field label={t("amount")}><Input required inputMode="decimal" placeholder="0,00" value={form.amount} onChange={(e) => { setForm({ ...form, amount: e.target.value }); setFormDirty(true); }} /></Field><Field label={t("currency")}><Input required minLength={3} maxLength={3} value={form.currency} onChange={(e) => { setForm({ ...form, currency: e.target.value.toUpperCase() }); setFormDirty(true); }} /></Field></div>
+        <Field label={t("category")}><Input required maxLength={80} value={form.category} onChange={(e) => { setForm({ ...form, category: e.target.value }); setFormDirty(true); }} /></Field>
+        <Field label={t("descriptionFinance")}><Input required maxLength={240} value={form.description} onChange={(e) => { setForm({ ...form, description: e.target.value }); setFormDirty(true); }} /></Field>
         <div className="form-grid">
-          <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => setForm({ ...form, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
-          <RemoteSelect label={t("documentsTab")} value={form.documentId} onChange={(documentId) => setForm({ ...form, documentId })} endpoint="/documents" responseKey="documents" labelKey="originalFilename" locale={locale} />
+          <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => { setForm({ ...form, animalId }); setFormDirty(true); }} endpoint="/animals" responseKey="animals" filters={{ status: "all", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+          <RemoteSelect label={t("documentsTab")} value={form.documentId} onChange={(documentId) => { setForm({ ...form, documentId }); setFormDirty(true); }} endpoint="/documents" responseKey="documents" labelKey="originalFilename" locale={locale} />
         </div>
         <p className="muted-note">{locale === "it" ? "Gli importi vengono inviati al backend come centesimi interi. Questo registro è gestionale e non sostituisce la contabilità fiscale." : "Amounts are sent to the API as integer cents. This log is for management and is not a tax accounting system."}</p>
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => { if (!formDirty || window.confirm(locale === "en" ? "Discard unsaved financial entry?" : "Scartare la registrazione finanziaria non salvata?")) { setModal(false); setFormDirty(false); } }}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
     </Modal>}
     {toast}
