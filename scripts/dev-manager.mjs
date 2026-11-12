@@ -171,6 +171,31 @@ async function startDashboard() {
   await new Promise((resolve, reject) => { dashboardServer.once("error", reject); dashboardServer.listen(DASHBOARD_PORT, "127.0.0.1", resolve); });
   await log("INFO", "DASHBOARD", "Dashboard disponibile su http://127.0.0.1:" + DASHBOARD_PORT);
 }
+function notifyDesktop(title, message) {
+  if (!windows || process.env.VIVARQO_DISABLE_TOAST === "1") return;
+  const t = String("Vivarqo - " + title).replace(/\x27/g, "\x27\x27").slice(0, 80);
+  const m = String(message).replace(/\x27/g, "\x27\x27").slice(0, 220);
+  const ps = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Warning; $n.Visible=$true; $n.BalloonTipTitle=\x27" + t + "\x27; $n.BalloonTipText=\x27" + m + "\x27; $n.ShowBalloonTip(8000); Start-Sleep -Seconds 9; $n.Dispose()";
+  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true, stdio: "ignore" });
+  child.on("error", () => {});
+}
+async function checkWorkerHeartbeat() {
+  const sql = "SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());";
+  const result = await run(exe("docker"), ["compose", "-f", COMPOSE, "exec", "-T", "postgres", "psql", "-U", "vivarqo", "-d", "vivarqo", "-tA", "-c", sql], true);
+  return result.stdout.trim().toLowerCase() === "t";
+}
+async function checkPostgres() { await run(exe("docker"), ["compose", "-f", COMPOSE, "exec", "-T", "postgres", "pg_isready", "-U", "vivarqo", "-d", "vivarqo"], true); }
+async function monitorInfrastructure() {
+  let pgFailures = 0, workerFailures = 0;
+  while (!STOP.requested) {
+    try { await checkPostgres(); pgFailures = 0; const db = services.get("postgres"); if (db) { db.state = "running"; db.lastCheck = "pg_isready OK"; } }
+    catch (error) { pgFailures++; const db = services.get("postgres"); if (db) { db.state = "degraded"; db.lastCheck = error.message; } if (pgFailures === 2) { await log("ERROR", "postgres", "PostgreSQL non risponde: tento il recupero Docker Compose."); try { await run(exe("docker"), ["compose", "-f", COMPOSE, "up", "-d", "postgres"]); if (db) db.restarts++; await log("WARN", "postgres", "Riavvio container richiesto; volume dati preservato."); } catch (restartError) { await log("FATAL", "postgres", "Recupero fallito: " + restartError.message); } } }
+    try { if (!(await checkWorkerHeartbeat())) throw new Error("heartbeat assente o scaduto (TTL 45s)"); workerFailures = 0; const w = services.get("worker"); if (w) { w.state = "running"; w.lastCheck = "heartbeat DB valido"; } }
+    catch (error) { workerFailures++; const w = services.get("worker"); if (w) { w.state = "degraded"; w.lastCheck = error.message; } if (workerFailures === 2 && w && w.child && w.state !== "restarting") { await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker."); w.state = "restarting"; killTree(w.child); scheduleRestart("worker"); } }
+    broadcast({ type: "state", services: serviceSnapshot(), diagnostics: diagnosticEvents });
+    await delay(10_000);
+  }
+}
 async function waitHttp(label, url, timeout = 90_000) {
   const startAt = Date.now(); let last = "nessuna risposta";
   while (Date.now() - startAt < timeout && !STOP.requested) {
