@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { summarizeDiagnostics } from "./dev-manager-core.mjs";
 import { access, appendFile, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -101,6 +102,7 @@ function appendServiceLog(name, chunk) {
     const item = { timestamp: stamp(), level, service: name, message: value.slice(0, 4000) };
     recentLogs.push(item); if (recentLogs.length > 1000) recentLogs.shift();
     if (["ERROR", "WARN"].includes(level)) { diagnosticEvents.push(item); if (diagnosticEvents.length > 500) diagnosticEvents.shift(); }
+    if (level === "ERROR") notifyDesktop(name, value);
     const line = item.timestamp + " [" + name + "] " + value;
     console.log(line); void appendFile(path.join(LOG_DIR, name + ".log"), line + "\n", "utf8");
     void appendFile(LOG_FILE, line + "\n", "utf8"); broadcast({ type: "log", item });
@@ -158,7 +160,7 @@ function serviceSnapshot() {
   const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend" };
   return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, stateLabel: s.state === "running" ? "Operativo" : s.state === "restarting" ? "Riavvio" : s.state === "failed" ? "Errore" : s.state === "degraded" ? "Degradato" : s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
 }
-function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: diagnosticEvents.slice(-100), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
+function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: summarizeDiagnostics(diagnosticEvents), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
 async function startDashboard() {
   const html = await readFile(DASHBOARD_FILE, "utf8");
   dashboardServer = createServer((req, res) => {
@@ -192,7 +194,7 @@ async function monitorInfrastructure() {
     catch (error) { pgFailures++; const db = services.get("postgres"); if (db) { db.state = "degraded"; db.lastCheck = error.message; } if (pgFailures === 2) { await log("ERROR", "postgres", "PostgreSQL non risponde: tento il recupero Docker Compose."); try { await run(exe("docker"), ["compose", "-f", COMPOSE, "up", "-d", "postgres"]); if (db) db.restarts++; await log("WARN", "postgres", "Riavvio container richiesto; volume dati preservato."); } catch (restartError) { await log("FATAL", "postgres", "Recupero fallito: " + restartError.message); } } }
     try { if (!(await checkWorkerHeartbeat())) throw new Error("heartbeat assente o scaduto (TTL 45s)"); workerFailures = 0; const w = services.get("worker"); if (w) { w.state = "running"; w.lastCheck = "heartbeat DB valido"; } }
     catch (error) { workerFailures++; const w = services.get("worker"); if (w) { w.state = "degraded"; w.lastCheck = error.message; } if (workerFailures === 2 && w && w.child && w.state !== "restarting") { await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker."); w.state = "restarting"; killTree(w.child); scheduleRestart("worker"); } }
-    broadcast({ type: "state", services: serviceSnapshot(), diagnostics: diagnosticEvents });
+    broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
     await delay(10_000);
   }
 }
@@ -227,6 +229,7 @@ async function monitor() {
         }
       }
     }
+    broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
     await delay(10_000);
   }
 }
