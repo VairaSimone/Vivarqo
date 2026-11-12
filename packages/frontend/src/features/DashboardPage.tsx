@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DashboardTodayDto, TaskDto } from "@vivarqo/contracts/operations";
+import type { DashboardTaskDto, DashboardTodayDto } from "@vivarqo/contracts/operations";
 import { parseDashboardTodayResponse } from "@vivarqo/contracts/operations";
 import { api, ApiError } from "../lib/api";
 import { formatDateTime, getNumber, getString } from "../lib/domain";
@@ -29,7 +29,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     finally { setCompleting(null); }
   }
 
-  const taskCard = (task: TaskDto, late = false, isComplete = false) => {
+  const taskCard = (task: DashboardTaskDto, late = false, isComplete = false) => {
     const id = task.id;
     const animal = task.animal;
     return <div className="task-row" key={id}>
@@ -64,7 +64,6 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         {due.length ? due.slice(0, 8).map((task) => taskCard(task)) : <EmptyState title={t("noTasks")} />}
         {Boolean(truncated?.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
         {completed.length > 0 && <><div className="panel-separator" /><PanelHeader title={t("completedToday")} />{completed.slice(0, 4).map((task) => taskCard(task, false, true))}{Boolean(truncated?.completedToday) && <p className="muted-note">{t("truncatedNotice")}</p>}</>}
-        {Boolean(truncated.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
       </Panel>
       <div className="dashboard-side">
         <Panel>

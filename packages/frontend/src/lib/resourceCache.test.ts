@@ -151,12 +151,13 @@ describe("resource cache", () => {
     const animals = loadCachedResource("/animals|locale:it", (signal) => {
       animalSignal = signal;
       return new Promise<string>(() => undefined);
-    }, new AbortController().signal);
+    }, animalConsumer.signal);
 
     invalidateResourceCachePrefix("/inventory");
     expect(inventorySignal?.aborted).toBe(true);
     expect(animalSignal?.aborted).toBe(false);
     await expect(inventory).rejects.toMatchObject({ name: "AbortError" });
     expect(animalSignal?.aborted).toBe(false);
-    void animals;
+    animalConsumer.abort();
+    await expect(animals).rejects.toMatchObject({ name: "AbortError" });
   });

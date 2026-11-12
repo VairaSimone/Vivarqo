@@ -69,6 +69,7 @@ export const dashboardTodayResponseSchema = z.object({
   quickActions: z.array(z.object({ key: z.string(), label: z.string(), targetPath: z.string() })).optional(),
   recentEvents: z.array(dashboardRecentEventSchema),
 }).passthrough();
+export type DashboardTaskDto = z.infer<typeof dashboardTaskSchema>;
 export type DashboardTodayDto = z.infer<typeof dashboardTodayResponseSchema>;
 export function parseDashboardTodayResponse(value: unknown): DashboardTodayDto {
   return dashboardTodayResponseSchema.parse(value);
