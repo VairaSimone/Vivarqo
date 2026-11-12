@@ -122,7 +122,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
           <Select aria-label={t("category")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}><option value="">{t("category")} · {t("all")}</option>{categories.map((value) => <option value={value} key={value}>{t("category" + value[0]!.toUpperCase() + value.slice(1))}</option>)}</Select></>}
           activeFilterCount={[q, status !== "open" ? status : "", category].filter(Boolean).length}
           onClearFilters={() => { setQ(""); setStatus("open"); setCategory(""); setPage(1); }}
-          resultCount={tasks.data?.pagination.total ?? 0} onRefresh={tasks.reload} loading={tasks.loading} />
+          resultCount={tasks.data?.pagination.total} onRefresh={tasks.reload} loading={tasks.loading} />
         {tasks.loading && !tasks.data ? <LoadingState /> : tasks.error ? <ErrorState message={tasks.error.message} retry={tasks.reload} /> :
           <div className="task-list">{list.length ? list.map((task) => <TaskRow key={getString(task, "id")} task={task} locale={locale} timezone={timezone} onComplete={() => void updateTask(task, "complete")} onDismiss={() => void updateTask(task, "dismiss")} onEdit={() => openEdit(task)} onDelete={() => void updateTask(task, "delete")} onOpen={() => navigate("/tasks/" + getString(task, "id"))} t={t} />) : <EmptyState title={t("noTasksList")} description={t("emptyHint")} action={<Button onClick={openCreate}>{t("addTask")}</Button>} />}</div>}
         {tasks.data?.pagination && <Pagination page={tasks.data.pagination.page} totalPages={tasks.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
