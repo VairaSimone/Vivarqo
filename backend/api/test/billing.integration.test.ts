@@ -13,6 +13,7 @@ const webhookSecret = "whsec_vivarqo_test_secret";
 const fakeStripeSecret = "sk_test_vivarqo_mock";
 const generatedEventIds: string[] = [];
 const userIds: string[] = [];
+let lastEventCreated = Math.floor(Date.now() / 1000) - 1;
 
 function signature(rawBody: Buffer, secret: string, timestamp = Math.floor(Date.now() / 1000)): string {
   const digest = createHmac("sha256", secret).update(String(timestamp) + ".").update(rawBody).digest("hex");
@@ -73,7 +74,10 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
   function sendEvent(agent: ReturnType<typeof request.agent>, event: Record<string, unknown>) {
     const eventId = String(event.id);
     generatedEventIds.push(eventId);
-    const body = Buffer.from(JSON.stringify(event), "utf8");
+    const created = typeof event.created === "number" ? event.created : lastEventCreated + 1;
+    lastEventCreated = Math.max(lastEventCreated, created);
+    const payload = { ...event, created };
+    const body = Buffer.from(JSON.stringify(payload), "utf8");
     return agent.post("/api/v1/webhooks/stripe")
       .set("Content-Type", "application/json")
       .set("Stripe-Signature", signature(body, webhookSecret))
@@ -166,6 +170,21 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     };
     await sendEvent(owner.agent, failedEvent).expect(200);
     expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
+
+    // A stale active subscription snapshot must not undo a newer invoice failure.
+    const staleActiveUpdate = {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: lastEventCreated - 1,
+      type: "customer.subscription.updated",
+      data: { object: {
+        ...updatedEvent.data.object,
+        status: "active",
+      } },
+    };
+    await sendEvent(owner.agent, staleActiveUpdate).expect(200);
+    const afterStaleActiveUpdate = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(afterStaleActiveUpdate.status).toBe("past_due");
+    expect(afterStaleActiveUpdate.lastStripeEventCreatedAt?.getTime()).toBe(lastEventCreated * 1000);
 
     // Also cover the newer Stripe invoice shape where subscription is nested
     // under parent.subscription_details.
