@@ -34,7 +34,7 @@
     "dev:manager": "node scripts/dev-manager.mjs",
     "check:dev-manager": "node --check scripts/dev-manager.mjs",
     "test:dev-manager": "node --test scripts/dev-manager.test.mjs",
-    "test:dev-manager:integration": "node --test scripts/dev-manager.process.test.mjs scripts/dev-manager.security.test.mjs",
+    "test:dev-manager:integration": "node --test scripts/dev-manager.process.test.mjs scripts/dev-manager.security.test.mjs scripts/dev-manager.resilience.test.mjs",
     "test:dev-manager:notifications": "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/dev-manager-notification-drill.ps1"
   },
   "dependencies": {
