@@ -61,6 +61,17 @@ function stringId(value: unknown): string | null {
   if (typeof value === "object" && value !== null && "id" in value && typeof (value as { id?: unknown }).id === "string") return (value as { id: string }).id;
   return null;
 }
+function invoiceSubscriptionId(invoice: StripeObject): string | null {
+  const direct = stringId(invoice.subscription);
+  if (direct) return direct;
+
+  // Newer Stripe API versions expose the subscription under parent details.
+  const parent = invoice.parent;
+  if (typeof parent !== "object" || parent === null) return null;
+  const details = (parent as Record<string, unknown>).subscription_details;
+  if (typeof details !== "object" || details === null) return null;
+  return stringId((details as Record<string, unknown>).subscription);
+}
 function timestamp(value: unknown): Date | null {
   return typeof value === "number" && Number.isFinite(value) ? new Date(value * 1000) : null;
 }
@@ -171,9 +182,14 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
 
   if (eventType === "invoice.payment_failed" || eventType === "invoice.paid") {
     const customerId = stringId(object.customer);
-    if (!customerId) return;
+    const subscriptionId = invoiceSubscriptionId(object);
+    // A customer can have more than one historical subscription. Invoice events
+    // must only mutate the exact subscription they refer to, never whichever one
+    // currently happens to be attached to that Stripe customer.
+    if (!customerId || !subscriptionId) return;
     const current = await tx.subscription.findFirst({
-      where: { stripeCustomerId: customerId }, select: { userId: true },
+      where: { stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId },
+      select: { userId: true },
     });
     if (!current) return;
     await lockBillingUser(tx, current.userId);
@@ -182,7 +198,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       // back into past_due, which would otherwise reopen the grace-period entitlement.
       await tx.subscription.updateMany({
         where: {
-          userId: current.userId, stripeCustomerId: customerId,
+          userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
           status: { in: ["active", "trialing", "past_due"] },
         },
         data: { status: "past_due" },
@@ -190,7 +206,10 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       return;
     }
     await tx.subscription.updateMany({
-      where: { userId: current.userId, stripeCustomerId: customerId, status: "past_due" },
+      where: {
+        userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
+        status: "past_due",
+      },
       data: { status: "active" },
     });
   }
