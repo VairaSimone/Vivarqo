@@ -34,11 +34,12 @@ async function log(level, source, message) {
   const line = item.timestamp + " [" + level + "] [" + source + "] " + item.message;
   console.log(line); await appendFile(LOG_FILE, line + "\n", "utf8").catch(() => {});
   broadcast({ type: "log", item });
+  if (["ERROR", "FATAL"].includes(level)) notifyDesktop(source, item.message);
 }
 function exe(name) { return name; }
 function run(command, args, capture = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit", windowsHide: true, shell: windows });
+    const child = spawn(command, args, { cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit", windowsHide: true, shell: windows && (command === "pnpm" || command === "corepack") });
     let stdout = "", stderr = "";
     if (capture) {
       child.stdout.on("data", c => { stdout += c.toString(); });
