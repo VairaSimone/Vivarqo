@@ -1350,7 +1350,11 @@ svg {
 
 @media (max-width: 1024px) {
   .sidebar {
-    width: 76px;
+    width: 220px;
+  }
+
+  .main-column {
+    margin-left: 220px;
   }
 
   .sidebar .nav-item {
