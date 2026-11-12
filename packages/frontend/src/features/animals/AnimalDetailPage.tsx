@@ -304,11 +304,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     <section className="animal-summary-grid" aria-label={t("recentActivity")}>
       <article className="animal-summary-card">
         <span>{t("lastWeight")}</span>
-        {summaryWeights.loading && !summaryWeights.data ? <strong>…</strong> : latestWeight ? <><strong>{formatWeight(latestWeight.weightG, locale)}</strong><small>{formatDate(latestWeight.measuredAt, locale)}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
+        {summaryWeights.loading && !summaryWeights.data ? <strong>…</strong> : summaryWeights.error ? <><strong className="animal-summary-empty">{t("summaryUnavailable")}</strong><button className="text-link" onClick={summaryWeights.reload}>{t("retry")}</button></> : latestWeight ? <><strong>{formatWeight(latestWeight.weightG, locale)}</strong><small>{formatDate(latestWeight.measuredAt, locale)}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
       </article>
       <article className="animal-summary-card">
         <span>{t("lastFeeding")}</span>
-        {summaryFeedings.loading && !summaryFeedings.data ? <strong>…</strong> : latestFeedingSession && latestFeedingEntry ? <><strong>{formatDate(latestFeedingSession.performedAt, locale)}</strong><small>{t(getString(latestFeedingEntry, "outcome") === "unknown" ? "feedingUnknown" : getString(latestFeedingEntry, "outcome"))}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
+        {summaryFeedings.loading && !summaryFeedings.data ? <strong>…</strong> : summaryFeedings.error ? <><strong className="animal-summary-empty">{t("summaryUnavailable")}</strong><button className="text-link" onClick={summaryFeedings.reload}>{t("retry")}</button></> : latestFeedingSession && latestFeedingEntry ? <><strong>{formatDate(latestFeedingSession.performedAt, locale)}</strong><small>{t(getString(latestFeedingEntry, "outcome") === "unknown" ? "feedingUnknown" : getString(latestFeedingEntry, "outcome"))}</small></> : <strong className="animal-summary-empty">{t("notRecorded")}</strong>}
       </article>
     </section>
     <div className="animal-profile-actions animal-quick-actions">
