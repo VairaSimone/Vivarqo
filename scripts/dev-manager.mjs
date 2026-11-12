@@ -24,7 +24,7 @@ async function log(level, source, message) {
   console.log(line);
   await appendFile(LOG_FILE, line + "\n", "utf8").catch(() => {});
 }
-function exe(name) { return windows ? name + ".cmd" : name; }
+function exe(name) { return name; }
 function run(command, args, capture = false) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit", windowsHide: true, shell: windows });
@@ -116,6 +116,7 @@ function start(name) {
   child.once("close", (code, signal) => {
     service.child = null;
     if (STOP.requested) { service.state = "stopped"; return; }
+    if (service.state === "restarting") return;
     service.state = "crashed"; service.failures++;
     void log("ERROR", name, "Processo terminato: code=" + code + ", signal=" + signal);
     scheduleRestart(name);
