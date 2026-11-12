@@ -424,18 +424,32 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
     await getOwnedAnimal(auth.userId, animalId);
-    const page = pageOptions(req.query);
-    const take = Math.min(100, page.page * page.pageSize);
-    const [feeding, weights, sheds, notes] = await Promise.all([
+    // A global page is assembled from four independently ordered streams. Fetching
+    // at least page * pageSize rows from each stream is sufficient to determine the
+    // globally sorted page; a fixed 100-row cap silently made older pages empty.
+    const page = parseBody(z.object({
+      page: z.coerce.number().int().min(1).max(100).default(1),
+      pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    }), req.query);
+    const take = page.page * page.pageSize;
+    const feedingWhere = { animalId, session: { is: { userId: auth.userId } } };
+    const weightWhere = { animalId };
+    const shedWhere = { animalId };
+    const noteWhere = { animalId, archivedAt: null };
+    const [feeding, weights, sheds, notes, feedingCount, weightCount, shedCount, noteCount] = await Promise.all([
       prisma.feedingEntry.findMany({
-        where: { animalId, session: { is: { userId: auth.userId } } },
+        where: feedingWhere,
         include: { session: { select: { id: true, performedAt: true, notes: true } } },
-        orderBy: { session: { performedAt: "desc" } },
+        orderBy: [{ session: { performedAt: "desc" } }, { id: "desc" }],
         take,
       }),
-      prisma.weightMeasurement.findMany({ where: { animalId }, orderBy: { measuredAt: "desc" }, take }),
-      prisma.shedRecord.findMany({ where: { animalId }, orderBy: { occurredAt: "desc" }, take }),
-      prisma.animalNote.findMany({ where: { animalId, archivedAt: null }, orderBy: { occurredAt: "desc" }, take }),
+      prisma.weightMeasurement.findMany({ where: weightWhere, orderBy: [{ measuredAt: "desc" }, { id: "desc" }], take }),
+      prisma.shedRecord.findMany({ where: shedWhere, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take }),
+      prisma.animalNote.findMany({ where: noteWhere, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take }),
+      prisma.feedingEntry.count({ where: feedingWhere }),
+      prisma.weightMeasurement.count({ where: weightWhere }),
+      prisma.shedRecord.count({ where: shedWhere }),
+      prisma.animalNote.count({ where: noteWhere }),
     ]);
     const items = [
       ...feeding.map((record) => ({ type: "feeding" as const, occurredAt: record.session.performedAt, record })),
@@ -444,13 +458,16 @@ export function createCareRouter() {
       ...notes.map((record) => ({ type: "note" as const, occurredAt: record.occurredAt, record })),
     ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
     const start = (page.page - 1) * page.pageSize;
+    const total = feedingCount + weightCount + shedCount + noteCount;
+    const fetched = feeding.length + weights.length + sheds.length + notes.length;
     res.status(200).json({
       items: items.slice(start, start + page.pageSize),
       pagination: {
         page: page.page,
         pageSize: page.pageSize,
-        total: feeding.length + weights.length + sheds.length + notes.length,
-        truncated: take === 100 && items.length >= 100,
+        total,
+        totalPages: Math.ceil(total / page.pageSize),
+        truncated: total > fetched,
       },
     });
   });
