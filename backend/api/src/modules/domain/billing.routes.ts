@@ -164,16 +164,15 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     if (!customerId || !subscriptionId) return;
     await lockBillingUser(tx, userRaw);
     const current = await tx.subscription.findUnique({
-      where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true, lastStripeEventCreatedAt: true },
+      where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true },
     });
-    if (current?.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return;
-    // checkout.session.completed is not authoritative for billing status or period
-    // dates. If subscription.created/updated was already processed, preserve it.
-    if (current && (
-      ["active", "trialing"].includes(current.status) ||
-      (current.stripeSubscriptionId === subscriptionId &&
-        ["canceled", "unpaid", "paused", "incomplete_expired"].includes(current.status))
-    )) return;
+    // Checkout completion is only a correlation signal, never an authoritative
+    // subscription-state event. Never overwrite any state for the same subscription.
+    // A different subscription may replace only a terminal historical subscription.
+    if (current?.stripeSubscriptionId) {
+      if (current.stripeSubscriptionId === subscriptionId) return;
+      if (!["canceled", "unpaid", "incomplete_expired"].includes(current.status)) return;
+    }
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
@@ -182,7 +181,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       // pending until customer.subscription.created/updated supplies the authoritative
       // status and paid-through date; otherwise a missing date could grant access forever.
       status: "incomplete",
-      lastStripeEventCreatedAt: eventCreatedAt,
+      lastStripeEventCreatedAt: null,
     };
     await tx.subscription.upsert({ where: { userId: userRaw }, create: { userId: userRaw, ...data }, update: data });
     return;
