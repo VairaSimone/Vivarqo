@@ -14,6 +14,7 @@ export interface TaskDto {
 export interface ReminderRuleDto {
   id: string;
   title: string;
+  description: string | null;
   category: string;
   intervalDays: number;
   nextDueAt: string;
