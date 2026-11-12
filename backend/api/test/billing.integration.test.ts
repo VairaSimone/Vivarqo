@@ -125,6 +125,9 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     const baseTime = Math.floor(Date.now() / 1000);
     const updatedEvent = {
       id: `evt_vivarqo_${randomUUID()}`,
+      // Stripe may create the subscription event before checkout.session.completed.
+      // Checkout must not advance the authoritative subscription-event watermark.
+      created: lastEventCreated - 1,
       type: "customer.subscription.updated",
       data: { object: {
         id: "sub_test_vivarqo",
@@ -170,11 +173,23 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     };
     await sendEvent(owner.agent, failedEvent).expect(200);
     expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
+    const failedEventCreated = lastEventCreated;
+
+    // A late Checkout completion is not authoritative and must not reset past_due.
+    const lateCheckoutAfterFailure = {
+      ...checkoutEvent,
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: failedEventCreated + 1,
+    };
+    await sendEvent(owner.agent, lateCheckoutAfterFailure).expect(200);
+    const afterLateCheckoutFailure = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(afterLateCheckoutFailure.status).toBe("past_due");
+    expect(afterLateCheckoutFailure.lastStripeEventCreatedAt?.getTime()).toBe(failedEventCreated * 1000);
 
     // A stale active subscription snapshot must not undo a newer invoice failure.
     const staleActiveUpdate = {
       id: `evt_vivarqo_${randomUUID()}`,
-      created: lastEventCreated - 1,
+      created: failedEventCreated - 1,
       type: "customer.subscription.updated",
       data: { object: {
         ...updatedEvent.data.object,
@@ -184,7 +199,7 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     await sendEvent(owner.agent, staleActiveUpdate).expect(200);
     const afterStaleActiveUpdate = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
     expect(afterStaleActiveUpdate.status).toBe("past_due");
-    expect(afterStaleActiveUpdate.lastStripeEventCreatedAt?.getTime()).toBe(lastEventCreated * 1000);
+    expect(afterStaleActiveUpdate.lastStripeEventCreatedAt?.getTime()).toBe(failedEventCreated * 1000);
 
     // Also cover the newer Stripe invoice shape where subscription is nested
     // under parent.subscription_details.
