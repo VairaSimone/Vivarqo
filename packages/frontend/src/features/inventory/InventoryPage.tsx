@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import type { InventoryItemDto, InventoryMovementDto } from "@vivarqo/contracts/inventory";
+import { parseInventoryItemsResponse, parseInventoryMovementsResponse } from "@vivarqo/contracts/inventory";
+import type { InventoryItemDto, InventoryItemsResponseDto, InventoryMovementDto, InventoryMovementsResponseDto } from "@vivarqo/contracts/inventory";
 import { api, ApiError } from "../../lib/api";
 import { dateTimeInputToUtc, formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
@@ -25,8 +26,8 @@ export function InventoryPage({ locale }: { locale: Locale }) {
   const [error, setError] = useState("");
   const { toast, show } = useToast();
   const url = "/inventory/items" + queryString({ page, pageSize: 25, active, q, category, lowStock: lowStock ? "true" : null });
-  const resource = useResource<{ items: InventoryItemDto[]; pagination: { page: number; totalPages: number; total: number } }>(url);
-  const movements = useResource<{ movements: InventoryMovementDto[]; pagination: { total: number; totalPages: number } }>(movementItem ? `/inventory/items/${getString(movementItem, "id")}/movements?page=1&pageSize=100` : null);
+  const resource = useResource<InventoryItemsResponseDto>(url, parseInventoryItemsResponse);
+  const movements = useResource<InventoryMovementsResponseDto>(movementItem ? `/inventory/items/${getString(movementItem, "id")}/movements?page=1&pageSize=100` : null, parseInventoryMovementsResponse);
 
   function openItem(item?: InventoryItemDto) {
     setEditing(item ?? null);

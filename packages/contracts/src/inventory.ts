@@ -1,10 +1,12 @@
+import { z } from "zod";
+
 export interface InventoryItemDto {
   id: string;
   name: string;
   category: string;
   unit: string;
-  quantityOnHand: number;
-  minimumQuantity: number | null;
+  quantityOnHand: number | string;
+  minimumQuantity: number | string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -15,7 +17,7 @@ export interface InventoryMovementDto {
   id: string;
   itemId: string;
   movementType: "in" | "out" | "adjustment";
-  quantity: number;
+  quantity: number | string;
   occurredAt: string;
   unitCostCents?: number | null;
   reference: string | null;
@@ -54,13 +56,13 @@ export interface InventoryDocumentRecordDto {
   name?: string;
   category?: string;
   unit?: string;
-  quantityOnHand?: number;
-  minimumQuantity?: number | null;
+  quantityOnHand?: number | string;
+  minimumQuantity?: number | string | null;
   isActive?: boolean;
   notes?: string | null;
   occurredAt?: string;
   movementType?: "in" | "out" | "adjustment";
-  quantity?: number;
+  quantity?: number | string;
   unitCost?: number | null;
   reference?: string | null;
   note?: string | null;
@@ -73,4 +75,41 @@ export interface InventoryDocumentRecordDto {
   attempts?: number;
   lastError?: string | null;
   nextAttemptAt?: string | null;
+}
+
+
+const inventoryDecimalSchema = z.union([
+  z.number().finite(),
+  z.string().regex(/^-?[0-9]+([.][0-9]{1,3})?$/, "Invalid decimal value"),
+]);
+const inventoryPaginationSchema = z.object({
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+export const inventoryItemsResponseSchema = z.object({
+  items: z.array(z.object({
+    id: z.string(), name: z.string(), category: z.string(), unit: z.string(),
+    quantityOnHand: inventoryDecimalSchema, minimumQuantity: inventoryDecimalSchema.nullable(),
+    notes: z.string().nullable(), isActive: z.boolean(), createdAt: z.string(), updatedAt: z.string(),
+  }).passthrough()),
+  pagination: inventoryPaginationSchema,
+}).passthrough();
+export const inventoryMovementsResponseSchema = z.object({
+  movements: z.array(z.object({
+    id: z.string(), itemId: z.string(), movementType: z.enum(["in", "out", "adjustment"]),
+    quantity: inventoryDecimalSchema, occurredAt: z.string(),
+    unitCostCents: z.number().int().nullable().optional(),
+    reference: z.string().nullable(), notes: z.string().nullable(),
+  }).passthrough()),
+  pagination: inventoryPaginationSchema,
+}).passthrough();
+export type InventoryItemsResponseDto = z.infer<typeof inventoryItemsResponseSchema>;
+export type InventoryMovementsResponseDto = z.infer<typeof inventoryMovementsResponseSchema>;
+export function parseInventoryItemsResponse(value: unknown): InventoryItemsResponseDto {
+  return inventoryItemsResponseSchema.parse(value);
+}
+export function parseInventoryMovementsResponse(value: unknown): InventoryMovementsResponseDto {
+  return inventoryMovementsResponseSchema.parse(value);
 }
