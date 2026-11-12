@@ -367,13 +367,23 @@ async function prepareProduction() {
 async function productionRun(composeArgs, args, capture = false) {
   return run("docker", [...composeArgs, ...args], capture);
 }
+function parseComposePsOutput(output) {
+  const value = String(output || "").trim();
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return value.split("\n").map(line => line.trim()).filter(Boolean).map(line => JSON.parse(line));
+  }
+}
 async function monitorProduction(composeArgs) {
   const names = ["postgres", "api", "worker", "web", "caddy", "backup", "migrate"];
   let workerFailures = 0;
   while (!STOP.requested) {
     try {
       const result = await productionRun(composeArgs, ["ps", "--all", "--format", "json"], true);
-      const rows = result.stdout.split("\n").map(line => line.trim()).filter(Boolean).map(line => JSON.parse(line));
+      const rows = parseComposePsOutput(result.stdout);
       for (const name of names) {
         const current = services.get(name) || { name, restarts: 0, child: null };
         current.state = "missing";
