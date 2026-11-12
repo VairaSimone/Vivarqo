@@ -394,13 +394,14 @@ async function monitorProduction(composeArgs) {
         } else throw new Error("heartbeat worker assente/scaduto");
       } catch (error) {
         const worker = services.get("worker");
+        const containerWasRunning = worker?.lastCheck.includes("container running") === true;
         if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
         const migrationsReady = services.get("migrate")?.state === "completed";
         const databaseReady = services.get("postgres")?.state === "running";
         if (!migrationsReady || !databaseReady) {
           workerFailures = 0;
         } else {
-          const containerExited = worker?.state === "degraded" && !worker.lastCheck.includes("container running");
+          const containerExited = Boolean(worker) && !containerWasRunning;
           workerFailures = containerExited ? 5 : workerFailures + 1;
           if (workerFailures >= 5 && Date.now() - (worker?.lastRecoveryAt || 0) >= 60_000) {
             if (worker) worker.lastRecoveryAt = Date.now();
