@@ -141,11 +141,20 @@ export function createTasksRouter() {
       }
       const task = await tx.task.update({ where: { id }, data: data as never });
       let nextTaskCreated = false;
-      if (existing.reminderRuleId && existing.status === "open") {
+      if (existing.reminderRuleId && (existing.status === "open" || input.status === "open")) {
         const rule = await tx.reminderRule.findFirst({
           where: { id: existing.reminderRuleId, userId: auth.userId, isEnabled: true },
         });
         if (rule) {
+          if (existing.status !== "open" && input.status === "open") {
+            const otherOpenTask = await tx.task.findFirst({
+              where: { userId: auth.userId, reminderRuleId: rule.id, status: "open", id: { not: id } },
+              select: { id: true },
+            });
+            if (otherOpenTask) {
+              throw new AppError(409, "REMINDER_OCCURRENCE_ALREADY_OPEN", "This reminder already has an open occurrence");
+            }
+          }
           await tx.reminderRule.update({
             where: { id: rule.id },
             data: {
