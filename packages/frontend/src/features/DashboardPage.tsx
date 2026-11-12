@@ -118,12 +118,16 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         <Panel>
           <PanelHeader title={t("upcomingReminders")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks?tab=reminders")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
           {reminders.length
-            ? reminders.slice(0, 5).map((rule) => <button className="simple-row dashboard-reminder-row" key={getString(rule, "id")} onClick={() => navigate("/tasks?tab=reminders")}>
-                <span className="simple-row-icon"><Icon name="clock" size={16} /></span>
-                <span className="dashboard-reminder-copy"><strong>{getString(rule, "title")}</strong><small>{getString(getObject(rule, "animal"), "name") || t("noAnimalLinked")} · {formatDateTime(getString(rule, "nextDueAt"), locale, timezone)}</small></span>
-                <Icon name="chevron" size={15} />
-              </button>)
-            : <EmptyState title={t("remindersEmpty")} description={t("remindersEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?tab=reminders")}>{t("createReminder")}</Button>} />}
+            ? reminders.slice(0, 5).map((rule) => {
+                const reminderOverdue = Date.parse(getString(rule, "nextDueAt")) < Date.now();
+                return <button className={`simple-row dashboard-reminder-row${reminderOverdue ? " dashboard-reminder-overdue" : ""}`} key={getString(rule, "id")} onClick={() => navigate("/tasks?tab=reminders")}>
+                  <span className="simple-row-icon"><Icon name="clock" size={16} /></span>
+                  <span className="dashboard-reminder-copy"><strong>{getString(rule, "title")}</strong><small>{getString(getObject(rule, "animal"), "name") || t("noAnimalLinked")} · {formatDateTime(getString(rule, "nextDueAt"), locale, timezone)}</small></span>
+                  {reminderOverdue && <Badge tone="danger">{t("overdue")}</Badge>}
+                  <Icon name="chevron" size={15} />
+                </button>;
+              })
+            : <EmptyState title={t("remindersEmpty")} description={t("remindersEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?tab=reminders&create=1")}>{t("createReminder")}</Button>} />}
           {Boolean(truncated?.imminentReminders) && <p className="muted-note">{t("truncatedNotice")}</p>}
         </Panel>
       </div>
