@@ -202,6 +202,7 @@ model ReminderRule {
   userId       String    @map("user_id") @db.Uuid
   animalId     String?   @map("animal_id") @db.Uuid
   title        String    @db.VarChar(160)
+  description  String?
   category     String    @db.VarChar(30)
   intervalDays Int       @map("interval_days")
   nextDueAt    DateTime  @map("next_due_at") @db.Timestamptz(6)
@@ -597,6 +598,7 @@ model Subscription {
   currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz(6)
   cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  lastStripeEventCreatedAt DateTime? @map("last_stripe_event_created_at") @db.Timestamptz(6)
   createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
