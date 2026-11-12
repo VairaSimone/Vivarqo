@@ -51,3 +51,13 @@ test("richiede ricorrenza prima di segnalare una configurazione persistente", ()
   assert.equal(repeated[0].classification, "persistent");
   assert.equal(repeated[0].requiresIntervention, true);
 });
+
+test("non promuove errori ricorrenti ma distanti nel tempo a guasti persistenti", () => {
+  const result = summarizeDiagnostics([
+    { service: "api", message: "Missing environment variable CSRF_SECRET", timestamp: "2026-11-12T10:00:00Z" },
+    { service: "api", message: "Missing environment variable CSRF_SECRET", timestamp: "2026-11-12T10:10:00Z" },
+    { service: "api", message: "Missing environment variable CSRF_SECRET", timestamp: "2026-11-12T10:20:00Z" }
+  ]);
+  assert.equal(result[0].classification, "likely-persistent");
+  assert.equal(result[0].requiresIntervention, false);
+});
