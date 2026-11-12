@@ -366,7 +366,7 @@ async function monitorProduction(composeArgs) {
       }
       for (const name of ["api", "web", "caddy", "backup"]) {
         const service = services.get(name);
-        if (service && service.state === "degraded") {
+        if (service && ["degraded", "missing"].includes(service.state)) {
           await log("WARN", name, "Container non sano; richiedo il riavvio Compose.");
           if (service.lastCheck.includes("container running")) {
             await productionRun(composeArgs, ["restart", name]);
@@ -382,7 +382,8 @@ async function monitorProduction(composeArgs) {
         if (heartbeat.stdout.trim().toLowerCase() === "t") {
           workerFailures = 0;
           const worker = services.get("worker");
-          if (worker) { worker.state = "running"; worker.lastCheck = "heartbeat DB valido"; }
+          if (worker && worker.state === "running") worker.lastCheck = "container running / heartbeat DB valido";
+          else if (worker) worker.lastCheck += " / heartbeat DB ancora valido entro TTL";
         } else throw new Error("heartbeat worker assente/scaduto");
       } catch (error) {
         const worker = services.get("worker");
@@ -395,7 +396,11 @@ async function monitorProduction(composeArgs) {
           workerFailures++;
           if (workerFailures >= 2) {
             await log("ERROR", "worker", "Heartbeat assente con DB e migrazioni pronti; richiedo il riavvio del container.");
-            await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
+            if (worker?.lastCheck.includes("container running")) {
+              await productionRun(composeArgs, ["restart", "worker"]);
+            } else {
+              await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
+            }
             if (worker) { worker.restarts++; worker.state = "restarting"; }
             workerFailures = 0;
           }
