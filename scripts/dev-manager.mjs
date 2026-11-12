@@ -339,6 +339,7 @@ async function monitorProduction(composeArgs) {
       for (const name of names) {
         const current = services.get(name) || { name, restarts: 0, child: null };
         current.state = "missing";
+        current.containerRunning = false;
         current.lastCheck = "Container non trovato";
         services.set(name, current);
       }
@@ -348,6 +349,7 @@ async function monitorProduction(composeArgs) {
         const state = String(row.State || row.state || "unknown").toLowerCase();
         const health = String(row.Health || row.health || "").toLowerCase();
         const current = services.get(name) || { name, restarts: 0, child: null };
+        current.containerRunning = state === "running";
         current.state = name === "migrate" && state === "exited" && Number(row.ExitCode ?? row.exitCode) === 0
           ? "completed"
           : state === "running" && (!health || health === "healthy") ? "running"
@@ -394,7 +396,7 @@ async function monitorProduction(composeArgs) {
         } else throw new Error("heartbeat worker assente/scaduto");
       } catch (error) {
         const worker = services.get("worker");
-        const containerWasRunning = worker?.lastCheck.includes("container running") === true;
+        const containerWasRunning = worker?.containerRunning === true;
         if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
         const migrationsReady = services.get("migrate")?.state === "completed";
         const databaseReady = services.get("postgres")?.state === "running";
@@ -406,7 +408,7 @@ async function monitorProduction(composeArgs) {
           if (workerFailures >= 5 && Date.now() - (worker?.lastRecoveryAt || 0) >= 60_000) {
             if (worker) worker.lastRecoveryAt = Date.now();
             await log("ERROR", "worker", "Heartbeat assente con DB e migrazioni pronti; richiedo il riavvio del container.");
-            if (worker?.lastCheck.includes("container running")) {
+            if (worker?.containerRunning) {
               await productionRun(composeArgs, ["restart", "worker"]);
             } else {
               await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
