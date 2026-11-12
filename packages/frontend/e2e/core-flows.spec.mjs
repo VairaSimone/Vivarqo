@@ -1020,7 +1020,7 @@ for (const viewport of responsiveViewports) {
         } else {
           await page.goto("/" + route);
         }
-        await expect(page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
+        await expect(route.startsWith("animals/") ? page.locator(".animal-hero h1") : page.locator(".page-header h1").first()).toBeVisible({ timeout: 10_000 });
         if (route === "feeding?create=1") {
           const dialog = page.getByRole("dialog");
           await expect(dialog).toBeVisible();
