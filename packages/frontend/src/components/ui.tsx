@@ -121,7 +121,7 @@ export function ListToolbar({ searchValue, onSearchChange, searchPlaceholder, fi
   const english = typeof document !== "undefined" && document.documentElement.lang === "en";
   return <section className="list-toolbar" aria-label={english ? "Search and filters" : "Ricerca e filtri"}>
     <div className="list-toolbar-main">
-      {onSearchChange && <label className="search-control list-toolbar-search"><Icon name="search" size={17} /><input type="search" value={searchValue ?? ""} onChange={(event) => onSearchChange(event.target.value)} placeholder={searchPlaceholder ?? (english ? "Search records" : "Cerca record")} /></label>}
+      {onSearchChange && <label className="search-control list-toolbar-search"><Icon name="search" size={17} /><input type="search" aria-label={searchPlaceholder ?? (english ? "Search records" : "Cerca record")} value={searchValue ?? ""} onChange={(event) => onSearchChange(event.target.value)} placeholder={searchPlaceholder ?? (english ? "Search records" : "Cerca record")} /></label>}
       {filters && <div className="list-toolbar-filters">{filters}</div>}
     </div>
     <div className="list-toolbar-meta">
