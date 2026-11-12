@@ -337,8 +337,8 @@ test("domain CSV imports preview and persist inventory and finance records", asy
   // Exercise the actual native/custom select interaction instead of assuming
   // its option elements are exposed as ordinary descendants in the DOM.
   for (const entity of [
-    "animals", "finance", "inventory", "reproductionCycles", "reproductiveEvents",
-    "clutches", "eggs", "incubationLogs", "offspringBatches",
+    "animals", "weights", "sheds", "notes", "feedings", "finance", "inventory",
+    "reproductionCycles", "reproductiveEvents", "clutches", "eggs", "incubationLogs", "offspringBatches",
   ]) {
     await entitySelect.selectOption(entity);
   }
