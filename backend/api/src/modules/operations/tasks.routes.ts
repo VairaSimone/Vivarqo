@@ -18,6 +18,25 @@ import { addDaysAtLocalTime, localDateFor, parseDateBound } from "./time.js";
 function requestId(res: Response): string {
   return typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
 }
+function nextOccurrenceAt(dueAt: Date, intervalDays: number, now: Date, timezone: string): Date {
+  let nextDueAt = addDaysAtLocalTime(dueAt, intervalDays, timezone);
+  if (nextDueAt <= now) {
+    const nextLocalDate = localDateFor(nextDueAt, timezone);
+    const nowLocalDate = localDateFor(now, timezone);
+    const nextLocalMidnight = Date.parse(`${nextLocalDate}T00:00:00.000Z`);
+    const nowLocalMidnight = Date.parse(`${nowLocalDate}T00:00:00.000Z`);
+    const daysBehind = Math.max(0, Math.floor((nowLocalMidnight - nextLocalMidnight) / 86_400_000));
+    const missedIntervals = Math.floor(daysBehind / intervalDays);
+    if (missedIntervals > 0) {
+      nextDueAt = addDaysAtLocalTime(nextDueAt, missedIntervals * intervalDays, timezone);
+    }
+    if (nextDueAt <= now) nextDueAt = addDaysAtLocalTime(nextDueAt, intervalDays, timezone);
+  }
+  return nextDueAt;
+}
+async function lockReminderRule(tx: typeof prisma, userId: string, reminderRuleId: string): Promise<void> {
+  await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM reminder_rules WHERE id = ${reminderRuleId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`;
+}
 function routeId(value: string | string[] | undefined, name: string): string {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", `Invalid ${name}`);
@@ -117,15 +136,46 @@ export function createTasksRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.dueAt) data.dueAt = new Date(input.dueAt);
     const updated = await prisma.$transaction(async (tx) => {
+      if (existing.reminderRuleId) {
+        await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
+      }
       const task = await tx.task.update({ where: { id }, data: data as never });
-      if (existing.reminderRuleId && input.dueAt && existing.status === "open") {
-        await tx.reminderRule.updateMany({
+      let nextTaskCreated = false;
+      if (existing.reminderRuleId && existing.status === "open") {
+        const rule = await tx.reminderRule.findFirst({
           where: { id: existing.reminderRuleId, userId: auth.userId, isEnabled: true },
-          data: { nextDueAt: new Date(input.dueAt) },
         });
+        if (rule) {
+          await tx.reminderRule.update({
+            where: { id: rule.id },
+            data: {
+              title: input.title ?? rule.title,
+              description: input.description !== undefined ? input.description : rule.description,
+              category: input.category ?? rule.category,
+              animalId: input.animalId !== undefined ? input.animalId : rule.animalId,
+              nextDueAt: input.dueAt ? new Date(input.dueAt) : rule.nextDueAt,
+            },
+          });
+          if (input.status === "dismissed") {
+            const nextDueAt = nextOccurrenceAt(existing.dueAt, rule.intervalDays, new Date(), auth.timezone);
+            await tx.reminderRule.update({ where: { id: rule.id }, data: { nextDueAt } });
+            await tx.task.create({
+              data: {
+                userId: auth.userId,
+                animalId: input.animalId !== undefined ? input.animalId : rule.animalId,
+                title: input.title ?? rule.title,
+                description: input.description !== undefined ? input.description : rule.description,
+                category: input.category ?? rule.category,
+                dueAt: nextDueAt,
+                reminderRuleId: rule.id,
+              },
+            });
+            nextTaskCreated = true;
+          }
+        }
       }
       await tx.auditEvent.create({
-        data: { userId: auth.userId, action: "task.updated", entityType: "task", entityId: id, requestId: requestId(res), metadata: { fields: Object.keys(input) } },
+        data: { userId: auth.userId, action: "task.updated", entityType: "task", entityId: id, requestId: requestId(res), metadata: { fields: Object.keys(input), nextOccurrenceCreated: nextTaskCreated } },
       });
       return task;
     });
@@ -154,23 +204,7 @@ export function createTasksRouter() {
           where: { id: existing.reminderRuleId, userId: auth.userId, isEnabled: true },
         });
         if (rule) {
-          nextDueAt = addDaysAtLocalTime(existing.dueAt, rule.intervalDays, auth.timezone);
-          if (nextDueAt <= now) {
-            // Jump over missed occurrences in one calculation instead of
-            // running Intl.DateTimeFormat once per interval for old tasks.
-            const nextLocalDate = localDateFor(nextDueAt, auth.timezone);
-            const nowLocalDate = localDateFor(now, auth.timezone);
-            const nextLocalMidnight = Date.parse(`${nextLocalDate}T00:00:00.000Z`);
-            const nowLocalMidnight = Date.parse(`${nowLocalDate}T00:00:00.000Z`);
-            const daysBehind = Math.max(0, Math.floor((nowLocalMidnight - nextLocalMidnight) / 86_400_000));
-            const missedIntervals = Math.floor(daysBehind / rule.intervalDays);
-            if (missedIntervals > 0) {
-              nextDueAt = addDaysAtLocalTime(nextDueAt, missedIntervals * rule.intervalDays, auth.timezone);
-            }
-            if (nextDueAt <= now) {
-              nextDueAt = addDaysAtLocalTime(nextDueAt, rule.intervalDays, auth.timezone);
-            }
-          }
+          nextDueAt = nextOccurrenceAt(existing.dueAt, rule.intervalDays, now, auth.timezone);
           await tx.reminderRule.update({
             where: { id: rule.id },
             data: { nextDueAt },
@@ -181,7 +215,7 @@ export function createTasksRouter() {
               animalId: existing.animalId,
               title: rule.title,
               category: rule.category,
-              description: existing.description,
+              description: rule.description,
               dueAt: nextDueAt,
               status: "open",
               reminderRuleId: rule.id,
@@ -238,6 +272,7 @@ export function createTasksRouter() {
         data: {
           userId: auth.userId,
           title: input.title,
+          description: input.description ?? null,
           category: input.category,
           intervalDays: input.intervalDays,
           nextDueAt: new Date(input.nextDueAt),
@@ -292,6 +327,7 @@ export function createTasksRouter() {
           where: { id: openTask.id },
           data: {
             title: rule.title,
+            description: rule.description,
             category: rule.category,
             dueAt: rule.nextDueAt,
             animalId: rule.animalId,
@@ -302,6 +338,7 @@ export function createTasksRouter() {
           data: {
             userId: auth.userId,
             title: rule.title,
+            description: rule.description,
             category: rule.category,
             dueAt: rule.nextDueAt,
             animalId: rule.animalId,
@@ -340,12 +377,35 @@ export function createTasksRouter() {
   router.delete("/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id, "task id");
-    const existing = await prisma.task.findFirst({ where: { id, userId: auth.userId }, select: { id: true } });
+    const existing = await prisma.task.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
     await prisma.$transaction(async (tx) => {
+      if (existing.reminderRuleId) await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
       await tx.task.delete({ where: { id } });
+      let nextOccurrenceCreated = false;
+      if (existing.status === "open" && existing.reminderRuleId) {
+        const rule = await tx.reminderRule.findFirst({
+          where: { id: existing.reminderRuleId, userId: auth.userId, isEnabled: true },
+        });
+        if (rule) {
+          const nextDueAt = nextOccurrenceAt(existing.dueAt, rule.intervalDays, new Date(), auth.timezone);
+          await tx.reminderRule.update({ where: { id: rule.id }, data: { nextDueAt } });
+          await tx.task.create({
+            data: {
+              userId: auth.userId,
+              animalId: rule.animalId,
+              title: rule.title,
+              description: rule.description,
+              category: rule.category,
+              dueAt: nextDueAt,
+              reminderRuleId: rule.id,
+            },
+          });
+          nextOccurrenceCreated = true;
+        }
+      }
       await tx.auditEvent.create({
-        data: { userId: auth.userId, action: "task.deleted", entityType: "task", entityId: id, requestId: requestId(res) },
+        data: { userId: auth.userId, action: "task.deleted", entityType: "task", entityId: id, requestId: requestId(res), metadata: { nextOccurrenceCreated } },
       });
     });
     res.status(204).send();
