@@ -5,30 +5,32 @@ import { invalidateResourceCacheEntry, loadCachedResource, subscribeResourceInva
 type ResourceState<T> = { data: T | null; loading: boolean; error: ApiError | null };
 export function useResource<T>(url: string | null) {
   const [state, setState] = useState<ResourceState<T>>({ data: null, loading: Boolean(url), error: null });
-  const [revision, setRevision] = useState(0);
   const [cacheVersion, setCacheVersion] = useState(0);
   const requestId = useRef(0);
-  const reload = useCallback(() => {
-    if (url) invalidateResourceCacheEntry(url + "|locale:" + getApiLocale());
-    setRevision((value) => value + 1);
-  }, [url]);
+  const cacheKey = url ? url + "|locale:" + getApiLocale() : null;
 
-  useEffect(() => subscribeResourceInvalidation(() => {
-    setCacheVersion((value) => value + 1);
-  }), []);
+  const reload = useCallback(() => {
+    if (cacheKey) invalidateResourceCacheEntry(cacheKey);
+  }, [cacheKey]);
+
+  useEffect(() => subscribeResourceInvalidation((invalidatedKey) => {
+    if (invalidatedKey === undefined || invalidatedKey === cacheKey) {
+      setCacheVersion((value) => value + 1);
+    }
+  }), [cacheKey]);
 
   useEffect(() => {
     const current = ++requestId.current;
-    if (!url) {
+    if (!url || !cacheKey) {
       setState({ data: null, loading: false, error: null });
       return;
     }
     setState((previous) => ({ ...previous, loading: true, error: null }));
     const controller = new AbortController();
-    loadCachedResource<T>(url + "|locale:" + getApiLocale(), (signal) => api.get<T>(url, { signal }), controller.signal).then((data) => {
+    loadCachedResource<T>(cacheKey, (signal) => api.get<T>(url, { signal }), controller.signal).then((data) => {
       if (requestId.current === current) setState({ data, loading: false, error: null });
     }).catch((reason: unknown) => {
-      if (controller.signal.aborted || requestId.current !== current) return;
+      if (controller.signal.aborted || requestId.current !== current || (reason instanceof Error && reason.name === "AbortError")) return;
       const error = reason instanceof ApiError ? reason : new ApiError(0, reason instanceof Error ? reason.message : "Network request failed", "NETWORK_ERROR");
       setState((previous) => ({ ...previous, loading: false, error }));
     });
@@ -36,7 +38,7 @@ export function useResource<T>(url: string | null) {
       controller.abort();
       if (requestId.current === current) requestId.current++;
     };
-  }, [url, revision, cacheVersion]);
+  }, [url, cacheKey, cacheVersion]);
 
   return { ...state, reload };
 }
