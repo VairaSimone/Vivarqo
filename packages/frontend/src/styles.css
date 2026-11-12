@@ -1070,3 +1070,223 @@ table, th, td {
     display: inline;
   }
 }
+
+
+/* Typography system — consistent readable sizes across the application.
+   Keep metadata compact, but never below 12px; browser zoom remains supported. */
+:root {
+  --font-body-size: 16px;
+  --font-label-size: 14px;
+  --font-meta-size: 12px;
+  --font-control-size: 16px;
+  --font-action-size: 14px;
+  --font-secondary-size: 13px;
+  --font-nav-size: 14px;
+  --font-section-size: 20px;
+}
+
+body {
+  font-size: var(--font-body-size);
+  line-height: 1.5;
+}
+
+.page-header h1 {
+  font-size: clamp(28px, 3vw, 34px);
+  line-height: 1.15;
+}
+
+.page-header p {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+h2,
+.panel-header h2 {
+  font-size: var(--font-section-size);
+  line-height: 1.3;
+}
+
+.nav-item,
+.sidebar-tools .nav-item,
+.global-search,
+.tabs-line button,
+.segmented button,
+.mobile-menu-button {
+  font-size: var(--font-nav-size) !important;
+}
+
+.nav-caption,
+.nav-count,
+.language-code,
+kbd,
+.app-footer,
+.eyebrow,
+.task-main small,
+.badge,
+.field-hint,
+.field-error,
+th,
+.list-meta,
+.pagination,
+.animal-name-cell small,
+.item-name small,
+.document-name small,
+.detail-field span,
+.record-row small,
+.chart-caption,
+.cycle-title span,
+.cycle-parents,
+.cycle-card-bottom > span,
+.cycle-parent span,
+.cycle-parent small,
+.cycle-stats,
+.timeline-copy span,
+.timeline-copy small,
+.clutch-card small,
+.animal-mini small,
+.session-date,
+.selector-header small,
+.animal-option small,
+.calendar-weekday-row span,
+.calendar-day-number,
+.calendar-event,
+.calendar-day-items > small,
+.calendar-legend,
+.calendar-date-block small,
+.calendar-item-copy small,
+.movement-summary span,
+.notification-copy small,
+.billing-card small,
+.status-row,
+.import-errors > div,
+.import-preview pre,
+.auth-visual-foot,
+.auth-top,
+.auth-legal,
+.public-badge,
+.public-fields span,
+.public-animal-card footer,
+.share-link-box > span,
+.mobile-bottom-nav button,
+.qr-share small {
+  font-size: max(12px, var(--font-meta-size)) !important;
+  line-height: 1.4;
+}
+
+.brand-copy small,
+.profile-copy small,
+.topbar-context,
+.global-search,
+.app-footer,
+.panel-header p,
+.metric-label,
+.dashboard-intro p,
+.quick-action strong,
+.muted-note,
+.empty-state p,
+.error-state,
+.alert,
+.offline-banner,
+.toast,
+.checkbox-field,
+.animal-profile-main span,
+.detail-copy,
+.record-row p,
+.timeline-copy p,
+.feeding-detail,
+.category-bar-row > div:first-child,
+.toggle-row small,
+.notification-copy p,
+.billing-card p,
+.export-intro p,
+.auth-subtitle,
+.auth-links button,
+.public-fields strong,
+.qr-share strong,
+.global-search-result-group,
+.global-search-result small {
+  font-size: max(13px, var(--font-secondary-size)) !important;
+  line-height: 1.5;
+}
+
+.profile-copy strong,
+.task-main strong,
+.quick-action strong,
+.simple-row strong,
+.activity-copy strong,
+.animal-name-cell strong,
+.item-name strong,
+.document-name strong,
+.detail-field strong,
+.record-row strong,
+.timeline-copy strong,
+.clutch-card strong,
+.egg-card strong,
+.animal-mini strong,
+.selector-header strong,
+.animal-option strong,
+.calendar-item-copy strong,
+.category-bar-row strong,
+.toggle-row strong,
+.notification-copy strong,
+.import-errors h3,
+.import-preview h3,
+.public-fields strong {
+  font-size: 14px !important;
+  line-height: 1.4;
+}
+
+.field-label,
+label.field-label {
+  font-size: var(--font-label-size) !important;
+  line-height: 1.4;
+}
+
+.control,
+.search-control input,
+input,
+select,
+textarea {
+  font-size: var(--font-control-size) !important;
+  line-height: 1.4;
+}
+
+.btn,
+.btn-sm,
+.btn-lg,
+.text-link,
+.tabs-line button,
+.segmented button {
+  font-size: var(--font-action-size) !important;
+}
+
+.btn,
+.btn-sm,
+.btn-lg {
+  min-height: 40px;
+}
+
+.panel-header h2 {
+  font-size: var(--font-section-size);
+}
+
+.metric-label,
+.panel-header p {
+  font-size: 13px !important;
+}
+
+:root[data-theme="dark"] {
+  --muted: #aebbb3;
+}
+
+@media (max-width: 760px) {
+  .page-header h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 390px) {
+  .page-header h1 {
+    font-size: 28px;
+  }
+}
