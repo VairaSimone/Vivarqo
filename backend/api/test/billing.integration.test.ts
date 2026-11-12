@@ -151,16 +151,40 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     expect(afterLateCheckout.status).toBe("active");
     expect(afterLateCheckout.currentPeriodEnd?.getTime()).toBe((baseTime + 2_592_000) * 1000);
 
+    // Invoices for an older subscription belonging to the same Stripe customer
+    // must not alter the current subscription after a renewal/re-subscription.
+    const staleFailedInvoice = {
+      id: `evt_vivarqo_${randomUUID()}`, type: "invoice.payment_failed",
+      data: { object: { id: "in_test_stale_failed", customer: "cus_test_vivarqo", subscription: "sub_old_vivarqo" } },
+    };
+    await sendEvent(owner.agent, staleFailedInvoice).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("active");
+
     const failedEvent = {
       id: `evt_vivarqo_${randomUUID()}`, type: "invoice.payment_failed",
-      data: { object: { id: "in_test_failed", customer: "cus_test_vivarqo" } },
+      data: { object: { id: "in_test_failed", customer: "cus_test_vivarqo", subscription: "sub_test_vivarqo" } },
     };
     await sendEvent(owner.agent, failedEvent).expect(200);
     expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
 
+    // Also cover the newer Stripe invoice shape where subscription is nested
+    // under parent.subscription_details.
+    const stalePaidInvoice = {
+      id: `evt_vivarqo_${randomUUID()}`, type: "invoice.paid",
+      data: { object: {
+        id: "in_test_stale_paid", customer: "cus_test_vivarqo",
+        parent: { subscription_details: { subscription: "sub_old_vivarqo" } },
+      } },
+    };
+    await sendEvent(owner.agent, stalePaidInvoice).expect(200);
+    expect((await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } })).status).toBe("past_due");
+
     const paidEvent = {
       id: `evt_vivarqo_${randomUUID()}`, type: "invoice.paid",
-      data: { object: { id: "in_test_paid", customer: "cus_test_vivarqo" } },
+      data: { object: {
+        id: "in_test_paid", customer: "cus_test_vivarqo",
+        parent: { subscription_details: { subscription: "sub_test_vivarqo" } },
+      } },
     };
     await sendEvent(owner.agent, paidEvent).expect(200);
     const paidAgain = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
@@ -200,7 +224,7 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     const lateFailedInvoice = {
       id: `evt_vivarqo_${randomUUID()}`,
       type: "invoice.payment_failed",
-      data: { object: { id: "in_test_late_failed", customer: "cus_test_vivarqo" } },
+      data: { object: { id: "in_test_late_failed", customer: "cus_test_vivarqo", subscription: "sub_test_vivarqo" } },
     };
     await sendEvent(owner.agent, lateFailedInvoice).expect(200);
     const afterLateInvoice = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
