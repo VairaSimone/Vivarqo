@@ -1776,3 +1776,8 @@ svg {
   .dashboard-task-row.task-row-overdue { margin-inline: -6px; padding-inline: 6px; }
   .dashboard-page .panel { padding: 13px; }
 }
+
+
+.dashboard-reminder-overdue { background: color-mix(in srgb, var(--danger-bg) 42%, transparent); }
+.dashboard-reminder-overdue .simple-row-icon { background: var(--danger-bg); color: var(--danger); }
+.dashboard-reminder-row .badge { margin-left: auto; }
