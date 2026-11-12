@@ -224,7 +224,7 @@ async function startDashboard() {
     const url = new URL(req.url || "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); res.end(html); return; }
     if (req.method === "GET" && url.pathname === "/api/state") { res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(dashboardState())); return; }
-    if (req.method === "GET" && url.pathname === "/events") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); eventClients.add(res); req.on("close", () => eventClients.delete(res)); return; }
+    if (req.method === "GET" && url.pathname === "/events") { res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" }); eventClients.add(res); res.on("close", () => eventClients.delete(res)); return; }
     res.writeHead(404); res.end("Not found");
   });
   await new Promise((resolve, reject) => { dashboardServer.once("error", reject); dashboardServer.listen(DASHBOARD_PORT, "127.0.0.1", resolve); });
