@@ -149,12 +149,12 @@ async function replayPendingInvoiceEvents(
       WHERE result = 'pending'
         AND event_type IN ('invoice.payment_failed', 'invoice.paid')
         AND stripe_event_created_at IS NOT NULL
-        AND COALESCE(payload->>'customer', payload#>>'{customer,id}') = ${customerId}
+        AND COALESCE(payload#>>'{customer,id}', payload->>'customer') = ${customerId}
         AND COALESCE(
-          payload->>'subscription',
           payload#>>'{subscription,id}',
-          payload#>>'{parent,subscription_details,subscription}',
-          payload#>>'{parent,subscription_details,subscription,id}'
+          payload->>'subscription',
+          payload#>>'{parent,subscription_details,subscription,id}',
+          payload#>>'{parent,subscription_details,subscription}'
         ) = ${subscriptionId}
       ORDER BY stripe_event_created_at ASC, id ASC
       FOR UPDATE`;
