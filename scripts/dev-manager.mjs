@@ -13,6 +13,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const ROOT = process.cwd();
 const COMPOSE = path.join("backend", "infra", "docker", "compose.yaml");
+const PRODUCTION_COMPOSE = path.join("backend", "infra", "docker", "compose.production.yaml");
 const LOG_DIR = path.join(ROOT, ".dev-manager", "logs");
 const LOG_FILE = path.join(LOG_DIR, "manager.log");
 const API_URL = process.env.VIVARQO_API_URL || "http://127.0.0.1:3000/healthz";
@@ -168,7 +169,7 @@ function broadcast(payload) {
   for (const client of eventClients) { try { client.write(data); } catch { eventClients.delete(client); } }
 }
 function serviceSnapshot() {
-  const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend" };
+  const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend", web: "Frontend web", caddy: "Reverse proxy", backup: "Backup DB", migrate: "Migrazioni" };
   return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, stateLabel: s.state === "running" ? "Operativo" : s.state === "restarting" ? "Riavvio" : s.state === "failed" ? "Errore" : s.state === "degraded" ? "Degradato" : s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
 }
 function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: summarizeDiagnostics(diagnosticEvents), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
@@ -284,6 +285,100 @@ async function monitor() {
     await delay(10_000);
   }
 }
+async function prepareProduction() {
+  if (process.platform !== "linux") throw new Error("La modalità production è supportata solo su Linux.");
+  const envFile = process.env.VIVARQO_ENV_FILE;
+  if (!envFile) throw new Error("Imposta VIVARQO_ENV_FILE con il percorso del file ambiente di produzione.");
+  const absoluteEnvFile = path.resolve(ROOT, envFile);
+  await access(absoluteEnvFile, constants.F_OK);
+  if (!(await exists("docker"))) throw new Error("Docker Engine non disponibile nel PATH.");
+  await run("docker", ["compose", "version"], true);
+  process.env.VIVARQO_ENV_FILE = absoluteEnvFile;
+  const args = ["compose", "--env-file", absoluteEnvFile, "-f", PRODUCTION_COMPOSE, "config", "--quiet"];
+  await run("docker", args, true);
+  return ["compose", "--env-file", absoluteEnvFile, "-f", PRODUCTION_COMPOSE];
+}
+async function productionRun(composeArgs, args, capture = false) {
+  return run("docker", [...composeArgs.slice(1), ...args], capture);
+}
+async function monitorProduction(composeArgs) {
+  const names = ["postgres", "api", "worker", "web", "caddy", "backup", "migrate"];
+  let workerFailures = 0;
+  while (!STOP.requested) {
+    try {
+      const result = await productionRun(composeArgs, ["ps", "--all", "--format", "json"], true);
+      const rows = result.stdout.split(/\\r?\\n/).filter(Boolean).map(line => JSON.parse(line));
+      for (const row of rows) {
+        const name = row.Service || row.service;
+        if (!name) continue;
+        const state = String(row.State || row.state || "unknown").toLowerCase();
+        const health = String(row.Health || row.health || "").toLowerCase();
+        const current = services.get(name) || { name, restarts: 0, child: null };
+        current.state = name === "migrate" && state === "exited" && Number(row.ExitCode || row.exitCode) === 0
+          ? "completed" : state === "running" && health !== "unhealthy" ? "running" : "degraded";
+        current.lastCheck = health ? "container " + state + " / health " + health : "container " + state;
+        services.set(name, current);
+      }
+      for (const name of names) {
+        if (!services.has(name)) services.set(name, { name, state: "missing", restarts: 0, child: null, lastCheck: "Container non trovato" });
+      }
+      const pg = services.get("postgres");
+      if (pg && pg.state !== "running") {
+        await log("ERROR", "postgres", "Container PostgreSQL non operativo; richiedo il ripristino Compose.");
+        await productionRun(composeArgs, ["up", "-d", "--no-deps", "postgres"]);
+        pg.restarts++; pg.state = "restarting";
+      }
+      for (const name of ["api", "web", "caddy", "backup"]) {
+        const service = services.get(name);
+        if (service && service.state === "degraded") {
+          await log("WARN", name, "Container non sano; richiedo il riavvio Compose.");
+          await productionRun(composeArgs, ["up", "-d", "--no-deps", name]);
+          service.restarts++; service.state = "restarting";
+        }
+      }
+      try {
+        const heartbeat = await productionRun(composeArgs, ["exec", "-T", "postgres", "sh", "-lc",
+          "psql -U \\"$POSTGRES_USER\\" -d \\"$POSTGRES_DB\\" -tA -c \\"SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());\\""], true);
+        if (heartbeat.stdout.trim().toLowerCase() === "t") {
+          workerFailures = 0;
+          const worker = services.get("worker");
+          if (worker) { worker.state = "running"; worker.lastCheck = "heartbeat DB valido"; }
+        } else throw new Error("heartbeat worker assente/scaduto");
+      } catch (error) {
+        workerFailures++;
+        const worker = services.get("worker");
+        if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
+        if (workerFailures >= 2) {
+          await log("ERROR", "worker", "Heartbeat non valido; richiedo il riavvio del container.");
+          await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
+          if (worker) { worker.restarts++; worker.state = "restarting"; }
+          workerFailures = 0;
+        }
+      }
+      for (const name of names.filter(n => n !== "migrate")) {
+        try {
+          const logs = await productionRun(composeArgs, ["logs", "--no-color", "--since", "12s", name], true);
+          if (logs.stdout) appendServiceLog(name, logs.stdout);
+          if (logs.stderr) appendServiceLog(name, logs.stderr);
+        } catch (error) { await log("WARN", name, "Lettura log container fallita: " + error.message); }
+      }
+    } catch (error) {
+      await log("ERROR", "DOCKER", "Monitoraggio Compose non riuscito: " + error.message);
+    }
+    broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
+    await delay(10_000);
+  }
+}
+async function productionMain() {
+  await mkdir(LOG_DIR, { recursive: true });
+  await loadPersistentLogs();
+  await startDashboard();
+  await log("INFO", "MANAGER", "Avvio Vivarqo Production Manager su Linux.");
+  const composeArgs = await prepareProduction();
+  await productionRun(composeArgs, ["up", "-d", "--build"]);
+  await log("INFO", "MANAGER", "Stack di produzione avviato. L'arresto del manager non arresta i container.");
+  await monitorProduction(composeArgs);
+}
 function status() {
   console.log("\nSTATO SERVIZI");
   for (const s of services.values()) console.log("  " + s.name.padEnd(10) + s.state.padEnd(12) + "riavvii: " + s.restarts);
@@ -302,6 +397,7 @@ async function shutdown(reason) {
   await log("INFO", "MANAGER", "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
 }
 async function main() {
+  if (process.env.VIVARQO_MANAGER_MODE === "production") return productionMain();
   await mkdir(LOG_DIR, { recursive: true });
   await loadPersistentLogs();
   await startDashboard();
