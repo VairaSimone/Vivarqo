@@ -39,14 +39,17 @@ async function loadPersistentLogs() {
       const second = line.indexOf("] [", first + 2);
       const third = line.indexOf("] ", second + 3);
       if (first > 0 && second > first && third > second) {
-        recentLogs.push({
+        const item = {
           timestamp: line.slice(0, first),
           level: line.slice(first + 2, second),
           service: line.slice(second + 3, third),
           message: line.slice(third + 2)
-        });
+        };
+        recentLogs.push(item);
+        if (["ERROR", "FATAL", "WARN"].includes(item.level)) diagnosticEvents.push(item);
       }
     }
+    if (diagnosticEvents.length > 500) diagnosticEvents.splice(0, diagnosticEvents.length - 500);
   } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
 async function log(level, source, message) {
@@ -431,7 +434,7 @@ async function productionMain() {
   await startDashboard();
   await log("INFO", "MANAGER", "Avvio Vivarqo Production Manager su Linux.");
   const composeArgs = await prepareProduction();
-  await productionRun(composeArgs, ["up", "-d", "--build"]);
+  await productionRun(composeArgs, ["up", "-d"]);
   await log("INFO", "MANAGER", "Stack di produzione avviato. L'arresto del manager non arresta i container.");
   await monitorProduction(composeArgs);
 }
