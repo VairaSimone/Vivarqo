@@ -22,6 +22,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [bulk, setBulk] = useState(queryParams.get("bulk") === "1" || (queryParams.get("create") === "1" && !queryParams.get("animalId")));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [formDirty, setFormDirty] = useState(false);
   const [performedAt, setPerformedAt] = useState(localDateTimeValue(new Date(), timezone));
   const [sessionNotes, setSessionNotes] = useState("");
   const [animalSearch, setAnimalSearch] = useState("");
@@ -50,15 +51,18 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   }, [path, timezone]);
 
   function openNew(isBulk: boolean) {
-    setBulk(isBulk); setModal(true); setError(""); setSelected(animalId ? [animalId] : []);
+    setBulk(isBulk); setModal(true); setError(""); setFormDirty(false); setSelected(animalId ? [animalId] : []);
     setEntries({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
   }
 
   function toggleAnimal(id: string) {
+    setFormDirty(true);
+    setError("");
     setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }
 
   function updateEntry(id: string, field: string, value: string) {
+    setFormDirty(true);
     setEntries((current) => ({
       ...current,
       [id]: { ...(current[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" }), [field]: value }
@@ -67,13 +71,13 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
 
   async function saveSession(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
+    if (busy) return;
     setError("");
     if (selected.length === 0) {
       setError(t("selectAnimals"));
-      setBusy(false);
       return;
     }
+    setBusy(true);
     try {
       const payload = {
         performedAt: dateTimeInputToUtc(performedAt, timezone),
@@ -92,6 +96,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
       };
       await api.post("/feeding-sessions", payload);
       setModal(false);
+      setFormDirty(false);
       resource.reload();
       show(t("feedingCreated"));
     } catch (reason) {
@@ -102,7 +107,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   }
 
   async function saveEntry(event: FormEvent) {
-    event.preventDefault(); if (!editEntry) return; setBusy(true); setError("");
+    event.preventDefault(); if (!editEntry || busy) return; setBusy(true); setError("");
     const payload = {
       outcome: editData.outcome, foodType: editData.foodType || null, foodSize: editData.foodSize || null,
       foodWeightG: editData.foodWeightG ? weightToGrams(editData.foodWeightG) : null, notes: editData.notes || null
@@ -164,14 +169,14 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
       {pager && <Pagination page={pager.page} totalPages={pager.totalPages} onChange={setPage} label={t("page")} />}
     </Panel>
 
-    {modal && <Modal title={bulk ? t("bulkFeeding") : t("registerFeeding")} onClose={() => setModal(false)} wide>
+    {modal && <Modal title={bulk ? t("bulkFeeding") : t("registerFeeding")} onClose={() => { setModal(false); setFormDirty(false); }} hasUnsavedChanges={formDirty} discardMessage={locale === "en" ? "Discard this feeding session? The selected animals and entries will be lost." : "Scartare questa registrazione? Gli animali selezionati e i dati inseriti andranno persi."} wide>
       <form className="form-stack" onSubmit={saveSession}>
         {error && <Alert tone="danger">{error}</Alert>}
         <div className="form-grid">
-          <Field label={t("feedingDate")}><Input type="datetime-local" required value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} /></Field>
-          <Field label={t("notes")}><Input value={sessionNotes} onChange={(e) => setSessionNotes(e.target.value)} /></Field>
+          <Field label={t("feedingDate")} required><Input type="datetime-local" required value={performedAt} onChange={(e) => { setPerformedAt(e.target.value); setFormDirty(true); }} /></Field>
+          <Field label={t("notes")}><Input value={sessionNotes} onChange={(e) => { setSessionNotes(e.target.value); setFormDirty(true); }} /></Field>
         </div>
-        <div className="selector-header"><div><strong>{t("selectAnimals")}</strong><small>{selected.length} {t("selected")}</small></div><label className="search-control"><Icon name="search" /><input value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} placeholder={t("search")} /></label></div>
+        <div className="selector-header"><div><strong>{t("selectAnimals")} <span className="field-required" aria-hidden="true">*</span></strong><small>{selected.length} {t("selected")}</small></div><label className="search-control"><Icon name="search" /><input value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} placeholder={t("search")} /></label></div>
         {animalsResource.loading && !animalsResource.data ? <LoadingState /> : <div className="animal-picker">
           {animalResults.map((animal) => <label className={`animal-option ${selected.includes(animal.id) ? "selected" : ""}`} key={animal.id}><input type="checkbox" checked={selected.includes(animal.id)} onChange={() => toggleAnimal(animal.id)} /><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{animal.name}</strong><small>{animal.identifier || animal.species}</small></span><i>{selected.includes(animal.id) ? <Icon name="check" size={16} /> : null}</i></label>)}
           {!animalResults.length && <p className="muted-note">{t("noAnimals")}</p>}
