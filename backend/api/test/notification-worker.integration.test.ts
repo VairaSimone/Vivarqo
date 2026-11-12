@@ -11,6 +11,9 @@ const userIds: string[] = [];
 describe.skipIf(!enabled)("Due-task notification worker", () => {
   afterAll(async () => {
     if (userIds.length) {
+      await prisma.pushDeliveryAttempt.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.pushSubscription.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.notificationPreferences.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.task.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -104,5 +107,34 @@ describe.skipIf(!enabled)("Due-task notification worker", () => {
     const second = await dispatchDueTaskNotifications(new Date());
     expect(second.created).toBe(0);
     expect(await prisma.notification.count({ where: { userId: user.id, category: "task_due" } })).toBe(1);
+  });
+
+  it("creates due-task notifications in the account language", async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: "notification-worker-en-" + randomUUID() + "@example.com",
+        passwordHash: await argon2.hash("Test-Password-42!", { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 }),
+        displayName: "English Notification Worker",
+        emailVerifiedAt: new Date(),
+        locale: "en",
+      },
+    });
+    userIds.push(user.id);
+    const task = await prisma.task.create({
+      data: {
+        userId: user.id,
+        title: "Check incubator",
+        category: "reproduction",
+        dueAt: new Date(Date.now() - 10 * 60_000),
+      },
+    });
+
+    const result = await dispatchDueTaskNotifications(new Date());
+    expect(result.created).toBe(1);
+    const alert = await prisma.notification.findFirstOrThrow({
+      where: { userId: user.id, category: "task_due", targetPath: "/tasks/" + task.id },
+    });
+    expect(alert.title).toBe("Task to complete: Check incubator");
+    expect(alert.body).toBe("It is overdue.");
   });
 });
