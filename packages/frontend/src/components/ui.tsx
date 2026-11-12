@@ -57,14 +57,17 @@ export function Alert({ children, tone = "info" }: { children: ReactNode; tone?:
 }
 type AccessibleControlProps = {
   id?: string;
+  required?: boolean;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean | "true" | "false";
+  "aria-required"?: boolean | "true" | "false";
 };
 
-export function Field({ label, hint, error, children }: {
+export function Field({ label, hint, error, required, children }: {
   label: string;
   hint?: string;
   error?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   const generatedId = useId();
@@ -78,12 +81,13 @@ export function Field({ label, hint, error, children }: {
           hint ? hintId : undefined,
           error ? errorId : undefined
         ].filter(Boolean).join(" ") || undefined,
-        "aria-invalid": error ? true : children.props["aria-invalid"]
+        "aria-invalid": error ? true : children.props["aria-invalid"],
+        "aria-required": required || children.props.required ? true : children.props["aria-required"]
       })
     : children;
 
   return <label className="field">
-    <span className="field-label">{label}</span>
+    <span className="field-label">{label}{(required || (isValidElement<AccessibleControlProps>(children) && children.props.required)) && <span className="field-required" aria-hidden="true"> *</span>}</span>
     {control}
     {hint && <small id={hintId} className="field-hint">{hint}</small>}
     {error && <small id={errorId} className="field-error" role="alert">{error}</small>}
@@ -212,12 +216,20 @@ export function Pagination({ page, totalPages, onChange, label = "Page" }: { pag
   const english = typeof document !== "undefined" && document.documentElement.lang === "en";
   return <div className="pagination"><span>{label} {page} / {totalPages}</span><div><Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onChange(page - 1)}><Icon name="chevron" size={13} />{english ? "Previous" : "Precedente"}</Button><Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>{english ? "Next" : "Successivo"}<Icon name="chevron" size={13} /></Button></div></div>;
 }
-export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide = false, hasUnsavedChanges = false, discardMessage }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; hasUnsavedChanges?: boolean; discardMessage?: string }) {
   const closeLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Chiudi";
   const dialogRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const closeRef = useRef(onClose);
+  const dirtyRef = useRef(hasUnsavedChanges);
+  const discardMessageRef = useRef(discardMessage);
   closeRef.current = onClose;
+  dirtyRef.current = hasUnsavedChanges;
+  discardMessageRef.current = discardMessage;
+  const requestClose = () => {
+    if (dirtyRef.current && !window.confirm(discardMessageRef.current ?? (document.documentElement.lang === "en" ? "Discard unsaved changes?" : "Vuoi scartare le modifiche non salvate?"))) return;
+    closeRef.current();
+  };
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -239,7 +251,7 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        closeRef.current();
+        requestClose();
         return;
       }
       if (event.key !== "Tab") return;
@@ -270,7 +282,7 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
     };
   }, []);
 
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}><section ref={dialogRef} tabIndex={-1} className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}><header className="modal-header"><h2 id={titleId}>{title}</h2><IconButton label={closeLabel} onClick={onClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}><section ref={dialogRef} tabIndex={-1} className={"modal " + (wide ? "modal-wide" : "")} role="dialog" aria-modal="true" aria-labelledby={titleId}><header className="modal-header"><h2 id={titleId}>{title}</h2><IconButton label={closeLabel} onClick={requestClose}><Icon name="close" size={16} /></IconButton></header><div className="modal-content">{children}</div></section></div>;
 }
 export function useToast() {
   const [message, setMessage] = useState("");
