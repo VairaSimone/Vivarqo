@@ -348,14 +348,36 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
       } },
     }).expect(200);
 
-    const subscription = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
-    expect(subscription.status).toBe("past_due");
-    expect(subscription.lastStripeEventCreatedAt?.getTime()).toBe((baseTime + 20) * 1000);
+    const subscriptionAfterStaleSnapshot = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    // Checkout has established the account mapping, so the pending failure is
+    // applied immediately. The older active subscription snapshot cannot revive it.
+    expect(subscriptionAfterStaleSnapshot.status).toBe("incomplete");
+    expect(subscriptionAfterStaleSnapshot.lastStripeEventCreatedAt?.getTime()).toBe((baseTime + 20) * 1000);
+
     const replayed = await prisma.stripeWebhookEvent.findUniqueOrThrow({
       where: { stripeEventId: invoiceEvent.id },
     });
     expect(replayed.result).toBe("processed");
     expect(replayed.processedAt).toBeTruthy();
+
+    await sendEvent(owner.agent, {
+      id: `evt_vivarqo_${randomUUID()}`,
+      created: baseTime + 22,
+      type: "customer.subscription.updated",
+      data: { object: {
+        id: "sub_pending_vivarqo",
+        customer: "cus_pending_vivarqo",
+        metadata: { user_id: owner.userId },
+        status: "active",
+        current_period_start: baseTime,
+        current_period_end: baseTime + 2_592_000,
+        cancel_at_period_end: false,
+        items: { data: [{ price: { id: "price_test_vivarqo" } }] },
+      } },
+    }).expect(200);
+    const recovered = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
+    expect(recovered.status).toBe("active");
+    expect(recovered.lastStripeEventCreatedAt?.getTime()).toBe((baseTime + 22) * 1000);
   });
 
   it("rejects expired and invalid webhook signatures without persisting the event", async () => {
