@@ -314,6 +314,26 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
+  it("includes the full local calendar day when filtering feeding sessions by date", async () => {
+    const owner = await account();
+    const animal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Date filter animal", species: "Python regius" },
+    });
+    await prisma.feedingSession.create({
+      data: {
+        userId: owner.userId,
+        performedAt: new Date("2026-10-20T10:00:00.000Z"),
+        entries: { create: [{ animalId: animal.id, outcome: "ate" }] },
+      },
+    });
+
+    const result = await owner.agent.get(
+      `/api/v1/feeding-sessions?animalId=${animal.id}&from=2026-10-20&to=2026-10-20`,
+    ).expect(200);
+    expect(result.body.sessions).toHaveLength(1);
+    expect(result.body.pagination.total).toBe(1);
+  });
+
   it("paginates animal history beyond 100 records and reports exact totals", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({
