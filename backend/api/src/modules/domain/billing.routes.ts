@@ -244,6 +244,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       lastStripeEventCreatedAt: null,
     };
     await tx.subscription.upsert({ where: { userId: userRaw }, create: { userId: userRaw, ...data }, update: data });
+    await replayPendingInvoiceEvents(tx, userRaw, customerId, subscriptionId);
     return false;
   }
 
