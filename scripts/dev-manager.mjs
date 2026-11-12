@@ -13,7 +13,9 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const ROOT = process.cwd();
 const COMPOSE = path.join("backend", "infra", "docker", "compose.yaml");
-const PRODUCTION_COMPOSE = path.join("backend", "infra", "docker", "compose.production.yaml");
+const PRODUCTION_COMPOSE = process.env.VIVARQO_MANAGER_PRODUCTION_COMPOSE
+  ? path.resolve(ROOT, process.env.VIVARQO_MANAGER_PRODUCTION_COMPOSE)
+  : path.join("backend", "infra", "docker", "compose.production.yaml");
 const LOG_DIR = process.env.VIVARQO_MANAGER_LOG_DIR
   ? path.resolve(ROOT, process.env.VIVARQO_MANAGER_LOG_DIR)
   : path.join(ROOT, ".dev-manager", "logs");
