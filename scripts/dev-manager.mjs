@@ -506,7 +506,9 @@ async function shutdown(reason) {
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
   if (dashboardServer) await new Promise(resolve => dashboardServer.close(resolve));
-  await log("INFO", "MANAGER", "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
+  await log("INFO", "MANAGER", process.env.VIVARQO_MANAGER_MODE === "production"
+    ? "Manager arrestato; i container Docker di produzione restano attivi."
+    : "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
 }
 async function main() {
   if (process.env.VIVARQO_MANAGER_TEST_MODE === "1") return testModeMain();
