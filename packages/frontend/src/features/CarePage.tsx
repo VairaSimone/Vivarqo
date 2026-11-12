@@ -3,7 +3,7 @@ import type { AnimalDto } from "@vivarqo/contracts/animals";
 import { parseFeedingSessionsResponse } from "@vivarqo/contracts/care";
 import type { FeedingEntryDto, FeedingSessionsResponseDto } from "@vivarqo/contracts/care";
 import { api, ApiError } from "../lib/api";
-import { dateTimeInputToUtc, formatDateTime, formatWeight, getArray, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
+import { dateTimeInputToUtc, formatDateTime, formatWeight, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";

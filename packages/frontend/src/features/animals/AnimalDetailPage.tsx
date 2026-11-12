@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { parseFeedingSessionsResponse } from "@vivarqo/contracts/care";
+import type { FeedingEntryDto, FeedingSessionDto, FeedingSessionsResponseDto } from "@vivarqo/contracts/care";
 import { api, ApiError } from "../../lib/api";
 import { downloadQrSvg, qrMatrix } from "../../lib/qr";
 import { dateForInput, dateTimeInputToUtc, dateTimeInputValue, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
@@ -10,7 +12,6 @@ import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
-type FeedingItem = Record<string, unknown>;
 const sourceAnimalDetailEndpoint = (sourceId: string) => "/animals/" + encodeURIComponent(sourceId);
 
 export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale; navigate: (path: string) => void }) {
@@ -39,7 +40,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
   const [feedingPage, setFeedingPage] = useState(1);
-  const [feedingEditEntry, setFeedingEditEntry] = useState<FeedingItem | null>(null);
+  const [feedingEditEntry, setFeedingEditEntry] = useState<FeedingEntryDto | null>(null);
   const [feedingBusy, setFeedingBusy] = useState(false);
   const [feedingFormError, setFeedingFormError] = useState("");
   const [feedingEditForm, setFeedingEditForm] = useState({
@@ -50,10 +51,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const weights = useResource<{ weights: WeightDto[] }>(animal && tab === "history" ? `/animals/${id}/weights?page=1&pageSize=100` : null);
   const sheds = useResource<{ sheds: ShedDto[] }>(animal && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
   const notes = useResource<{ notes: AnimalNoteDto[] }>(animal && tab === "history" ? `/animals/${id}/notes?page=1&pageSize=100` : null);
-  const feedings = useResource<{
-    sessions: FeedingItem[];
-    pagination: { page: number; pageSize: number; total: number; totalPages: number };
-  }>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null);
+  const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
@@ -158,7 +156,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
-  function openFeedingEdit(session: FeedingItem, entry: FeedingItem) {
+  function openFeedingEdit(session: FeedingSessionDto, entry: FeedingEntryDto) {
     setFeedingFormError("");
     setFeedingEditForm({
       performedAt: dateTimeInputValue(getString(session, "performedAt")),
@@ -195,7 +193,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     }
   }
 
-  async function deleteFeedingEntry(entry: FeedingItem) {
+  async function deleteFeedingEntry(entry: FeedingEntryDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try {
       await api.delete("/feeding-entries/" + getString(entry, "id"));
@@ -297,7 +295,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <PanelHeader title={t("feedingHistory")} action={getString(animal, "status") === "active" ? <Button size="sm" onClick={() => navigate("/feeding?animalId=" + encodeURIComponent(id) + "&create=1")}><Icon name="feed" size={14} />{t("newFeeding")}</Button> : undefined} />
           {feedings.loading && !feedings.data ? <LoadingState /> : feedings.error ? <ErrorState message={feedings.error.message} retry={feedings.reload} /> : feedings.data?.sessions.length ? <div className="session-list">
             {feedings.data.sessions.map((session) => {
-              const entries = getArray<FeedingItem>(session, "entries");
+              const entries = session.entries;
               const entry = entries.find((candidate) => getString(candidate, "animalId") === id);
               if (!entry) return null;
               const outcomeValue = getString(entry, "outcome");
