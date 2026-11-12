@@ -3,10 +3,11 @@ ALTER TABLE "subscriptions"
 
 ALTER TABLE "stripe_webhook_events"
   ADD COLUMN "stripe_event_created_at" TIMESTAMPTZ(6),
-  ADD COLUMN "payload" JSONB;
+  ADD COLUMN "stripe_customer_id" VARCHAR(128),
+  ADD COLUMN "stripe_subscription_id" VARCHAR(128);
 
 CREATE INDEX "stripe_webhook_events_pending_idx"
-  ON "stripe_webhook_events" ("result", "event_type", "stripe_event_created_at")
+  ON "stripe_webhook_events" ("result", "event_type", "stripe_customer_id", "stripe_subscription_id", "stripe_event_created_at")
   WHERE "result" = 'pending';
 
 -- Existing non-incomplete subscriptions have already had an authoritative lifecycle
