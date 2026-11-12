@@ -155,6 +155,7 @@ CREATE TABLE reminder_rules (
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     animal_id       UUID REFERENCES animals(id) ON DELETE RESTRICT,
     title           VARCHAR(160) NOT NULL,
+    description     TEXT,
     category        VARCHAR(30) NOT NULL
                     CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'document', 'inventory', 'custom')),
     interval_days   INTEGER NOT NULL CHECK (interval_days > 0),
@@ -468,6 +469,7 @@ CREATE TABLE subscriptions (
     current_period_start    TIMESTAMPTZ,
     current_period_end      TIMESTAMPTZ,
     cancel_at_period_end    BOOLEAN NOT NULL DEFAULT FALSE,
+    last_stripe_event_created_at TIMESTAMPTZ,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT subscription_period_check CHECK (
@@ -479,6 +481,9 @@ CREATE TABLE stripe_webhook_events (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stripe_event_id     VARCHAR(128) NOT NULL UNIQUE,
     event_type          VARCHAR(120) NOT NULL,
+    stripe_event_created_at TIMESTAMPTZ,
+    stripe_customer_id  VARCHAR(128),
+    stripe_subscription_id VARCHAR(128),
     processed_at        TIMESTAMPTZ,
     result              VARCHAR(20) NOT NULL DEFAULT 'pending'
                         CHECK (result IN ('pending', 'processed', 'failed', 'ignored')),
@@ -519,8 +524,10 @@ CREATE INDEX tasks_user_status_due_idx ON tasks (user_id, status, due_at);
 CREATE INDEX tasks_open_due_worker_idx ON tasks (due_at, id) WHERE status = 'open';
 CREATE INDEX tasks_animal_idx ON tasks (animal_id);
 CREATE INDEX tasks_reminder_rule_idx ON tasks (reminder_rule_id);
+CREATE UNIQUE INDEX tasks_one_open_per_reminder_rule_idx ON tasks (reminder_rule_id) WHERE status = 'open';
 CREATE INDEX push_subscriptions_user_idx ON push_subscriptions (user_id);
 CREATE INDEX notifications_user_created_idx ON notifications (user_id, created_at DESC);
+CREATE INDEX stripe_webhook_events_pending_idx ON stripe_webhook_events (result, event_type, stripe_customer_id, stripe_subscription_id, stripe_event_created_at) WHERE result = 'pending';
 CREATE INDEX notifications_user_unread_idx ON notifications (user_id, created_at DESC) WHERE read_at IS NULL;
 CREATE INDEX notifications_user_category_target_idx ON notifications (user_id, category, target_path);
 CREATE INDEX reproduction_cycles_user_status_started_idx ON reproduction_cycles (user_id, status, started_on DESC);
