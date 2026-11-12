@@ -313,6 +313,8 @@ async function monitor() {
 }
 async function prepareProduction() {
   if (process.platform !== "linux") throw new Error("La modalità production è supportata solo su Linux.");
+  const nodeVersion = process.versions.node.split(".").map(Number);
+  if (nodeVersion[0] !== 24 || nodeVersion[1] < 11) throw new Error("Richiesto Node.js >=24.11 e <25; rilevato " + process.versions.node);
   const envFile = process.env.VIVARQO_ENV_FILE;
   if (!envFile) throw new Error("Imposta VIVARQO_ENV_FILE con il percorso del file ambiente di produzione.");
   const absoluteEnvFile = path.resolve(ROOT, envFile);
@@ -347,7 +349,10 @@ async function monitorProduction(composeArgs) {
         const health = String(row.Health || row.health || "").toLowerCase();
         const current = services.get(name) || { name, restarts: 0, child: null };
         current.state = name === "migrate" && state === "exited" && Number(row.ExitCode ?? row.exitCode) === 0
-          ? "completed" : state === "running" && health !== "unhealthy" ? "running" : "degraded";
+          ? "completed"
+          : state === "running" && (!health || health === "healthy") ? "running"
+          : state === "running" && health === "starting" ? "starting"
+          : "degraded";
         current.lastCheck = health ? "container " + state + " / health " + health : "container " + state;
         services.set(name, current);
       }
@@ -355,7 +360,7 @@ async function monitorProduction(composeArgs) {
         if (!services.has(name)) services.set(name, { name, state: "missing", restarts: 0, child: null, lastCheck: "Container non trovato" });
       }
       const pg = services.get("postgres");
-      if (pg && pg.state !== "running") {
+      if (pg && ["degraded", "missing"].includes(pg.state)) {
         await log("ERROR", "postgres", "Container PostgreSQL non operativo; richiedo il ripristino Compose.");
         if (pg.lastCheck.includes("container running")) {
           await productionRun(composeArgs, ["restart", "postgres"]);
