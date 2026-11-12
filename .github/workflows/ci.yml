@@ -118,16 +118,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.20.0
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Syntax-check and test Dev Manager diagnostics
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check supervisor syntax on Windows
         run: |
           node --check scripts/dev-manager.mjs
           node --check scripts/dev-manager-core.mjs
-          node --test scripts/dev-manager.test.mjs
-
+      - name: Run diagnostic unit tests on Windows
+        run: pnpm test:dev-manager
+      - name: Exercise Windows command, notification and process tools
+        run: node --test scripts/dev-manager.windows.test.mjs
+      - name: Verify PowerShell notification dependencies
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          if (-not [System.Windows.Forms.NotifyIcon]) { throw "NotifyIcon unavailable" }
+          if (-not [System.Drawing.SystemIcons]::Warning) { throw "System notification icon unavailable" }
   e2e:
     runs-on: ubuntu-24.04
     env:
