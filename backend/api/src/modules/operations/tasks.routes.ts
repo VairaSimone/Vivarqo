@@ -157,7 +157,7 @@ export function createTasksRouter() {
             },
           });
           if (input.status === "dismissed") {
-            const nextDueAt = nextOccurrenceAt(existing.dueAt, rule.intervalDays, new Date(), auth.timezone);
+            const nextDueAt = nextOccurrenceAt(task.dueAt, rule.intervalDays, new Date(), auth.timezone);
             await tx.reminderRule.update({ where: { id: rule.id }, data: { nextDueAt } });
             await tx.task.create({
               data: {
@@ -286,6 +286,7 @@ export function createTasksRouter() {
           userId: auth.userId,
           animalId: input.animalId ?? null,
           title: input.title,
+          description: input.description ?? null,
           category: input.category,
           dueAt: new Date(input.nextDueAt),
           reminderRuleId: rule.id,
@@ -307,6 +308,7 @@ export function createTasksRouter() {
     if (!existing) throw new AppError(404, "REMINDER_RULE_NOT_FOUND", "Reminder rule not found");
     if (input.animalId !== undefined) await assertOwnedAnimal(auth.userId, input.animalId);
     const result = await prisma.$transaction(async (tx) => {
+      await lockReminderRule(tx, auth.userId, id);
       const rule = await tx.reminderRule.update({
         where: { id },
         data: {
@@ -361,6 +363,7 @@ export function createTasksRouter() {
     const existing = await prisma.reminderRule.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "REMINDER_RULE_NOT_FOUND", "Reminder rule not found");
     const rule = await prisma.$transaction(async (tx) => {
+      await lockReminderRule(tx, auth.userId, id);
       await tx.task.updateMany({
         where: { userId: auth.userId, reminderRuleId: id, status: "open" },
         data: { status: "dismissed" },
