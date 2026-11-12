@@ -86,6 +86,33 @@ describe("resource cache", () => {
     expect(secondCalls).toBe(1);
   });
 
+  it("does not reuse or cache an in-flight request after its key is invalidated", async () => {
+    let finishOld: ((value: string) => void) | undefined;
+    let finishFresh: ((value: string) => void) | undefined;
+    let calls = 0;
+    const oldConsumer = new AbortController();
+    const oldRequest = loadCachedResource("pending-invalidation|it", () => {
+      calls++;
+      return new Promise<string>((resolve) => { finishOld = resolve; });
+    }, oldConsumer.signal);
+
+    invalidateResourceCacheEntry("pending-invalidation|it");
+    await expect(oldRequest).rejects.toMatchObject({ name: "AbortError" });
+
+    const freshRequest = loadCachedResource("pending-invalidation|it", () => {
+      calls++;
+      return new Promise<string>((resolve) => { finishFresh = resolve; });
+    }, new AbortController().signal);
+    expect(calls).toBe(2);
+
+    finishOld?.("stale response");
+    finishFresh?.("fresh response");
+    await expect(freshRequest).resolves.toBe("fresh response");
+    await expect(loadCachedResource("pending-invalidation|it", async () => "unexpected", new AbortController().signal))
+      .resolves.toBe("fresh response");
+    expect(calls).toBe(2);
+  });
+
   it("expires cached values after the TTL", async () => {
     vi.useFakeTimers();
     let calls = 0;
