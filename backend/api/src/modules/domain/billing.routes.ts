@@ -360,12 +360,20 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
     try {
       await prisma.$transaction(async (tx) => {
         await tx.stripeWebhookEvent.create({
-          data: { stripeEventId: event.id, eventType: event.type, result: "pending" },
+          data: {
+            stripeEventId: event.id,
+            eventType: event.type,
+            stripeEventCreatedAt: timestamp(event.created),
+            payload: event.data.object as never,
+            result: "pending",
+          },
         });
-        await syncStripeEvent(tx, event, priceId);
+        const pending = await syncStripeEvent(tx, event, priceId);
         await tx.stripeWebhookEvent.update({
           where: { stripeEventId: event.id },
-          data: { result: "processed", processedAt: new Date() },
+          data: pending
+            ? { result: "pending", processedAt: null }
+            : { result: "processed", processedAt: new Date() },
         });
       });
     } catch (error) {
