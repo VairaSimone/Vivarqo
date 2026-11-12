@@ -80,6 +80,8 @@ function invalidateAfterMutation(path: string): void {
   const affected: Record<string, string[]> = {
     animals: ["/animals", "/home/today", "/calendar", "/tasks", "/feeding", "/documents", "/reproduction-cycles", "/clutches"],
     feeding: ["/feeding", "/animals", "/home/today"],
+    "feeding-sessions": ["/feeding-sessions", "/animals", "/home/today"],
+    "feeding-entries": ["/feeding-sessions", "/animals", "/home/today"],
     tasks: ["/tasks", "/home/today", "/calendar"],
     reminders: ["/tasks", "/home/today", "/calendar"],
     inventory: ["/inventory", "/finance"],
@@ -91,6 +93,8 @@ function invalidateAfterMutation(path: string): void {
     "reproductive-events": ["/reproduction-cycles", "/calendar", "/home/today"],
     "offspring-batches": ["/reproduction-cycles", "/animals"],
     notifications: ["/notifications"],
+    "notification-preferences": ["/notification-preferences", "/notifications"],
+    "push-subscriptions": ["/push-subscriptions", "/notifications"],
   };
   const prefixes = affected[root];
   if (!prefixes) {
