@@ -124,7 +124,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(page.getByText("Cosa richiede attenzione oggi?")).toBeVisible();
   await expect(page.getByRole("heading", { name: "In ritardo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Da fare oggi" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Nei prossimi 7 giorni" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nei prossimi 7 giorni" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Registra alimentazione" })).toBeVisible();
 
   // Create a real task due in two days and verify that the dashboard surfaces
@@ -662,7 +662,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
     response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/archive") &&
     response.status() === 200
   );
-  await page.getByRole("button", { name: "Archivia" }).click();
+  await page.getByRole("button", { name: "Archivia" }).last().click();
   await itemArchivedResponse;
   const archivedResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=false");
   expect(archivedResponse.status()).toBe(200);
