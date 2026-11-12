@@ -1634,3 +1634,56 @@ svg {
     white-space: nowrap;
   }
 }
+
+
+/* Animal detail: identity first, then only verified recent records. */
+.animal-detail-page { gap: 18px; }
+.animal-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.animal-hero-identity { display: flex; align-items: center; gap: 17px; min-width: 0; }
+.animal-hero .animal-profile-avatar { width: 76px; height: 76px; flex: 0 0 76px; border-radius: 18px; }
+.animal-hero .animal-profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.animal-hero .animal-profile-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.animal-hero-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.animal-hero-title h1 { margin: 0; font-size: clamp(26px, 3vw, 34px); line-height: 1.12; overflow-wrap: anywhere; }
+.animal-hero-meta, .animal-hero-morph { margin: 0; color: var(--muted); font-size: 14px; }
+.animal-hero-meta span { padding-inline: 3px; color: var(--border-strong); }
+.animal-hero-morph { font-weight: 600; color: var(--text); }
+.animal-hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex: 0 0 auto; }
+.animal-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.animal-summary-card {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface);
+}
+.animal-summary-card > span { color: var(--muted); font-size: 13px; font-weight: 600; }
+.animal-summary-card > strong { color: var(--forest); font-family: Manrope, sans-serif; font-size: 24px; line-height: 1.2; overflow-wrap: anywhere; }
+.animal-summary-card > strong.animal-summary-empty { color: var(--muted); font-family: inherit; font-size: 15px; font-weight: 500; }
+.animal-summary-card > small { color: var(--muted); font-size: 12px; }
+.animal-quick-actions { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+.animal-quick-actions .btn { min-height: 42px; }
+@media (max-width: 760px) {
+  .animal-hero { align-items: flex-start; flex-direction: column; padding: 16px; }
+  .animal-hero-actions { width: 100%; justify-content: flex-start; }
+  .animal-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 390px) {
+  .animal-hero-identity { align-items: flex-start; gap: 11px; }
+  .animal-hero .animal-profile-avatar { width: 56px; height: 56px; flex-basis: 56px; }
+  .animal-hero-title h1 { font-size: 24px; }
+  .animal-hero-meta { font-size: 13px; }
+  .animal-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .animal-summary-card { padding: 13px 14px; }
+  .animal-summary-card > strong { font-size: 21px; }
+  .animal-quick-actions .btn { flex: 1 1 calc(50% - 8px); }
+}
