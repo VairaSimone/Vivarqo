@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { parseInventoryItemsResponse, parseInventoryMovementsResponse } from "@vivarqo/contracts/inventory";
-import type { InventoryItemDto, InventoryItemsResponseDto, InventoryMovementDto, InventoryMovementsResponseDto } from "@vivarqo/contracts/inventory";
+import type { InventoryItemDto, InventoryItemsResponseDto, InventoryMovementsResponseDto } from "@vivarqo/contracts/inventory";
 import { api, ApiError } from "../../lib/api";
 import { dateTimeInputToUtc, formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
