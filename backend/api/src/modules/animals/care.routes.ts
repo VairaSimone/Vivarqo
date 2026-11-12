@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { parseDateBound } from "../operations/time.js";
 import type { Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
@@ -87,18 +88,16 @@ export function createCareRouter() {
       ];
     }
     if (typeof req.query.from === "string" || typeof req.query.to === "string") {
-      const dateFilter: Record<string, Date> = {};
-      if (typeof req.query.from === "string") {
-        const from = new Date(req.query.from);
-        if (Number.isNaN(from.getTime())) throw new AppError(400, "VALIDATION_ERROR", "Invalid from date");
-        dateFilter.gte = from;
-      }
-      if (typeof req.query.to === "string") {
-        const to = new Date(req.query.to);
-        if (Number.isNaN(to.getTime())) throw new AppError(400, "VALIDATION_ERROR", "Invalid to date");
-        dateFilter.lte = to;
-      }
-      where.performedAt = dateFilter;
+      const from = typeof req.query.from === "string"
+        ? parseDateBound(req.query.from, auth.timezone)
+        : undefined;
+      const to = typeof req.query.to === "string"
+        ? parseDateBound(req.query.to, auth.timezone, true)
+        : undefined;
+      where.performedAt = {
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lt: to } : {}),
+      };
     }
     const [total, sessions] = await Promise.all([
       prisma.feedingSession.count({ where: where as never }),
