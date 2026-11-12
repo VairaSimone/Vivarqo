@@ -191,10 +191,41 @@ async function monitorInfrastructure() {
   let pgFailures = 0, workerFailures = 0;
   while (!STOP.requested) {
     let postgresAvailable = false;
-    try { await checkPostgres(); postgresAvailable = true; pgFailures = 0; const db = services.get("postgres"); if (db) { db.state = "running"; db.lastCheck = "pg_isready OK"; } }
-    catch (error) { pgFailures++; const db = services.get("postgres"); if (db) { db.state = "degraded"; db.lastCheck = error.message; } if (pgFailures === 2 || pgFailures % 6 === 0) { await log("ERROR", "postgres", "PostgreSQL non risponde: tento il recupero Docker Compose."); try { await run(exe("docker"), ["compose", "-f", COMPOSE, "restart", "postgres"]); } catch { await run(exe("docker"), ["compose", "-f", COMPOSE, "up", "-d", "postgres"]); } if (db) db.restarts++; await log("WARN", "postgres", "Riavvio container richiesto; volume dati preservato."); } catch (restartError) { await log("FATAL", "postgres", "Recupero fallito: " + restartError.message); } } }
-    try { if (!postgresAvailable) throw new Error("controllo sospeso: PostgreSQL non disponibile"); if (!(await checkWorkerHeartbeat())) throw new Error("heartbeat assente o scaduto (TTL 45s)"); workerFailures = 0; const w = services.get("worker"); if (w) { w.state = "running"; w.lastCheck = "heartbeat DB valido"; } }
-    catch (error) { workerFailures++; const w = services.get("worker"); if (w) { w.state = "degraded"; w.lastCheck = error.message; } if (postgresAvailable && workerFailures === 2 && w && w.child && w.state !== "restarting") { await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker."); w.state = "restarting"; killTree(w.child); scheduleRestart("worker"); } }
+    try {
+      await checkPostgres(); postgresAvailable = true; pgFailures = 0;
+      const db = services.get("postgres");
+      if (db) { db.state = "running"; db.lastCheck = "pg_isready OK"; }
+    } catch (error) {
+      pgFailures++;
+      const db = services.get("postgres");
+      if (db) { db.state = "degraded"; db.lastCheck = error.message; }
+      if (pgFailures === 2 || pgFailures % 6 === 0) {
+        await log("ERROR", "postgres", "PostgreSQL non risponde: tento il recupero Docker Compose.");
+        try {
+          try { await run(exe("docker"), ["compose", "-f", COMPOSE, "restart", "postgres"]); }
+          catch { await run(exe("docker"), ["compose", "-f", COMPOSE, "up", "-d", "postgres"]); }
+          if (db) db.restarts++;
+          await log("WARN", "postgres", "Riavvio container richiesto; volume dati preservato.");
+        } catch (restartError) {
+          await log("FATAL", "postgres", "Recupero fallito: " + restartError.message);
+        }
+      }
+    }
+    try {
+      if (!postgresAvailable) throw new Error("controllo sospeso: PostgreSQL non disponibile");
+      if (!(await checkWorkerHeartbeat())) throw new Error("heartbeat assente o scaduto (TTL 45s)");
+      workerFailures = 0;
+      const worker = services.get("worker");
+      if (worker) { worker.state = "running"; worker.lastCheck = "heartbeat DB valido"; }
+    } catch (error) {
+      workerFailures++;
+      const worker = services.get("worker");
+      if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
+      if (postgresAvailable && workerFailures === 2 && worker && worker.child && worker.state !== "restarting") {
+        await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker.");
+        worker.state = "restarting"; killTree(worker.child); scheduleRestart("worker");
+      }
+    }
     broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
     await delay(10_000);
   }
