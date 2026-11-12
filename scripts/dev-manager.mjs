@@ -97,10 +97,13 @@ async function prepareDatabase() {
 function appendServiceLog(name, chunk) {
   const lines = chunk.toString().split(/\r?\n/).filter(Boolean);
   for (const value of lines) {
-    const line = stamp() + " [" + name + "] " + value;
-    console.log(line);
-    void appendFile(path.join(LOG_DIR, name + ".log"), line + "\n", "utf8");
-    void appendFile(LOG_FILE, line + "\n", "utf8");
+    const level = /error|exception|fatal|uncaught/i.test(value) ? "ERROR" : /warn/i.test(value) ? "WARN" : "INFO";
+    const item = { timestamp: stamp(), level, service: name, message: value.slice(0, 4000) };
+    recentLogs.push(item); if (recentLogs.length > 1000) recentLogs.shift();
+    if (["ERROR", "WARN"].includes(level)) { diagnosticEvents.push(item); if (diagnosticEvents.length > 500) diagnosticEvents.shift(); }
+    const line = item.timestamp + " [" + name + "] " + value;
+    console.log(line); void appendFile(path.join(LOG_DIR, name + ".log"), line + "\n", "utf8");
+    void appendFile(LOG_FILE, line + "\n", "utf8"); broadcast({ type: "log", item });
   }
 }
 function killTree(child) {
