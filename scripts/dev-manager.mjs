@@ -14,7 +14,9 @@ import { setTimeout as delay } from "node:timers/promises";
 const ROOT = process.cwd();
 const COMPOSE = path.join("backend", "infra", "docker", "compose.yaml");
 const PRODUCTION_COMPOSE = path.join("backend", "infra", "docker", "compose.production.yaml");
-const LOG_DIR = path.join(ROOT, ".dev-manager", "logs");
+const LOG_DIR = process.env.VIVARQO_MANAGER_LOG_DIR
+  ? path.resolve(ROOT, process.env.VIVARQO_MANAGER_LOG_DIR)
+  : path.join(ROOT, ".dev-manager", "logs");
 const LOG_FILE = path.join(LOG_DIR, "manager.log");
 const API_URL = process.env.VIVARQO_API_URL || "http://127.0.0.1:3000/healthz";
 const WEB_URL = process.env.VIVARQO_WEB_URL || "http://127.0.0.1:5173";
@@ -165,6 +167,7 @@ function start(name) {
     if (STOP.requested) { service.state = "stopped"; return; }
     if (service.state === "restarting") return;
     service.state = "crashed"; service.failures++;
+    registerRestartFailure(service);
     service.lastExit = "code=" + code + ", signal=" + signal;
     void log("ERROR", name, "Processo terminato: " + service.lastExit);
     scheduleRestart(name);
@@ -172,17 +175,23 @@ function start(name) {
   void log("INFO", name, "Avviato (PID " + (child.pid || "n/d") + ").");
   return service;
 }
+function registerRestartFailure(service) {
+  if (Date.now() - (service.startedAt || Date.now()) >= 60_000) service.consecutiveFailures = 0;
+  service.consecutiveFailures = (service.consecutiveFailures || 0) + 1;
+}
 function scheduleRestart(name) {
   const service = services.get(name);
   if (!service || STOP.requested) return;
-  if (service.restarts >= 8) {
+  const attempt = service.consecutiveFailures || 1;
+  if (attempt > 8) {
     service.state = "failed";
-    void log("FATAL", name, "Otto riavvii falliti: serve intervento manuale.");
+    void log("FATAL", name, "Otto tentativi consecutivi falliti: serve intervento manuale.");
     return;
   }
-  const wait = Math.min(30_000, 1000 * Math.pow(2, service.restarts));
-  service.restarts++; service.state = "restarting";
-  void log("WARN", name, "Riavvio " + service.restarts + "/8 tra " + Math.ceil(wait / 1000) + "s.");
+  const wait = Math.min(30_000, 1000 * Math.pow(2, attempt - 1));
+  service.restarts++;
+  service.state = "restarting";
+  void log("WARN", name, "Tentativo di riavvio " + attempt + "/8 tra " + Math.ceil(wait / 1000) + "s. Riavvii totali: " + service.restarts + ".");
   setTimeout(() => { if (!STOP.requested && service.state === "restarting") start(name); }, wait).unref();
 }
 function broadcast(payload) {
@@ -264,6 +273,7 @@ async function monitorInfrastructure() {
       if (worker) { worker.state = "degraded"; worker.lastCheck = error.message; }
       if (postgresAvailable && workerFailures === 2 && worker && worker.child && worker.state !== "restarting") {
         await log("ERROR", "worker", "Heartbeat non valido: " + error.message + ". Riavvio worker.");
+        registerRestartFailure(worker);
         const previousChild = worker.child;
         worker.state = "restarting";
         await terminateProcessTree(previousChild);
@@ -309,6 +319,7 @@ async function monitor() {
         const count = (misses.get(item.name) || 0) + 1; misses.set(item.name, count);
         if (count === 3) {
           await log("ERROR", item.name, "Tre health check consecutivi falliti: " + e.message + ". Riavvio.");
+          registerRestartFailure(service);
           const previousChild = service.child;
           service.state = "restarting";
           await terminateProcessTree(previousChild);
