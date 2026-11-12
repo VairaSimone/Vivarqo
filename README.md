@@ -8,7 +8,11 @@ Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. 
 - Docker Engine + Docker Compose per PostgreSQL 18 locale.
 - PostgreSQL 18 in ogni ambiente gestito. La migrazione iniziale richiede l'estensione `citext`.
 
-## Avvio locale
+## Dev Manager (Windows) e VPS Linux
+
+Per installare e avviare il supervisore, gestire gli avvii successivi, consultare dashboard/log, arrestare il servizio e configurare systemd su una VPS, segui la [guida operativa del Vivarqo Manager](docs/dev-manager.md). Per DNS, TLS, segreti, storage S3 e backup di produzione consulta anche la [guida di deployment production/staging](backend/docs/production-deployment.md).
+
+## Avvio locale manuale
 Dalla root del repository:
 
 ```bash
