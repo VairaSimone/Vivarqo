@@ -99,17 +99,21 @@ Poi visita `http://127.0.0.1:4179` sul PC. Il manager non sostituisce Docker res
 pnpm check:dev-manager
 pnpm test:dev-manager
 pnpm test:dev-manager:integration
+pnpm test:dev-manager:postgres
 ```
 
 I test d'integrazione di processo e sicurezza vengono eseguiti su Linux e Windows nella CI.
 
-Drill PostgreSQL reale (arresta e riavvia il container locale; crea e rimuove una tabella temporanea per verificare che i dati sopravvivano):
+Drill PostgreSQL reale:
+- il primo script ferma e riavvia il container e verifica che il volume conservi i dati;
+- il secondo avvia il manager in harness isolato, ferma PostgreSQL dall'esterno, verifica che sia il manager a recuperarlo e controlla che il dato persistente sia ancora leggibile.
 
 ```bash
 VIVARQO_MANAGER_POSTGRES_DRILL=1 bash scripts/dev-manager-postgres-drill.sh
+node scripts/dev-manager-postgres-manager.test.mjs
 ```
 
-Eseguilo solo su un ambiente di sviluppo/test: interrompe temporaneamente le connessioni al database. Non usarlo su un database di produzione.
+Eseguili solo su un ambiente di sviluppo/test: interrompono temporaneamente le connessioni al database e usano il Compose locale. Non usarli su un database di produzione.
 
 ## Limiti da tenere presenti
 
