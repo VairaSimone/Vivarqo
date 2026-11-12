@@ -35,4 +35,4 @@ UPDATE reminder_rules AS rule
 
 CREATE UNIQUE INDEX tasks_one_open_per_reminder_rule_idx
   ON tasks (reminder_rule_id)
-  WHERE reminder_rule_id IS NOT NULL AND status = 'open';
+  WHERE status = 'open';
