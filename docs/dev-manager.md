@@ -75,7 +75,17 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-Adatta utente, percorso repository e percorso Node alla VPS. Non esporre la porta 4179 su Internet: resta legata a localhost. Per aprirla dal PC amministratore usa un tunnel SSH:
+Adatta utente, percorso repository e percorso Node alla VPS. Dopo aver aggiornato il file unit:
+
+```bash
+sudo install -m 0644 deploy/systemd/vivarqo-manager.service /etc/systemd/system/vivarqo-manager.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now vivarqo-manager
+sudo systemctl status vivarqo-manager
+journalctl -u vivarqo-manager -f
+```
+
+Non esporre la porta 4179 su Internet: resta legata a localhost. Per aprirla dal PC amministratore usa un tunnel SSH:
 
 ```bash
 ssh -L 4179:127.0.0.1:4179 user@vps
