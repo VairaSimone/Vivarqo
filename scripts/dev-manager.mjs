@@ -2,6 +2,8 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { summarizeDiagnostics } from "./dev-manager-core.mjs";
+import { terminateProcessTree } from "./dev-manager-process.mjs";
+import { isDashboardRequestAllowed } from "./dev-manager-security.mjs";
 import { access, appendFile, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -119,25 +121,7 @@ function appendServiceLog(name, chunk) {
     void appendFile(LOG_FILE, line + "\n", "utf8"); broadcast({ type: "log", item });
   }
 }
-function signalTree(child, force = false) {
-  if (!child || !child.pid) return;
-  if (windows) {
-    const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", ...(force ? ["/F"] : [])], { stdio: "ignore", windowsHide: true });
-    killer.on("error", () => {});
-  } else {
-    try { process.kill(-child.pid, force ? "SIGKILL" : "SIGTERM"); }
-    catch { try { child.kill(force ? "SIGKILL" : "SIGTERM"); } catch {} }
-  }
-}
-async function terminateTree(child, timeoutMs = 5000) {
-  if (!child || child.exitCode !== null || child.signalCode !== null) return;
-  signalTree(child, false);
-  await Promise.race([new Promise(resolve => child.once("close", resolve)), delay(timeoutMs)]);
-  if (child.exitCode === null && child.signalCode === null) {
-    signalTree(child, true);
-    await Promise.race([new Promise(resolve => child.once("close", resolve)), delay(2000)]);
-  }
-}
+
 const commands = { api: ["dev:api"], worker: ["dev:worker"], frontend: ["dev:frontend"] };
 
 function start(name) {
@@ -191,10 +175,7 @@ function dashboardState() { return { services: serviceSnapshot(), logs: recentLo
 async function startDashboard() {
   const html = await readFile(DASHBOARD_FILE, "utf8");
   dashboardServer = createServer((req, res) => {
-    const remote = req.socket.remoteAddress || "";
-    const loopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
-    const host = String(req.headers.host || "").toLowerCase();
-    if (!loopback || !["127.0.0.1:" + DASHBOARD_PORT, "localhost:" + DASHBOARD_PORT, "[::1]:" + DASHBOARD_PORT].includes(host)) {
+    if (!isDashboardRequestAllowed(req.socket.remoteAddress, req.headers.host, DASHBOARD_PORT)) {
       res.writeHead(403, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
       res.end("Forbidden");
       return;
@@ -313,7 +294,7 @@ async function shutdown(reason) {
   STOP.requested = true;
   await log("WARN", "MANAGER", "Arresto richiesto: " + reason);
   const children = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
-  await Promise.all(children.map(child => terminateTree(child)));
+  await Promise.all(children.map(child => terminateProcessTree(child)));
   for (const s of services.values()) { s.child = null; s.state = "stopped"; }
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
