@@ -152,7 +152,10 @@ function start(name) {
     cwd: ROOT, env: { ...process.env, FORCE_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true, shell: windows && !testMode, detached: !windows
   });
-  service.child = child; service.state = "running"; service.startedAt = Date.now(); services.set(name, service);
+  service.child = child;
+  service.state = name === "api" || name === "frontend" ? "starting" : "running";
+  service.startedAt = Date.now();
+  services.set(name, service);
   child.stdout.on("data", c => appendServiceLog(name, c));
   child.stderr.on("data", c => appendServiceLog(name, c));
   child.once("error", e => { service.state = "crashed"; void log("ERROR", name, "Errore processo: " + e.message); });
@@ -277,7 +280,12 @@ async function waitHttp(label, url, timeout = 90_000) {
   while (Date.now() - startAt < timeout && !STOP.requested) {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(2500) });
-      if (response.ok) { await log("INFO", label, "Health check OK: " + url + " (HTTP " + response.status + ")."); return; }
+      if (response.ok) {
+        const service = services.get(label.toLowerCase());
+        if (service) { service.state = "running"; service.lastCheck = "HTTP " + response.status + " OK"; }
+        await log("INFO", label, "Health check OK: " + url + " (HTTP " + response.status + ").");
+        return;
+      }
       last = "HTTP " + response.status;
     } catch (e) { last = e.message; }
     await delay(1500);
@@ -290,11 +298,13 @@ async function monitor() {
   while (!STOP.requested) {
     for (const item of checks) {
       const service = services.get(item.name);
-      if (!service || !service.child || service.state !== "running") continue;
+      if (!service || !service.child || !["running", "starting"].includes(service.state)) continue;
       try {
         const response = await fetch(item.url, { signal: AbortSignal.timeout(2500) });
         if (!response.ok) throw new Error("HTTP " + response.status);
         misses.set(item.name, 0);
+        service.state = "running";
+        service.lastCheck = "HTTP " + response.status + " OK";
       } catch (e) {
         const count = (misses.get(item.name) || 0) + 1; misses.set(item.name, count);
         if (count === 3) {
