@@ -139,6 +139,15 @@ export function createTasksRouter() {
       if (existing.status === "completed" && ("status" in input || "dueAt" in input)) {
         throw new AppError(409, "TASK_ALREADY_COMPLETED", "Completed tasks are historical records and cannot be reopened or rescheduled");
       }
+      if (existing.status !== "open" && input.status === "open" && existing.reminderRuleId) {
+        const linkedRule = await tx.reminderRule.findFirst({
+          where: { id: existing.reminderRuleId, userId: auth.userId },
+          select: { isEnabled: true },
+        });
+        if (!linkedRule?.isEnabled) {
+          throw new AppError(409, "REMINDER_RULE_DISABLED", "A task linked to a disabled reminder rule cannot be reopened");
+        }
+      }
       const task = await tx.task.update({ where: { id }, data: data as never });
       let nextTaskCreated = false;
       if (existing.reminderRuleId && (existing.status === "open" || input.status === "open")) {
