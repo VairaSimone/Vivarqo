@@ -99,7 +99,7 @@ async function processOne(now: Date): Promise<boolean> {
     }),
     prisma.user.findUnique({
       where: { id: attempt.userId },
-      select: { timezone: true, accountStatus: true, deletedAt: true },
+      select: { timezone: true, locale: true, accountStatus: true, deletedAt: true },
     }),
   ]);
   if (!user || user.deletedAt !== null || user.accountStatus !== "active") {
@@ -134,13 +134,16 @@ async function processOne(now: Date): Promise<boolean> {
   }
 
   try {
+    const english = user.locale === "en";
     const response = await sendWebPush({
       endpoint: attempt.pushSubscription.endpoint,
       p256dh: attempt.pushSubscription.p256dh,
       authSecret: attempt.pushSubscription.authSecret,
     }, {
       // Push alerts may appear on a locked device. Never expose user-entered task titles there.
-      title: attempt.notification.category === "task_due" ? "Promemoria Vivarqo" : "Vivarqo",
+      title: attempt.notification.category === "task_due"
+        ? (english ? "Vivarqo reminder" : "Promemoria Vivarqo")
+        : "Vivarqo",
       body: attempt.notification.body,
       url: attempt.notification.targetPath ?? "/",
       category: attempt.notification.category,
