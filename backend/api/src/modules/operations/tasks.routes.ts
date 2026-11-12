@@ -127,17 +127,17 @@ export function createTasksRouter() {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id, "task id");
     const input = parseBody(patchTaskSchema, req.body);
-    const existing = await prisma.task.findFirst({ where: { id, userId: auth.userId } });
-    if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
-    if (existing.status === "completed" && ("status" in input || "dueAt" in input)) {
-      throw new AppError(409, "TASK_ALREADY_COMPLETED", "Completed tasks are historical records and cannot be reopened or rescheduled");
-    }
     if (input.animalId !== undefined) await assertOwnedAnimal(auth.userId, input.animalId);
     const data: Record<string, unknown> = { ...input };
     if (input.dueAt) data.dueAt = new Date(input.dueAt);
     const updated = await prisma.$transaction(async (tx) => {
-      if (existing.reminderRuleId) {
-        await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
+      const initial = await tx.task.findFirst({ where: { id, userId: auth.userId } });
+      if (!initial) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
+      if (initial.reminderRuleId) await lockReminderRule(tx, auth.userId, initial.reminderRuleId);
+      const existing = await tx.task.findFirst({ where: { id, userId: auth.userId } });
+      if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
+      if (existing.status === "completed" && ("status" in input || "dueAt" in input)) {
+        throw new AppError(409, "TASK_ALREADY_COMPLETED", "Completed tasks are historical records and cannot be reopened or rescheduled");
       }
       const task = await tx.task.update({ where: { id }, data: data as never });
       let nextTaskCreated = false;
@@ -187,10 +187,12 @@ export function createTasksRouter() {
     const id = routeId(req.params.id, "task id");
     const now = new Date();
     const result = await prisma.$transaction(async (tx) => {
+      const initial = await tx.task.findFirst({ where: { id, userId: auth.userId } });
+      if (!initial) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
+      if (initial.reminderRuleId) await lockReminderRule(tx, auth.userId, initial.reminderRuleId);
       const existing = await tx.task.findFirst({ where: { id, userId: auth.userId } });
       if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
       if (existing.status !== "open") throw new AppError(409, "TASK_NOT_OPEN", "Only open tasks can be completed");
-      if (existing.reminderRuleId) await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
 
       const claimed = await tx.task.updateMany({
         where: { id, userId: auth.userId, status: "open" },
@@ -381,10 +383,12 @@ export function createTasksRouter() {
   router.delete("/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id, "task id");
-    const existing = await prisma.task.findFirst({ where: { id, userId: auth.userId } });
-    if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
     await prisma.$transaction(async (tx) => {
-      if (existing.reminderRuleId) await lockReminderRule(tx, auth.userId, existing.reminderRuleId);
+      const initial = await tx.task.findFirst({ where: { id, userId: auth.userId } });
+      if (!initial) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
+      if (initial.reminderRuleId) await lockReminderRule(tx, auth.userId, initial.reminderRuleId);
+      const existing = await tx.task.findFirst({ where: { id, userId: auth.userId } });
+      if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
       await tx.task.delete({ where: { id } });
       let nextOccurrenceCreated = false;
       if (existing.status === "open" && existing.reminderRuleId) {
