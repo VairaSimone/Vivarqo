@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { invalidateAllResourceCache, invalidateResourceCacheEntry, loadCachedResource } from "./resourceCache";
+import { invalidateAllResourceCache, invalidateResourceCacheEntry, invalidateResourceCachePrefix, loadCachedResource } from "./resourceCache";
 
 describe("resource cache", () => {
   it("deduplicates concurrent requests and reuses the short-lived result", async () => {
@@ -123,3 +123,40 @@ describe("resource cache", () => {
     vi.useRealTimers();
   });
 });
+
+  it("invalidates only entries under a resource prefix", async () => {
+    let inventoryCalls = 0;
+    let animalCalls = 0;
+    const signal = new AbortController().signal;
+    const inventoryKey = "/inventory/items?page=1|locale:it";
+    const animalKey = "/animals?page=1|locale:it";
+
+    await loadCachedResource(inventoryKey, async () => ++inventoryCalls, signal);
+    await loadCachedResource(animalKey, async () => ++animalCalls, signal);
+    invalidateResourceCachePrefix("/inventory");
+
+    await expect(loadCachedResource(inventoryKey, async () => ++inventoryCalls, signal)).resolves.toBe(2);
+    await expect(loadCachedResource(animalKey, async () => ++animalCalls, signal)).resolves.toBe(1);
+    expect(inventoryCalls).toBe(2);
+    expect(animalCalls).toBe(1);
+  });
+
+  it("aborts matching in-flight requests without touching unrelated resources", async () => {
+    let inventorySignal: AbortSignal | undefined;
+    let animalSignal: AbortSignal | undefined;
+    const inventory = loadCachedResource("/inventory/items|locale:it", (signal) => {
+      inventorySignal = signal;
+      return new Promise<string>(() => undefined);
+    }, new AbortController().signal);
+    const animals = loadCachedResource("/animals|locale:it", (signal) => {
+      animalSignal = signal;
+      return new Promise<string>(() => undefined);
+    }, new AbortController().signal);
+
+    invalidateResourceCachePrefix("/inventory");
+    expect(inventorySignal?.aborted).toBe(true);
+    expect(animalSignal?.aborted).toBe(false);
+    await expect(inventory).rejects.toMatchObject({ name: "AbortError" });
+    expect(animalSignal?.aborted).toBe(false);
+    void animals;
+  });

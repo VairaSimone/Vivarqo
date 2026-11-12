@@ -140,6 +140,20 @@ export function subscribeResourceInvalidation(listener: (key?: string) => void):
   return () => invalidationListeners.delete(listener);
 }
 
+/** Invalidate only resources whose URL starts with the supplied API path. */
+export function invalidateResourceCachePrefix(prefix: string): void {
+  if (!prefix) return;
+  for (const key of [...cache.keys()]) {
+    if (key.startsWith(prefix)) cache.delete(key);
+  }
+  for (const [key, entry] of [...pending.entries()]) {
+    if (!key.startsWith(prefix)) continue;
+    if (pending.get(key) === entry) pending.delete(key);
+    entry.controller.abort();
+  }
+  invalidationListeners.forEach((listener) => listener(prefix));
+}
+
 /** Call after a successful mutation or when the authenticated account changes. */
 export function invalidateAllResourceCache(): void {
   generation++;

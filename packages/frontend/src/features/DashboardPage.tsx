@@ -1,28 +1,26 @@
 import { useState } from "react";
+import type { DashboardTodayDto, TaskDto } from "@vivarqo/contracts/operations";
+import { parseDashboardTodayResponse } from "@vivarqo/contracts/operations";
 import { api, ApiError } from "../lib/api";
-import { formatDateTime, getArray, getNumber, getString } from "../lib/domain";
+import { formatDateTime, getNumber, getString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, PageHeader, Panel, PanelHeader, useToast } from "../components/ui";
 
-type DashboardData = Record<string, unknown>;
-type Task = Record<string, unknown>;
-
 export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
-  const resource = useResource<DashboardData>("/home/today");
+  const resource = useResource<DashboardTodayDto>("/home/today", parseDashboardTodayResponse);
   const { toast, show } = useToast();
   const [completing, setCompleting] = useState<string | null>(null);
-  const data = resource.data ?? {};
-  const tasks = (data.tasks ?? {}) as Record<string, unknown>;
-  const due = getArray<Task>(tasks, "dueToday");
-  const overdue = getArray<Task>(tasks, "overdue");
-  const completed = getArray<Task>(tasks, "completedToday");
-  const reminders = getArray<Task>(data, "imminentReminders");
-  const recent = getArray<Task>(data, "recentEvents");
-  const counts = (data.counts ?? {}) as Record<string, unknown>;
-  const truncated = (data.truncated ?? {}) as Record<string, unknown>;
+  const data = resource.data;
+  const due = data?.tasks.dueToday ?? [];
+  const overdue = data?.tasks.overdue ?? [];
+  const completed = data?.tasks.completedToday ?? [];
+  const reminders = data?.imminentReminders ?? [];
+  const recent = data?.recentEvents ?? [];
+  const counts = data?.counts;
+  const truncated = data?.truncated;
 
   async function complete(id: string) {
     setCompleting(id);
@@ -31,12 +29,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     finally { setCompleting(null); }
   }
 
-  const taskCard = (task: Task, late = false, isComplete = false) => {
-    const id = getString(task, "id");
-    const animal = task.animal as Record<string, unknown> | undefined;
+  const taskCard = (task: TaskDto, late = false, isComplete = false) => {
+    const id = task.id;
+    const animal = task.animal;
     return <div className="task-row" key={id}>
       <button className="task-check" aria-label={t("taskCompleted")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
-      <button className="task-main" onClick={() => navigate(`/tasks`)}><strong>{getString(task, "title")}</strong><small>{getString(animal, "name") || t("noRecords")} · {formatDateTime(getString(task, "dueAt"), locale, timezone)}</small></button>
+      <button className="task-main" onClick={() => navigate(`/tasks`)}><strong>{task.title}</strong><small>{getString(animal, "name") || t("noRecords")} · {formatDateTime(task.dueAt, locale, timezone)}</small></button>
       {late && <Badge tone="danger">{t("overdue")}</Badge>}
     </div>;
   };
@@ -60,12 +58,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       <Panel className="dashboard-tasks">
         <PanelHeader title={t("overdue")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
         {overdue.length ? overdue.slice(0, 5).map((task) => taskCard(task, true)) : <EmptyState title={t("noTasks")} />}
-        {Boolean(truncated.overdue) && <p className="muted-note">{t("truncatedNotice")}</p>}
+        {Boolean(truncated?.overdue) && <p className="muted-note">{t("truncatedNotice")}</p>}
         <div className="panel-separator" />
         <PanelHeader title={t("dueToday")} />
         {due.length ? due.slice(0, 8).map((task) => taskCard(task)) : <EmptyState title={t("noTasks")} />}
-        {Boolean(truncated.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
-        {completed.length > 0 && <><div className="panel-separator" /><PanelHeader title={t("completedToday")} />{completed.slice(0, 4).map((task) => taskCard(task, false, true))}{Boolean(truncated.completedToday) && <p className="muted-note">{t("truncatedNotice")}</p>}</>}
+        {Boolean(truncated?.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
+        {completed.length > 0 && <><div className="panel-separator" /><PanelHeader title={t("completedToday")} />{completed.slice(0, 4).map((task) => taskCard(task, false, true))}{Boolean(truncated?.completedToday) && <p className="muted-note">{t("truncatedNotice")}</p>}</>}
         {Boolean(truncated.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
       </Panel>
       <div className="dashboard-side">

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { InventoryItemDto, InventoryMovementDto } from "@vivarqo/contracts/inventory";
 import { api, ApiError } from "../../lib/api";
-import { formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
+import { dateTimeInputToUtc, formatDate, formatNumber, getString, localDateTimeValue, queryString } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
@@ -61,7 +61,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     try {
       const body = {
         movementType: movementForm.movementType, quantity: Number(movementForm.quantity),
-        occurredAt: new Date(movementForm.occurredAt).toISOString(),
+        occurredAt: dateTimeInputToUtc(movementForm.occurredAt),
         unitCostCents: movementForm.unitCost ? Math.round(Number(movementForm.unitCost.replace(",", ".")) * 100) : null,
         reference: movementForm.reference || null, notes: movementForm.notes || null
       };

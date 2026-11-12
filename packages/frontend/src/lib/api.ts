@@ -1,4 +1,4 @@
-import { invalidateAllResourceCache } from "./resourceCache";
+import { invalidateAllResourceCache, invalidateResourceCachePrefix } from "./resourceCache";
 const API_BASE = "/api/v1";
 let csrfToken: string | null = null;
 let csrfPromise: Promise<string> | null = null;
@@ -69,6 +69,37 @@ async function getCsrfToken(): Promise<string> {
   return csrfPromise;
 }
 
+
+/**
+ * Keep mutation invalidation scoped to resources that can be affected by the
+ * changed aggregate. Unknown routes deliberately fall back to a full reset.
+ */
+function invalidateAfterMutation(path: string): void {
+  const pathname = path.split(/[?#]/, 1)[0] ?? path;
+  const root = pathname.split("/").filter(Boolean)[0] ?? "";
+  const affected: Record<string, string[]> = {
+    animals: ["/animals", "/home/today", "/calendar", "/tasks", "/feeding", "/documents", "/reproduction-cycles", "/clutches"],
+    feeding: ["/feeding", "/animals", "/home/today"],
+    tasks: ["/tasks", "/home/today", "/calendar"],
+    reminders: ["/tasks", "/home/today", "/calendar"],
+    inventory: ["/inventory", "/finance"],
+    documents: ["/documents", "/animals", "/reproduction-cycles"],
+    finance: ["/finance"],
+    "reproduction-cycles": ["/reproduction-cycles", "/clutches", "/calendar", "/home/today", "/animals"],
+    clutches: ["/clutches", "/reproduction-cycles", "/calendar", "/home/today", "/animals"],
+    eggs: ["/clutches", "/reproduction-cycles", "/calendar", "/home/today"],
+    "reproductive-events": ["/reproduction-cycles", "/calendar", "/home/today"],
+    "offspring-batches": ["/reproduction-cycles", "/animals"],
+    notifications: ["/notifications"],
+  };
+  const prefixes = affected[root];
+  if (!prefixes) {
+    invalidateAllResourceCache();
+    return;
+  }
+  for (const prefix of prefixes) invalidateResourceCachePrefix(prefix);
+}
+
 async function request<T>(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const mutating = !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
   const headers = new Headers({ "Accept": "application/json", "Accept-Language": apiLocale });
@@ -98,7 +129,7 @@ export const api = {
     return request<T>(path, "GET", undefined, options.signal);
   },
   post<T = void>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, "POST", body).then((result) => { invalidateAllResourceCache(); return result; });
+    return request<T>(path, "POST", body).then((result) => { invalidateAfterMutation(path); return result; });
   },
   patch<T = void>(path: string, body: unknown): Promise<T> {
     return request<T>(path, "PATCH", body).then((result) => { invalidateAllResourceCache(); return result; });
@@ -125,7 +156,7 @@ export const api = {
       notifyUnauthorized(path, error.status);
       throw error;
     }
-    invalidateAllResourceCache();
+    invalidateAfterMutation(path);
     return await response.json() as T;
   },
   async download(path: string, fallbackFilename = "download"): Promise<void> {

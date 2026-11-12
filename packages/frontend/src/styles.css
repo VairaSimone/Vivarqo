@@ -28,6 +28,15 @@
   --sidebar-text: #edf2ec;
   --sidebar-muted: #bfcfc7;
   --radius: 12px;
+  --font-body-size: 16px;
+  --font-label-size: 13px;
+  --font-meta-size: 12px;
+  --font-control-size: 16px;
+  --font-action-size: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
   --shadow: 0 8px 28px rgba(31, 48, 41, .055);
   --shadow-modal: 0 24px 80px rgba(15, 26, 22, .2);
 }
@@ -62,7 +71,7 @@ html { min-width: 320px; min-height: 100%; background: var(--paper); scroll-beha
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--paper); color: var(--text); }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(200, 117, 75, .45); outline-offset: 2px; }
+
 button:disabled { opacity: .55; cursor: not-allowed !important; }
 ::selection { background: rgba(145, 168, 154, .35); }
 h1, h2, h3, p { margin-top: 0; }
@@ -661,7 +670,7 @@ tbody tr:hover { background: var(--surface-soft); }
 
 .global-search-panel { display: flex; flex-direction: column; gap: 12px; }
 .global-search-results { display: flex; flex-direction: column; gap: 4px; max-height: min(60vh, 520px); overflow: auto; }
-.global-search-result { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.global-search-result { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
 .global-search-result:hover, .global-search-result:focus-visible { border-color: var(--forest); background: var(--surface-soft); }
 .global-search-result-group { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .global-search-result strong { font-size: 13px; }
@@ -671,7 +680,7 @@ tbody tr:hover { background: var(--surface-soft); }
 /* Accessibility release baseline: visible operational text must remain readable.
    Table compaction may reduce whitespace, never the text size or hit target. */
 body {
-  font-size: 16px;
+  font-size: var(--font-body-size);
   line-height: 1.5;
 }
 
@@ -711,7 +720,7 @@ small,
 .btn, .btn-sm,
 .nav-item, .sidebar-tools .nav-item, .global-search, .tabs-line button,
 .segmented button, .mobile-menu-button {
-  font-size: 14px !important;
+  font-size: var(--font-action-size) !important;
 }
 
 .btn, .btn-sm {
@@ -727,7 +736,7 @@ small,
 }
 
 .control, .search-control input {
-  font-size: 16px !important;
+  font-size: var(--font-control-size) !important;
 }
 
 .control {
@@ -736,7 +745,7 @@ small,
 }
 
 .field-label {
-  font-size: 13px !important;
+  font-size: var(--font-label-size) !important;
 }
 
 table, th, td {

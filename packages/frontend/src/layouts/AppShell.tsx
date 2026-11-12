@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { AnimalDto } from "@vivarqo/contracts/animals";
+import type { DocumentDto } from "@vivarqo/contracts/inventory";
+import type { ReproductionCycleSummaryDto } from "@vivarqo/contracts/reproduction";
+import type { TaskDto } from "@vivarqo/contracts/operations";
 import { api } from "../lib/api";
 import { Icon, IconButton, Input, Modal } from "../components/ui";
-import { getArray, getString, queryString } from "../lib/domain";
+import { getString, queryString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 
@@ -120,24 +124,24 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       setSearchLoading(true);
       setSearchFailed(false);
       const requests = await Promise.allSettled([
-        api.get<Record<string, unknown>>("/animals" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
-        api.get<Record<string, unknown>>("/tasks" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
-        api.get<Record<string, unknown>>("/documents" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
-        api.get<Record<string, unknown>>("/reproduction-cycles" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
+        api.get<{ animals: AnimalDto[] }>("/animals" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
+        api.get<{ tasks: TaskDto[] }>("/tasks" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
+        api.get<{ documents: DocumentDto[] }>("/documents" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
+        api.get<{ cycles: ReproductionCycleSummaryDto[] }>("/reproduction-cycles" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
       ]);
       if (!active || controller.signal.aborted) return;
       const [animalResponse, taskResponse, documentResponse, cycleResponse] = requests;
       const results = [
-        ...(animalResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(animalResponse.value, "animals").map((item) => ({
+        ...(animalResponse.status === "fulfilled" ? animalResponse.value.animals.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "species"), group: t("navAnimals"), path: "/animals/" + getString(item, "id")
         })) : []),
-        ...(taskResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(taskResponse.value, "tasks").map((item) => ({
+        ...(taskResponse.status === "fulfilled" ? taskResponse.value.tasks.map((item) => ({
           id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks?q=" + encodeURIComponent(query)
         })) : []),
-        ...(documentResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(documentResponse.value, "documents").map((item) => ({
+        ...(documentResponse.status === "fulfilled" ? documentResponse.value.documents.map((item) => ({
           id: getString(item, "id"), title: getString(item, "originalFilename"), subtitle: getString(item, "category"), group: t("navDocuments"), path: "/documents?q=" + encodeURIComponent(query)
         })) : []),
-        ...(cycleResponse.status === "fulfilled" ? getArray<Record<string, unknown>>(cycleResponse.value, "cycles").map((item) => ({
+        ...(cycleResponse.status === "fulfilled" ? cycleResponse.value.cycles.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name") || t("cycles"), subtitle: getString(item, "status"), group: t("navBreeding"), path: "/reproduction-cycles/" + getString(item, "id")
         })) : []),
       ].filter((item) => item.id && item.title).slice(0, 20);
