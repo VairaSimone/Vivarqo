@@ -16,13 +16,15 @@ Oppure doppio clic su `dev-manager.cmd`.
 
 La modalità predefinita è `development`: crea `.env` da `.env.example` solo se manca, installa le dipendenze, avvia PostgreSQL dal Compose di sviluppo e avvia API, worker e frontend come processi Node. La dashboard è su `http://127.0.0.1:4179`.
 
-Le notifiche desktop Windows vengono inviate tramite PowerShell/.NET WinForms. Funzionano nella sessione desktop interattiva dell'utente: minimizzare il manager non deve interromperle, ma eseguirlo come servizio Windows nella sessione 0 non è supportato. Per provarle davvero dalla sessione desktop:
+Le notifiche desktop Windows vengono inviate tramite PowerShell/.NET WinForms. Funzionano nella sessione desktop interattiva dell'utente: minimizzare il manager non deve interromperle, ma eseguirlo come servizio Windows nella sessione 0 non è supportato. Per provarle davvero mentre il manager resta minimizzato:
+1. Avvia `pnpm dev:manager` e minimizza la finestra.
+2. Da una seconda PowerShell, esegui:
 
 ```powershell
 pnpm test:dev-manager:notifications
 ```
 
-Il test invia una notifica e chiede conferma visiva; non è un test automatico headless.
+Il drill termina forzatamente il processo API, attende il suo riavvio e chiede conferma della notifica generata dal manager. È una verifica interattiva sul desktop reale, non un test automatico headless.
 
 ## Linux: produzione su VPS
 
