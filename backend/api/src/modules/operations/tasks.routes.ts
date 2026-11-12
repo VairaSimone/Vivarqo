@@ -162,7 +162,7 @@ export function createTasksRouter() {
               description: input.description !== undefined ? input.description : rule.description,
               category: input.category ?? rule.category,
               animalId: input.animalId !== undefined ? input.animalId : rule.animalId,
-              nextDueAt: input.dueAt ? new Date(input.dueAt) : rule.nextDueAt,
+              nextDueAt: input.dueAt ? new Date(input.dueAt) : (existing.status !== "open" && input.status === "open" ? task.dueAt : rule.nextDueAt),
             },
           });
           if (input.status === "dismissed") {
