@@ -10,7 +10,7 @@ import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, Geneti
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
 const sourceAnimalDetailEndpoint = (sourceId: string) => "/animals/" + encodeURIComponent(sourceId);
 
@@ -487,7 +487,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <Field label={t("birthDate")}><Input type="date" value={animalEditForm.birthDate} onChange={(e) => setAnimalEditForm({ ...animalEditForm, birthDate: e.target.value })} /></Field>
           <Field label={t("acquiredDate")}><Input type="date" value={animalEditForm.acquiredDate} onChange={(e) => setAnimalEditForm({ ...animalEditForm, acquiredDate: e.target.value })} /></Field>
           <Field label={t("previousBreeder")}><Input maxLength={160} value={animalEditForm.previousBreeder} onChange={(e) => setAnimalEditForm({ ...animalEditForm, previousBreeder: e.target.value })} /></Field>
-          <Field label={t("status")}><Select value={animalEditForm.status} onChange={(e) => setAnimalEditForm({ ...animalEditForm, status: e.target.value })}>{["active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t("animalStatus_" + value)}</option>)}</Select></Field>
+          <Field label={t("status")}><Select value={animalEditForm.status} onChange={(e) => setAnimalEditForm({ ...animalEditForm, status: e.target.value })}>{[...(isArchived ? ["archived"] : []), "active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t("animalStatus_" + value)}</option>)}</Select></Field>
         </div>
         <Field label={t("geneticsNotes")}><Textarea rows={2} value={animalEditForm.geneticsNotes} onChange={(e) => setAnimalEditForm({ ...animalEditForm, geneticsNotes: e.target.value })} /></Field>
         <Field label={t("origin")}><Textarea rows={2} value={animalEditForm.originDescription} onChange={(e) => setAnimalEditForm({ ...animalEditForm, originDescription: e.target.value })} /></Field>
