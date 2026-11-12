@@ -24,8 +24,15 @@ export function NotificationSettingsPage({ locale }: { locale: Locale }) {
   }, [prefs.data]);
   async function save(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
-    try { const { pushEnabled: _pushEnabled, ...inAppPreferences } = values;
-      await api.patch("/notification-preferences", inAppPreferences); prefs.reload(); show(t("saveSuccess")); }
+    try {
+      const { pushEnabled: _pushEnabled, ...inAppPreferences } = values;
+      await api.patch("/notification-preferences", {
+        ...inAppPreferences,
+        quietHoursStart: values.quietHoursStart || null,
+        quietHoursEnd: values.quietHoursEnd || null,
+      });
+      prefs.reload(); show(t("saveSuccess"));
+    }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }

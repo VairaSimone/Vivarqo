@@ -327,6 +327,133 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   await expect(page.getByText("E2E Imported Python", { exact: true })).toBeVisible();
 });
 
+
+test("domain CSV imports preview and persist inventory and finance records", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page, owner);
+  await page.goto("/imports");
+
+  const entitySelect = page.getByLabel("Tipo di dati");
+  const supportedEntities = await entitySelect.locator("option").evaluateAll((options) =>
+    options.map((option) => option.value).filter(Boolean)
+  );
+  expect(supportedEntities).toEqual(expect.arrayContaining([
+    "animals", "finance", "inventory", "reproductionCycles", "reproductiveEvents",
+    "clutches", "eggs", "incubationLogs", "offspringBatches"
+  ]));
+
+  const imports = [
+    {
+      entity: "inventory",
+      filename: "vivarqo-e2e-inventory.csv",
+      csv: "name,category,unit,quantityOnHand,minimumQuantity\\nE2E Imported Decimal Stock,food,unit,1.005,0.250\\n",
+      expectedRows: 1,
+    },
+    {
+      entity: "finance",
+      filename: "vivarqo-e2e-finance.csv",
+      csv: "entryType,occurredOn,amountEUR,category,description\\nexpense," + new Date().toISOString().slice(0, 10) + ",9.99,Import E2E,E2E imported expense\\n",
+      expectedRows: 1,
+    },
+  ];
+
+  for (const item of imports) {
+    await entitySelect.selectOption(item.entity);
+    await page.getByLabel("Scegli CSV o XLSX").setInputFiles({
+      name: item.filename,
+      mimeType: "text/csv",
+      buffer: Buffer.from(item.csv, "utf8"),
+    });
+
+    const previewPromise = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/imports?entity=" + item.entity) &&
+      response.request().method() === "POST"
+    );
+    await page.getByRole("button", { name: "Anteprima" }).click();
+    const previewResponse = await previewPromise;
+    expect(previewResponse.status()).toBe(201);
+    const preview = await previewResponse.json();
+    expect(preview.validRows).toBe(item.expectedRows);
+    expect(preview.invalidRows).toBe(0);
+    expect(preview.missingFields).toEqual([]);
+
+    const confirmPromise = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/imports/" + preview.importId + "/confirm") &&
+      response.request().method() === "POST"
+    );
+    await page.getByRole("button", { name: "Conferma importazione" }).click();
+    expect((await confirmPromise).status()).toBe(202);
+
+    await expect.poll(async () => {
+      const response = await page.context().request.get(
+        "http://127.0.0.1:4173/api/v1/imports/" + preview.importId + "?statusOnly=true"
+      );
+      expect(response.status()).toBe(200);
+      return (await response.json()).status;
+    }, { timeout: 90_000, intervals: [1000, 2000, 3000] }).toBe("completed");
+  }
+
+  const inventoryResponse = await page.context().request.get(
+    "http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=true&q=E2E%20Imported%20Decimal%20Stock"
+  );
+  expect(inventoryResponse.status()).toBe(200);
+  expect((await inventoryResponse.json()).items.some((item) =>
+    item.name === "E2E Imported Decimal Stock" && Number(item.quantityOnHand) === 1.005
+  )).toBe(true);
+
+  const financeResponse = await page.context().request.get(
+    "http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25&q=E2E%20imported%20expense"
+  );
+  expect(financeResponse.status()).toBe(200);
+  expect((await financeResponse.json()).entries.some((entry) =>
+    entry.description === "E2E imported expense" && entry.amountCents === "999"
+  )).toBe(true);
+});
+
+test("notification preferences persist and empty quiet hours are sent as null", async ({ page }) => {
+  await signIn(page, owner);
+  await page.goto("/settings/notifications");
+
+  const quietHours = page.locator('input[type="time"]');
+  await expect(quietHours).toHaveCount(2);
+  await quietHours.nth(0).fill("22:00");
+  await quietHours.nth(1).fill("07:00");
+  const inAppToggle = page.locator(".toggle-row input[type=checkbox]").first();
+  await inAppToggle.uncheck();
+
+  const savePromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/notification-preferences") &&
+    response.request().method() === "PATCH"
+  );
+  await page.getByRole("button", { name: "Salva" }).first().click();
+  expect((await savePromise).status()).toBe(200);
+
+  const saved = await page.context().request.get("http://127.0.0.1:4173/api/v1/notification-preferences");
+  expect(saved.status()).toBe(200);
+  expect((await saved.json()).preferences).toMatchObject({
+    inAppEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:00",
+  });
+
+  await inAppToggle.check();
+  await quietHours.nth(0).fill("");
+  await quietHours.nth(1).fill("");
+  const resetPromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/notification-preferences") &&
+    response.request().method() === "PATCH"
+  );
+  await page.getByRole("button", { name: "Salva" }).first().click();
+  expect((await resetPromise).status()).toBe(200);
+
+  const reset = await page.context().request.get("http://127.0.0.1:4173/api/v1/notification-preferences");
+  expect((await reset.json()).preferences).toMatchObject({
+    inAppEnabled: true,
+    quietHoursStart: null,
+    quietHoursEnd: null,
+  });
+});
+
 test("background export job produces a downloadable ZIP", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page, owner);
@@ -770,6 +897,33 @@ test("profile and language preferences persist across reloads", async ({ page })
   await preferenceForm.getByRole("button", { name: "Salva modifiche" }).click();
   expect((await darkThemeResponse).status()).toBe(200);
   await expect.poll(() => page.locator("html").getAttribute("data-theme")).toBe("dark");
+
+  await preferenceForm.locator("select").nth(2).selectOption("kg");
+  await preferenceForm.locator("select").nth(3).selectOption("f");
+  await preferenceForm.locator("select").nth(4).selectOption("dd/MM/yyyy");
+  await preferenceForm.locator("select").nth(5).selectOption("animals");
+  await preferenceForm.getByLabel("Tabelle compatte").check();
+  const advancedPreferencesPromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account/preferences") && response.request().method() === "PATCH"
+  );
+  await preferenceForm.getByRole("button", { name: "Salva modifiche" }).click();
+  expect((await advancedPreferencesPromise).status()).toBe(200);
+  const advancedPreferencesResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/account/preferences");
+  expect((await advancedPreferencesResponse.json()).preferences).toMatchObject({
+    weightUnit: "kg", temperatureUnit: "f", dateFormat: "dd/MM/yyyy",
+    defaultLandingPage: "animals", compactTables: true, theme: "dark"
+  });
+
+  await preferenceForm.locator("select").nth(2).selectOption("g");
+  await preferenceForm.locator("select").nth(3).selectOption("c");
+  await preferenceForm.locator("select").nth(4).selectOption("locale");
+  await preferenceForm.locator("select").nth(5).selectOption("today");
+  await preferenceForm.getByLabel("Tabelle compatte").uncheck();
+  const restorePreferencesPromise = page.waitForResponse((response) =>
+    response.url().endsWith("/api/v1/account/preferences") && response.request().method() === "PATCH"
+  );
+  await preferenceForm.getByRole("button", { name: "Salva modifiche" }).click();
+  expect((await restorePreferencesPromise).status()).toBe(200);
 
   await page.emulateMedia({ colorScheme: "dark" });
   await preferenceForm.getByLabel("Tema").selectOption("system");
