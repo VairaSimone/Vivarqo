@@ -153,6 +153,21 @@ jobs:
           Add-Type -AssemblyName System.Drawing
           if (-not [System.Windows.Forms.NotifyIcon]) { throw "NotifyIcon unavailable" }
           if (-not [System.Drawing.SystemIcons]::Warning) { throw "System notification icon unavailable" }
+  dev-manager-postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Recover PostgreSQL after a real container stop and verify persisted data
+        env:
+          VIVARQO_MANAGER_POSTGRES_DRILL: "1"
+        run: |
+          docker compose -f backend/infra/docker/compose.yaml up -d postgres
+          bash scripts/dev-manager-postgres-drill.sh
+      - name: Stop isolated PostgreSQL container
+        if: always()
+        run: docker compose -f backend/infra/docker/compose.yaml down -v
+
   e2e:
     runs-on: ubuntu-24.04
     env:
