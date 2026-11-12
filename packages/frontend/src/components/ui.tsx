@@ -117,7 +117,7 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
   const retryLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Retry" : "Riprova";
   return <div className="error-state" role="alert"><Icon name="alert" size={19} /><span>{message}</span>{retry && <Button size="sm" variant="secondary" onClick={retry}>{retryLabel}</Button>}</div>;
 }
-export function DataTable({ headers, rows, empty = "No records" }: { headers: string[]; rows: ReactNode[][]; empty?: string }) {
+export function DataTable({ headers, rows, empty = "No records", mobileLayout = "cards" }: { headers: string[]; rows: ReactNode[][]; empty?: string; mobileLayout?: "cards" | "scroll" }) {
   const regionLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Records table" : "Tabella dei record";
   const scrollHintId = useId();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +151,7 @@ export function DataTable({ headers, rows, empty = "No records" }: { headers: st
     <div
       ref={wrapperRef}
       className="table-wrap"
+      data-mobile-layout={mobileLayout}
       data-overflow={hasOverflow ? "true" : "false"}
       role="region"
       aria-label={regionLabel}
