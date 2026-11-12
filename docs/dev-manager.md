@@ -100,17 +100,20 @@ pnpm check:dev-manager
 pnpm test:dev-manager
 pnpm test:dev-manager:integration
 pnpm test:dev-manager:postgres
+pnpm test:dev-manager:production
 ```
 
 I test d'integrazione di processo e sicurezza vengono eseguiti su Linux e Windows nella CI.
 
 Drill PostgreSQL reale:
 - il primo script ferma e riavvia il container e verifica che il volume conservi i dati;
-- il secondo avvia il manager in harness isolato, ferma PostgreSQL dall'esterno, verifica che sia il manager a recuperarlo e controlla che il dato persistente sia ancora leggibile.
+- il secondo avvia il manager in modalità sviluppo isolata, ferma PostgreSQL dall'esterno, verifica il recovery del monitor sviluppo e controlla il dato;
+- il terzo avvia la vera modalità production su un Compose temporaneo Linux, esegue le migrazioni di test, ferma PostgreSQL, verifica il recovery del Production Manager, controlla il dato persistente e verifica che arrestare il manager lasci i container attivi.
 
 ```bash
 VIVARQO_MANAGER_POSTGRES_DRILL=1 bash scripts/dev-manager-postgres-drill.sh
 node scripts/dev-manager-postgres-manager.test.mjs
+node scripts/dev-manager-production.test.mjs
 ```
 
 Eseguili solo su un ambiente di sviluppo/test: interrompono temporaneamente le connessioni al database e usano il Compose locale. Non usarli su un database di produzione.
