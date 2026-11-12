@@ -94,7 +94,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
         <label className="checkbox-field low-stock-filter"><input type="checkbox" checked={lowStock} onChange={(e) => { setLowStock(e.target.checked); setPage(1); }} />{t("lowStock")}</label></>}
         activeFilterCount={[q, active !== "true" ? active : "", category, lowStock ? "lowStock" : ""].filter(Boolean).length}
         onClearFilters={() => { setQ(""); setActive("true"); setCategory(""); setLowStock(false); setPage(1); }}
-        resultCount={resource.data?.pagination.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
+        resultCount={resource.data?.pagination.total} onRefresh={resource.reload} loading={resource.loading} />
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("itemName"), t("quantity"), t("minimumQuantity"), t("status"), t("actions")]} rows={rows} empty={t("noInventory")} />}
       {resource.data?.pagination && <Pagination page={page} totalPages={resource.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
     </Panel>
