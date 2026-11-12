@@ -200,7 +200,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
             </div>;
           })}
         </div>}
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy || selected.length === 0}>{busy ? t("loading") : t("registerFeeding")}</Button></div>
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => { if (!formDirty || window.confirm(locale === "en" ? "Discard this feeding session? The selected animals and entries will be lost." : "Scartare questa registrazione? Gli animali selezionati e i dati inseriti andranno persi.")) { setModal(false); setFormDirty(false); } }}>{t("cancel")}</Button><Button type="submit" disabled={busy || selected.length === 0}>{busy ? t("loading") : t("registerFeeding")}</Button></div>
       </form>
     </Modal>}
 
