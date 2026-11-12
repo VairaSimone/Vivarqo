@@ -154,6 +154,46 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect(entry.amountCents).toBe(1999n);
   });
 
+  it("accepts valid three-decimal inventory quantities in API and CSV imports", async () => {
+    const owner = await account();
+    const created = await owner.agent.post("/api/v1/inventory/items")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        name: "Precision stock",
+        category: "food",
+        unit: "kg",
+        quantityOnHand: 1.001,
+        minimumQuantity: 1.005,
+      }).expect(201);
+    expect(Number(created.body.item.quantityOnHand)).toBe(1.001);
+    expect(Number(created.body.item.minimumQuantity)).toBe(1.005);
+
+    const movement = await owner.agent.post("/api/v1/inventory/items/" + created.body.item.id + "/movements")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        movementType: "adjustment",
+        quantity: 1.005,
+        occurredAt: new Date().toISOString(),
+      }).expect(201);
+    expect(Number(movement.body.item.quantityOnHand)).toBe(1.005);
+
+    const validImport = await owner.agent.post("/api/v1/imports?entity=inventory")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(Buffer.from("name,category,unit,quantityOnHand,minimumQuantity\\nCSV precision,food,kg,1.001,1.005\\n", "utf8"))
+      .expect(201);
+    expect(validImport.body.validRows).toBe(1);
+    expect(validImport.body.invalidRows).toBe(0);
+
+    const invalidImport = await owner.agent.post("/api/v1/imports?entity=inventory")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(Buffer.from("name,category,unit,quantityOnHand\\nToo precise,food,kg,1.0001\\n", "utf8"))
+      .expect(201);
+    expect(invalidImport.body.validRows).toBe(0);
+    expect(invalidImport.body.invalidRows).toBe(1);
+  });
+
   it("rejects impossible calendar dates during preview", async () => {
     const owner = await account();
     const preview = await owner.agent.post("/api/v1/imports?entity=reproductionCycles")
