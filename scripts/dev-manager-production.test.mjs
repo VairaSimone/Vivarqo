@@ -48,7 +48,7 @@ async function main() {
     volumes:
       - prod-manager-test-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vivarqo -d vivarqo"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U vivarqo -d vivarqo"]
       interval: 2s
       timeout: 3s
       retries: 30
