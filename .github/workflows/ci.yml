@@ -162,6 +162,7 @@ jobs:
         env:
           VIVARQO_MANAGER_POSTGRES_DRILL: "1"
         run: |
+          touch .env
           docker compose -f backend/infra/docker/compose.yaml up -d postgres
           bash scripts/dev-manager-postgres-drill.sh
       - name: Stop isolated PostgreSQL container
