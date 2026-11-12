@@ -169,7 +169,6 @@ jobs:
           touch .env
           docker compose -f backend/infra/docker/compose.yaml up -d postgres
           bash scripts/dev-manager-postgres-drill.sh
-          pnpm --version || true
           node scripts/dev-manager-postgres-manager.test.mjs
       - name: Stop isolated PostgreSQL container
         if: always()
