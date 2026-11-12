@@ -8,7 +8,7 @@ import type { AnimalDto } from "@vivarqo/contracts/animals";
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
-import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 type AnimalForm = {
   name: string; identifier: string; species: string; sex: string; morph: string; geneticsNotes: string;
   birthDate: string; birthDateEstimated: boolean; acquiredDate: string; originDescription: string;
@@ -172,19 +172,17 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
-    <Panel className="filters-panel">
-      <div className="filter-row">
-        <label className="search-control"><Icon name="search" size={17} /><input placeholder={t("search")} value={search} onChange={(e) => setSearch(e.target.value)} /></label>
-        <Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="active">{t("active")}</option><option value="all">{t("allStatuses")}</option><option value="sold">{t("animalStatus_sold")}</option><option value="transferred">{t("animalStatus_transferred")}</option><option value="deceased">{t("animalStatus_deceased")}</option><option value="archived">{t("archived")}</option></Select>
-        <Select aria-label={t("sex")} value={sex} onChange={(e) => { setSex(e.target.value); setPage(1); }}><option value="">{t("allSexes")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option><option value="unknown">{t("unknown")}</option></Select>
-        <Input placeholder={t("species")} value={species} onChange={(e) => { setSpecies(e.target.value); setPage(1); }} />
-        <Input placeholder={t("morph")} value={morph} onChange={(e) => { setMorph(e.target.value); setPage(1); }} />
-        <Input placeholder={t("location")} value={location} onChange={(e) => { setLocation(e.target.value); setPage(1); }} />
-        <Select aria-label={t("sort")} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}><option value="updatedAt">{t("recentlyUpdated")}</option><option value="createdAt">{t("recentlyCreated")}</option><option value="name">{t("name")}</option></Select>
-      </div>
-    </Panel>
     <Panel>
-      <div className="list-meta"><span>{pager?.total ?? 0} {t("rows")}</span><Button variant="ghost" size="sm" onClick={resource.reload}><Icon name="refresh" size={15} />{t("refresh")}</Button></div>
+      <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
+        filters={<><Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="active">{t("active")}</option><option value="all">{t("allStatuses")}</option><option value="sold">{t("animalStatus_sold")}</option><option value="transferred">{t("animalStatus_transferred")}</option><option value="deceased">{t("animalStatus_deceased")}</option><option value="archived">{t("archived")}</option></Select>
+        <Select aria-label={t("sex")} value={sex} onChange={(e) => { setSex(e.target.value); setPage(1); }}><option value="">{t("allSexes")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option><option value="unknown">{t("unknown")}</option></Select>
+        <Input aria-label={t("species")} placeholder={t("species")} value={species} onChange={(e) => { setSpecies(e.target.value); setPage(1); }} />
+        <Input aria-label={t("morph")} placeholder={t("morph")} value={morph} onChange={(e) => { setMorph(e.target.value); setPage(1); }} />
+        <Input aria-label={t("location")} placeholder={t("location")} value={location} onChange={(e) => { setLocation(e.target.value); setPage(1); }} />
+        <Select aria-label={t("sort")} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}><option value="updatedAt">{t("recentlyUpdated")}</option><option value="createdAt">{t("recentlyCreated")}</option><option value="name">{t("name")}</option></Select></>}
+        activeFilterCount={[q, status !== "active" ? status : "", sex, species, morph, location].filter(Boolean).length}
+        onClearFilters={() => { setSearch(""); setQ(""); setStatus("active"); setSex(""); setSpecies(""); setMorph(""); setLocation(""); setSort("updatedAt"); setPage(1); }}
+        resultCount={pager?.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> :
         <DataTable headers={[t("name"), t("species"), t("morph"), t("sex"), t("location"), t("status"), t("actions")]} rows={rows} empty={t("noAnimals")} />}
       {pager && <Pagination page={pager.page} totalPages={pager.totalPages} onChange={setPage} label={t("page")} />}
