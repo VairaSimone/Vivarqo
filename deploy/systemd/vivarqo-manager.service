@@ -1,0 +1,24 @@
+[Unit]
+Description=Vivarqo Production Manager
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=vivarqo
+Group=vivarqo
+SupplementaryGroups=docker
+WorkingDirectory=/opt/vivarqo
+Environment=VIVARQO_MANAGER_MODE=production
+Environment=VIVARQO_ENV_FILE=/etc/vivarqo/production.env
+Environment=VIVARQO_MANAGER_PORT=4179
+ExecStart=/usr/bin/node /opt/vivarqo/scripts/dev-manager.mjs
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
