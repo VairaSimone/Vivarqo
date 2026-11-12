@@ -7,7 +7,7 @@ if [[ "${VIVARQO_MANAGER_POSTGRES_DRILL:-}" != "1" ]]; then
 fi
 
 compose=(docker compose -f backend/infra/docker/compose.yaml)
-table="dev_manager_recovery_${$}"
+table="dev_manager_recovery_$"
 marker="recovery-${RANDOM}-${RANDOM}-$(date +%s)"
 created=0
 
