@@ -325,13 +325,19 @@ async function monitorProduction(composeArgs) {
     try {
       const result = await productionRun(composeArgs, ["ps", "--all", "--format", "json"], true);
       const rows = result.stdout.split("\n").map(line => line.trim()).filter(Boolean).map(line => JSON.parse(line));
+      for (const name of names) {
+        const current = services.get(name) || { name, restarts: 0, child: null };
+        current.state = "missing";
+        current.lastCheck = "Container non trovato";
+        services.set(name, current);
+      }
       for (const row of rows) {
         const name = row.Service || row.service;
         if (!name) continue;
         const state = String(row.State || row.state || "unknown").toLowerCase();
         const health = String(row.Health || row.health || "").toLowerCase();
         const current = services.get(name) || { name, restarts: 0, child: null };
-        current.state = name === "migrate" && state === "exited" && Number(row.ExitCode || row.exitCode) === 0
+        current.state = name === "migrate" && state === "exited" && Number(row.ExitCode ?? row.exitCode) === 0
           ? "completed" : state === "running" && health !== "unhealthy" ? "running" : "degraded";
         current.lastCheck = health ? "container " + state + " / health " + health : "container " + state;
         services.set(name, current);
@@ -342,14 +348,22 @@ async function monitorProduction(composeArgs) {
       const pg = services.get("postgres");
       if (pg && pg.state !== "running") {
         await log("ERROR", "postgres", "Container PostgreSQL non operativo; richiedo il ripristino Compose.");
-        await productionRun(composeArgs, ["up", "-d", "--no-deps", "postgres"]);
+        if (pg.lastCheck.includes("container running")) {
+          await productionRun(composeArgs, ["restart", "postgres"]);
+        } else {
+          await productionRun(composeArgs, ["up", "-d", "--no-deps", "postgres"]);
+        }
         pg.restarts++; pg.state = "restarting";
       }
       for (const name of ["api", "web", "caddy", "backup"]) {
         const service = services.get(name);
         if (service && service.state === "degraded") {
           await log("WARN", name, "Container non sano; richiedo il riavvio Compose.");
-          await productionRun(composeArgs, ["up", "-d", "--no-deps", name]);
+          if (service.lastCheck.includes("container running")) {
+            await productionRun(composeArgs, ["restart", name]);
+          } else {
+            await productionRun(composeArgs, ["up", "-d", "--no-deps", name]);
+          }
           service.restarts++; service.state = "restarting";
         }
       }
@@ -370,7 +384,7 @@ async function monitorProduction(composeArgs) {
           workerFailures = 0;
         } else {
           workerFailures++;
-          if (workerFailures >= 2 && worker?.state !== "missing") {
+          if (workerFailures >= 2) {
             await log("ERROR", "worker", "Heartbeat assente con DB e migrazioni pronti; richiedo il riavvio del container.");
             await productionRun(composeArgs, ["up", "-d", "--no-deps", "worker"]);
             if (worker) { worker.restarts++; worker.state = "restarting"; }
