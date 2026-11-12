@@ -42,7 +42,7 @@ export VIVARQO_ENV_FILE=/etc/vivarqo/production.env
 node scripts/dev-manager.mjs
 ```
 
-Il file indicato da `VIVARQO_ENV_FILE` deve valorizzare tutte le variabili richieste dal Compose production, inclusi percorsi dei secret e directory backup. Il manager esegue `docker compose config --quiet` prima di avviare lo stack con `up -d --build`. Le migrazioni sono gestite dal servizio Compose `migrate`.
+Il file indicato da `VIVARQO_ENV_FILE` deve valorizzare tutte le variabili richieste dal Compose production, inclusi percorsi dei secret e directory backup. Il manager esegue `docker compose config --quiet` prima di avviare lo stack con `up -d`; Compose costruisce le immagini mancanti, ma il manager non ricostruisce immagini a ogni riavvio. Le migrazioni sono gestite dal servizio Compose `migrate`. Per distribuire una nuova versione, esegui la build/deploy tramite la pipeline o la procedura di rilascio, non tramite il supervisore.
 
 Per un VPS, esegui il manager tramite systemd così viene riavviato dopo un crash o un reboot. Esempio di unità:
 
