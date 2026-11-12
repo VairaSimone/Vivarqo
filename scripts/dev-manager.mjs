@@ -68,6 +68,7 @@ async function log(level, source, message) {
 function exe(name) { return name; }
 function run(command, args, capture = false) {
   return new Promise((resolve, reject) => {
+    if (STOP.requested) { reject(new Error("Manager in arresto: comando non avviato.")); return; }
     const child = spawn(command, args, {
       cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
       windowsHide: true, shell: windows && (command === "pnpm" || command === "corepack"), detached: !windows
@@ -231,7 +232,7 @@ async function startDashboard() {
   await log("INFO", "DASHBOARD", "Dashboard disponibile su http://127.0.0.1:" + DASHBOARD_PORT);
 }
 function notifyDesktop(title, message) {
-  if (!windows || process.env.VIVARQO_DISABLE_TOAST === "1") return;
+  if (!windows || STOP.requested || process.env.VIVARQO_DISABLE_TOAST === "1") return;
   const now = Date.now();
   if (now - (notificationTimes.get(title) || 0) < 20_000) return;
   notificationTimes.set(title, now);
@@ -533,4 +534,9 @@ process.on("SIGINT", () => { void shutdown("SIGINT"); });
 process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
 process.on("uncaughtException", async e => { await log("FATAL", "MANAGER", e.stack || e.message); await shutdown("uncaughtException"); process.exitCode = 1; });
 process.on("unhandledRejection", reason => { void log("ERROR", "MANAGER", "Promise non gestita: " + String(reason)); });
-main().catch(async e => { await log("FATAL", "MANAGER", e.stack || e.message); await shutdown("startup failure"); process.exitCode = 1; });
+main().catch(async e => {
+  if (STOP.requested) return;
+  await log("FATAL", "MANAGER", e.stack || e.message);
+  await shutdown("startup failure");
+  process.exitCode = 1;
+});
