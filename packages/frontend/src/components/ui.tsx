@@ -138,8 +138,14 @@ export function ListToolbar({ searchValue, onSearchChange, searchPlaceholder, fi
   </section>;
 }
 
-export function LoadingState() {
-  return <div className="loading-state" role="status" aria-label={typeof document !== "undefined" && document.documentElement.lang === "en" ? "Loading" : "Caricamento"}><span className="spinner" /></div>;
+export function LoadingState({ label }: { label?: string } = {}) {
+  const fallback = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Loading" : "Caricamento";
+  return <div className="loading-state" role="status" aria-label={label ?? fallback}><span className="spinner" /><span className="loading-state-label">{label ?? fallback}</span></div>;
+}
+export function Skeleton({ rows = 3, className = "" }: { rows?: number; className?: string }) {
+  return <div className={["skeleton-stack", className].filter(Boolean).join(" ")} aria-hidden="true">
+    {Array.from({ length: Math.max(1, Math.min(rows, 8)) }, (_, index) => <span className="skeleton-line" key={index} />)}
+  </div>;
 }
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return <div className="empty-state"><span className="empty-icon"><Icon name="leaf" size={20} /></span><h3>{title}</h3>{description && <p>{description}</p>}{action}</div>;
@@ -286,14 +292,22 @@ export function Modal({ title, onClose, children, wide = false, hasUnsavedChange
 }
 export function useToast() {
   const [message, setMessage] = useState("");
+  const [tone, setTone] = useState<"success" | "error" | "warning" | "info">("success");
   const [version, setVersion] = useState(0);
   useEffect(() => {
     if (!message) return;
     const timer = window.setTimeout(() => setMessage(""), 3200);
     return () => window.clearTimeout(timer);
   }, [message, version]);
-  const show = (nextMessage: string) => { setMessage(nextMessage); setVersion((value) => value + 1); };
+  const show = (nextMessage: string, nextTone: "success" | "error" | "warning" | "info" = "success") => {
+    setMessage(nextMessage);
+    setTone(nextTone);
+    setVersion((value) => value + 1);
+  };
   const closeLabel = typeof document !== "undefined" && document.documentElement.lang === "en" ? "Close" : "Chiudi";
-  const toast = message ? <div className="toast" role="status"><Icon name="checkCircle" size={16} /><span>{message}</span><IconButton label={closeLabel} onClick={() => setMessage("")}><Icon name="close" size={13} /></IconButton></div> : null;
+  const toast = message ? <div className={"toast toast-" + tone} role={tone === "error" ? "alert" : "status"} aria-live={tone === "error" ? "assertive" : "polite"}>
+    <Icon name={tone === "success" ? "checkCircle" : "alert"} size={16} /><span>{message}</span>
+    <IconButton label={closeLabel} onClick={() => setMessage("")}><Icon name="close" size={13} /></IconButton>
+  </div> : null;
   return { toast, show };
 }
