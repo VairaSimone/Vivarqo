@@ -28,6 +28,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [animalSearch, setAnimalSearch] = useState("");
   const [animalPage, setAnimalPage] = useState(1);
   const [selected, setSelected] = useState<string[]>(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
+  const [selectedNames, setSelectedNames] = useState<Record<string, string>>({});
   const [entries, setEntries] = useState<Record<string, { outcome: string; foodType: string; foodSize: string; foodWeightG: string; notes: string }>>({});
   const [editEntry, setEditEntry] = useState<FeedingEntryDto | null>(null);
   const [editData, setEditData] = useState({ outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" });
@@ -52,12 +53,14 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
 
   function openNew(isBulk: boolean) {
     setBulk(isBulk); setModal(true); setError(""); setFormDirty(false); setSelected(animalId ? [animalId] : []);
-    setEntries({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
+    setEntries({}); setSelectedNames({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
   }
 
   function toggleAnimal(id: string) {
     setFormDirty(true);
     setError("");
+    const animal = animalResults.find((item) => item.id === id);
+    if (animal) setSelectedNames((current) => ({ ...current, [id]: animal.name }));
     setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }
 
@@ -177,6 +180,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
           <Field label={t("notes")}><Input value={sessionNotes} onChange={(e) => { setSessionNotes(e.target.value); setFormDirty(true); }} /></Field>
         </div>
         <div className="selector-header"><div><strong>{t("selectAnimals")} <span className="field-required" aria-hidden="true">*</span></strong><small>{selected.length} {t("selected")}</small></div><label className="search-control"><Icon name="search" /><input value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} placeholder={t("search")} /></label></div>
+        {selected.length > 0 && <div className="feeding-selected-animals" aria-label={locale === "en" ? "Selected animals" : "Animali selezionati"}>{selected.map((id) => <span className="feeding-selected-chip" key={id}>{selectedNames[id] || animalResults.find((item) => item.id === id)?.name || id}<button type="button" aria-label={(locale === "en" ? "Remove " : "Rimuovi ") + (selectedNames[id] || id)} onClick={() => toggleAnimal(id)}><Icon name="close" size={12} /></button></span>)}</div>}
         {animalsResource.loading && !animalsResource.data ? <LoadingState /> : <div className="animal-picker">
           {animalResults.map((animal) => <label className={`animal-option ${selected.includes(animal.id) ? "selected" : ""}`} key={animal.id}><input type="checkbox" checked={selected.includes(animal.id)} onChange={() => toggleAnimal(animal.id)} /><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{animal.name}</strong><small>{animal.identifier || animal.species}</small></span><i>{selected.includes(animal.id) ? <Icon name="check" size={16} /> : null}</i></label>)}
           {!animalResults.length && <p className="muted-note">{t("noAnimals")}</p>}
@@ -186,7 +190,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
           {selected.map((id) => {
             const animal = animalResults.find((item) => item.id === id);
             const entry = entries[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" };
-            return <div className="feeding-animal-form" key={id}><div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><strong>{animal?.name || id}</strong></div>
+            return <div className="feeding-animal-form" key={id}><div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><strong>{animal?.name || selectedNames[id] || id}</strong></div>
               <div className="form-grid form-grid-small">
                 <Field label={t("outcome")}><Select value={entry.outcome} onChange={(e) => updateEntry(id, "outcome", e.target.value)}><option value="ate">{t("ate")}</option><option value="refused">{t("refused")}</option><option value="not_offered">{t("not_offered")}</option><option value="unknown">{t("feedingUnknown")}</option></Select></Field>
                 <Field label={t("foodType")}><Input value={entry.foodType} onChange={(e) => updateEntry(id, "foodType", e.target.value)} /></Field>
