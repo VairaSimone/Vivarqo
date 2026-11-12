@@ -360,7 +360,8 @@ async function monitorProduction(composeArgs) {
         if (!services.has(name)) services.set(name, { name, state: "missing", restarts: 0, child: null, lastCheck: "Container non trovato" });
       }
       const pg = services.get("postgres");
-      if (pg && ["degraded", "missing"].includes(pg.state)) {
+      if (pg && ["degraded", "missing"].includes(pg.state) && Date.now() - (pg.lastRecoveryAt || 0) >= 60_000) {
+        pg.lastRecoveryAt = Date.now();
         await log("ERROR", "postgres", "Container PostgreSQL non operativo; richiedo il ripristino Compose.");
         if (pg.lastCheck.includes("container running")) {
           await productionRun(composeArgs, ["restart", "postgres"]);
@@ -371,7 +372,8 @@ async function monitorProduction(composeArgs) {
       }
       for (const name of ["api", "web", "caddy", "backup"]) {
         const service = services.get(name);
-        if (service && ["degraded", "missing"].includes(service.state)) {
+        if (service && ["degraded", "missing"].includes(service.state) && Date.now() - (service.lastRecoveryAt || 0) >= 60_000) {
+          service.lastRecoveryAt = Date.now();
           await log("WARN", name, "Container non sano; richiedo il riavvio Compose.");
           if (service.lastCheck.includes("container running")) {
             await productionRun(composeArgs, ["restart", name]);
@@ -398,8 +400,10 @@ async function monitorProduction(composeArgs) {
         if (!migrationsReady || !databaseReady) {
           workerFailures = 0;
         } else {
-          workerFailures++;
-          if (workerFailures >= 2) {
+          const containerExited = worker?.state === "degraded" && !worker.lastCheck.includes("container running");
+          workerFailures = containerExited ? 5 : workerFailures + 1;
+          if (workerFailures >= 5 && Date.now() - (worker?.lastRecoveryAt || 0) >= 60_000) {
+            if (worker) worker.lastRecoveryAt = Date.now();
             await log("ERROR", "worker", "Heartbeat assente con DB e migrazioni pronti; richiedo il riavvio del container.");
             if (worker?.lastCheck.includes("container running")) {
               await productionRun(composeArgs, ["restart", "worker"]);
