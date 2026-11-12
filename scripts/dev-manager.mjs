@@ -116,7 +116,7 @@ function appendServiceLog(name, chunk) {
     recentLogs.push(item); if (recentLogs.length > 1000) recentLogs.shift();
     if (["ERROR", "WARN"].includes(level)) { diagnosticEvents.push(item); if (diagnosticEvents.length > 500) diagnosticEvents.shift(); }
     if (level === "ERROR") notifyDesktop(name, value);
-    const line = item.timestamp + " [" + name + "] " + value;
+    const line = item.timestamp + " [" + level + "] [" + name + "] " + value;
     console.log(line); void appendFile(path.join(LOG_DIR, name + ".log"), line + "\n", "utf8");
     void appendFile(LOG_FILE, line + "\n", "utf8"); broadcast({ type: "log", item });
   }
