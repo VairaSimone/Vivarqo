@@ -6,6 +6,7 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
 import { parseAnimalFile } from "../animals/animal-file-parser.js";
 import { resolveImportColumnMapping } from "../animals/import-column-mapping.js";
+import { hasMaximumDecimalPlaces } from "./decimal-precision.js";
 
 const uploadBody = raw({
   type: ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"],
@@ -96,8 +97,10 @@ const schemas = {
   }).strict().transform((v) => v as Record<string, unknown>),
   inventory: z.object({
     name: z.string().trim().min(1).max(160), category: z.enum(["food", "substrate", "material", "equipment", "other"]),
-    unit: z.string().trim().min(1).max(24), quantityOnHand: z.number().finite().min(0).max(999_999_999.999).refine((v) => Number.isInteger(v * 1000)),
-    minimumQuantity: z.number().finite().min(0).max(999_999_999.999).refine((v) => Number.isInteger(v * 1000)).nullable().optional(),
+    unit: z.string().trim().min(1).max(24), quantityOnHand: z.number().finite().min(0).max(999_999_999.999)
+      .refine((value) => hasMaximumDecimalPlaces(value, 3), "Quantity supports at most 3 decimal places"),
+    minimumQuantity: z.number().finite().min(0).max(999_999_999.999)
+      .refine((value) => hasMaximumDecimalPlaces(value, 3), "Quantity supports at most 3 decimal places").nullable().optional(),
     notes: z.string().max(10_000).nullable().optional(), isActive: z.boolean().default(true),
   }).strict().transform((v) => v as Record<string, unknown>),
   reproductionCycles: z.object({
