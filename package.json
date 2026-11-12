@@ -30,7 +30,8 @@
     "typecheck:frontend": "pnpm contracts:build && pnpm --filter @vivarqo/frontend typecheck",
     "build:frontend": "pnpm contracts:build && pnpm --filter @vivarqo/frontend build",
     "db:ensure": "pnpm --filter @vivarqo/api exec tsx src/migrate.ts",
-    "contracts:build": "pnpm --filter @vivarqo/contracts build"
+    "contracts:build": "pnpm --filter @vivarqo/contracts build",
+    "dev:manager": "node scripts/dev-manager.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
