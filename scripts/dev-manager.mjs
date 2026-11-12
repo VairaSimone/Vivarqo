@@ -156,7 +156,7 @@ function broadcast(payload) {
 }
 function serviceSnapshot() {
   const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend" };
-  return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
+  return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, stateLabel: s.state === "running" ? "Operativo" : s.state === "restarting" ? "Riavvio" : s.state === "failed" ? "Errore" : s.state === "degraded" ? "Degradato" : s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
 }
 function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: diagnosticEvents.slice(-100), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
 async function startDashboard() {
@@ -242,10 +242,14 @@ async function shutdown(reason) {
   for (const s of services.values()) if (s.child) { s.state = "stopping"; killTree(s.child); }
   await delay(1200);
   for (const s of services.values()) s.state = "stopped";
+  for (const client of eventClients) { try { client.end(); } catch {} }
+  eventClients.clear();
+  if (dashboardServer) await new Promise(resolve => dashboardServer.close(resolve));
   await log("INFO", "MANAGER", "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
 }
 async function main() {
   await mkdir(LOG_DIR, { recursive: true });
+  await startDashboard();
   await log("INFO", "MANAGER", "Avvio Vivarqo Dev Manager.");
   await prepare();
   await prepareDatabase();
@@ -254,9 +258,10 @@ async function main() {
   start("worker");
   start("frontend");
   await waitHttp("FRONTEND", WEB_URL);
+  services.set("postgres", { name: "postgres", state: "running", restarts: 0, child: null, lastCheck: "pg_isready OK" });
   status();
-  await log("INFO", "MANAGER", "Ambiente pronto.");
-  await monitor();
+  await log("INFO", "MANAGER", "Ambiente pronto. Dashboard: http://127.0.0.1:" + DASHBOARD_PORT);
+  await Promise.all([monitor(), monitorInfrastructure()]);
 }
 process.on("SIGINT", () => { void shutdown("SIGINT"); });
 process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
