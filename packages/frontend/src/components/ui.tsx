@@ -107,6 +107,33 @@ export function PanelHeader({ title, description, action }: { title: string; des
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: ReactNode }) {
   return <header className="page-header"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1>{description && <p>{description}</p>}</div>{action && <div className="page-actions">{action}</div>}</header>;
 }
+export function ListToolbar({ searchValue, onSearchChange, searchPlaceholder, filters, activeFilterCount = 0, onClearFilters, resultCount, onRefresh, loading = false }: {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
+  filters?: ReactNode;
+  activeFilterCount?: number;
+  onClearFilters?: () => void;
+  resultCount?: number;
+  onRefresh?: () => void;
+  loading?: boolean;
+}) {
+  const english = typeof document !== "undefined" && document.documentElement.lang === "en";
+  return <section className="list-toolbar" aria-label={english ? "Search and filters" : "Ricerca e filtri"}>
+    <div className="list-toolbar-main">
+      {onSearchChange && <label className="search-control list-toolbar-search"><Icon name="search" size={17} /><input type="search" value={searchValue ?? ""} onChange={(event) => onSearchChange(event.target.value)} placeholder={searchPlaceholder ?? (english ? "Search records" : "Cerca record")} /></label>}
+      {filters && <div className="list-toolbar-filters">{filters}</div>}
+    </div>
+    <div className="list-toolbar-meta">
+      <span className="list-toolbar-count">{typeof resultCount === "number" ? resultCount + (english ? " records" : " record") : null}</span>
+      <div className="list-toolbar-actions">
+        {activeFilterCount > 0 && <><span className="active-filter-indicator" role="status">{activeFilterCount} {english ? "active filters" : "filtri attivi"}</span>{onClearFilters && <Button size="sm" variant="ghost" onClick={onClearFilters}>{english ? "Clear filters" : "Azzera filtri"}</Button>}</>}
+        {onRefresh && <Button size="sm" variant="ghost" onClick={onRefresh} disabled={loading}><Icon name="refresh" size={15} />{english ? "Refresh" : "Aggiorna"}</Button>}
+      </div>
+    </div>
+  </section>;
+}
+
 export function LoadingState() {
   return <div className="loading-state" role="status" aria-label={typeof document !== "undefined" && document.documentElement.lang === "en" ? "Loading" : "Caricamento"}><span className="spinner" /></div>;
 }
