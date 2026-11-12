@@ -8,7 +8,7 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 import { getUserEntitlements } from "./billing-entitlements.js";
 
 type StripeObject = Record<string, unknown> & { id?: string; object?: string; metadata?: Record<string, unknown> };
-type StripeEvent = { id: string; type: string; data: { object: StripeObject } };
+type StripeEvent = { id: string; type: string; created: number; data: { object: StripeObject } };
 function routeId(value: string | string[] | undefined): string {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid subscription id");
@@ -104,6 +104,8 @@ async function lockBillingUser(tx: BillingTransaction, userId: string): Promise<
 async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<void> {
   const object = event.data.object;
   const eventType = event.type;
+  const eventCreatedAt = timestamp(event.created);
+  if (!eventCreatedAt) return;
 
   if (eventType.startsWith("customer.subscription.")) {
     const stripeSubscriptionId = stringId(object.id);
@@ -120,8 +122,11 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     if (!account) return;
     await lockBillingUser(tx, userId);
     const current = await tx.subscription.findUnique({
-      where: { userId }, select: { stripeSubscriptionId: true, status: true },
+      where: { userId }, select: { stripeSubscriptionId: true, status: true, lastStripeEventCreatedAt: true },
     });
+    // Stripe timestamps have second-level precision. Reject older or equal-time
+    // events so a delayed snapshot cannot overwrite a state already applied.
+    if (current?.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return;
     // Do not let a delayed event for an older subscription overwrite the account's
     // newer subscription. A newly-created subscription may replace a terminal old one.
     if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== stripeSubscriptionId) {
@@ -142,6 +147,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       currentPeriodStart: timestamp(object.current_period_start),
       currentPeriodEnd: timestamp(object.current_period_end),
       cancelAtPeriodEnd: object.cancel_at_period_end === true,
+      lastStripeEventCreatedAt: eventCreatedAt,
     };
     await tx.subscription.upsert({ where: { userId }, create: { userId, ...data }, update: data });
     return;
@@ -158,8 +164,9 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     if (!customerId || !subscriptionId) return;
     await lockBillingUser(tx, userRaw);
     const current = await tx.subscription.findUnique({
-      where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true },
+      where: { userId: userRaw }, select: { stripeSubscriptionId: true, status: true, lastStripeEventCreatedAt: true },
     });
+    if (current?.lastStripeEventCreatedAt && eventCreatedAt <= current.lastStripeEventCreatedAt) return;
     // checkout.session.completed is not authoritative for billing status or period
     // dates. If subscription.created/updated was already processed, preserve it.
     if (current && (
@@ -175,6 +182,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
       // pending until customer.subscription.created/updated supplies the authoritative
       // status and paid-through date; otherwise a missing date could grant access forever.
       status: "incomplete",
+      lastStripeEventCreatedAt: eventCreatedAt,
     };
     await tx.subscription.upsert({ where: { userId: userRaw }, create: { userId: userRaw, ...data }, update: data });
     return;
@@ -193,24 +201,36 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     });
     if (!current) return;
     await lockBillingUser(tx, current.userId);
+    const lockedSubscription = await tx.subscription.findFirst({
+      where: { userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId },
+      select: { status: true, lastStripeEventCreatedAt: true },
+    });
+    if (!lockedSubscription) return;
+    if (lockedSubscription.lastStripeEventCreatedAt &&
+        eventCreatedAt <= lockedSubscription.lastStripeEventCreatedAt) return;
+
+    // Invoice events share the same chronology as subscription lifecycle events.
     if (eventType === "invoice.payment_failed") {
-      // A delayed failed-invoice event must never move a deleted/unpaid subscription
-      // back into past_due, which would otherwise reopen the grace-period entitlement.
+      if (!["active", "trialing", "past_due"].includes(lockedSubscription.status)) return;
       await tx.subscription.updateMany({
         where: {
           userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
           status: { in: ["active", "trialing", "past_due"] },
         },
-        data: { status: "past_due" },
+        data: { status: "past_due", lastStripeEventCreatedAt: eventCreatedAt },
       });
       return;
     }
+    if (!["active", "trialing", "past_due"].includes(lockedSubscription.status)) return;
     await tx.subscription.updateMany({
       where: {
         userId: current.userId, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId,
-        status: "past_due",
+        status: { in: ["active", "trialing", "past_due"] },
       },
-      data: { status: "active" },
+      data: {
+        status: lockedSubscription.status === "past_due" ? "active" : lockedSubscription.status,
+        lastStripeEventCreatedAt: eventCreatedAt,
+      },
     });
   }
 }
@@ -281,7 +301,7 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
     } catch {
       throw new AppError(400, "WEBHOOK_BODY_INVALID", "Stripe webhook payload is invalid JSON");
     }
-    if (!event.id || typeof event.type !== "string" || !event.data || (typeof event.data.object !== "object" || event.data.object === null)) {
+    if (!event.id || typeof event.type !== "string" || !Number.isSafeInteger(event.created) || event.created < 0 || !event.data || (typeof event.data.object !== "object" || event.data.object === null)) {
       throw new AppError(400, "WEBHOOK_BODY_INVALID", "Stripe webhook payload is missing required fields");
     }
     try {
