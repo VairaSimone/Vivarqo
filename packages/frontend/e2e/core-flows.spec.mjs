@@ -283,6 +283,14 @@ test("responsive fixture: create an animal for detail-route coverage", async ({ 
   const created = list.animals.find((animal) => animal.name === animalName);
   expect(created?.id).toBeTruthy();
 
+  await page.getByRole("button", { name: new RegExp(animalName) }).click();
+  await expect(page).toHaveURL(new RegExp("/animals/" + created.id));
+  await expect(page.getByRole("heading", { name: animalName, exact: true })).toBeVisible();
+  await expect(page.getByText("Identificativo non inserito")).toBeVisible();
+  await expect(page.getByText("Non registrato").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registra peso" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registra alimentazione" })).toBeVisible();
+
   expect(pageErrors, "uncaught browser JavaScript errors").toEqual([]);
   expect(unexpectedServerErrors, "unexpected HTTP 5xx responses").toEqual([]);
 });
