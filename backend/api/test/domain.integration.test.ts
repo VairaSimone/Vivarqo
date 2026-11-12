@@ -314,6 +314,31 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
+  it("paginates animal history beyond 100 records and reports exact totals", async () => {
+    const owner = await account();
+    const animal = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Long history", species: "Python regius" },
+    });
+    await prisma.weightMeasurement.createMany({
+      data: Array.from({ length: 101 }, (_, index) => ({
+        animalId: animal.id,
+        measuredAt: new Date(Date.UTC(2026, 0, 1, 0, index)),
+        weightG: 100 + index,
+      })),
+    });
+
+    const page = await owner.agent.get(`/api/v1/animals/${animal.id}/history?page=5&pageSize=25`).expect(200);
+    expect(page.body.items).toHaveLength(1);
+    expect(page.body.items[0].type).toBe("weight");
+    expect(page.body.pagination).toMatchObject({
+      page: 5,
+      pageSize: 25,
+      total: 101,
+      totalPages: 5,
+      truncated: false,
+    });
+  });
+
   it("matches care-import animal identifiers without regard to letter case", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({
