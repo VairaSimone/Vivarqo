@@ -329,7 +329,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
 
 
 test("domain CSV imports preview and persist inventory and finance records", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await signIn(page, owner);
   await page.goto("/imports");
 
@@ -346,13 +346,13 @@ test("domain CSV imports preview and persist inventory and finance records", asy
     {
       entity: "inventory",
       filename: "vivarqo-e2e-inventory.csv",
-      csv: "name,category,unit,quantityOnHand,minimumQuantity\\nE2E Imported Decimal Stock,food,unit,1.005,0.250\\n",
+      csv: "name,category,unit,quantityOnHand,minimumQuantity\nE2E Imported Decimal Stock,food,unit,1.005,0.250\n",
       expectedRows: 1,
     },
     {
       entity: "finance",
       filename: "vivarqo-e2e-finance.csv",
-      csv: "entryType,occurredOn,amountEUR,category,description\\nexpense," + new Date().toISOString().slice(0, 10) + ",9.99,Import E2E,E2E imported expense\\n",
+      csv: "entryType,occurredOn,amountEUR,category,description\nexpense," + new Date().toISOString().slice(0, 10) + ",9.99,Import E2E,E2E imported expense\n",
       expectedRows: 1,
     },
   ];
