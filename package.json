@@ -32,7 +32,8 @@
     "db:ensure": "pnpm --filter @vivarqo/api exec tsx src/migrate.ts",
     "contracts:build": "pnpm --filter @vivarqo/contracts build",
     "dev:manager": "node scripts/dev-manager.mjs",
-    "check:dev-manager": "node --check scripts/dev-manager.mjs"
+    "check:dev-manager": "node --check scripts/dev-manager.mjs",
+    "test:dev-manager": "node --test scripts/dev-manager.test.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
