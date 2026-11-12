@@ -23,6 +23,14 @@
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
+    },
+    "./care": {
+      "types": "./dist/care.d.ts",
+      "import": "./dist/care.js"
+    },
+    "./finance": {
+      "types": "./dist/finance.d.ts",
+      "import": "./dist/finance.js"
     }
   },
   "scripts": {

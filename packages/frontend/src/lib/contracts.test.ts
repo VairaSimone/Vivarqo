@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseDashboardTodayResponse } from "@vivarqo/contracts/operations";
 import { parseInventoryItemsResponse } from "@vivarqo/contracts/inventory";
+import { parseFeedingSessionsResponse } from "@vivarqo/contracts/care";
+import { parseFinanceEntriesResponse, parseFinanceSummaryResponse } from "@vivarqo/contracts/finance";
 
 const validDashboard = {
   date: "2026-11-12",
@@ -52,6 +54,40 @@ describe("inventory response contract", () => {
         isActive: true, createdAt: "2026-11-12T10:00:00.000Z", updatedAt: "2026-11-12T10:00:00.000Z",
       }],
       pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    })).toThrow();
+  });
+});
+
+
+describe("care and finance response contracts", () => {
+  it("validates feeding sessions with decimal weights serialized as strings", () => {
+    const response = parseFeedingSessionsResponse({
+      sessions: [{
+        id: "session-1", performedAt: "2026-11-12T10:00:00.000Z", notes: null,
+        entries: [{
+          id: "entry-1", sessionId: "session-1", animalId: "animal-1", outcome: "ate",
+          foodType: "rat", foodSize: "small", foodWeightG: "150.00", notes: null,
+          animal: { id: "animal-1", name: "Nala", identifier: "N-1", species: "Boa constrictor", status: "active" },
+        }],
+      }],
+      pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    });
+    expect(response.sessions[0]?.entries[0]?.foodWeightG).toBe("150.00");
+  });
+
+  it("validates finance cents as integer strings", () => {
+    const entries = parseFinanceEntriesResponse({
+      entries: [{
+        id: "finance-1", entryType: "expense", occurredOn: "2026-11-12T00:00:00.000Z",
+        amountCents: "1999", currency: "EUR", category: "food", description: "Food",
+        animalId: null, documentId: null,
+      }],
+      pagination: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    });
+    expect(entries.entries[0]?.amountCents).toBe("1999");
+    expect(() => parseFinanceSummaryResponse({
+      currency: "EUR", from: null, to: null, incomeCents: "0",
+      expenseCents: "1.5", balanceCents: "-1.5", categories: [],
     })).toThrow();
   });
 });

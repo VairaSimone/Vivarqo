@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { parseFinanceEntriesResponse, parseFinanceSummaryResponse } from "@vivarqo/contracts/finance";
+import type { FinanceEntriesResponseDto, FinanceEntryDto, FinanceSummaryDto } from "@vivarqo/contracts/finance";
 import { api, ApiError } from "../lib/api";
 import { amountToCents, formatDate, formatMoneyCents, getString, queryString, todayDate } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -6,8 +8,6 @@ import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, useToast } from "../components/ui";
-
-type Item = Record<string, unknown>;
 
 export function FinancePage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
@@ -18,18 +18,18 @@ export function FinancePage({ locale }: { locale: Locale }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState<Item | null>(null);
+  const [editing, setEditing] = useState<FinanceEntryDto | null>(null);
   const [form, setForm] = useState({ entryType: "expense", occurredOn: todayDate(), amount: "", currency: "EUR", category: "", description: "", animalId: "", documentId: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { toast, show } = useToast();
   const url = "/finance/entries" + queryString({ page, pageSize: 25, entryType, category, q, from, to });
-  const resource = useResource<{ entries: Item[]; pagination: { page: number; totalPages: number; total: number } }>(url);
-  const summary = useResource<{ currency: string; incomeCents: string; expenseCents: string; balanceCents: string; categories: Item[] }>(
-    "/finance/summary" + queryString({ from, to, currency: "EUR" })
+  const resource = useResource<FinanceEntriesResponseDto>(url, parseFinanceEntriesResponse);
+  const summary = useResource<FinanceSummaryDto>(
+    "/finance/summary" + queryString({ from, to, currency: "EUR" }), parseFinanceSummaryResponse
   );
 
-  function openForm(entry?: Item) {
+  function openForm(entry?: FinanceEntryDto) {
     setEditing(entry ?? null);
     setForm({
       entryType: getString(entry, "entryType", "expense"),
@@ -62,7 +62,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof Error ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
-  async function remove(entry: Item) {
+  async function remove(entry: FinanceEntryDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try { await api.delete(`/finance/entries/${getString(entry, "id")}`); resource.reload(); summary.reload(); show(t("delete")); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }

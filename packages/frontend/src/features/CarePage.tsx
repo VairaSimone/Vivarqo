@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
+import type { AnimalDto } from "@vivarqo/contracts/animals";
+import { parseFeedingSessionsResponse } from "@vivarqo/contracts/care";
+import type { FeedingEntryDto, FeedingSessionsResponseDto } from "@vivarqo/contracts/care";
 import { api, ApiError } from "../lib/api";
 import { dateTimeInputToUtc, formatDateTime, formatWeight, getArray, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -6,8 +9,7 @@ import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
-type Item = Record<string, unknown>;
-type AnimalOption = { id: string; name: string; identifier?: string | null; species: string; status?: string };
+type AnimalOption = AnimalDto;
 
 export function CarePage({ locale, path, timezone }: { locale: Locale; path: string; timezone: string }) {
   const t = (key: string) => translate(locale, key);
@@ -26,12 +28,12 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [animalPage, setAnimalPage] = useState(1);
   const [selected, setSelected] = useState<string[]>(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
   const [entries, setEntries] = useState<Record<string, { outcome: string; foodType: string; foodSize: string; foodWeightG: string; notes: string }>>({});
-  const [editEntry, setEditEntry] = useState<Item | null>(null);
+  const [editEntry, setEditEntry] = useState<FeedingEntryDto | null>(null);
   const [editData, setEditData] = useState({ outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" });
   const { toast, show } = useToast();
 
   const listUrl = "/feeding-sessions" + queryString({ page, pageSize: 25, animalId, outcome, q });
-  const resource = useResource<{ sessions: Item[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(listUrl);
+  const resource = useResource<FeedingSessionsResponseDto>(listUrl, parseFeedingSessionsResponse);
   const animalsResource = useResource<{ animals: AnimalOption[]; pagination: { total: number; page: number; totalPages: number } }>(
     modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, status: "active", sort: "name" }) : null
   );
@@ -110,7 +112,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
     finally { setBusy(false); }
   }
 
-  async function deleteEntry(entry: Item) {
+  async function deleteEntry(entry: FeedingEntryDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try { await api.delete(`/feeding-entries/${getString(entry, "id")}`); resource.reload(); show(t("delete")); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -132,11 +134,11 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
       <div className="list-meta"><span>{pager?.total ?? 0} {t("rows")}</span><Button variant="ghost" size="sm" onClick={resource.reload}><Icon name="refresh" size={15} />{t("refresh")}</Button></div>
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : sessions.length ? <div className="session-list">
         {sessions.map((session) => {
-          const sessionEntries = getArray<Item>(session, "entries");
+          const sessionEntries = session.entries;
           return <article className="session-card" key={getString(session, "id")}>
             <div className="session-date"><span>{formatDateTime(getString(session, "performedAt"), locale, timezone)}</span><Badge>{sessionEntries.length} {t("feedingEntries")}</Badge></div>
             <div className="session-animals">{sessionEntries.map((entry) => {
-              const animal = entry.animal as Item | undefined;
+              const animal = entry.animal ?? undefined;
               const outcomeValue = getString(entry, "outcome");
               return <div className="feeding-entry" key={getString(entry, "id")}>
                 <div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{getString(animal, "name") || t("noRecords")}</strong><small>{getString(animal, "species")}</small></span></div>
