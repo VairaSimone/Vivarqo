@@ -1,45 +1,118 @@
-# Vivarqo Dev Manager
+# Vivarqo Manager
 
-Launcher e supervisore locale per Windows/macOS/Linux. Usa i comandi ufficiali del monorepo.
+Un unico entrypoint con due modalità separate: sviluppo locale e supervisione della produzione Linux. La dashboard HTTP ascolta esclusivamente su loopback.
 
-## Avvio
+## Windows: sviluppo e test
 
-Prerequisiti: Node.js 24.11.x, Corepack/pnpm 10.20 e Docker Desktop/Docker Engine con Compose v2 avviato.
+Prerequisiti: Windows 10/11, Node.js 24.11.x, Corepack/pnpm 10.20 e Docker Desktop con Compose v2 avviato.
 
-Su Windows: doppio clic su dev-manager.cmd.
-Da terminale, nella root: pnpm dev:manager
+Avvio dalla root del repository:
 
-La dashboard si apre su http://127.0.0.1:4179. È legata a localhost e non è esposta in rete.
+```powershell
+pnpm dev:manager
+```
 
-Il primo avvio crea .env da .env.example se non esiste e genera un CSRF_SECRET casuale. Non sovrascrive un .env esistente. Esegue pnpm install --frozen-lockfile, avvia PostgreSQL dal Compose locale, attende pg_isready, genera Prisma e lancia db:ensure.
+Oppure doppio clic su `dev-manager.cmd`.
 
-Avvia poi API e attende /healthz, worker e frontend.
+La modalità predefinita è `development`: crea `.env` da `.env.example` solo se manca, installa le dipendenze, avvia PostgreSQL dal Compose di sviluppo e avvia API, worker e frontend come processi Node. La dashboard è su `http://127.0.0.1:4179`.
 
-## Dashboard e monitoraggio
+Le notifiche desktop Windows vengono inviate tramite PowerShell/.NET WinForms. Funzionano nella sessione desktop interattiva dell'utente: minimizzare il manager non deve interromperle, ma eseguirlo come servizio Windows nella sessione 0 non è supportato. Per provarle davvero dalla sessione desktop:
 
-- Stato live di PostgreSQL, API, worker e frontend.
-- Log live filtrabili e cronologia recente.
-- Diagnostica con raggruppamento degli errori ricorrenti e suggerimenti.
-- Su Windows gli errori generano una notifica nell'area di notifica tramite PowerShell/.NET WinForms. Le notifiche possono essere disattivate con VIVARQO_DISABLE_TOAST=1.
-- Il worker è verificato interrogando il heartbeat DB scritto dal processo worker ogni 10 secondi (TTL 45 secondi).
-- PostgreSQL viene controllato con pg_isready. Dopo due controlli falliti il manager prova a ricreare/riavviare il servizio con Docker Compose; riprova periodicamente se resta indisponibile.
-- API e frontend ricevono health check HTTP ogni 10 secondi; tre controlli consecutivi falliti provocano un riavvio.
-- Processi terminati inaspettatamente vengono riavviati con backoff esponenziale, fino a 8 tentativi.
+```powershell
+pnpm test:dev-manager:notifications
+```
 
-I log sono in .dev-manager/logs/. Ctrl+C arresta i processi applicativi e chiude la dashboard. PostgreSQL resta attivo e il volume dati non viene cancellato.
+Il test invia una notifica e chiede conferma visiva; non è un test automatico headless.
 
-Variabili opzionali:
-- VIVARQO_MANAGER_PORT: porta dashboard, default 4179.
-- VIVARQO_API_URL: endpoint health API, default http://127.0.0.1:3000/healthz.
-- VIVARQO_WEB_URL: URL frontend, default http://127.0.0.1:5173.
-- VIVARQO_DISABLE_TOAST=1: disattiva notifiche Windows.
+## Linux: produzione su VPS
+
+La modalità production usa esclusivamente `backend/infra/docker/compose.production.yaml`. Non installa pnpm, non copia file `.env`, non avvia processi Node di sviluppo e **non arresta i container quando il manager viene fermato**. Docker Compose mantiene i servizi attivi e i rispettivi restart policy; il manager li monitora e richiede il ripristino dei container non sani.
+
+Prerequisiti:
+- Linux con Docker Engine e Compose v2;
+- checkout del repository in una directory stabile;
+- file ambiente production e segreti già predisposti secondo la documentazione di deployment;
+- utente di servizio autorizzato ad accedere al socket Docker.
+
+Avvio manuale:
+
+```bash
+export VIVARQO_MANAGER_MODE=production
+export VIVARQO_ENV_FILE=/etc/vivarqo/production.env
+node scripts/dev-manager.mjs
+```
+
+Il file indicato da `VIVARQO_ENV_FILE` deve valorizzare tutte le variabili richieste dal Compose production, inclusi percorsi dei secret e directory backup. Il manager esegue `docker compose config --quiet` prima di avviare lo stack con `up -d --build`. Le migrazioni sono gestite dal servizio Compose `migrate`.
+
+Per un VPS, esegui il manager tramite systemd così viene riavviato dopo un crash o un reboot. Esempio di unità:
+
+```ini
+[Unit]
+Description=Vivarqo Production Manager
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=vivarqo
+Group=vivarqo
+SupplementaryGroups=docker
+WorkingDirectory=/opt/vivarqo
+Environment=VIVARQO_MANAGER_MODE=production
+Environment=VIVARQO_ENV_FILE=/etc/vivarqo/production.env
+Environment=VIVARQO_MANAGER_PORT=4179
+ExecStart=/usr/bin/node /opt/vivarqo/scripts/dev-manager.mjs
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Adatta utente, percorso repository e percorso Node alla VPS. Non esporre la porta 4179 su Internet: resta legata a localhost. Per aprirla dal PC amministratore usa un tunnel SSH:
+
+```bash
+ssh -L 4179:127.0.0.1:4179 user@vps
+```
+
+Poi visita `http://127.0.0.1:4179` sul PC. Il manager non sostituisce Docker restart policy, systemd, backup monitorati o un sistema di alerting esterno.
+
+## Dashboard, log e diagnostica
+
+- Stato container/processi e contatori di riavvio.
+- Log live filtrabili per livello e servizio; cronologia recuperata da `.dev-manager/logs/manager.log`.
+- EventSource riconnette automaticamente; al ripristino della connessione ricarica lo snapshot per recuperare gli eventi persi.
+- Diagnostica raggruppata: rete/timeout e database non raggiungibile sono classificati come transitori; un singolo evento non viene promosso a problema persistente.
+- Dashboard protetta da bind loopback, controllo dell'indirizzo remoto e validazione dell'header Host.
+- Worker verificato tramite heartbeat DB reale: scrittura ogni 10 secondi, TTL 45 secondi.
+- PostgreSQL verificato con health check Compose/pg_isready e riavviato senza rimuovere il volume.
 
 ## Test
 
-- pnpm check:dev-manager: controllo sintattico.
-- pnpm test:dev-manager: test unitari diagnosi/raggruppamento.
-- scripts/dev-manager.windows.test.mjs: smoke test Windows per cmd.exe, PowerShell/WinForms e taskkill; eseguito nel job Windows CI.
+```bash
+pnpm check:dev-manager
+pnpm test:dev-manager
+pnpm test:dev-manager:integration
+```
 
-## Limiti
+I test d'integrazione di processo e sicurezza vengono eseguiti su Linux e Windows nella CI.
 
-È un supervisore di sviluppo locale, non un process manager di produzione. Il controllo worker verifica il heartbeat del processo e la connessione DB, non la riuscita funzionale di ogni singolo job. Se Docker Engine è completamente fermo, il manager può solo tentare il comando Compose e segnalare l'errore; non può avviare Docker Desktop in modo affidabile su tutte le configurazioni. Le notifiche Windows richiedono una sessione desktop interattiva. La porta dashboard è vincolata a localhost.
+Drill PostgreSQL reale (arresta e riavvia il container locale; crea e rimuove una tabella temporanea per verificare che i dati sopravvivano):
+
+```bash
+VIVARQO_MANAGER_POSTGRES_DRILL=1 bash scripts/dev-manager-postgres-drill.sh
+```
+
+Eseguilo solo su un ambiente di sviluppo/test: interrompe temporaneamente le connessioni al database. Non usarlo su un database di produzione.
+
+## Limiti da tenere presenti
+
+- Le notifiche visibili richiedono una sessione Windows interattiva e la conferma manuale; GitHub Actions non può dimostrare che un balloon sia apparso sul desktop fisico.
+- Il drill PostgreSQL CI verifica un vero container Compose e la persistenza del volume, ma non simula un disco guasto o una corruzione fisica.
+- La modalità production monitora lo stato dei container e il heartbeat worker; non sostituisce monitoraggio applicativo di ogni job, backup off-site, restore periodici o alerting esterno.
+- La dashboard è locale. Su VPS si accede tramite SSH tunnel, non pubblicando la porta.
+- Il manager non deve essere eseguito contemporaneamente in più istanze sulla stessa stack: usare una sola unità systemd.
