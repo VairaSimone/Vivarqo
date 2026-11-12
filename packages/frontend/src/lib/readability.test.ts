@@ -14,8 +14,10 @@ describe("frontend readability baseline", () => {
     expect(baseline).toContain(".badge");
     expect(baseline).toContain("table, th, td");
     expect(baseline).toContain(".mobile-bottom-nav button");
-    expect(baseline).toContain("font-size: 14px !important");
-    expect(baseline).toContain("font-size: 16px !important");
+    expect(css).toContain("--font-action-size: 14px");
+    expect(baseline).toContain("font-size: var(--font-action-size) !important");
+    expect(css).toContain("--font-control-size: 16px");
+    expect(baseline).toContain("font-size: var(--font-control-size) !important");
   });
 
   it("does not let compact table preferences shrink readable row targets", () => {

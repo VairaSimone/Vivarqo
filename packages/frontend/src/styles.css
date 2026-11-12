@@ -619,52 +619,11 @@ tbody tr:hover { background: var(--surface-soft); }
 :root[data-theme="dark"] .badge-primary { background: #253d32; color: #a7c7b2; }
 
 
-/* Readability and keyboard baseline: retain the existing visual system while
-   preventing operational labels and metadata from dropping below 12px. */
-.brand-copy small, .nav-caption, .nav-count, .profile-copy strong, .profile-copy small,
-.sidebar-tools .nav-item, .language-code, .topbar-context, .global-search, kbd,
-.app-footer, .eyebrow, .btn, .btn-sm, .panel-header p, .metric-label,
-.dashboard-intro p, .task-main strong, .task-main small, .badge, .quick-action strong,
-.simple-row strong, .simple-row small, .activity-copy strong, .activity-copy small,
-.muted-note, .empty-state p, .error-state, .alert, .offline-banner,
-.global-alert > button, .toast, .field-label, .field-hint, .field-error,
-.checkbox-field, table, th, .list-meta, .pagination, .animal-name-cell strong,
-.item-name strong, .document-name strong, .animal-name-cell small, .item-name small,
-.document-name small, .animal-profile-main span, .tabs-line button, .detail-field span,
-.detail-field strong, .detail-copy, .text-link, .record-row strong, .record-row small,
-.record-row p, .chart-caption, .cycle-title span, .cycle-parents,
-.cycle-card-bottom > span, .cycle-parent span, .cycle-parent small, .cycle-stats,
-.timeline-copy span, .timeline-copy small, .timeline-copy strong, .timeline-copy p,
-.clutch-card strong, .clutch-card small, .egg-card strong, .animal-mini strong,
-.animal-mini small, .feeding-detail, .session-date, .selector-header strong,
-.selector-header small, .animal-option strong, .animal-option small, .segmented button,
-.calendar-weekday-row span, .calendar-day-number, .calendar-event,
-.calendar-day-items > small, .calendar-legend, .calendar-date-block small,
-.calendar-item-copy strong, .calendar-item-copy small, .movement-summary span,
-.category-bar-row > div:first-child, .category-bar-row strong, .toggle-row strong,
-.toggle-row small, .notification-copy strong, .notification-copy p,
-.notification-copy small, .billing-card p, .billing-card small, .export-intro p,
-.status-row, .import-errors h3, .import-preview h3, .import-errors > div,
-.import-preview pre, .auth-visual-foot, .auth-top, .auth-top button,
-.auth-subtitle, .auth-links button, .auth-legal, .public-badge,
-.public-fields span, .public-fields strong, .public-animal-card footer,
-.share-link-box > span, .mobile-bottom-nav button, .qr-share strong, .qr-share small {
-  font-size: max(12px, .75rem);
-}
-.btn { font-size: max(14px, .875rem); }
-.control, .search-control input { font-size: 16px; }
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid var(--terracotta);
-  outline-offset: 2px;
-}
-
+/* Layout utilities retained here; typography and focus rules live in the
+   single release baseline below to avoid competing overrides. */
 .offline-banner { align-items: flex-start; }
 .offline-banner > span { display: flex; flex-direction: column; gap: 2px; }
-.offline-banner small { color: var(--muted); font-size: 9px; line-height: 1.4; }
-:root[data-compact-tables="true"] th { padding-block: 6px; }
-:root[data-compact-tables="true"] td { min-height: 34px; padding-block: 6px; }
-:root[data-compact-tables="true"] .record-row,
-:root[data-compact-tables="true"] .task-row { padding-block: 7px; }
+.offline-banner small { color: var(--muted); font-size: var(--font-meta-size); line-height: 1.4; }
 .remote-select { min-width: 0; }
 .remote-select .search-control { min-width: 0; width: 100%; }
 
@@ -672,10 +631,9 @@ tbody tr:hover { background: var(--surface-soft); }
 .global-search-results { display: flex; flex-direction: column; gap: 4px; max-height: min(60vh, 520px); overflow: auto; }
 .global-search-result { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
 .global-search-result:hover, .global-search-result:focus-visible { border-color: var(--forest); background: var(--surface-soft); }
-.global-search-result-group { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
-.global-search-result strong { font-size: 13px; }
-.global-search-result small { color: var(--muted); font-size: 11px; }
-
+.global-search-result-group { color: var(--muted); font-size: var(--font-meta-size); text-transform: uppercase; letter-spacing: .06em; }
+.global-search-result strong { font-size: var(--font-label-size); }
+.global-search-result small { color: var(--muted); font-size: var(--font-meta-size); }
 
 /* Accessibility release baseline: visible operational text must remain readable.
    Table compaction may reduce whitespace, never the text size or hit target. */
