@@ -26,6 +26,8 @@ const recentLogs = [];
 const diagnosticEvents = [];
 const eventClients = new Set();
 const notificationTimes = new Map();
+const notificationProcesses = new Set();
+const commandProcesses = new Set();
 let dashboardServer;
 const STOP = { requested: false };
 const services = new Map();
@@ -66,14 +68,22 @@ async function log(level, source, message) {
 function exe(name) { return name; }
 function run(command, args, capture = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit", windowsHide: true, shell: windows && (command === "pnpm" || command === "corepack") });
+    const child = spawn(command, args, {
+      cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      windowsHide: true, shell: windows && (command === "pnpm" || command === "corepack"), detached: !windows
+    });
+    commandProcesses.add(child);
     let stdout = "", stderr = "";
     if (capture) {
       child.stdout.on("data", c => { stdout += c.toString(); });
       child.stderr.on("data", c => { stderr += c.toString(); });
     }
-    child.once("error", reject);
-    child.once("close", code => code === 0 ? resolve({ stdout: stdout.trim(), stderr: stderr.trim() }) : reject(new Error(command + " " + args.join(" ") + " exit " + code + (stderr ? ": " + stderr.trim() : ""))));
+    child.once("error", error => { commandProcesses.delete(child); reject(error); });
+    child.once("close", code => {
+      commandProcesses.delete(child);
+      if (code === 0) resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+      else reject(new Error(command + " " + args.join(" ") + " exit " + code + (stderr ? ": " + stderr.trim() : "")));
+    });
   });
 }
 async function exists(command, args) {
@@ -229,7 +239,9 @@ function notifyDesktop(title, message) {
   const m = String(message).replace(/\x27/g, "\x27\x27").slice(0, 220);
   const ps = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Warning; $n.Visible=$true; $n.BalloonTipTitle=\x27" + t + "\x27; $n.BalloonTipText=\x27" + m + "\x27; $n.ShowBalloonTip(8000); Start-Sleep -Seconds 9; $n.Dispose()";
   const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true, stdio: "ignore" });
-  child.on("error", () => {});
+  notificationProcesses.add(child);
+  child.on("error", () => notificationProcesses.delete(child));
+  child.once("close", () => notificationProcesses.delete(child));
 }
 async function checkWorkerHeartbeat() {
   const sql = "SELECT EXISTS (SELECT 1 FROM api_rate_limit_buckets WHERE namespace = 'worker-heartbeat' AND reset_at > NOW());";
@@ -485,8 +497,11 @@ async function shutdown(reason) {
   if (STOP.requested) return;
   STOP.requested = true;
   await log("WARN", "MANAGER", "Arresto richiesto: " + reason);
-  const children = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
+  const serviceChildren = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
+  const children = [...new Set([...serviceChildren, ...commandProcesses, ...notificationProcesses])];
   await Promise.all(children.map(child => terminateProcessTree(child)));
+  commandProcesses.clear();
+  notificationProcesses.clear();
   for (const s of services.values()) { s.child = null; s.state = "stopped"; }
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
