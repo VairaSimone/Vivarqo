@@ -36,7 +36,8 @@
     "test:dev-manager": "node --test scripts/dev-manager.test.mjs",
     "test:dev-manager:integration": "node --test scripts/dev-manager.process.test.mjs scripts/dev-manager.security.test.mjs scripts/dev-manager.resilience.test.mjs scripts/dev-manager.dashboard.test.mjs",
     "test:dev-manager:notifications": "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/dev-manager-notification-drill.ps1",
-    "test:dev-manager:postgres": "node scripts/dev-manager-postgres-manager.test.mjs"
+    "test:dev-manager:postgres": "node scripts/dev-manager-postgres-manager.test.mjs",
+    "test:dev-manager:production": "node scripts/dev-manager-production.test.mjs"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
