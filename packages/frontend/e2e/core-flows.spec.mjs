@@ -121,6 +121,28 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(page.getByRole("alert")).toBeVisible();
 
   await signIn(page, owner);
+  await expect(page.getByText("Cosa richiede attenzione oggi?")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "In ritardo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Da fare oggi" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nei prossimi 7 giorni" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registra alimentazione" })).toBeVisible();
+
+  // Create a real task due in two days and verify that the dashboard surfaces
+  // it in the upcoming section and opens its own task detail when selected.
+  await page.goto("/tasks?create=1");
+  await page.getByLabel("Titolo attività").fill("E2E dashboard upcoming task");
+  const upcomingDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  const upcomingDateTime = new Date(upcomingDate.getTime() - upcomingDate.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  await page.getByLabel("Scadenza").fill(upcomingDateTime);
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await page.goto("/today");
+  const upcomingTask = page.getByRole("button", { name: "Apri attività: E2E dashboard upcoming task" });
+  await expect(upcomingTask).toBeVisible();
+  await upcomingTask.click();
+  await expect(page.getByRole("dialog")).toContainText("E2E dashboard upcoming task");
+  await page.getByRole("button", { name: "Chiudi" }).click();
+  await page.goto("/today");
+
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
   expect(manifestHref).toBeTruthy();
   const manifestResponse = await page.request.get(new URL(manifestHref, page.url()).toString());
