@@ -334,13 +334,14 @@ test("domain CSV imports preview and persist inventory and finance records", asy
   await page.goto("/imports");
 
   const entitySelect = page.getByLabel("Tipo di dati");
-  const supportedEntities = await entitySelect.locator("option").evaluateAll((options) =>
-    options.map((option) => option.value).filter(Boolean)
-  );
-  expect(supportedEntities).toEqual(expect.arrayContaining([
+  // Exercise the actual native/custom select interaction instead of assuming
+  // its option elements are exposed as ordinary descendants in the DOM.
+  for (const entity of [
     "animals", "finance", "inventory", "reproductionCycles", "reproductiveEvents",
-    "clutches", "eggs", "incubationLogs", "offspringBatches"
-  ]));
+    "clutches", "eggs", "incubationLogs", "offspringBatches",
+  ]) {
+    await entitySelect.selectOption(entity);
+  }
 
   const imports = [
     {
