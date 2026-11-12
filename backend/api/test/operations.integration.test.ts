@@ -253,6 +253,13 @@ describe.skipIf(!integrationEnabled)("Operations, reminders, Today and calendar 
       .send({ status: "dismissed" })
       .expect(200);
 
+    await owner.agent
+      .patch(`/api/v1/tasks/${nextTask.id}`)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({ status: "open" })
+      .expect(409);
+
     openTasks = await owner.agent.get("/api/v1/tasks?status=open&pageSize=100").expect(200);
     const replacement = openTasks.body.tasks.find((item: { reminderRuleId: string }) => item.reminderRuleId === created.body.rule.id);
     expect(replacement).toBeTruthy();
