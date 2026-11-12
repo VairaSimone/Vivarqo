@@ -23,6 +23,8 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   const [editing, setEditing] = useState<TaskDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [taskDirty, setTaskDirty] = useState(false);
+  const [reminderDirty, setReminderDirty] = useState(false);
   // A route opened directly with ?create=1 must be ready for submission too.
   // Keeping dueAt empty here made native required-field validation block the
   // form before the API request was ever sent.
@@ -38,12 +40,14 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       setReminderEdit(null);
       setReminderForm({ title: "", description: "", category: "custom", intervalDays: "7", nextDueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
       setError("");
+      setReminderDirty(false);
       setReminderModal(true);
     } else if (currentParams.has("create")) {
       setReminderModal(false);
       setEditing(null);
       setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" });
       setError("");
+      setTaskDirty(false);
       setModal(true);
     } else {
       setModal(false);
@@ -59,18 +63,18 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
   const detail = useResource<{ task: TaskDto }>(taskId ? `/tasks/${encodeURIComponent(taskId)}` : null);
   const { toast, show } = useToast();
 
-  function openCreate() { setEditing(null); setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" }); setError(""); setModal(true); }
+  function openCreate() { setEditing(null); setForm({ title: "", description: "", category: "custom", dueAt: localDateTimeValue(new Date(), timezone), animalId: "" }); setError(""); setTaskDirty(false); setModal(true); }
   function openEdit(task: TaskDto) {
     setEditing(task);
     setForm({ title: getString(task, "title"), description: getString(task, "description"), category: getString(task, "category", "custom"), dueAt: dateTimeInputValue(getString(task, "dueAt"), timezone), animalId: getString(task, "animalId") });
-    setError(""); setModal(true);
+    setError(""); setTaskDirty(false); setModal(true);
   }
   async function saveTask(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); if (busy) return; setBusy(true); setError("");
     try {
       const body = { title: form.title, description: form.description || null, category: form.category, dueAt: dateTimeInputToUtc(form.dueAt, timezone), animalId: form.animalId || null };
       if (editing) await api.patch(`/tasks/${getString(editing, "id")}`, body); else await api.post("/tasks", body);
-      setModal(false); tasks.reload(); detail.reload(); show(t("saveSuccess"));
+      setModal(false); setTaskDirty(false); tasks.reload(); detail.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
@@ -91,15 +95,15 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       nextDueAt: rule ? dateTimeInputValue(getString(rule, "nextDueAt"), timezone) : localDateTimeValue(new Date(), timezone),
       animalId: getString(rule, "animalId")
     });
-    setError(""); setReminderModal(true);
+    setError(""); setReminderDirty(false); setReminderModal(true);
   }
   async function saveReminder(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); if (busy) return; setBusy(true); setError("");
     try {
       const body = { ...reminderForm, description: reminderForm.description.trim() || null, intervalDays: Number(reminderForm.intervalDays), nextDueAt: dateTimeInputToUtc(reminderForm.nextDueAt, timezone), animalId: reminderForm.animalId || null, isEnabled: true };
       if (reminderEdit) await api.patch(`/tasks/reminder-rules/${getString(reminderEdit, "id")}`, body);
       else await api.post("/tasks/reminder-rules", body);
-      setReminderModal(false); reminders.reload(); tasks.reload(); show(t("saveSuccess"));
+      setReminderModal(false); setReminderDirty(false); reminders.reload(); tasks.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : reason instanceof RangeError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
@@ -132,25 +136,25 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
       {reminders.data?.pagination && <Pagination page={reminders.data.pagination.page} totalPages={reminders.data.pagination.totalPages} onChange={setReminderPage} label={t("page")} />}
     </Panel>}
 
-    {modal && <Modal title={editing ? t("edit") : t("addTask")} onClose={() => setModal(false)}>
+    {modal && <Modal title={editing ? t("edit") : t("addTask")} onClose={() => { setModal(false); setTaskDirty(false); }} hasUnsavedChanges={taskDirty} discardMessage={locale === "en" ? "Discard unsaved task changes?" : "Scartare le modifiche non salvate all'attività?"}>
       <form className="form-stack" onSubmit={saveTask}>{error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("taskTitle")}><Input required maxLength={160} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-        <div className="form-grid"><Field label={t("category")}><Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((value) => <option key={value} value={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
-          <Field label={t("dueAt")}><Input required type="datetime-local" value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} /></Field></div>
-        <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => setForm({ ...form, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
-        <Field label={t("description")}><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
+        <Field label={t("taskTitle")}><Input required maxLength={160} value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setTaskDirty(true); }} /></Field>
+        <div className="form-grid"><Field label={t("category")}><Select value={form.category} onChange={(e) => { setForm({ ...form, category: e.target.value }); setTaskDirty(true); }}>{categories.map((value) => <option key={value} value={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
+          <Field label={t("dueAt")}><Input required type="datetime-local" value={form.dueAt} onChange={(e) => { setForm({ ...form, dueAt: e.target.value }); setTaskDirty(true); }} /></Field></div>
+        <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => { setForm({ ...form, animalId }); setTaskDirty(true); }} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+        <Field label={t("description")}><Textarea rows={3} value={form.description} onChange={(e) => { setForm({ ...form, description: e.target.value }); setTaskDirty(true); }} /></Field>
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => { if (!taskDirty || window.confirm(locale === "en" ? "Discard unsaved task changes?" : "Scartare le modifiche non salvate all'attività?")) { setModal(false); setTaskDirty(false); } }}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
     </Modal>}
-    {reminderModal && <Modal title={reminderEdit ? t("edit") : t("createReminder")} onClose={() => setReminderModal(false)}>
+    {reminderModal && <Modal title={reminderEdit ? t("edit") : t("createReminder")} onClose={() => { setReminderModal(false); setReminderDirty(false); }} hasUnsavedChanges={reminderDirty} discardMessage={locale === "en" ? "Discard unsaved reminder changes?" : "Scartare le modifiche non salvate al promemoria?"}>
       <form className="form-stack" onSubmit={saveReminder}>{error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("taskTitle")}><Input required value={reminderForm.title} onChange={(e) => setReminderForm({ ...reminderForm, title: e.target.value })} /></Field>
-        <Field label={t("description")}><Textarea rows={3} value={reminderForm.description} onChange={(e) => setReminderForm({ ...reminderForm, description: e.target.value })} /></Field>
-        <div className="form-grid"><Field label={t("category")}><Select value={reminderForm.category} onChange={(e) => setReminderForm({ ...reminderForm, category: e.target.value })}>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
-        <Field label={t("intervalDays")}><Input required type="number" min="1" max="3650" value={reminderForm.intervalDays} onChange={(e) => setReminderForm({ ...reminderForm, intervalDays: e.target.value })} /></Field>
-        <Field label={t("nextDueAt")}><Input required type="datetime-local" value={reminderForm.nextDueAt} onChange={(e) => setReminderForm({ ...reminderForm, nextDueAt: e.target.value })} /></Field></div>
-        <RemoteSelect label={t("animalDetail")} value={reminderForm.animalId} onChange={(animalId) => setReminderForm({ ...reminderForm, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
-        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setReminderModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
+        <Field label={t("taskTitle")}><Input required value={reminderForm.title} onChange={(e) => { setReminderForm({ ...reminderForm, title: e.target.value }); setReminderDirty(true); }} /></Field>
+        <Field label={t("description")}><Textarea rows={3} value={reminderForm.description} onChange={(e) => { setReminderForm({ ...reminderForm, description: e.target.value }); setReminderDirty(true); }} /></Field>
+        <div className="form-grid"><Field label={t("category")}><Select value={reminderForm.category} onChange={(e) => { setReminderForm({ ...reminderForm, category: e.target.value }); setReminderDirty(true); }}>{categories.map((value) => <option value={value} key={value}>{t(`category${value[0]!.toUpperCase()}${value.slice(1)}`)}</option>)}</Select></Field>
+        <Field label={t("intervalDays")}><Input required type="number" min="1" max="3650" value={reminderForm.intervalDays} onChange={(e) => { setReminderForm({ ...reminderForm, intervalDays: e.target.value }); setReminderDirty(true); }} /></Field>
+        <Field label={t("nextDueAt")}><Input required type="datetime-local" value={reminderForm.nextDueAt} onChange={(e) => { setReminderForm({ ...reminderForm, nextDueAt: e.target.value }); setReminderDirty(true); }} /></Field></div>
+        <RemoteSelect label={t("animalDetail")} value={reminderForm.animalId} onChange={(animalId) => { setReminderForm({ ...reminderForm, animalId }); setReminderDirty(true); }} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => { if (!reminderDirty || window.confirm(locale === "en" ? "Discard unsaved reminder changes?" : "Scartare le modifiche non salvate al promemoria?")) { setReminderModal(false); setReminderDirty(false); } }}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
     </Modal>}
     {taskId && detail.data?.task && <Modal title={getString(detail.data.task, "title")} onClose={() => navigate("/tasks")}>
