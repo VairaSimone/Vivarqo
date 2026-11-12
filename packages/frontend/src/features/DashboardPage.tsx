@@ -40,7 +40,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     const id = task.id;
     const animal = task.animal;
     return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}`} key={id}>
-      <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={t("taskCompleted")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
+      <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={t("completeTask")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
       <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
         <strong>{task.title}</strong>
         <small>{getString(animal, "name") || t("noAnimalLinked")} · {formatDateTime(task.dueAt, locale, timezone)}</small>
