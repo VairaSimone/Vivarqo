@@ -218,7 +218,7 @@ export async function sendWebPush(
   });
 }
 
-function isWithinQuietHours(now: Date, timezone: string, start: Date | null, end: Date | null): boolean {
+export function isWithinQuietHours(now: Date, timezone: string, start: Date | null, end: Date | null): boolean {
   if (!start || !end || start.getTime() === end.getTime()) return false;
   const time = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
