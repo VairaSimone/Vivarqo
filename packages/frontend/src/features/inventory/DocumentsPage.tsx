@@ -82,7 +82,7 @@ export function DocumentsPage({ locale, path, navigate }: { locale: Locale; path
         <RemoteSelect label={t("cycles")} value={cycleId} onChange={(value) => { setCycleId(value); setPage(1); setAnimalId(""); }} endpoint="/reproduction-cycles" responseKey="cycles" filters={{ status: "all" }} detailEndpoint={(id) => "/reproduction-cycles/" + encodeURIComponent(id)} detailKey="cycle" locale={locale} emptyLabel={t("all")} /></>}
         activeFilterCount={[search, animalId, cycleId].filter(Boolean).length}
         onClearFilters={() => { setSearch(""); setAnimalId(""); setCycleId(""); setPage(1); }}
-        resultCount={resource.data?.pagination.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
+        resultCount={resource.data?.pagination.total} onRefresh={resource.reload} loading={resource.loading} />
       <div className="list-meta"><span className="muted-note">{t("privateStorage")}</span></div>
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : <DataTable headers={[t("file"), t("documentCategory"), t("date"), t("animalDetail"), t("actions")]} rows={(resource.data?.documents ?? []).map((document) => [
         <div className="document-name"><span className="item-symbol"><Icon name="file" /></span><span><strong>{getString(document, "originalFilename")}</strong><small>{formatNumber(getString(document, "sizeBytes"), locale, 0)} bytes</small></span></div>,
