@@ -351,10 +351,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
                     <span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>
                     {foodWeight ? <small>{formatWeight(foodWeight, locale)}</small> : null}
                   </div>
-                  <div className="row-actions">
+                  {!isArchived && <div className="row-actions">
                     <IconButton label={t("edit")} onClick={() => openFeedingEdit(session, entry)}><Icon name="edit" size={15} /></IconButton>
                     <IconButton label={t("delete")} onClick={() => void deleteFeedingEntry(entry)}><Icon name="trash" size={15} /></IconButton>
-                  </div>
+                  </div>}
                 </div>
                 {getString(entry, "notes") && <p className="muted-note">{getString(entry, "notes")}</p>}
                 {getString(session, "notes") && <p className="muted-note">{getString(session, "notes")}</p>}
@@ -365,25 +365,25 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         </Panel>
         <Panel><PanelHeader title={t("weightHistory")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("weight")}><Icon name="plus" size={14} />{t("addWeight")}</Button> : undefined} />
           <WeightChart weights={weights.data?.weights ?? []} locale={locale} />
-          <RecordList records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
+          <RecordList readOnly={isArchived} records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
         </Panel>
         <Panel><PanelHeader title={t("addShed")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
-          <RecordList records={sheds.data?.sheds ?? []} kind="shed" locale={locale} onEdit={(record) => openRecord("shed", record)} onDelete={(record) => void deleteRecord("shed", record)} />
+          <RecordList readOnly={isArchived} records={sheds.data?.sheds ?? []} kind="shed" locale={locale} onEdit={(record) => openRecord("shed", record)} onDelete={(record) => void deleteRecord("shed", record)} />
         </Panel>
         <Panel><PanelHeader title={t("animalNotes")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("note")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
-          <RecordList records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
+          <RecordList readOnly={isArchived} records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
         </Panel>
       </div>
     </div>}
 
-    {tab === "documents" && <Panel><PanelHeader title={t("documentsTab")} action={<Button onClick={() => navigate(`/documents?animalId=${id}`)}><Icon name="upload" size={15} />{t("uploadDocument")}</Button>} />
+    {tab === "documents" && <Panel><PanelHeader title={t("documentsTab")} action={!isArchived ? <Button onClick={() => navigate(`/documents?animalId=${id}`)}><Icon name="upload" size={15} />{t("uploadDocument")}</Button> : undefined} />
       {documents.data?.documents?.length ? <DataTable headers={[t("name"), t("documentCategory"), t("date"), t("actions")]} rows={documents.data.documents.map((doc) => [
         <strong>{getString(doc, "originalFilename")}</strong>, getString(doc, "category"), formatDate(getString(doc, "createdAt"), locale),
         <div className="row-actions"><IconButton label={t("download")} onClick={() => void api.download(`/documents/${getString(doc, "id")}/download`, getString(doc, "originalFilename", "document"))}><Icon name="download" /></IconButton></div>
       ])} empty={t("noDocuments")} /> : <EmptyState title={t("noDocuments")} description={t("emptyHint")} />}</Panel>}
 
     {tab === "traits" && <Panel>
-      <PanelHeader title={t("traits")} action={{!isArchived && <Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button>}} />
+      <PanelHeader title={t("traits")} action={!isArchived ? <Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button> : undefined} />
       {traits.loading && !traits.data ? <LoadingState /> : traits.error ? <ErrorState message={traits.error.message} retry={traits.reload} /> : traits.data?.traits?.length ? traits.data.traits.map((trait) => (
         <div className="simple-row genetic-trait-row" key={trait.id}>
           <span className="simple-row-icon"><Icon name="leaf" /></span>
@@ -395,10 +395,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
               : t("geneticSourceUnknown")}</small>
             {trait.confidenceNote && <small>{t("geneticConfidenceNote")}: {trait.confidenceNote}</small>}
           </div>
-          <div className="row-actions">
+          {!isArchived && <div className="row-actions">
             <IconButton label={t("edit")} onClick={() => openGeneticTrait(trait)}><Icon name="edit" size={15} /></IconButton>
             <IconButton label={t("delete")} onClick={() => void deleteGeneticTrait(trait)}><Icon name="trash" size={15} /></IconButton>
-          </div>
+          </div>}
         </div>
       )) : <EmptyState title={t("noRecords")} />}
     </Panel>}
@@ -514,9 +514,9 @@ function Detail({ label, value }: { label: string; value: string }) {
   return <div className="detail-field"><span>{label}</span><strong>{value || "—"}</strong></div>;
 }
 
-function RecordList({ records, kind, locale, onEdit, onDelete }: { records: CareRecordDto[]; kind: "weight" | "shed" | "note"; locale: Locale; onEdit: (record: CareRecordDto) => void; onDelete: (record: CareRecordDto) => void }) {
+function RecordList({ records, kind, locale, onEdit, onDelete, readOnly = false }: { records: CareRecordDto[]; readOnly?: boolean; kind: "weight" | "shed" | "note"; locale: Locale; onEdit: (record: CareRecordDto) => void; onDelete: (record: CareRecordDto) => void }) {
   if (!records.length) return <EmptyState title={translate(locale, "noRecords")} />;
-  return <div className="record-list">{records.map((record) => <div className="record-row" key={getString(record, "id")}><div><strong>{kind === "weight" ? formatWeight(getString(record, "weightG"), locale) : kind === "shed" ? getString(record, "outcome") : getString(record, "title") || getString(record, "category")}</strong><small>{formatDate(kind === "weight" ? getString(record, "measuredAt") : getString(record, "occurredAt"), locale)}</small>{kind === "note" && <p>{getString(record, "body")}</p>}</div><div className="row-actions"><IconButton label={translate(locale, "edit")} onClick={() => onEdit(record)}><Icon name="edit" size={15} /></IconButton><IconButton label={translate(locale, "delete")} onClick={() => onDelete(record)}><Icon name="trash" size={15} /></IconButton></div></div>)}</div>;
+  return <div className="record-list">{records.map((record) => <div className="record-row" key={getString(record, "id")}><div><strong>{kind === "weight" ? formatWeight(getString(record, "weightG"), locale) : kind === "shed" ? getString(record, "outcome") : getString(record, "title") || getString(record, "category")}</strong><small>{formatDate(kind === "weight" ? getString(record, "measuredAt") : getString(record, "occurredAt"), locale)}</small>{kind === "note" && <p>{getString(record, "body")}</p>}</div>{!readOnly && <div className="row-actions"><IconButton label={translate(locale, "edit")} onClick={() => onEdit(record)}><Icon name="edit" size={15} /></IconButton><IconButton label={translate(locale, "delete")} onClick={() => onDelete(record)}><Icon name="trash" size={15} /></IconButton></div>}</div>)}</div>;
 }
 
 function WeightChart({ weights, locale }: { weights: WeightDto[]; locale: Locale }) {
