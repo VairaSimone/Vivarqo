@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { diagnose, primaryErrorMessage, summarizeDiagnostics } from "./dev-manager-core.mjs";
 import {
   clearUnusedVapidPlaceholder, findAvailablePort, getIncompleteVapidVariables,
-  getLocalPostgresPort, getPortFromComposeMapping, isTcpPortAvailable,
+  getInvalidVapidVariables, getLocalPostgresPort, getPortFromComposeMapping, isTcpPortAvailable,
   readEnvValue, setEnvValues, withLocalPostgresPort
 } from "./dev-manager-config.mjs";
 import { terminateProcessTree } from "./dev-manager-process.mjs";
@@ -179,9 +179,11 @@ async function configureLocalPostgresPort() {
 
   // Reuse the already-running Compose mapping on subsequent starts. Otherwise
   // probe for a free loopback port and never terminate the process occupying it.
-  const selectedPort = existingComposePort || await findAvailablePort(preferredPort, Math.max(5500, preferredPort + 100), isTcpPortAvailable);
+  const searchEndPort = Math.min(65_535, Math.max(5500, preferredPort + 100));
+  const selectedPort = existingComposePort || await findAvailablePort(preferredPort, searchEndPort, isTcpPortAvailable);
   if (!selectedPort) {
-    throw new Error("Nessuna porta TCP libera trovata tra " + preferredPort + " e 5500. Libera una porta o imposta VIVARQO_POSTGRES_HOST_PORT manualmente.");
+    throw new Error("Nessuna porta TCP libera trovata tra " + preferredPort + " e " + searchEndPort +
+      ". Libera una porta o imposta VIVARQO_POSTGRES_HOST_PORT manualmente.");
   }
 
   const updates = { VIVARQO_POSTGRES_HOST_PORT: String(selectedPort) };
@@ -254,6 +256,11 @@ async function prepare() {
   if (missingVapid.length) {
     throw new Error("Configurazione VAPID incompleta. Mancano: " + missingVapid.join(", ") +
       ". Configura tutte le tre variabili oppure lascia VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT vuote.");
+  }
+  const invalidVapid = getInvalidVapidVariables(envContents);
+  if (invalidVapid.length) {
+    throw new Error("Configurazione VAPID non valida: " + invalidVapid.join(", ") +
+      ". Verifica il formato, la corrispondenza tra chiave pubblica e privata e il subject. I valori segreti non vengono mostrati.");
   }
   const currentEnv = await readFile(".env", "utf8");
   if (envContents !== currentEnv) await persistEnvFile(path.join(ROOT, ".env"), envContents);
