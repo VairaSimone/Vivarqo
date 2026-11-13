@@ -299,17 +299,21 @@ async function prepareDatabase() {
       if (!portBindingFailure || attempt === 5) throw error;
 
       const currentPort = Number(process.env.VIVARQO_POSTGRES_HOST_PORT || 5432);
-      const nextPort = await findAvailablePort(currentPort + 1, Math.min(65_535, currentPort + 100), isTcpPortAvailable);
+      const nextStartPort = currentPort + 1;
+      const nextEndPort = Math.min(65_535, currentPort + 100);
+      const nextPort = nextStartPort <= nextEndPort
+        ? await findAvailablePort(nextStartPort, nextEndPort, isTcpPortAvailable)
+        : null;
       if (!nextPort) {
         throw new Error("Docker non è riuscito a pubblicare PostgreSQL e non è disponibile una porta alternativa tra " +
-          (currentPort + 1) + " e " + Math.min(65_535, currentPort + 100) + ". Processo esterno non terminato.");
+          nextStartPort + " e " + nextEndPort + ". Processo esterno non terminato.");
       }
       const owners = await describePortOwner(currentPort);
       const ownerLabel = owners.length
         ? owners.map(owner => String(owner.name || "processo") + " PID " + owner.pid).join(", ")
         : "processo non identificato";
       await persistLocalPostgresPort(nextPort);
-      await log("WARN", "DATABASE", "Docker ha rilevato un conflitto sulla porta " + currentPort +
+      await log("INFO", "DATABASE", "Docker ha rilevato un conflitto sulla porta " + currentPort +
         " (" + ownerLabel + "). Sposto PostgreSQL Docker sulla porta " + nextPort +
         " e riprovo; nessun processo esterno viene terminato.");
     }
