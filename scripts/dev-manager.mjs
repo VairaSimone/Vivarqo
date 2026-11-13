@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { summarizeDiagnostics } from "./dev-manager-core.mjs";
+import { diagnose, primaryErrorMessage, summarizeDiagnostics } from "./dev-manager-core.mjs";
+import {
+  clearUnusedVapidPlaceholder, findAvailablePort, getIncompleteVapidVariables,
+  getLocalPostgresPort, getPortFromComposeMapping, isTcpPortAvailable,
+  readEnvValue, setEnvValues, withLocalPostgresPort
+} from "./dev-manager-config.mjs";
 import { terminateProcessTree } from "./dev-manager-process.mjs";
 import { isDashboardRequestAllowed } from "./dev-manager-security.mjs";
-import { access, appendFile, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, appendFile, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
@@ -52,10 +57,8 @@ async function loadPersistentLogs() {
           message: line.slice(third + 2)
         };
         recentLogs.push(item);
-        if (["ERROR", "FATAL", "WARN"].includes(item.level)) diagnosticEvents.push(item);
       }
     }
-    if (diagnosticEvents.length > 500) diagnosticEvents.splice(0, diagnosticEvents.length - 500);
   } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
 async function log(level, source, message) {
@@ -68,31 +71,154 @@ async function log(level, source, message) {
   if (["ERROR", "FATAL"].includes(level)) notifyDesktop(source, item.message);
 }
 function exe(name) { return name; }
+
+function spawnCommand(command, args, options) {
+  if (windows && (command === "pnpm" || command === "corepack")) {
+    // .cmd shims require cmd.exe on Windows. Launch it explicitly rather than
+    // enabling Node's shell:true mode (DEP0190 and argument concatenation risk).
+    return spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", command, ...args], {
+      ...options, shell: false
+    });
+  }
+  return spawn(command, args, { ...options, shell: false });
+}
+
+const MAX_COMMAND_OUTPUT = 1024 * 1024;
+function appendBounded(current, chunk) {
+  return (current + chunk.toString()).slice(-MAX_COMMAND_OUTPUT);
+}
+
 function run(command, args, capture = false) {
   return new Promise((resolve, reject) => {
     if (STOP.requested) { reject(new Error("Manager in arresto: comando non avviato.")); return; }
-    const child = spawn(command, args, {
+    const child = spawnCommand(command, args, {
       cwd: ROOT, env: process.env, stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-      windowsHide: true, shell: windows && (command === "pnpm" || command === "corepack"), detached: !windows
+      windowsHide: true, detached: !windows
     });
     commandProcesses.add(child);
     let stdout = "", stderr = "";
     if (capture) {
-      child.stdout.on("data", c => { stdout += c.toString(); });
-      child.stderr.on("data", c => { stderr += c.toString(); });
+      child.stdout.on("data", chunk => { stdout = appendBounded(stdout, chunk); });
+      child.stderr.on("data", chunk => { stderr = appendBounded(stderr, chunk); });
     }
     child.once("error", error => { commandProcesses.delete(child); reject(error); });
     child.once("close", code => {
       commandProcesses.delete(child);
       if (code === 0) resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
-      else reject(new Error(command + " " + args.join(" ") + " exit " + code + (stderr ? ": " + stderr.trim() : "")));
+      else {
+        const details = [stdout, stderr].filter(Boolean).join("\n").slice(-MAX_COMMAND_OUTPUT);
+        reject(new Error(command + " " + args.join(" ") + " exit " + code + (details ? ":\n" + details : "")));
+      }
     });
   });
 }
+
+async function runAndForward(command, args) {
+  const result = await run(command, args, true);
+  if (result.stdout) process.stdout.write(result.stdout + "\n");
+  if (result.stderr) process.stderr.write(result.stderr + "\n");
+  return result;
+}
+
 async function exists(command, args) {
   try { await run(exe(command), args || ["--version"], true); return true; } catch { return false; }
 }
 function pnpmArgs(args) { return packageManager === "corepack" ? ["pnpm", ...args] : args; }
+
+async function persistEnvFile(filePath, contents) {
+  const temporaryPath = filePath + ".dev-manager-" + process.pid + ".tmp";
+  await writeFile(temporaryPath, contents, { encoding: "utf8", mode: 0o600 });
+  try {
+    await rename(temporaryPath, filePath);
+  } catch (error) {
+    await import("node:fs/promises").then(fs => fs.unlink(temporaryPath).catch(() => {}));
+    throw error;
+  }
+}
+
+async function describePortOwner(port) {
+  if (!windows) return [];
+  const script = "$port = " + Number(port) +
+    "; $ids = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique);" +
+    " $rows = foreach ($id in $ids) { $p = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $id);" +
+    " [pscustomobject]@{ pid = $id; name = $p.Name } }; ConvertTo-Json -InputObject @($rows) -Compress";
+  try {
+    const result = await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], true);
+    if (!result.stdout) return [];
+    const parsed = JSON.parse(result.stdout);
+    return (Array.isArray(parsed) ? parsed : [parsed]).filter(item => item && item.pid);
+  } catch {
+    return [];
+  }
+}
+
+async function getExistingComposePostgresPort() {
+  try {
+    const result = await run("docker", ["compose", "-f", COMPOSE, "port", "postgres", "5432"], true);
+    return getPortFromComposeMapping(result.stdout);
+  } catch {
+    return null;
+  }
+}
+
+async function configureLocalPostgresPort() {
+  const envPath = path.join(ROOT, ".env");
+  const original = await readFile(envPath, "utf8");
+  const existingComposePort = await getExistingComposePostgresPort();
+  const inheritedPort = Number(process.env.VIVARQO_POSTGRES_HOST_PORT || 0);
+  const filePort = Number(readEnvValue(original, "VIVARQO_POSTGRES_HOST_PORT") || 0);
+  const inheritedUrl = process.env.DATABASE_URL?.trim() || "";
+  const fileUrl = readEnvValue(original, "DATABASE_URL") || "";
+  const preferredPort = existingComposePort ||
+    (Number.isInteger(inheritedPort) && inheritedPort > 0 && inheritedPort <= 65_535 ? inheritedPort : null) ||
+    (Number.isInteger(filePort) && filePort > 0 && filePort <= 65_535 ? filePort : null) ||
+    getLocalPostgresPort(inheritedUrl || fileUrl) ||
+    5432;
+
+  // Reuse the already-running Compose mapping on subsequent starts. Otherwise
+  // probe for a free loopback port and never terminate the process occupying it.
+  const selectedPort = existingComposePort || await findAvailablePort(preferredPort, 5500, isTcpPortAvailable);
+  if (!selectedPort) {
+    throw new Error("Nessuna porta TCP libera trovata tra " + preferredPort + " e 5500. Libera una porta o imposta VIVARQO_POSTGRES_HOST_PORT manualmente.");
+  }
+
+  const updates = { VIVARQO_POSTGRES_HOST_PORT: String(selectedPort) };
+  if (getLocalPostgresPort(fileUrl) !== null) {
+    updates.DATABASE_URL = withLocalPostgresPort(fileUrl, selectedPort);
+  }
+  const updatedContents = setEnvValues(original, updates);
+  if (updatedContents !== original) await persistEnvFile(envPath, updatedContents);
+
+  process.env.VIVARQO_POSTGRES_HOST_PORT = String(selectedPort);
+  if (inheritedUrl && getLocalPostgresPort(inheritedUrl) !== null) {
+    process.env.DATABASE_URL = withLocalPostgresPort(inheritedUrl, selectedPort);
+  } else if (!inheritedUrl && updates.DATABASE_URL) {
+    process.env.DATABASE_URL = updates.DATABASE_URL;
+  }
+
+  if (!existingComposePort && selectedPort !== preferredPort) {
+    const owners = await describePortOwner(preferredPort);
+    const ownerLabel = owners.length
+      ? owners.map(owner => String(owner.name || "processo") + " PID " + owner.pid).join(", ")
+      : "processo non identificato";
+    await log("INFO", "DATABASE", "Porta host " + preferredPort + " occupata da " + ownerLabel +
+      "; non interrompo il processo esistente. PostgreSQL Docker userà la porta " + selectedPort +
+      " (porta interna container: 5432).");
+  } else if (existingComposePort) {
+    await log("INFO", "DATABASE", "Riutilizzo la porta " + selectedPort + " già pubblicata dal container PostgreSQL di Vivarqo.");
+  } else {
+    await log("INFO", "DATABASE", "Porta host PostgreSQL verificata: " + selectedPort + ".");
+  }
+  return selectedPort;
+}
+
+async function validateLocalEnvironment() {
+  await log("INFO", "SETUP", "Verifica preventiva della configurazione .env...");
+  await runAndForward(exe(packageManager), pnpmArgs([
+    "--filter", "@vivarqo/api", "exec", "tsx", "src/config/validate-env.ts"
+  ]));
+  await log("INFO", "SETUP", "Configurazione .env valida; i provider non configurati restano disabilitati.");
+}
 
 async function prepare() {
   const v = process.versions.node.split(".").map(Number);
@@ -104,36 +230,61 @@ async function prepare() {
   const version = await run(exe(packageManager), packageManager === "corepack" ? ["pnpm", "--version"] : ["--version"], true);
   await log("INFO", "SETUP", "Node " + process.versions.node + "; pnpm " + version.stdout);
   if (!(await exists("docker"))) throw new Error("Docker non installato o non presente nel PATH.");
-  await run(exe("docker"), ["compose", "version"], true);
+  await run("docker", ["compose", "version"], true);
 
   try { await access(".env", constants.F_OK); }
   catch {
     await copyFile(".env.example", ".env");
-    const p = path.join(ROOT, ".env");
-    const contents = await readFile(p, "utf8");
-    await writeFile(p, contents.replace("replace-with-another-32-bytes-of-random-secret", randomBytes(48).toString("base64url")), "utf8");
-    await log("WARN", "SETUP", "Creato .env con CSRF_SECRET casuale. Configura i provider se ti servono.");
+    const initial = await readFile(".env", "utf8");
+    await writeFile(".env", initial.replace("replace-with-another-32-bytes-of-random-secret", randomBytes(48).toString("base64url")), "utf8");
+    await log("INFO", "SETUP", "Creato .env locale con CSRF_SECRET casuale. I provider esterni restano opzionali.");
   }
 
+  let envContents = await readFile(".env", "utf8");
+  const nodeEnv = readEnvValue(envContents, "NODE_ENV") || "development";
+  const csrfSecret = readEnvValue(envContents, "CSRF_SECRET") || "";
+  if (nodeEnv === "development" && (!csrfSecret || /replace-with-another-32-bytes-of-random-secret/i.test(csrfSecret))) {
+    envContents = setEnvValues(envContents, { CSRF_SECRET: randomBytes(48).toString("base64url") });
+    await log("INFO", "SETUP", "Rigenerato CSRF_SECRET mancante o segnaposto per il solo ambiente development.");
+  }
+  envContents = clearUnusedVapidPlaceholder(envContents);
+  const missingVapid = getIncompleteVapidVariables(envContents);
+  if (missingVapid.length) {
+    throw new Error("Configurazione VAPID incompleta. Mancano: " + missingVapid.join(", ") +
+      ". Configura tutte le tre variabili oppure lascia VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY e VAPID_SUBJECT vuote.");
+  }
+  const currentEnv = await readFile(".env", "utf8");
+  if (envContents !== currentEnv) await persistEnvFile(path.join(ROOT, ".env"), envContents);
+
   await log("INFO", "DEPENDENCIES", "Verifica dipendenze con pnpm install --frozen-lockfile...");
-  await run(exe(packageManager), pnpmArgs(["install", "--frozen-lockfile"]));
+  const install = await runAndForward(exe(packageManager), pnpmArgs(["install", "--frozen-lockfile"]));
+  const installOutput = install.stdout + "\n" + install.stderr;
+  if (/Ignored build scripts/i.test(installOutput)) {
+    const warning = installOutput.match(/Ignored build scripts:[\\s\\S]{0,900}/i)?.[0] || "pnpm ha ignorato uno o più script.";
+    await log("WARN", "DEPENDENCIES", warning +
+      " Il Manager non autorizza pacchetti non presenti in onlyBuiltDependencies. Verifica la dipendenza e usa pnpm approve-builds solo dopo averne controllato la provenienza.");
+  }
   await log("INFO", "DEPENDENCIES", "Dipendenze verificate.");
 }
 
 async function prepareDatabase() {
-  await log("INFO", "DATABASE", "Avvio PostgreSQL locale...");
-  await run(exe("docker"), ["compose", "-f", COMPOSE, "up", "-d", "postgres"]);
+  await log("INFO", "DATABASE", "Avvio PostgreSQL locale sulla porta host " +
+    process.env.VIVARQO_POSTGRES_HOST_PORT + "...");
+  await runAndForward("docker", ["compose", "-f", COMPOSE, "up", "-d", "postgres"]);
   let ready = false;
   for (let i = 0; i < 40; i++) {
     try {
-      await run(exe("docker"), ["compose", "-f", COMPOSE, "exec", "-T", "postgres", "pg_isready", "-U", "vivarqo", "-d", "vivarqo"], true);
+      await run("docker", ["compose", "-f", COMPOSE, "exec", "-T", "postgres", "pg_isready", "-U", "vivarqo", "-d", "vivarqo"], true);
       ready = true; break;
     } catch { await delay(1500); }
   }
   if (!ready) throw new Error("PostgreSQL non pronto dopo 60 secondi.");
+  resolveServiceDiagnostics("postgres", "PostgreSQL risponde a pg_isready.");
   await log("INFO", "DATABASE", "PostgreSQL pronto; genero Prisma e verifico lo schema.");
-  await run(exe(packageManager), pnpmArgs(["db:generate"]));
-  await run(exe(packageManager), pnpmArgs(["db:ensure"]));
+  await runAndForward(exe(packageManager), pnpmArgs(["db:generate"]));
+  await runAndForward(exe(packageManager), pnpmArgs(["db:ensure"]));
+  await log("INFO", "DEPENDENCIES", "Compilo una sola volta i Contracts condivisi prima di avviare API e worker.");
+  await runAndForward(exe(packageManager), pnpmArgs(["contracts:build"]));
 }
 
 function appendServiceLog(name, chunk) {
@@ -150,7 +301,11 @@ function appendServiceLog(name, chunk) {
   }
 }
 
-const commands = { api: ["dev:api"], worker: ["dev:worker"], frontend: ["dev:frontend"] };
+const commands = {
+  api: ["--filter", "@vivarqo/api", "dev"],
+  worker: ["--filter", "@vivarqo/api", "exec", "tsx", "src/worker.ts"],
+  frontend: ["--filter", "@vivarqo/frontend", "dev"]
+};
 
 function start(name) {
   if (STOP.requested) return null;
@@ -164,9 +319,9 @@ function start(name) {
   const args = testMode
     ? [path.join(ROOT, "scripts", "dev-manager-fixture.mjs"), name, String(testPort || "0")]
     : pnpmArgs(commands[name]);
-  const child = spawn(executable, args, {
+  const child = spawnCommand(executable, args, {
     cwd: ROOT, env: { ...process.env, FORCE_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true, shell: windows && !testMode, detached: !windows
+    windowsHide: true, detached: !windows
   });
   service.child = child;
   service.state = name === "api" || name === "frontend" ? "starting" : "running";
@@ -216,6 +371,17 @@ function serviceSnapshot() {
   const labels = { postgres: "PostgreSQL", api: "Backend API", worker: "Background worker", frontend: "Frontend", web: "Frontend web", caddy: "Reverse proxy", backup: "Backup DB", migrate: "Migrazioni" };
   return [...services.values()].map(s => ({ name: s.name, label: labels[s.name] || s.name, state: s.state, stateLabel: s.state === "running" ? "Operativo" : s.state === "restarting" ? "Riavvio" : s.state === "failed" ? "Errore" : s.state === "degraded" ? "Degradato" : s.state, pid: s.child?.pid || null, restarts: s.restarts || 0, detail: s.lastCheck || s.lastExit || "" }));
 }
+function resolveServiceDiagnostics(serviceName, reason) {
+  const normalized = String(serviceName || "").toLowerCase();
+  let removed = 0;
+  for (let index = diagnosticEvents.length - 1; index >= 0; index -= 1) {
+    if (String(diagnosticEvents[index].service || "").toLowerCase() === normalized) {
+      diagnosticEvents.splice(index, 1);
+      removed += 1;
+    }
+  }
+  if (removed) void log("INFO", "DIAGNOSTICS", "Risolte " + removed + " segnalazioni per " + normalized + ": " + reason);
+}
 function dashboardState() { return { services: serviceSnapshot(), logs: recentLogs.slice(-500), diagnostics: summarizeDiagnostics(diagnosticEvents), environment: "Node.js " + process.versions.node + " / " + process.platform }; }
 async function startDashboard() {
   const html = await readFile(DASHBOARD_FILE, "utf8");
@@ -262,6 +428,7 @@ async function monitorInfrastructure() {
       await checkPostgres(); postgresAvailable = true; pgFailures = 0;
       const db = services.get("postgres");
       if (db) { db.state = "running"; db.lastCheck = "pg_isready OK"; }
+      resolveServiceDiagnostics("postgres", "pg_isready OK.");
     } catch (error) {
       pgFailures++;
       const db = services.get("postgres");
@@ -284,6 +451,7 @@ async function monitorInfrastructure() {
       workerFailures = 0;
       const worker = services.get("worker");
       if (worker) { worker.state = "running"; worker.lastCheck = "heartbeat DB valido"; }
+      resolveServiceDiagnostics("worker", "heartbeat DB valido.");
     } catch (error) {
       workerFailures++;
       const worker = services.get("worker");
@@ -310,6 +478,7 @@ async function waitHttp(label, url, timeout = 90_000) {
       if (response.ok) {
         const service = services.get(label.toLowerCase());
         if (service) { service.state = "running"; service.lastCheck = "HTTP " + response.status + " OK"; }
+        resolveServiceDiagnostics(label.toLowerCase(), "health check HTTP " + response.status + " OK.");
         await log("INFO", label, "Health check OK: " + url + " (HTTP " + response.status + ").");
         return;
       }
@@ -330,6 +499,7 @@ async function monitor() {
         const response = await fetch(item.url, { signal: AbortSignal.timeout(2500) });
         if (!response.ok) throw new Error("HTTP " + response.status);
         misses.set(item.name, 0);
+        resolveServiceDiagnostics(item.name, "health check HTTP " + response.status + " OK.");
         service.state = "running";
         service.lastCheck = "HTTP " + response.status + " OK";
       } catch (e) {
@@ -516,7 +686,7 @@ function status() {
 async function shutdown(reason) {
   if (STOP.requested) return;
   STOP.requested = true;
-  await log("WARN", "MANAGER", "Arresto richiesto: " + reason);
+  await log("INFO", "MANAGER", "Arresto richiesto: " + reason + " (arresto volontario).");
   const serviceChildren = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
   const children = [...new Set([...serviceChildren, ...commandProcesses, ...notificationProcesses])];
   await Promise.all(children.map(child => terminateProcessTree(child)));
@@ -538,6 +708,8 @@ async function main() {
   await startDashboard();
   await log("INFO", "MANAGER", "Avvio Vivarqo Dev Manager.");
   await prepare();
+  await configureLocalPostgresPort();
+  await validateLocalEnvironment();
   await prepareDatabase();
   start("api");
   await waitHttp("API", API_URL);
@@ -555,7 +727,10 @@ process.on("uncaughtException", async e => { await log("FATAL", "MANAGER", e.sta
 process.on("unhandledRejection", reason => { void log("ERROR", "MANAGER", "Promise non gestita: " + String(reason)); });
 main().catch(async e => {
   if (STOP.requested) return;
-  await log("FATAL", "MANAGER", e.stack || e.message);
+  const rawError = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
+  const primary = primaryErrorMessage(rawError);
+  const diagnosis = diagnose(primary);
+  await log("FATAL", "MANAGER", diagnosis.title + ": " + primary + ". " + diagnosis.advice);
   await shutdown("startup failure");
   process.exitCode = 1;
 });
