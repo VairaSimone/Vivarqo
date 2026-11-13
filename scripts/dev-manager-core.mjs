@@ -37,6 +37,10 @@ export function primaryErrorMessage(message) {
     /Invalid (?:development|staging|production) environment:[^\r\n]*/i,
     /ports are not available:[^\r\n]*/i,
     /Error response from daemon:[^\r\n]*/i,
+    /dependency failed to start:[^\r\n]*/i,
+    /(?:psql: error|FATAL:|ERROR:)[^\r\n]*/i,
+    /password authentication failed for user[^\r\n]*/i,
+    /database "\w+" does not exist[^\r\n]*/i,
     /Ignored build scripts:[^\r\n]*/i,
     /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\r\n]*/i
   ];
