@@ -1,3 +1,10 @@
 packages:
   - backend/*
   - packages/*
+
+# Permit lifecycle scripts only for dependencies reviewed for this repository.
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - argon2
+  - esbuild
+  - prisma
