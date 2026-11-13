@@ -23,6 +23,11 @@ const originSchema = z.string().url().refine((value) => {
   }
 }, "must be an origin only, without a path, query, credentials or fragment").transform((value) => new URL(value).origin);
 
+const emptyStringToUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
+const optionalString = z.preprocess(emptyStringToUndefined, z.string().optional());
+const optionalEmail = z.preprocess(emptyStringToUndefined, z.string().email().optional());
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
@@ -36,27 +41,27 @@ const environmentSchema = z.object({
     { message: "must be a PostgreSQL connection URL" },
   ),
   CSRF_SECRET: z.string().min(32),
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().email().optional(),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRICE_ID: z.string().optional(),
+  RESEND_API_KEY: optionalString,
+  EMAIL_FROM: optionalEmail,
+  STRIPE_SECRET_KEY: optionalString,
+  STRIPE_WEBHOOK_SECRET: optionalString,
+  STRIPE_PRICE_ID: optionalString,
   BILLING_ACCESS_MODE: z.enum(["unrestricted", "subscription_required"]).default("unrestricted"),
   BILLING_PAST_DUE_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
   // Zero means unlimited; configure positive values when free-plan quotas are launched.
   BILLING_FREE_MAX_ANIMALS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   BILLING_FREE_MAX_DOCUMENTS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
   BILLING_FREE_MAX_STORAGE_BYTES: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
-  VAPID_PUBLIC_KEY: z.string().optional(),
-  VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().optional(),
+  VAPID_PUBLIC_KEY: optionalString,
+  VAPID_PRIVATE_KEY: optionalString,
+  VAPID_SUBJECT: optionalString,
   S3_ENDPOINT: z.preprocess((value) => typeof value === "string" && !value.trim() ? undefined : value, z.string().url().optional()),
-  S3_REGION: z.string().optional(),
-  S3_BUCKET: z.string().optional(),
-  S3_ACCESS_KEY_ID: z.string().optional(),
-  S3_SECRET_ACCESS_KEY: z.string().optional(),
-  SENTRY_DSN: z.string().url().optional(),
-  METRICS_BEARER_TOKEN: z.string().min(32).optional(),
+  S3_REGION: optionalString,
+  S3_BUCKET: optionalString,
+  S3_ACCESS_KEY_ID: optionalString,
+  S3_SECRET_ACCESS_KEY: optionalString,
+  SENTRY_DSN: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
+  METRICS_BEARER_TOKEN: z.preprocess(emptyStringToUndefined, z.string().min(32).optional()),
   PRIVATE_STORAGE_PATH: z.string().min(1).default("./var/private"),
   EXPORT_MAX_ARCHIVE_BYTES: z.coerce.number().int().min(1024 * 1024).max(Number.MAX_SAFE_INTEGER).default(20 * 1024 * 1024 * 1024),
   EXPORT_MAX_ENTRIES: z.coerce.number().int().min(1).max(1_000_000).default(100_000),
