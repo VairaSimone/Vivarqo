@@ -32,7 +32,7 @@
     "db:ensure": "pnpm --filter @vivarqo/api exec tsx src/migrate.ts",
     "contracts:build": "pnpm --filter @vivarqo/contracts build",
     "dev:manager": "node scripts/dev-manager.mjs",
-    "check:dev-manager": "node --check scripts/dev-manager.mjs",
+    "check:dev-manager": "node --check scripts/dev-manager.mjs && node --check scripts/dev-manager-core.mjs && node --check scripts/dev-manager-config.mjs",
     "test:dev-manager": "node --test scripts/dev-manager.test.mjs",
     "test:dev-manager:integration": "node --test scripts/dev-manager.process.test.mjs scripts/dev-manager.security.test.mjs scripts/dev-manager.resilience.test.mjs scripts/dev-manager.dashboard.test.mjs",
     "test:dev-manager:notifications": "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/dev-manager-notification-drill.ps1",
