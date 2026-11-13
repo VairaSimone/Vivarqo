@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily Vivarqo PostgreSQL backup schedule
+Description=Daily Snakebee PostgreSQL backup schedule
 
 [Timer]
 OnCalendar=*-*-* 02:17:00
