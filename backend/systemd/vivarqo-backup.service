@@ -1,5 +1,5 @@
 [Unit]
-Description=Verified Vivarqo PostgreSQL backup
+Description=Verified Snakebee PostgreSQL backup
 Wants=network-online.target
 After=network-online.target
 
