@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -120,16 +120,29 @@ volumes:
       windowsHide: true
     });
     composeStarted = true;
-    let snapshot = await waitFor(async () => {
-      const response = await fetch(stateUrl, { signal: AbortSignal.timeout(2000) });
-      if (!response.ok) return false;
-      const state = await response.json();
-      const get = name => state.services.find(x => x.name === name);
-      return get("postgres")?.state === "running" &&
-        get("migrate")?.state === "completed" &&
-        ["api", "web", "worker", "caddy", "backup"].every(name => get(name)?.state === "running")
-        ? state : false;
-    }, 120_000, "stack Compose production isolato pronto");
+    let snapshot;
+    try {
+      snapshot = await waitFor(async () => {
+        const response = await fetch(stateUrl, { signal: AbortSignal.timeout(2000) });
+        if (!response.ok) return false;
+        const state = await response.json();
+        const get = name => state.services.find(x => x.name === name);
+        return get("postgres")?.state === "running" &&
+          get("migrate")?.state === "completed" &&
+          ["api", "web", "worker", "caddy", "backup"].every(name => get(name)?.state === "running")
+          ? state : false;
+      }, 120_000, "stack Compose production isolato pronto");
+    } catch (error) {
+      const managerLog = await readFile(path.join(logDir, "manager.log"), "utf8").catch(() => "(manager.log non disponibile)");
+      const composeState = (() => {
+        try { return compose(["ps", "--all", "--format", "json"]); }
+        catch (composeError) { return String(composeError); }
+      })();
+      console.error("Production Manager diagnostics before timeout:");
+      console.error("Compose state:\n" + composeState);
+      console.error("Manager log (last 200 lines):\n" + managerLog.split(/\r?\n/).slice(-200).join("\n"));
+      throw error;
+    }
 
     compose(["exec", "-T", "postgres", "psql", "-U", "vivarqo", "-d", "vivarqo", "-v", "ON_ERROR_STOP=1", "-c",
       "INSERT INTO api_rate_limit_buckets VALUES ('persist-marker', '2099-01-01T00:00:00Z')"]);
