@@ -65,7 +65,7 @@ In alternativa fai doppio clic su `dev-manager.cmd`.
 
 Al primo avvio e agli avvii successivi il manager:
 1. verifica Node, pnpm e Docker Compose;
-2. crea `.env` copiando `.env.example` solo se manca e genera un CSRF secret casuale per lo sviluppo;
+2. crea `.env` copiando `.env.example` solo se manca, con permessi privati, e genera un CSRF secret casuale per lo sviluppo;
 3. normalizza i placeholder opzionali e valida la configurazione prima di avviare i servizi, senza stampare segreti;
 4. esegue `pnpm install --frozen-lockfile`; gli script di installazione consentiti sono limitati alla allowlist `onlyBuiltDependencies` in `pnpm-workspace.yaml`;
 5. controlla la porta host di PostgreSQL, riutilizza quella del container Vivarqo già attivo oppure sceglie una porta libera e sincronizza `VIVARQO_POSTGRES_HOST_PORT` e il `DATABASE_URL` locale;
