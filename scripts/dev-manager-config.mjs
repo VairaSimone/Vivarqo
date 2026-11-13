@@ -3,14 +3,14 @@ import { createServer } from "node:net";
 export function readEnvValue(contents, name) {
   const expression = new RegExp("^\\s*(?:export\\s+)?" + name + "\\s*=\\s*(.*)$");
   let result;
-  for (const line of String(contents || "").split(/\\r?\\n/)) {
+  for (const line of String(contents || "").split(/\r?\n/)) {
     const match = line.match(expression);
     if (!match) continue;
     let value = match[1].trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     } else {
-      value = value.replace(/\\s+#.*$/, "").trim();
+      value = value.replace(/\s+#.*$/, "").trim();
     }
     result = value;
   }
@@ -18,7 +18,7 @@ export function readEnvValue(contents, name) {
 }
 
 export function setEnvValues(contents, updates) {
-  const lines = String(contents || "").split(/\\r?\\n/);
+  const lines = String(contents || "").split(/\r?\n/);
   for (const [name, rawValue] of Object.entries(updates)) {
     const value = String(rawValue);
     const expression = new RegExp("^(\\s*(?:export\\s+)?" + name + "\\s*=).*$");
@@ -32,7 +32,7 @@ export function setEnvValues(contents, updates) {
     if (!found) lines.push(name + "=" + value);
   }
   while (lines.length && lines[lines.length - 1] === "") lines.pop();
-  return lines.join("\\n") + "\\n";
+  return lines.join("\n") + "\n";
 }
 
 export function getLocalPostgresPort(databaseUrl) {
@@ -40,7 +40,7 @@ export function getLocalPostgresPort(databaseUrl) {
   try {
     const url = new URL(databaseUrl);
     if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return null;
-    if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase())) return null;
+    if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname.toLowerCase())) return null;
     const port = Number(url.port || 5432);
     return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null;
   } catch {
@@ -57,8 +57,8 @@ export function withLocalPostgresPort(databaseUrl, port) {
 }
 
 export function getPortFromComposeMapping(output) {
-  const value = String(output || "").trim().split(/\\r?\\n/).filter(Boolean).at(-1) || "";
-  const match = value.match(/:(\\d+)$/);
+  const value = String(output || "").trim().split(/\r?\n/).filter(Boolean).at(-1) || "";
+  const match = value.match(/:(\d+)$/);
   if (!match) return null;
   const port = Number(match[1]);
   return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null;
