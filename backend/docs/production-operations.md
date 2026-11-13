@@ -66,7 +66,7 @@ pnpm verify:stripe:test
 
 Lo script rifiuta chiavi diverse da `sk_test_`, verifica che il Price sia attivo/ricorrente e crea una sessione Checkout hosted. Completa il flusso nel browser usando metodi di pagamento di test Stripe. Dopo il checkout, ricava il customer ID Test Mode e ripeti il comando con `STRIPE_TEST_CUSTOMER_ID=cus_...` per ottenere una sessione Customer Portal.
 
-Usa account e utenti sacrificabili. Lo script crea una sessione su Stripe Test Mode ma non modifica direttamente il database Vivarqo: l'aggiornamento locale dipende dal webhook firmato.
+Usa account e utenti sacrificabili. Lo script crea una sessione su Stripe Test Mode ma non modifica direttamente il database Snakebee: l'aggiornamento locale dipende dal webhook firmato.
 
 Per i webhook:
 - autentica Stripe CLI sullo stesso account Test Mode;
