@@ -1,6 +1,6 @@
-# Vivarqo Manager — guida operativa
+# Snakebee Manager — guida operativa
 
-Questa guida spiega come installare, avviare, usare, aggiornare e arrestare il supervisore Vivarqo. Il manager ha due modalità distinte:
+Questa guida spiega come installare, avviare, usare, aggiornare e arrestare il supervisore Snakebee. Il manager ha due modalità distinte:
 
 - **Development (Windows/Linux):** prepara l'ambiente di sviluppo, installa le dipendenze, avvia PostgreSQL locale e i processi API, worker e frontend.
 - **Production (Linux VPS):** avvia e sorveglia lo stack Docker Compose di produzione. Non installa dipendenze Node del progetto e, quando il manager viene fermato, lascia intenzionalmente attivi i container.
@@ -41,14 +41,14 @@ pnpm --version
 Se non hai ancora il repository:
 
 ```powershell
-git clone https://github.com/VairaSimone/Vivarqo.git
-cd Vivarqo
+git clone https://github.com/VairaSimone/Snakebee.git
+cd Snakebee
 ```
 
 Se il repository è già presente, entra nella sua cartella e aggiorna il branch:
 
 ```powershell
-cd C:\percorso\Vivarqo
+cd C:\percorso\Snakebee
 git switch main
 git pull --ff-only origin main
 ```
@@ -68,7 +68,7 @@ Al primo avvio e agli avvii successivi il manager:
 2. crea `.env` copiando `.env.example` solo se manca, con permessi privati, e genera un CSRF secret casuale per lo sviluppo;
 3. normalizza i placeholder opzionali e valida la configurazione prima di avviare i servizi, senza stampare segreti;
 4. esegue `pnpm install --frozen-lockfile`; gli script di installazione consentiti sono limitati alla allowlist `onlyBuiltDependencies` in `pnpm-workspace.yaml`;
-5. controlla la porta host di PostgreSQL, riutilizza quella del container Vivarqo già attivo oppure sceglie una porta libera e sincronizza `VIVARQO_POSTGRES_HOST_PORT` e il `DATABASE_URL` locale;
+5. controlla la porta host di PostgreSQL, riutilizza quella del container Snakebee già attivo oppure sceglie una porta libera e sincronizza `VIVARQO_POSTGRES_HOST_PORT` e il `DATABASE_URL` locale;
 6. non termina processi PostgreSQL o altri servizi esterni che occupano porte;
 7. avvia PostgreSQL, attende `pg_isready`, genera il client Prisma e verifica/applica lo schema tramite `db:ensure`;
 8. compila una sola volta i Contracts condivisi, poi avvia API, worker e frontend;
@@ -83,7 +83,7 @@ URL predefiniti:
 - Frontend: http://127.0.0.1:5173
 - API health: http://127.0.0.1:3000/healthz
 
-La dashboard del manager è separata dall'interfaccia utente di Vivarqo. Se la porta 4179 è già occupata, imposta `VIVARQO_MANAGER_PORT` a una porta libera prima dell'avvio.
+La dashboard del manager è separata dall'interfaccia utente di Snakebee. Se la porta 4179 è già occupata, imposta `VIVARQO_MANAGER_PORT` a una porta libera prima dell'avvio.
 
 ### Avvii successivi su Windows
 
@@ -160,7 +160,7 @@ L'accesso al gruppo `docker` equivale, nella pratica, a privilegi root sull'host
 Clona il repository:
 
 ```bash
-sudo -u vivarqo git clone https://github.com/VairaSimone/Vivarqo.git /opt/vivarqo
+sudo -u vivarqo git clone https://github.com/VairaSimone/Snakebee.git /opt/vivarqo
 cd /opt/vivarqo
 sudo -u vivarqo git switch main
 ```
@@ -301,7 +301,7 @@ Lascia il tunnel aperto e visita sul PC:
 
 http://127.0.0.1:4179
 
-Se hai cambiato `VIVARQO_MANAGER_PORT`, usa la stessa porta sia nel tunnel sia nell'URL. Chiudendo il tunnel non arresti il manager o i servizi Vivarqo.
+Se hai cambiato `VIVARQO_MANAGER_PORT`, usa la stessa porta sia nel tunnel sia nell'URL. Chiudendo il tunnel non arresti il manager o i servizi Snakebee.
 
 ## 3. Utilizzo quotidiano sulla VPS
 
@@ -381,7 +381,7 @@ I log persistenti del manager si trovano in `.dev-manager/logs/manager.log`; la 
 
 Non sostituisce backup off-site, monitoraggio del provider, alerting esterno, aggiornamento sicuro delle immagini o prove periodiche di disaster recovery.
 
-## 4. Aggiornare Vivarqo senza perdere i dati
+## 4. Aggiornare Snakebee senza perdere i dati
 
 Prima di aggiornare:
 1. verifica che il backup PostgreSQL più recente sia valido;
