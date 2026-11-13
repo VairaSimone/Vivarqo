@@ -1,3 +1,4 @@
+import { createECDH } from "node:crypto";
 import { createServer } from "node:net";
 
 export function readEnvValue(contents, name) {
@@ -108,4 +109,50 @@ export function getIncompleteVapidVariables(contents) {
   return configured.length > 0 && configured.length < 3
     ? Object.keys(values).filter(name => !values[name].trim())
     : [];
+}
+
+export function getInvalidVapidVariables(contents) {
+  const values = {
+    VAPID_PUBLIC_KEY: readEnvValue(contents, "VAPID_PUBLIC_KEY") || "",
+    VAPID_PRIVATE_KEY: readEnvValue(contents, "VAPID_PRIVATE_KEY") || "",
+    VAPID_SUBJECT: readEnvValue(contents, "VAPID_SUBJECT") || ""
+  };
+  if (!Object.values(values).some(value => value.trim())) return [];
+  if (getIncompleteVapidVariables(contents).length) return getIncompleteVapidVariables(contents);
+
+  const decode = value => {
+    if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
+    const decoded = Buffer.from(value, "base64url");
+    return decoded.toString("base64url") === value ? decoded : null;
+  };
+  const publicKey = decode(values.VAPID_PUBLIC_KEY);
+  const privateKey = decode(values.VAPID_PRIVATE_KEY);
+  const invalid = [];
+  if (!publicKey || publicKey.length !== 65 || publicKey[0] !== 4) invalid.push("VAPID_PUBLIC_KEY");
+  if (!privateKey || privateKey.length !== 32) invalid.push("VAPID_PRIVATE_KEY");
+  if (invalid.length) return invalid;
+
+  try {
+    const curve = createECDH("prime256v1");
+    curve.setPrivateKey(privateKey);
+    const derivedPublicKey = curve.getPublicKey(undefined, "uncompressed");
+    if (!derivedPublicKey.equals(publicKey)) return ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
+  } catch {
+    return ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
+  }
+
+  const subject = values.VAPID_SUBJECT.trim();
+  if (subject.startsWith("mailto:")) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(subject.slice("mailto:".length))) invalid.push("VAPID_SUBJECT");
+  } else {
+    try {
+      const parsed = new URL(subject);
+      if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
+        invalid.push("VAPID_SUBJECT");
+      }
+    } catch {
+      invalid.push("VAPID_SUBJECT");
+    }
+  }
+  return invalid;
 }
