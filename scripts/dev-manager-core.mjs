@@ -13,7 +13,7 @@ const RULES = [
   { id: "permission", pattern: /EACCES|EPERM|permission denied|access is denied/i, title: "Permessi insufficienti", advice: "Controlla i permessi sulla cartella e sui file coinvolti; evita di eseguire tutto come amministratore.", classification: "likely-persistent" },
   { id: "shell-deprecation", pattern: /DEP0190|shell option true/i, title: "Avvio processi Windows deprecato", advice: "Aggiorna il launcher per avviare pnpm tramite cmd.exe esplicito con shell disabilitata.", classification: "auto-repairable" },
   { id: "unknown", pattern: /.*/, title: "Errore da verificare", advice: "Errore non classificato: controlla il contesto nei log prima di attribuire una causa.", classification: "needs-review" }
-];;
+];
 
 export function diagnose(message) {
   const text = String(message || "").slice(0, 4000);
@@ -33,21 +33,22 @@ export function diagnose(message) {
 export function primaryErrorMessage(message) {
   const text = String(message || "").slice(0, 20_000);
   const priorities = [
-    /Invalid environment configuration:[^\\r\\n]*/i,
-    /Invalid (?:development|staging|production) environment:[^\\r\\n]*/i,
-    /ports are not available:[^\\r\\n]*/i,
-    /Error response from daemon:[^\\r\\n]*/i,
-    /Ignored build scripts:[^\\r\\n]*/i,
-    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\\r\\n]*/i
+    /Invalid environment configuration:[^\r\n]*/i,
+    /Invalid (?:development|staging|production) environment:[^\r\n]*/i,
+    /ports are not available:[^\r\n]*/i,
+    /Error response from daemon:[^\r\n]*/i,
+    /Ignored build scripts:[^\r\n]*/i,
+    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\r\n]*/i
   ];
   for (const pattern of priorities) {
     const match = text.match(pattern);
     if (match) return match[0].trim();
   }
-  const lines = text.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
-  const firstError = lines.find(line => /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\\bFATAL\\b|\\bERR_[A-Z_]+\\b/i.test(line));
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const firstError = lines.find(line => /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\bFATAL\b|\bERR_[A-Z_]+\b/i.test(line));
   return (firstError || lines.at(-1) || "Errore sconosciuto").slice(0, 4000);
 }
+
 export function summarizeDiagnostics(entries) {
   const grouped = new Map();
   for (const entry of entries) {
