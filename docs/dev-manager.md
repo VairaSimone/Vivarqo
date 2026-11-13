@@ -63,16 +63,20 @@ pnpm dev:manager
 
 In alternativa fai doppio clic su `dev-manager.cmd`.
 
-Al primo avvio il manager:
+Al primo avvio e agli avvii successivi il manager:
 1. verifica Node, pnpm e Docker Compose;
-2. crea `.env` copiando `.env.example`, solo se il file non esiste, e genera un CSRF secret casuale;
-3. esegue `pnpm install --frozen-lockfile`;
-4. avvia PostgreSQL tramite `backend/infra/docker/compose.yaml`;
-5. genera il client Prisma e verifica/applica lo schema tramite `db:ensure`;
-6. avvia API, worker e frontend;
-7. apre la dashboard locale.
+2. crea `.env` copiando `.env.example` solo se manca e genera un CSRF secret casuale per lo sviluppo;
+3. normalizza i placeholder opzionali e valida la configurazione prima di avviare i servizi, senza stampare segreti;
+4. esegue `pnpm install --frozen-lockfile`; gli script di installazione consentiti sono limitati alla allowlist `onlyBuiltDependencies` in `pnpm-workspace.yaml`;
+5. controlla la porta host di PostgreSQL, riutilizza quella del container Vivarqo già attivo oppure sceglie una porta libera e sincronizza `VIVARQO_POSTGRES_HOST_PORT` e il `DATABASE_URL` locale;
+6. non termina processi PostgreSQL o altri servizi esterni che occupano porte;
+7. avvia PostgreSQL, attende `pg_isready`, genera il client Prisma e verifica/applica lo schema tramite `db:ensure`;
+8. compila una sola volta i Contracts condivisi, poi avvia API, worker e frontend;
+9. apre la dashboard locale.
 
-La preparazione può richiedere diversi minuti al primo avvio perché Docker deve scaricare e/o costruire le immagini e pnpm deve scaricare i pacchetti.
+Se una dipendenza richiede uno script non presente nella allowlist, il manager non lo autorizza automaticamente: mostra il pacchetto e indica di verificarne la provenienza prima di usare `pnpm approve-builds`. Se trova una configurazione VAPID parziale o una coppia di chiavi non valida, si ferma indicando i nomi delle variabili da correggere senza mostrarne i valori.
+
+La preparazione può richiedere diversi minuti al primo avvio perché Docker deve scaricare le immagini e pnpm deve installare i pacchetti.
 
 URL predefiniti:
 - Dashboard manager: http://127.0.0.1:4179
@@ -93,7 +97,7 @@ Non devi cancellare `.env`, reinstallare manualmente le dipendenze o ricreare il
 
 ### Arrestare lo sviluppo
 
-Premi `Ctrl+C) nella finestra del manager. Il manager termina API, worker, frontend e i processi figli che ha avviato; chiude la dashboard. PostgreSQL resta attivo nel container e i dati persistenti non vengono cancellati.
+Premi `Ctrl+C` nella finestra del manager. Il manager termina API, worker, frontend e i processi figli che ha avviato; chiude la dashboard. PostgreSQL resta attivo nel container e i dati persistenti non vengono cancellati.
 
 Per arrestare anche PostgreSQL, fallo esplicitamente dalla cartella repository:
 
@@ -445,6 +449,9 @@ I test PostgreSQL e production sono distruttivi **solo per le risorse temporanee
 | Docker non disponibile | Avvia Docker Desktop su Windows; su VPS controlla `systemctl status docker` e `docker info`. |
 | pnpm non trovato (sviluppo) | `corepack enable` e `corepack prepare pnpm@10.20.0 --activate`. |
 | Porta dashboard occupata | Imposta `VIVARQO_MANAGER_PORT` su una porta libera e riavvia il manager. |
+| Porta PostgreSQL host occupata | Il manager controlla il processo, non lo termina, seleziona una porta host libera e sincronizza il `.env`. |
+| Script pnpm ignorati | I pacchetti approvati sono dichiarati in `onlyBuiltDependencies`; per nuove dipendenze verifica il pacchetto prima dell'approvazione manuale. |
+| Configurazione ambiente non valida | Il manager esegue un preflight e indica la variabile o il gruppo VAPID da correggere. I provider opzionali possono restare vuoti. |
 | PostgreSQL non diventa ready | Controlla `docker compose logs postgres`, spazio disco e stato del volume. Non cancellare il volume come tentativo di riparazione. |
 | API/frontend non partono | Controlla dashboard, `.dev-manager/logs` e `docker compose logs` (su production). Verifica prima configurazione e dipendenze. |
 | systemd entra in restart loop | `journalctl -u vivarqo-manager -n 200 --no-pager`; controlla percorso Node, permessi del repository, environment file e accesso al socket Docker. |
