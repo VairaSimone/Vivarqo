@@ -1,4 +1,4 @@
-VIVARQO
+SNAKEBEE
 Specifica tecnica del prodotto e dell’architettura
 Versione: 1.0
 Data: 27 ottobre 2026
@@ -36,11 +36,11 @@ Indice
 28.	Elementi commerciali da configurare
 29.	Riferimenti tecnici ufficiali
 1. Scopo del documento
-Questo documento definisce in modo operativo il prodotto Vivarqo: moduli, comportamento delle funzioni, architettura software, stack tecnologico, modello relazionale dei dati, API, interfaccia grafica, sicurezza, test e distribuzione.
+Questo documento definisce in modo operativo il prodotto Snakebee: moduli, comportamento delle funzioni, architettura software, stack tecnologico, modello relazionale dei dati, API, interfaccia grafica, sicurezza, test e distribuzione.
 Le scelte tecniche riportate qui sono vincolanti per la prima implementazione. Il documento non attribuisce al progetto decisioni commerciali mai definite: prezzo, limiti del piano gratuito, soglie di utilizzo e calendario commerciale vengono configurati prima del lancio e non sono codificati nell’applicazione.
 Il progetto è una nuova applicazione. Il repository di SnakeBee è una fonte di riferimento leggibile. **Stato repository (2 novembre 2026):** il codice del precedente frontend è stato rimosso dal branch `main`; questa specifica conserva i requisiti e lo stack di destinazione per la nuova implementazione. Il backend attualmente versionato e `docs/openapi.yaml` prevalgono su eventuali ipotesi o dettagli non ancora implementati.
 2. Identità e perimetro
-•	Nome: Vivarqo.
+•	Nome: Snakebee.
 •	Destinatari: piccoli e medi allevatori di rettili; il riferimento operativo è un allevamento con circa 20–150 esemplari.
 •	Forma: applicazione web mobile-first, installabile come Progressive Web App (PWA).
 •	Lingua iniziale dell’interfaccia: Italiano e inglese
@@ -254,7 +254,7 @@ L’app mostra saldo, movimenti e avviso di scorta bassa quando il saldo è mino
 I documenti possono essere associati ad animale o ciclo riproduttivo. Ogni documento conserva nome originale, tipo MIME, dimensione, chiave di storage, data di caricamento, categoria e nota.
 I file sono privati per impostazione predefinita. Il server crea URL firmati a scadenza per download autorizzati. Il nome del file non viene utilizzato come percorso fisico.
 Le fotografie principali degli animali sono oggetti privati separati dai documenti, con chiave casuale non esposta nelle API. Sono ammessi JPEG, PNG e WebP verificati tramite firma del contenuto, con dimensione massima di 5 MB. Upload, sostituzione, lettura e rimozione richiedono una sessione e la proprietà dell'animale; la sostituzione elimina il precedente oggetto. La pagina pubblica non riceve mai la chiave di storage e può mostrare la fotografia soltanto tramite la selezione esplicita nel campo photo della condivisione.
-Sono previsti controlli su estensione, MIME reale, dimensione massima configurata e contenuto ammesso. I documenti non sono analizzati o certificati legalmente da Vivarqo.
+Sono previsti controlli su estensione, MIME reale, dimensione massima configurata e contenuto ammesso. I documenti non sono analizzati o certificati legalmente da Snakebee.
 14.2 Schede pubbliche e QR
 Un utente può abilitare una pagina pubblica per un animale e ottenere il relativo URL e QR code. Ogni pagina ha uno slug non prevedibile, stato abilitato/disabilitato e lista esplicita dei campi pubblicabili.
 Campi pubblicabili iniziali: nome scelto per la condivisione, specie, morph, sesso se consentito dall’utente, fotografia selezionata, descrizione pubblica e dati di nascita se espressamente attivati. Email, nome dell’account, note private, documenti privati, cronologia alimentare, peso e posizione non vengono pubblicati automaticamente.
@@ -267,7 +267,7 @@ Il registro economico è un modulo separato che permette di registrare: - Tipo: 
 Il riepilogo mostra somme per periodo e categoria. Non è un sistema di contabilità fiscale, fatturazione elettronica o tenuta contabile ufficiale. Non genera automaticamente documenti fiscali.
 17. Importazione ed esportazione dati
 17.1 Importazione
-L’importazione deve accettare CSV UTF-8 e file XLSX. Il flusso prevede: 1. Upload del file in area temporanea privata. 2. Riconoscimento della prima riga come intestazione, con possibilità di selezionare il foglio nei file XLSX. 3. Mappatura assistita delle colonne ai campi Vivarqo. 4. Anteprima delle righe e validazione. 5. Report di errori con numero riga, colonna e motivo. 6. Conferma esplicita dell’utente. 7. Importazione in transazione per ogni gruppo di dati coerente; report finale con record creati, ignorati ed errori.
+L’importazione deve accettare CSV UTF-8 e file XLSX. Il flusso prevede: 1. Upload del file in area temporanea privata. 2. Riconoscimento della prima riga come intestazione, con possibilità di selezionare il foglio nei file XLSX. 3. Mappatura assistita delle colonne ai campi Snakebee. 4. Anteprima delle righe e validazione. 5. Report di errori con numero riga, colonna e motivo. 6. Conferma esplicita dell’utente. 7. Importazione in transazione per ogni gruppo di dati coerente; report finale con record creati, ignorati ed errori.
 L’importatore non deve inventare dati mancanti né interpretare automaticamente testo ambiguo. I duplicati sono rilevati attraverso identificativo utente se presente e confronto normalizzato di campi non univoci; i casi ambigui richiedono una decisione dell’utente.
 Prima release: importazione delle anagrafiche animali e dei file strutturati di alimentazioni, pesi, mute e note. Il formato di importazione dei cicli riproduttivi è definito con un template dedicato nella release del modulo riproduttivo.
 17.2 Esportazione
@@ -282,7 +282,7 @@ Regole:
 •	Rendere i webhook idempotenti mediante memorizzazione dell’ID evento Stripe elaborato.
 •	Accettare eventi duplicati senza duplicare effetti.
 •	Aggiornare la sottoscrizione tramite API e webhook, non solo dopo il redirect di Checkout.
-•	Non salvare dati della carta nel database Vivarqo.
+•	Non salvare dati della carta nel database Snakebee.
 •	Tenere prezzo, ID del Price Stripe, limiti e funzionalità abilitate in configurazione backend; non codificarli nel frontend.
 •	La cancellazione e il pagamento fallito devono produrre stati visibili nell’account e un percorso di gestione tramite Customer Portal.
 Prezzo, periodo di prova, limiti numerici del piano gratuito e politica di tolleranza non vengono fissati da questo documento perché non risultano decisioni commerciali confermate. Devono essere configurati prima di abilitare gli acquisti.
@@ -401,7 +401,7 @@ id UUID PK, user_id UUID FK NULL, action VARCHAR(80) NOT NULL, entity_type VARCH
 •	Tutte le colonne FK; le chiavi esterne a servizi esterni sono uniche.
 22. Interfaccia grafica e design system
 22.1 Direzione visiva
-Vivarqo usa un’identità naturale, pulita e professionale. Evitare un’estetica da gioco, colori fluorescenti, fondi molto saturi e illustrazioni cartoon di rettili.
+Snakebee usa un’identità naturale, pulita e professionale. Evitare un’estetica da gioco, colori fluorescenti, fondi molto saturi e illustrazioni cartoon di rettili.
 Palette di riferimento:
 •	Verde bosco #23463D: colore primario e navigazione selezionata.
 •	Verde salvia #92A99A: colore secondario e superfici di supporto.
@@ -448,7 +448,7 @@ Desktop (da 1024 px): sidebar sinistra, barra superiore con ricerca e menu accou
 22.5 Comportamenti UI obbligatori
 Ogni vista dati deve avere stati di caricamento, vuoto, errore e contenuto. Le operazioni distruttive richiedono conferma. Le operazioni di salvataggio mostrano esito positivo/negativo. L’utente non perde un form già compilato per un errore di rete senza messaggio e possibilità di riprovare.
 23. PWA e notifiche browser
-•	Manifest con nome Vivarqo, short name Vivarqo, icone e colori del tema.
+•	Manifest con nome Snakebee, short name Snakebee, icone e colori del tema.
 •	Service worker per cache degli asset statici e schermata di avvio.
 •	Nessuna cache delle risposte private del backend tramite cache pubblica generica.
 •	Nessuna mutazione offline nella prima release.
@@ -538,4 +538,4 @@ L’app deve poter abilitare/disabilitare funzionalità tramite entitlements lat
 •	Sicurezza: OWASP Session Management e OWASP Password Storage.
 •	Protezione dei dati: GDPR - Regolamento UE 2016/679.
 ________________________________________
-Fine specifica tecnica Vivarqo 1.0.
+Fine specifica tecnica Snakebee 1.0.
