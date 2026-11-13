@@ -112,7 +112,7 @@ test("sceglie la causa primaria della configurazione invece dell'errore secondar
   const output = [
     "Error: Invalid environment configuration: SENTRY_DSN: Invalid URL",
     "at config/env.ts:70",
-    "Error: Command \\"tsx\\" not found",
+    'Error: Command "tsx" not found',
     "ELIFECYCLE Command failed with exit code 1"
   ].join("\n");
   assert.match(primaryErrorMessage(output), /Invalid environment configuration: SENTRY_DSN/);
