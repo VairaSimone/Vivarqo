@@ -163,6 +163,26 @@ async function getExistingComposePostgresPort() {
   }
 }
 
+async function persistLocalPostgresPort(port) {
+  const envPath = path.join(ROOT, ".env");
+  const original = await readFile(envPath, "utf8");
+  const fileUrl = readEnvValue(original, "DATABASE_URL") || "";
+  const updates = { VIVARQO_POSTGRES_HOST_PORT: String(port) };
+  if (getLocalPostgresPort(fileUrl) !== null) {
+    updates.DATABASE_URL = withLocalPostgresPort(fileUrl, port);
+  }
+  const updatedContents = setEnvValues(original, updates);
+  if (updatedContents !== original) await persistEnvFile(envPath, updatedContents);
+
+  process.env.VIVARQO_POSTGRES_HOST_PORT = String(port);
+  const inheritedUrl = process.env.DATABASE_URL?.trim() || "";
+  if (inheritedUrl && getLocalPostgresPort(inheritedUrl) !== null) {
+    process.env.DATABASE_URL = withLocalPostgresPort(inheritedUrl, port);
+  } else if (!inheritedUrl && updates.DATABASE_URL) {
+    process.env.DATABASE_URL = updates.DATABASE_URL;
+  }
+}
+
 async function configureLocalPostgresPort() {
   const envPath = path.join(ROOT, ".env");
   const original = await readFile(envPath, "utf8");
@@ -186,19 +206,7 @@ async function configureLocalPostgresPort() {
       ". Libera una porta o imposta VIVARQO_POSTGRES_HOST_PORT manualmente.");
   }
 
-  const updates = { VIVARQO_POSTGRES_HOST_PORT: String(selectedPort) };
-  if (getLocalPostgresPort(fileUrl) !== null) {
-    updates.DATABASE_URL = withLocalPostgresPort(fileUrl, selectedPort);
-  }
-  const updatedContents = setEnvValues(original, updates);
-  if (updatedContents !== original) await persistEnvFile(envPath, updatedContents);
-
-  process.env.VIVARQO_POSTGRES_HOST_PORT = String(selectedPort);
-  if (inheritedUrl && getLocalPostgresPort(inheritedUrl) !== null) {
-    process.env.DATABASE_URL = withLocalPostgresPort(inheritedUrl, selectedPort);
-  } else if (!inheritedUrl && updates.DATABASE_URL) {
-    process.env.DATABASE_URL = updates.DATABASE_URL;
-  }
+  await persistLocalPostgresPort(selectedPort);
 
   if (!existingComposePort && selectedPort !== preferredPort) {
     const owners = await describePortOwner(preferredPort);
@@ -279,7 +287,34 @@ async function prepare() {
 async function prepareDatabase() {
   await log("INFO", "DATABASE", "Avvio PostgreSQL locale sulla porta host " +
     process.env.VIVARQO_POSTGRES_HOST_PORT + "...");
-  await runAndForward("docker", ["compose", "-f", COMPOSE, "up", "-d", "postgres"]);
+  let containerStarted = false;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      await runAndForward("docker", ["compose", "-f", COMPOSE, "up", "-d", "postgres"]);
+      containerStarted = true;
+      break;
+    } catch (error) {
+      const message = String(error?.message || error);
+      const portBindingFailure = /ports are not available|failed to bind host port|driver failed programming external connectivity|listen tcp.*bind:|address already in use/i.test(message);
+      if (!portBindingFailure || attempt === 5) throw error;
+
+      const currentPort = Number(process.env.VIVARQO_POSTGRES_HOST_PORT || 5432);
+      const nextPort = await findAvailablePort(currentPort + 1, Math.min(65_535, currentPort + 100), isTcpPortAvailable);
+      if (!nextPort) {
+        throw new Error("Docker non è riuscito a pubblicare PostgreSQL e non è disponibile una porta alternativa tra " +
+          (currentPort + 1) + " e " + Math.min(65_535, currentPort + 100) + ". Processo esterno non terminato.");
+      }
+      const owners = await describePortOwner(currentPort);
+      const ownerLabel = owners.length
+        ? owners.map(owner => String(owner.name || "processo") + " PID " + owner.pid).join(", ")
+        : "processo non identificato";
+      await persistLocalPostgresPort(nextPort);
+      await log("WARN", "DATABASE", "Docker ha rilevato un conflitto sulla porta " + currentPort +
+        " (" + ownerLabel + "). Sposto PostgreSQL Docker sulla porta " + nextPort +
+        " e riprovo; nessun processo esterno viene terminato.");
+    }
+  }
+  if (!containerStarted) throw new Error("Impossibile avviare PostgreSQL Docker dopo 5 tentativi di selezione porta.");
   let ready = false;
   for (let i = 0; i < 40; i++) {
     try {
