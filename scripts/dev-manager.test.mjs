@@ -147,6 +147,7 @@ test("sceglie la causa primaria della configurazione invece dell'errore secondar
 
 test("classifica i problemi di binding Docker e i build script bloccati", () => {
   assert.equal(diagnose("Error response from daemon: ports are not available").id, "docker-port-binding");
+  assert.equal(diagnose("Error: listen EADDRINUSE: address already in use").id, "port-in-use");
   assert.equal(diagnose("Ignored build scripts: @prisma/engines").id, "pnpm-build-scripts");
   assert.equal(diagnose("DEP0190 shell option true").id, "shell-deprecation");
 });
