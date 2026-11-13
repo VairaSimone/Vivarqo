@@ -57,17 +57,24 @@ async function main() {
   migrate:
     image: postgres:18
     environment:
-      POSTGRES_USER: vivarqo
-      POSTGRES_DB: vivarqo
       PGPASSWORD: manager-test-password
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      psql -h postgres -U vivarqo -d vivarqo -v ON_ERROR_STOP=1
-      -c "CREATE TABLE api_rate_limit_buckets (namespace text PRIMARY KEY, reset_at timestamptz NOT NULL);"
-      -c "INSERT INTO api_rate_limit_buckets VALUES ('worker-heartbeat', NOW() + INTERVAL '1 day');"
+    entrypoint: ["psql"]
+    command:
+      - "-h"
+      - "postgres"
+      - "-U"
+      - "vivarqo"
+      - "-d"
+      - "vivarqo"
+      - "-v"
+      - "ON_ERROR_STOP=1"
+      - "-c"
+      - "CREATE TABLE api_rate_limit_buckets (namespace text PRIMARY KEY, reset_at timestamptz NOT NULL);"
+      - "-c"
+      - "INSERT INTO api_rate_limit_buckets VALUES ('worker-heartbeat', NOW() + INTERVAL '1 day');"
     restart: "no"
 
   api:
