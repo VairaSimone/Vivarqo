@@ -722,7 +722,14 @@ async function productionMain() {
   await startDashboard();
   await log("INFO", "MANAGER", "Avvio Vivarqo Production Manager su Linux.");
   const composeArgs = await prepareProduction();
-  await productionRun(composeArgs, ["up", "-d"]);
+  // Capture startup output: in service managers and CI stdout may be detached,
+  // so inheriting child streams would hide the actual Compose/DB failure.
+  const startup = await productionRun(composeArgs, ["up", "-d"], true);
+  const startupLines = (startup.stdout + "\n" + startup.stderr)
+    .split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(-40);
+  for (const line of startupLines) {
+    await log(/\\b(?:warn|warning)\\b/i.test(line) ? "WARN" : "INFO", "DOCKER", line);
+  }
   await log("INFO", "MANAGER", "Stack di produzione avviato. L'arresto del manager non arresta i container.");
   await monitorProduction(composeArgs);
 }
