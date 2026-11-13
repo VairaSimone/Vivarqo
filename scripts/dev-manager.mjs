@@ -728,7 +728,7 @@ async function productionMain() {
   const startupLines = (startup.stdout + "\n" + startup.stderr)
     .split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(-40);
   for (const line of startupLines) {
-    await log(/\\b(?:warn|warning)\\b/i.test(line) ? "WARN" : "INFO", "DOCKER", line);
+    await log(/\b(?:warn|warning)\b/i.test(line) ? "WARN" : "INFO", "DOCKER", line);
   }
   await log("INFO", "MANAGER", "Stack di produzione avviato. L'arresto del manager non arresta i container.");
   await monitorProduction(composeArgs);
