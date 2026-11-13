@@ -217,7 +217,7 @@ async function configureLocalPostgresPort() {
       "; non interrompo il processo esistente. PostgreSQL Docker userà la porta " + selectedPort +
       " (porta interna container: 5432).");
   } else if (existingComposePort) {
-    await log("INFO", "DATABASE", "Riutilizzo la porta " + selectedPort + " già pubblicata dal container PostgreSQL di Vivarqo.");
+    await log("INFO", "DATABASE", "Riutilizzo la porta " + selectedPort + " già pubblicata dal container PostgreSQL di Snakebee.");
   } else {
     await log("INFO", "DATABASE", "Porta host PostgreSQL verificata: " + selectedPort + ".");
   }
@@ -453,7 +453,7 @@ function notifyDesktop(title, message) {
   const now = Date.now();
   if (now - (notificationTimes.get(title) || 0) < 20_000) return;
   notificationTimes.set(title, now);
-  const t = String("Vivarqo - " + title).replace(/\x27/g, "\x27\x27").slice(0, 80);
+  const t = String("Snakebee - " + title).replace(/\x27/g, "\x27\x27").slice(0, 80);
   const m = String(message).replace(/\x27/g, "\x27\x27").slice(0, 220);
   const ps = "Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $n=New-Object System.Windows.Forms.NotifyIcon; $n.Icon=[System.Drawing.SystemIcons]::Warning; $n.Visible=$true; $n.BalloonTipTitle=\x27" + t + "\x27; $n.BalloonTipText=\x27" + m + "\x27; $n.ShowBalloonTip(8000); Start-Sleep -Seconds 9; $n.Dispose()";
   const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true, stdio: "ignore" });
@@ -720,7 +720,7 @@ async function productionMain() {
   await mkdir(LOG_DIR, { recursive: true });
   await loadPersistentLogs();
   await startDashboard();
-  await log("INFO", "MANAGER", "Avvio Vivarqo Production Manager su Linux.");
+  await log("INFO", "MANAGER", "Avvio Snakebee Production Manager su Linux.");
   const composeArgs = await prepareProduction();
   // Capture startup output: in service managers and CI stdout may be detached,
   // so inheriting child streams would hide the actual Compose/DB failure.
@@ -761,7 +761,7 @@ async function main() {
   await mkdir(LOG_DIR, { recursive: true });
   await loadPersistentLogs();
   await startDashboard();
-  await log("INFO", "MANAGER", "Avvio Vivarqo Dev Manager.");
+  await log("INFO", "MANAGER", "Avvio Snakebee Dev Manager.");
   await prepare();
   await configureLocalPostgresPort();
   await validateLocalEnvironment();
