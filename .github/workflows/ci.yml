@@ -140,6 +140,7 @@ jobs:
         run: |
           node --check scripts/dev-manager.mjs
           node --check scripts/dev-manager-core.mjs
+          node --check scripts/dev-manager-config.mjs
       - name: Run diagnostic and process integration tests on Windows
         run: |
           pnpm test:dev-manager
