@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: vivarqo
       POSTGRES_PASSWORD: vivarqo_dev
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${VIVARQO_POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - vivarqo-postgres-data:/var/lib/postgresql
     healthcheck:
