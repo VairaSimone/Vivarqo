@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createECDH } from "node:crypto";
 import { diagnose, primaryErrorMessage, summarizeDiagnostics } from "./dev-manager-core.mjs";
 import {
   clearUnusedVapidPlaceholder, findAvailablePort, getIncompleteVapidVariables,
-  getLocalPostgresPort, getPortFromComposeMapping, readEnvValue, setEnvValues,
+  getInvalidVapidVariables, getLocalPostgresPort, getPortFromComposeMapping, readEnvValue, setEnvValues,
   withLocalPostgresPort
 } from "./dev-manager-config.mjs";
 
@@ -106,6 +107,31 @@ test("riutilizza il subject VAPID di esempio solo quando tutte le chiavi sono as
   assert.deepEqual(getIncompleteVapidVariables(normalized), []);
   const partial = "VAPID_PUBLIC_KEY=real-public-key\nVAPID_PRIVATE_KEY=\nVAPID_SUBJECT=\n";
   assert.deepEqual(getIncompleteVapidVariables(partial), ["VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
+});
+
+
+test("verifica le chiavi VAPID P-256 e rileva una coppia non corrispondente", () => {
+  const curve = createECDH("prime256v1");
+  curve.generateKeys();
+  const valid = [
+    "VAPID_PUBLIC_KEY=" + curve.getPublicKey("base64url", "uncompressed"),
+    "VAPID_PRIVATE_KEY=" + curve.getPrivateKey("base64url"),
+    "VAPID_SUBJECT=mailto:admin@vivarqo.example"
+  ].join("\n");
+  assert.deepEqual(getInvalidVapidVariables(valid), []);
+
+  const otherCurve = createECDH("prime256v1");
+  otherCurve.generateKeys();
+  const mismatched = valid.replace(
+    "VAPID_PUBLIC_KEY=" + curve.getPublicKey("base64url", "uncompressed"),
+    "VAPID_PUBLIC_KEY=" + otherCurve.getPublicKey("base64url", "uncompressed")
+  );
+  assert.deepEqual(getInvalidVapidVariables(mismatched), ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"]);
+});
+
+test("diagnostica errori generici di ambiente anche quando il campo non è Sentry o Metrics", () => {
+  assert.equal(diagnose("Invalid environment configuration: APP_ORIGIN: invalid URL").id, "env-invalid");
+  assert.equal(diagnose("Configurazione VAPID non valida: VAPID_PRIVATE_KEY").id, "vapid-incomplete");
 });
 
 test("sceglie la causa primaria della configurazione invece dell'errore secondario tsx", () => {
