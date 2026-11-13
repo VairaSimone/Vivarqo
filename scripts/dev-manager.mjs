@@ -177,7 +177,7 @@ async function configureLocalPostgresPort() {
 
   // Reuse the already-running Compose mapping on subsequent starts. Otherwise
   // probe for a free loopback port and never terminate the process occupying it.
-  const selectedPort = existingComposePort || await findAvailablePort(preferredPort, 5500, isTcpPortAvailable);
+  const selectedPort = existingComposePort || await findAvailablePort(preferredPort, Math.max(5500, preferredPort + 100), isTcpPortAvailable);
   if (!selectedPort) {
     throw new Error("Nessuna porta TCP libera trovata tra " + preferredPort + " e 5500. Libera una porta o imposta VIVARQO_POSTGRES_HOST_PORT manualmente.");
   }
@@ -260,7 +260,7 @@ async function prepare() {
   const install = await runAndForward(exe(packageManager), pnpmArgs(["install", "--frozen-lockfile"]));
   const installOutput = install.stdout + "\n" + install.stderr;
   if (/Ignored build scripts/i.test(installOutput)) {
-    const warning = installOutput.match(/Ignored build scripts:[\\s\\S]{0,900}/i)?.[0] || "pnpm ha ignorato uno o più script.";
+    const warning = installOutput.match(/Ignored build scripts:[\s\S]{0,900}/i)?.[0] || "pnpm ha ignorato uno o più script.";
     await log("WARN", "DEPENDENCIES", warning +
       " Il Manager non autorizza pacchetti non presenti in onlyBuiltDependencies. Verifica la dipendenza e usa pnpm approve-builds solo dopo averne controllato la provenienza.");
   }
