@@ -1,4 +1,4 @@
-# Deployment production/staging — Vivarqo
+# Deployment production/staging — Snakebee
 
 Questa configurazione separa sviluppo locale, staging e produzione. È una configurazione di deployment da applicare su un host reale; il suo inserimento in Git non significa che il servizio sia già stato distribuito.
 
