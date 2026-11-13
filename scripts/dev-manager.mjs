@@ -154,6 +154,8 @@ async function describePortOwner(port) {
 
 async function getExistingComposePostgresPort() {
   try {
+    const status = await run("docker", ["compose", "-f", COMPOSE, "ps", "--status", "running", "--format", "json", "postgres"], true);
+    if (!status.stdout.trim()) return null;
     const result = await run("docker", ["compose", "-f", COMPOSE, "port", "postgres", "5432"], true);
     return getPortFromComposeMapping(result.stdout);
   } catch {
