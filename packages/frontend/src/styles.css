@@ -1929,3 +1929,9 @@ svg {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Keep native file pickers and modal submit actions comfortably operable at every viewport. */
+.field input[type="file"] { min-height: 44px; height: 44px; }
+.field input[type="file"]::file-selector-button { min-height: 44px; }
+.modal-content .btn[type="submit"] { min-height: 44px; }
