@@ -20,25 +20,25 @@ const RESET_PASSWORD_TTL_MS = 60 * 60 * 1000;
 function verificationEmail(locale: string, link: string): { subject: string; html: string } {
   if (locale === "en") {
     return {
-      subject: "Verify your email address — Vivarqo",
-      html: "<p>To verify your email address, open this link:</p><p><a href=\"" + link + "\">Verify email</a></p><p>The link expires in 24 hours. If you did not request a Vivarqo account, ignore this email.</p>",
+      subject: "Verify your email address — Snakebee",
+      html: "<p>To verify your email address, open this link:</p><p><a href=\"" + link + "\">Verify email</a></p><p>The link expires in 24 hours. If you did not request a Snakebee account, ignore this email.</p>",
     };
   }
   return {
-    subject: "Verifica il tuo indirizzo email — Vivarqo",
-    html: "<p>Per verificare il tuo indirizzo email, apri questo link:</p><p><a href=\"" + link + "\">Verifica email</a></p><p>Il link scade tra 24 ore. Se non hai richiesto un account Vivarqo, ignora questa email.</p>",
+    subject: "Verifica il tuo indirizzo email — Snakebee",
+    html: "<p>Per verificare il tuo indirizzo email, apri questo link:</p><p><a href=\"" + link + "\">Verifica email</a></p><p>Il link scade tra 24 ore. Se non hai richiesto un account Snakebee, ignora questa email.</p>",
   };
 }
 
 function passwordResetEmail(locale: string, link: string): { subject: string; html: string } {
   if (locale === "en") {
     return {
-      subject: "Reset your password — Vivarqo",
+      subject: "Reset your password — Snakebee",
       html: "<p>To set a new password, open this link:</p><p><a href=\"" + link + "\">Reset password</a></p><p>The link expires in 60 minutes. If you did not request a reset, ignore this email.</p>",
     };
   }
   return {
-    subject: "Reimposta la password — Vivarqo",
+    subject: "Reimposta la password — Snakebee",
     html: "<p>Per impostare una nuova password, apri questo link:</p><p><a href=\"" + link + "\">Reimposta password</a></p><p>Il link scade tra 60 minuti. Se non hai richiesto il reset, ignora questa email.</p>",
   };
 }
@@ -46,12 +46,12 @@ function passwordResetEmail(locale: string, link: string): { subject: string; ht
 function changedEmailVerification(locale: string, link: string): { subject: string; html: string } {
   if (locale === "en") {
     return {
-      subject: "Confirm your new email address — Vivarqo",
+      subject: "Confirm your new email address — Snakebee",
       html: "<p>To confirm your new email address, open this link:</p><p><a href=\"" + link + "\">Verify email</a></p><p>The link expires in 24 hours.</p>",
     };
   }
   return {
-    subject: "Conferma il nuovo indirizzo email — Vivarqo",
+    subject: "Conferma il nuovo indirizzo email — Snakebee",
     html: "<p>Per confermare il nuovo indirizzo email, apri questo link:</p><p><a href=\"" + link + "\">Verifica email</a></p><p>Il link scade tra 24 ore.</p>",
   };
 }
