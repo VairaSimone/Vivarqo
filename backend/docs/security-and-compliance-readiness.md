@@ -83,7 +83,7 @@ Non esiste una singola legge mondiale applicabile in modo identico a tutti gli u
 - [ ] Valutare DSA per le schede pubbliche e implementare una procedura di segnalazione prima di promuovere la funzione.
 - [ ] Far revisionare il contratto di abbonamento e i diritti del consumatore da un professionista competente.
 
-**Non descrivere Vivarqo come “GDPR compliant”, “DSA compliant” o “conforme a tutte le leggi mondiali” finché i punti organizzativi e di prodotto sopra non sono stati verificati e documentati.**
+**Non descrivere Snakebee come “GDPR compliant”, “DSA compliant” o “conforme a tutte le leggi mondiali” finché i punti organizzativi e di prodotto sopra non sono stati verificati e documentati.**
 
 
 ## 5. Aggiornamento 30 ottobre 2026 — account e push
