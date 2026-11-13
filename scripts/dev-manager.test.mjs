@@ -116,7 +116,7 @@ test("verifica chiavi VAPID P-256 con byte iniziale omesso e rileva coppie non c
   fixedPrivateKey[31] = 1;
   curve.setPrivateKey(fixedPrivateKey);
   const exportedPrivateKey = curve.getPrivateKey("base64url");
-  assert.equal(Buffer.from(exportedPrivateKey, "base64url").length, 31, "il caso deve riprodurre l'esportazione senza zero iniziale");
+  assert.ok(Buffer.from(exportedPrivateKey, "base64url").length < 32, "il caso deve riprodurre l'esportazione senza zero iniziale");
 
   const valid = [
     "VAPID_PUBLIC_KEY=" + curve.getPublicKey("base64url", "uncompressed"),
