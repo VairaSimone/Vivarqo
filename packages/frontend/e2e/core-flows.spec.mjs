@@ -134,7 +134,13 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   const upcomingDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
   const upcomingDateTime = new Date(upcomingDate.getTime() - upcomingDate.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   await page.getByLabel("Scadenza").fill(upcomingDateTime);
+  const upcomingTaskCreated = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    response.url().endsWith("/api/v1/tasks") &&
+    response.status() === 201
+  );
   await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await upcomingTaskCreated;
   await page.goto("/today");
   const upcomingTask = page.getByRole("button", { name: "Apri attività: E2E dashboard upcoming task" });
   await expect(upcomingTask).toBeVisible();
