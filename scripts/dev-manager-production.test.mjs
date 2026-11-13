@@ -138,8 +138,13 @@ volumes:
         try { return compose(["ps", "--all", "--format", "json"]); }
         catch (composeError) { return String(composeError); }
       })();
+      const composeLogs = (() => {
+        try { return compose(["logs", "--no-color", "--tail=100", "postgres", "migrate"]); }
+        catch (composeError) { return String(composeError); }
+      })();
       console.error("Production Manager diagnostics before timeout:");
       console.error("Compose state:\n" + composeState);
+      console.error("Compose postgres/migrate logs:\n" + composeLogs);
       console.error("Manager log (last 200 lines):\n" + managerLog.split(/\r?\n/).slice(-200).join("\n"));
       throw error;
     }
