@@ -9,7 +9,7 @@ import {
 } from "./dev-manager-config.mjs";
 import { terminateProcessTree } from "./dev-manager-process.mjs";
 import { isDashboardRequestAllowed } from "./dev-manager-security.mjs";
-import { access, appendFile, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
@@ -246,16 +246,16 @@ async function prepare() {
 
   try { await access(".env", constants.F_OK); }
   catch {
-    await copyFile(".env.example", ".env");
-    const initial = await readFile(".env", "utf8");
-    await writeFile(".env", initial.replace("replace-with-another-32-bytes-of-random-secret", randomBytes(48).toString("base64url")), "utf8");
-    await log("INFO", "SETUP", "Creato .env locale con CSRF_SECRET casuale. I provider esterni restano opzionali.");
+    const example = await readFile(".env.example", "utf8");
+    const initial = example.replace("replace-with-another-32-bytes-of-random-secret", randomBytes(48).toString("base64url"));
+    await persistEnvFile(path.join(ROOT, ".env"), initial);
+    await log("INFO", "SETUP", "Creato .env locale con permessi privati e CSRF_SECRET casuale. I provider esterni restano opzionali.");
   }
 
   let envContents = await readFile(".env", "utf8");
   const nodeEnv = readEnvValue(envContents, "NODE_ENV") || "development";
   const csrfSecret = readEnvValue(envContents, "CSRF_SECRET") || "";
-  if (nodeEnv === "development" && (!csrfSecret || /replace-with-another-32-bytes-of-random-secret/i.test(csrfSecret))) {
+  if (nodeEnv === "development" && (csrfSecret.length < 32 || /replace-with-another-32-bytes-of-random-secret/i.test(csrfSecret))) {
     envContents = setEnvValues(envContents, { CSRF_SECRET: randomBytes(48).toString("base64url") });
     await log("INFO", "SETUP", "Rigenerato CSRF_SECRET mancante o segnaposto per il solo ambiente development.");
   }
@@ -734,7 +734,7 @@ function status() {
 async function shutdown(reason) {
   if (STOP.requested) return;
   STOP.requested = true;
-  await log("INFO", "MANAGER", "Arresto richiesto: " + reason + " (arresto volontario).");
+  await log("INFO", "MANAGER", "Arresto richiesto: " + reason + ".");
   const serviceChildren = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
   const children = [...new Set([...serviceChildren, ...commandProcesses, ...notificationProcesses])];
   await Promise.all(children.map(child => terminateProcessTree(child)));
