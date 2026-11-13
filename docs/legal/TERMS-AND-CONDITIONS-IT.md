@@ -1,4 +1,4 @@
-# Termini e condizioni del servizio Vivarqo — bozza
+# Termini e condizioni del servizio Snakebee — bozza
 
 > **BOZZA INTERNA — NON PUBBLICARE SENZA COMPILAZIONE E REVISIONE PROFESSIONALE.** I segnaposto devono essere sostituiti con condizioni realmente applicate. Questo documento non costituisce consulenza legale.
 
@@ -6,13 +6,13 @@
 
 ## 1. Gestore
 
-Il servizio Vivarqo è gestito da **[RAGIONE SOCIALE / NOME E COGNOME]**, con sede in **[INDIRIZZO]**, C.F./P.IVA **[DATI]**, email **[EMAIL]**, PEC **[PEC, SE APPLICABILE]** (il “Gestore”).
+Il servizio Snakebee è gestito da **[RAGIONE SOCIALE / NOME E COGNOME]**, con sede in **[INDIRIZZO]**, C.F./P.IVA **[DATI]**, email **[EMAIL]**, PEC **[PEC, SE APPLICABILE]** (il “Gestore”).
 
 ## 2. Oggetto del servizio
 
-Vivarqo mette a disposizione strumenti software per organizzare schede animali, registri di cura, attività, riproduzioni, documenti, inventario, informazioni economiche gestionali, notifiche ed esportazioni. Funzionalità e limiti dipendono dal piano e dalla versione.
+Snakebee mette a disposizione strumenti software per organizzare schede animali, registri di cura, attività, riproduzioni, documenti, inventario, informazioni economiche gestionali, notifiche ed esportazioni. Funzionalità e limiti dipendono dal piano e dalla versione.
 
-Vivarqo è uno strumento organizzativo: non costituisce parere veterinario, diagnosi o prescrizione sanitaria, certificazione genealogica, registro fiscale o servizio di consulenza legale/contabile. L'utente resta responsabile delle decisioni relative agli animali e delle verifiche professionali e normative necessarie.
+Snakebee è uno strumento organizzativo: non costituisce parere veterinario, diagnosi o prescrizione sanitaria, certificazione genealogica, registro fiscale o servizio di consulenza legale/contabile. L'utente resta responsabile delle decisioni relative agli animali e delle verifiche professionali e normative necessarie.
 
 ## 3. Account e credenziali
 
