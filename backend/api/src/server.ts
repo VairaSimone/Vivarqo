@@ -18,7 +18,7 @@ async function startServer(): Promise<void> {
 
   const app = createApp();
   server = app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Vivarqo API listening");
+    logger.info({ port: env.PORT, apiOrigin: env.API_ORIGIN }, "Snakebee API listening");
   });
 }
 
@@ -78,7 +78,7 @@ void startServer().catch(async (error: unknown) => {
   // raw messages out of logs; the error class and failed start are enough to triage.
   logger.fatal({
     errorName: error instanceof Error ? error.name : "UnknownError",
-  }, "Vivarqo API startup failed; no HTTP listener was started");
+  }, "Snakebee API startup failed; no HTTP listener was started");
   try {
     await prisma.$disconnect();
   } catch {
