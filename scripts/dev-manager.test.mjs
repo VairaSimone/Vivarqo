@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { diagnose, summarizeDiagnostics } from "./dev-manager-core.mjs";
+import { diagnose, primaryErrorMessage, summarizeDiagnostics } from "./dev-manager-core.mjs";
+import {
+  clearUnusedVapidPlaceholder, findAvailablePort, getIncompleteVapidVariables,
+  getLocalPostgresPort, getPortFromComposeMapping, readEnvValue, setEnvValues,
+  withLocalPostgresPort
+} from "./dev-manager-config.mjs";
 
 test("classifica problemi comuni con suggerimenti operativi", () => {
   assert.equal(diagnose("Error: connect ECONNREFUSED 127.0.0.1:5432").id, "db-connection");
@@ -61,3 +66,62 @@ test("non promuove errori ricorrenti ma distanti nel tempo a guasti persistenti"
   assert.equal(result[0].classification, "likely-persistent");
   assert.equal(result[0].requiresIntervention, false);
 });
+
+test("seleziona una porta libera senza provare a terminare il processo che occupa quella preferita", async () => {
+  const tried = [];
+  const selected = await findAvailablePort(5432, 5435, async port => {
+    tried.push(port);
+    return port === 5434;
+  });
+  assert.equal(selected, 5434);
+  assert.deepEqual(tried, [5432, 5433, 5434]);
+});
+
+test("rifiuta una configurazione quando nessuna porta nell'intervallo è disponibile", async () => {
+  const selected = await findAvailablePort(5432, 5434, async () => false);
+  assert.equal(selected, null);
+});
+
+test("legge e aggiorna soltanto assegnazioni .env attive preservando i commenti", () => {
+  const original = "# DATABASE_URL=postgresql://ignored\nDATABASE_URL=postgresql://vivarqo:dev@localhost:5432/vivarqo?schema=public\nVAPID_SUBJECT=mailto:admin@example.com\n";
+  assert.equal(readEnvValue(original, "DATABASE_URL"), "postgresql://vivarqo:dev@localhost:5432/vivarqo?schema=public");
+  const updated = setEnvValues(original, { VIVARQO_POSTGRES_HOST_PORT: "5433", VAPID_SUBJECT: "" });
+  assert.match(updated, /^# DATABASE_URL=postgresql:/m);
+  assert.match(updated, /^VIVARQO_POSTGRES_HOST_PORT=5433$/m);
+  assert.match(updated, /^VAPID_SUBJECT=$/m);
+});
+
+test("aggiorna soltanto URL PostgreSQL locali e conserva path e query", () => {
+  const url = "postgresql://user:pass@localhost:5432/vivarqo?schema=public";
+  assert.equal(getLocalPostgresPort(url), 5432);
+  assert.equal(getLocalPostgresPort("postgresql://db.internal:5432/vivarqo"), null);
+  assert.equal(withLocalPostgresPort(url, 5433), "postgresql://user:pass@localhost:5433/vivarqo?schema=public");
+  assert.equal(getPortFromComposeMapping("127.0.0.1:5433\n"), 5433);
+});
+
+test("riutilizza il subject VAPID di esempio solo quando tutte le chiavi sono assenti", () => {
+  const example = "VAPID_PUBLIC_KEY=\nVAPID_PRIVATE_KEY=\nVAPID_SUBJECT=mailto:admin@example.com\n";
+  const normalized = clearUnusedVapidPlaceholder(example);
+  assert.equal(readEnvValue(normalized, "VAPID_SUBJECT"), "");
+  assert.deepEqual(getIncompleteVapidVariables(normalized), []);
+  const partial = "VAPID_PUBLIC_KEY=real-public-key\nVAPID_PRIVATE_KEY=\nVAPID_SUBJECT=\n";
+  assert.deepEqual(getIncompleteVapidVariables(partial), ["VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
+});
+
+test("sceglie la causa primaria della configurazione invece dell'errore secondario tsx", () => {
+  const output = [
+    "Error: Invalid environment configuration: SENTRY_DSN: Invalid URL",
+    "at config/env.ts:70",
+    "Error: Command \\"tsx\\" not found",
+    "ELIFECYCLE Command failed with exit code 1"
+  ].join("\n");
+  assert.match(primaryErrorMessage(output), /Invalid environment configuration: SENTRY_DSN/);
+  assert.equal(diagnose(primaryErrorMessage(output)).id, "env-invalid");
+});
+
+test("classifica i problemi di binding Docker e i build script bloccati", () => {
+  assert.equal(diagnose("Error response from daemon: ports are not available").id, "docker-port-binding");
+  assert.equal(diagnose("Ignored build scripts: @prisma/engines").id, "pnpm-build-scripts");
+  assert.equal(diagnose("DEP0190 shell option true").id, "shell-deprecation");
+});
+
