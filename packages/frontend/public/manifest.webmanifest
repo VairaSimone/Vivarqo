@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Vivarqo — Breeder workspace",
-  "short_name": "Vivarqo",
+  "name": "Snakebee — Breeder workspace",
+  "short_name": "Snakebee",
   "description": "Il gestionale per piccoli e medi allevatori di rettili.",
   "start_url": "/today",
   "scope": "/",
