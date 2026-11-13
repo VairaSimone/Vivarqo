@@ -1,4 +1,4 @@
-# Informativa sul trattamento dei dati personali — Vivarqo (bozza)
+# Informativa sul trattamento dei dati personali — Snakebee (bozza)
 
 > **BOZZA INTERNA — NON PUBBLICARE SENZA COMPLETAMENTO E REVISIONE LEGALE.** I campi tra parentesi quadre devono essere verificati dal titolare. Il testo non costituisce parere legale né certificazione di conformità.
 
@@ -13,7 +13,7 @@ Responsabile della protezione dei dati (DPO/RPD): **[DATI SOLO SE FORMALMENTE NO
 
 ## 2. Servizio e ambito
 
-Vivarqo è un servizio online che permette agli utenti di organizzare informazioni su animali, registri di cura, attività, riproduzioni, documenti, inventario, dati economici gestionali, notifiche e condivisioni pubbliche volontarie. L'informativa riguarda sito, applicazione web/PWA, API e servizi esterni effettivamente configurati.
+Snakebee è un servizio online che permette agli utenti di organizzare informazioni su animali, registri di cura, attività, riproduzioni, documenti, inventario, dati economici gestionali, notifiche e condivisioni pubbliche volontarie. L'informativa riguarda sito, applicazione web/PWA, API e servizi esterni effettivamente configurati.
 
 ## 3. Categorie di dati
 
@@ -24,7 +24,7 @@ A seconda delle funzioni utilizzate, possono essere trattati:
 - **Documenti e allegati:** file, nome originale, tipo, dimensione, categoria, note e riferimenti al contenuto.
 - **Condivisioni pubbliche:** campi della scheda animale scelti dall'utente per la pubblicazione, slug casuale e stato della condivisione. L'utente deve evitare di pubblicare dati personali di terzi senza titolo.
 - **Notifiche e Web Push:** preferenze, notifiche, endpoint e chiavi della sottoscrizione del browser.
-- **Abbonamenti e pagamenti:** identificativi cliente/abbonamento Stripe, piano, stato della sottoscrizione ed eventi di pagamento/webhook. Il backend Vivarqo non memorizza il numero completo della carta; la gestione del pagamento avviene tramite il provider.
+- **Abbonamenti e pagamenti:** identificativi cliente/abbonamento Stripe, piano, stato della sottoscrizione ed eventi di pagamento/webhook. Il backend Snakebee non memorizza il numero completo della carta; la gestione del pagamento avviene tramite il provider.
 - **Dati tecnici e sicurezza:** timestamp, log minimizzati, user-agent quando raccolto, identificatori tecnici e hash di indirizzi IP utilizzati per i controlli di sicurezza.
 
 Non inserire nei campi note categorie particolari di dati o informazioni di terzi non necessarie al servizio.
