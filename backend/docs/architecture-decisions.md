@@ -1,4 +1,4 @@
-# Decisioni e discrepanze rilevate — Vivarqo 1.0
+# Decisioni e discrepanze rilevate — Snakebee 1.0
 
 ## Decisioni di questo incremento
 - Il repository segue il monorepo pnpm previsto dalla specifica.
