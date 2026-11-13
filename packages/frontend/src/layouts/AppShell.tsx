@@ -176,7 +176,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to main content" : "Vai al contenuto principale"}</a>
     <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={locale === "it" ? "Navigazione principale" : "Main navigation"} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
-      <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Vivarqo home">
+      <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Snakebee home">
         <span className="brand-mark"><Icon name="leaf" size={21} /></span>
         <span className="brand-copy"><strong>vivarqo</strong><small>{t("brandTagline")}</small></span>
       </button>
@@ -211,7 +211,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         </div>
       </header>
       <main id="main-content" className="page-content" tabIndex={-1}>{children}</main>
-      <footer className="app-footer"><span>Vivarqo</span><span>{new Date().getFullYear()}</span></footer>
+      <footer className="app-footer"><span>Snakebee</span><span>{new Date().getFullYear()}</span></footer>
     </div>
     <nav className="mobile-bottom-nav" aria-label={t("navWorkspace")} inert={mobileMenu}>
       {[
