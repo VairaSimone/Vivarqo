@@ -129,12 +129,17 @@ export function getInvalidVapidVariables(contents) {
   const privateKey = decode(values.VAPID_PRIVATE_KEY);
   const invalid = [];
   if (!publicKey || publicKey.length !== 65 || publicKey[0] !== 4) invalid.push("VAPID_PUBLIC_KEY");
-  if (!privateKey || privateKey.length !== 32) invalid.push("VAPID_PRIVATE_KEY");
+  // Node/OpenSSL may omit leading zero octets when exporting an EC private
+  // scalar. A P-256 scalar can therefore be 1..32 bytes in base64url form.
+  if (!privateKey || privateKey.length < 1 || privateKey.length > 32) invalid.push("VAPID_PRIVATE_KEY");
   if (invalid.length) return invalid;
 
   try {
+    const normalizedPrivateKey = privateKey.length === 32
+      ? privateKey
+      : Buffer.concat([Buffer.alloc(32 - privateKey.length), privateKey]);
     const curve = createECDH("prime256v1");
-    curve.setPrivateKey(privateKey);
+    curve.setPrivateKey(normalizedPrivateKey);
     const derivedPublicKey = curve.getPublicKey(undefined, "uncompressed");
     if (!derivedPublicKey.equals(publicKey)) return ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"];
   } catch {
