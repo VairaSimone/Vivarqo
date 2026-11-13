@@ -1,6 +1,6 @@
-# Vivarqo
+# Snakebee
 
-Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene un backend Node.js con PostgreSQL/Prisma e un frontend React/Vite in italiano e inglese, con layout responsive e una PWA installabile. Il client utilizza sessioni cookie, token CSRF e API same-origin.
+Snakebee è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene un backend Node.js con PostgreSQL/Prisma e un frontend React/Vite in italiano e inglese, con layout responsive e una PWA installabile. Il client utilizza sessioni cookie, token CSRF e API same-origin.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -10,7 +10,7 @@ Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. 
 
 ## Dev Manager (Windows) e VPS Linux
 
-Per installare e avviare il supervisore, gestire gli avvii successivi, consultare dashboard/log, arrestare il servizio e configurare systemd su una VPS, segui la [guida operativa del Vivarqo Manager](docs/dev-manager.md). Per DNS, TLS, segreti, storage S3 e backup di produzione consulta anche la [guida di deployment production/staging](backend/docs/production-deployment.md).
+Per installare e avviare il supervisore, gestire gli avvii successivi, consultare dashboard/log, arrestare il servizio e configurare systemd su una VPS, segui la [guida operativa del Snakebee Manager](docs/dev-manager.md). Per DNS, TLS, segreti, storage S3 e backup di produzione consulta anche la [guida di deployment production/staging](backend/docs/production-deployment.md).
 
 ## Avvio locale manuale
 Dalla root del repository:
