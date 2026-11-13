@@ -110,12 +110,17 @@ test("riutilizza il subject VAPID di esempio solo quando tutte le chiavi sono as
 });
 
 
-test("verifica le chiavi VAPID P-256 e rileva una coppia non corrispondente", () => {
+test("verifica chiavi VAPID P-256 con byte iniziale omesso e rileva coppie non corrispondenti", () => {
   const curve = createECDH("prime256v1");
-  curve.generateKeys();
+  const fixedPrivateKey = Buffer.alloc(32);
+  fixedPrivateKey[31] = 1;
+  curve.setPrivateKey(fixedPrivateKey);
+  const exportedPrivateKey = curve.getPrivateKey("base64url");
+  assert.equal(Buffer.from(exportedPrivateKey, "base64url").length, 31, "il caso deve riprodurre l'esportazione senza zero iniziale");
+
   const valid = [
     "VAPID_PUBLIC_KEY=" + curve.getPublicKey("base64url", "uncompressed"),
-    "VAPID_PRIVATE_KEY=" + curve.getPrivateKey("base64url"),
+    "VAPID_PRIVATE_KEY=" + exportedPrivateKey,
     "VAPID_SUBJECT=mailto:admin@vivarqo.example"
   ].join("\n");
   assert.deepEqual(getInvalidVapidVariables(valid), []);
