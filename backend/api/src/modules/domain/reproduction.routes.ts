@@ -281,6 +281,7 @@ export function createReproductionRouter() {
     const eggs = await prisma.$transaction(async (tx) => {
       const results = [];
       for (const egg of input.eggs) results.push(await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, notes: egg.notes ?? null } }));
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.created", entityType: "egg", metadata: { count: results.length } } });
       return results;
     });
     res.status(201).json({ eggs, createdCount: eggs.length });
