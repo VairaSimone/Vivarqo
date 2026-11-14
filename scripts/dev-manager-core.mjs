@@ -35,33 +35,33 @@ export function diagnose(message) {
 export function primaryErrorMessage(message) {
   const text = String(message || "").slice(0, 20_000);
   const priorities = [
-    /Invalid environment configuration:[^\\r\\n]*/i,
-    /Invalid (?:development|staging|production) environment:[^\\r\\n]*/i,
-    /Cannot connect to the Docker daemon[^\\r\\n]*|error during connect[^\\r\\n]*|dockerDesktopLinuxEngine[^\\r\\n]*/i,
-    /Error response from daemon:[^\\r\\n]*/i,
-    /pull access denied[^\\r\\n]*|failed to pull image[^\\r\\n]*|failed to resolve reference[^\\r\\n]*|manifest unknown[^\\r\\n]*/i,
-    /ports are not available[^\\r\\n]*|failed to bind host port[^\\r\\n]*|driver failed programming external connectivity[^\\r\\n]*/i,
-    /dependency failed to start:[^\\r\\n]*/i,
-    /(?:psql: error|FATAL:|ERROR:)[^\\r\\n]*/i,
-    /password authentication failed for user[^\\r\\n]*/i,
-    /database "\\w+" does not exist[^\\r\\n]*/i,
-    /Ignored build scripts:[^\\r\\n]*/i,
-    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\\r\\n]*/i
+    /Invalid environment configuration:[^\r\n]*/i,
+    /Invalid (?:development|staging|production) environment:[^\r\n]*/i,
+    /Cannot connect to the Docker daemon[^\r\n]*|error during connect[^\r\n]*|dockerDesktopLinuxEngine[^\r\n]*/i,
+    /Error response from daemon:[^\r\n]*/i,
+    /pull access denied[^\r\n]*|failed to pull image[^\r\n]*|failed to resolve reference[^\r\n]*|manifest unknown[^\r\n]*/i,
+    /ports are not available[^\r\n]*|failed to bind host port[^\r\n]*|driver failed programming external connectivity[^\r\n]*/i,
+    /dependency failed to start:[^\r\n]*/i,
+    /(?:psql: error|FATAL:|ERROR:)[^\r\n]*/i,
+    /password authentication failed for user[^\r\n]*/i,
+    /database "\w+" does not exist[^\r\n]*/i,
+    /Ignored build scripts:[^\r\n]*/i,
+    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\r\n]*/i
   ];
   for (const pattern of priorities) {
     const match = text.match(pattern);
     if (match) return match[0].trim().slice(0, 4000);
   }
 
-  const lines = text.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const meaningful = lines.filter(line =>
-    !/^at\\s/.test(line) &&
-    !/^Error: docker(?:\\s|$)/i.test(line) &&
-    !/^ELIFECYCLE\\b/i.test(line) &&
-    !/^Command failed with exit code\\b/i.test(line)
+    !/^at\s/.test(line) &&
+    !/^Error: docker(?:\s|$)/i.test(line) &&
+    !/^ELIFECYCLE\b/i.test(line) &&
+    !/^Command failed with exit code\b/i.test(line)
   );
   const firstFailure = meaningful.find(line =>
-    /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\\bFATAL\\b|\\bERR_[A-Z_]+\\b/i.test(line)
+    /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\bFATAL\b|\bERR_[A-Z_]+\b/i.test(line)
   );
   return (firstFailure || meaningful[0] || lines.at(-1) || "Errore sconosciuto").slice(0, 4000);
 }
