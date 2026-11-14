@@ -74,7 +74,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
   });
   const suggestions = contextual.filter((item) => {
     if (progress.dismissedSuggestions.includes(item.key)) return false;
-    if (item.key === "animal-care") return progress.completed.animal && (!progress.completed.weight || !progress.completed.feeding);
+    if (item.key === "animal-care") return progress.completed.animal && !progress.completed.weight;
     return progress.completed.clutch && !progress.completed.egg;
   });
 
