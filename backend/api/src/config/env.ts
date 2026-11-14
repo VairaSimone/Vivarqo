@@ -54,7 +54,7 @@ const environmentSchema = z.object({
   STRIPE_PRICE_ID: optionalString,
   BILLING_ACCESS_MODE: z.enum(["unrestricted", "subscription_required"]).default("unrestricted"),
   BILLING_PAST_DUE_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
-  // Zero means unlimited; configure positive values when free-plan quotas are launched.
+  // Zero means unlimited; the finite defaults provide a usable free-first plan.
   BILLING_FREE_MAX_ANIMALS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(15),
   BILLING_FREE_MAX_DOCUMENTS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(30),
   BILLING_FREE_MAX_STORAGE_BYTES: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(536_870_912),
