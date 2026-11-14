@@ -38,7 +38,7 @@ Oltre ai quattro file generati, provisionare tramite secret manager:
 - `s3_access_key_id`
 - `s3_secret_access_key`
 
-La chiave VAPID pubblica, il Price ID, `EMAIL_PROVIDER=brevo` e le configurazioni dei provider non segrete restano nei rispettivi file environment. Le chiavi, i bucket, gli account Stripe e le directory secret di staging e produzione devono essere distinti.
+La chiave VAPID pubblica, i Price ID Stripe mensile e annuale (`STRIPE_PRICE_MONTHLY_ID` e `STRIPE_PRICE_ANNUAL_ID`), `EMAIL_PROVIDER=brevo` e le configurazioni dei provider non segrete restano nei rispettivi file environment. Le chiavi, i bucket, gli account Stripe e le directory secret di staging e produzione devono essere distinti.
 
 Il loader applicativo supporta `VARIABLE_FILE`; legge i file a runtime e non inserisce i percorsi *_FILE o i valori dei segreti nell'ambiente del processo. Sia staging sia produzione esigono HTTPS, email, Stripe, VAPID e storage S3 reali; staging rifiuta chiavi Stripe Live e richiede Test Mode, mentre produzione richiede Live Mode. Il container Caddy riceve soltanto dominio pubblico ed email ACME, non l'intera configurazione applicativa. La password DB viene usata per costruire la URL PostgreSQL in memoria. Le chiavi Stripe Test Mode sono rifiutate quando `VIVARQO_NODE_ENV=production`.
 
