@@ -46,6 +46,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
       - name: Verify OpenAPI routes and specification structure
         run: pnpm check:openapi
       - name: Install dependencies
