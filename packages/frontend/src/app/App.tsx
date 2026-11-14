@@ -1,8 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, clearCsrfCache, setApiLocale, setUnauthorizedHandler } from "../lib/api";
 import { invalidateAllResourceCache } from "../lib/resourceCache";
 import { AppShell } from "../layouts/AppShell";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
+import { CookieConsentBanner } from "../components/CookieConsentBanner";
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
 const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
@@ -59,6 +60,7 @@ export function App() {
     weightUnit: "g", temperatureUnit: "c", dateFormat: "locale", compactTables: false, timezone: "Europe/Rome"
   });
   const t = (key: string) => translate(locale, key);
+  const withCookieBanner = (content: ReactNode) => <>{content}<CookieConsentBanner locale={locale} /></>;
   const isPublic = isPublicPath(path);
   const authRoute = authMode(path);
   const timezone = user?.timezone || "Europe/Rome";
@@ -219,21 +221,21 @@ export function App() {
     const route = routeOnly(path);
     if (route.startsWith("/legal/")) return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><LegalPage path={route} locale={locale} navigate={navigate} /></Suspense>;
     const slug = route.split("/").filter(Boolean).at(-1) ?? "";
-    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><PublicAnimalPage slug={slug} locale={locale} /></Suspense>;
+    return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><PublicAnimalPage slug={slug} locale={locale} /></Suspense>);
   }
 
   if (authRoute && !user) {
-    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode={authRoute} locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>;
+    return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode={authRoute} locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>);
   }
 
   if (!authReady) return <div className="app-boot"><span className="brand-mark"><Icon name="leaf" /></span><LoadingState /></div>;
 
   if (!user && routeOnly(path) === "/") {
-    return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>;
+    return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>);
   }
 
   if (!user) {
-    return <div className="auth-fallback"><Alert tone="danger">{authError || t("networkOffline")}</Alert><div className="inline-actions"><Button onClick={() => navigate("/login")}>{t("signIn")}</Button><Button variant="secondary" onClick={() => window.location.reload()}>{t("retry")}</Button></div></div>;
+    return withCookieBanner(<div className="auth-fallback"><Alert tone="danger">{authError || t("networkOffline")}</Alert><div className="inline-actions"><Button onClick={() => navigate("/login")}>{t("signIn")}</Button><Button variant="secondary" onClick={() => window.location.reload()}>{t("retry")}</Button></div></div>);
   }
 
   const route = routeOnly(path);
@@ -254,9 +256,9 @@ export function App() {
       navigate={navigate} />;
   else page = <ErrorState message={locale === "it" ? "Pagina non trovata." : "Page not found."} retry={() => navigate("/today")} />;
 
-  return <AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
+  return withCookieBanner(<AppShell path={path} user={user} locale={locale} onNavigate={navigate} onLocaleChange={changeLocale} onSignOut={() => void signOut()} unreadCount={notifications.data?.unreadCount ?? 0}>
     {!online && <div className="offline-banner" role="status"><Icon name="alert" size={15} /><span><strong>{t("networkOffline")}</strong><small>{t("offlineAppShellOnly")}</small></span></div>}
     {authError && <div className="global-alert"><Alert tone="danger">{authError}</Alert><button onClick={() => setAuthError("")}>{t("close")}</button></div>}
     <RouteErrorBoundary key={route} locale={locale}><Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>{page}</Suspense></RouteErrorBoundary>
-  </AppShell>;
+  </AppShell>);
 }
