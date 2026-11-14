@@ -97,7 +97,7 @@ Non considerare completo il disaster recovery finché non sono stati provati ins
 
 Il workflow `.github/workflows/deploy-production.yml` è intenzionalmente solo `workflow_dispatch`: un push su `main` non distribuisce automaticamente. Il job usa l'environment GitHub `production`; configura eventuali required reviewers nelle impostazioni del repository prima di abilitarlo.
 
-Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository, e l'utente SSH di deploy autorizzato a eseguire Docker Compose. L'utente deve poter aggiornare il checkout e usare Docker; non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
+Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository. L'utente SSH di deploy deve poter leggere il repository Git (chiave deploy read-only o credenziale equivalente), aggiornare il checkout e usare Docker Compose. L'utente deve avere accesso ai file `.env.production` e alle directory configurate, ma non deve poter modificare segreti condivisi da altri servizi. L'accesso al gruppo Docker equivale di fatto a privilegi root: non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
 
 - `VIVARQO_DEPLOY_HOST`: hostname/IP del VPS.
 - `VIVARQO_DEPLOY_USER`: utente SSH di deploy.
