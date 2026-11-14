@@ -7,18 +7,23 @@ import { AppError } from "../../errors/app-error.js";
 import { assertQuotaWithinLimit, assertStorageWithinLimit, PlanLimitExceededError, resolveBillingEntitlements } from "./billing-policy.js";
 
 const subscriptionSelect = { status: true, stripePriceId: true, currentPeriodEnd: true } as const;
-function policy(expectedPriceId = env.STRIPE_PRICE_ID) {
+function configuredPriceIds(): string[] {
+  return [env.STRIPE_PRICE_MONTHLY_ID, env.STRIPE_PRICE_ANNUAL_ID, env.STRIPE_PRICE_ID]
+    .filter((value): value is string => Boolean(value));
+}
+function policy(expectedPriceIds: readonly string[] = configuredPriceIds(), annualPriceId = env.STRIPE_PRICE_ANNUAL_ID) {
   return {
     accessMode: env.BILLING_ACCESS_MODE,
     pastDueGraceDays: env.BILLING_PAST_DUE_GRACE_DAYS,
     freeMaxAnimals: env.BILLING_FREE_MAX_ANIMALS,
     freeMaxDocuments: env.BILLING_FREE_MAX_DOCUMENTS,
     freeMaxStorageBytes: env.BILLING_FREE_MAX_STORAGE_BYTES,
-    expectedPriceId,
+    expectedPriceIds,
+    annualPriceId,
   };
 }
 
-export async function getUserEntitlements(userId: string, expectedPriceId = env.STRIPE_PRICE_ID): Promise<BillingEntitlementsDto> {
+export async function getUserEntitlements(userId: string, expectedPriceIds: readonly string[] = configuredPriceIds(), annualPriceId = env.STRIPE_PRICE_ANNUAL_ID): Promise<BillingEntitlementsDto> {
   const [subscription, animalsUsed, documentsUsed, storage] = await Promise.all([
     prisma.subscription.findUnique({ where: { userId }, select: subscriptionSelect }),
     // Archived animals still consume a slot because their care history is retained.
@@ -27,7 +32,7 @@ export async function getUserEntitlements(userId: string, expectedPriceId = env.
     prisma.document.aggregate({ where: { userId, deletedAt: null }, _sum: { sizeBytes: true } }),
   ]);
   return {
-    ...resolveBillingEntitlements(subscription, policy(expectedPriceId)),
+    ...resolveBillingEntitlements(subscription, policy(expectedPriceIds, annualPriceId)),
     animalsUsed, documentsUsed, storageBytesUsed: (storage._sum.sizeBytes ?? 0n).toString(),
   };
 }
