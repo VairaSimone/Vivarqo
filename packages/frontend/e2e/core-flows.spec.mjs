@@ -16,7 +16,13 @@ async function signIn(page, account) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Password").fill(account.password);
+  const loginResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/auth/login"
+  );
   await page.getByRole("button", { name: "Accedi" }).click();
+  const response = await loginResponse;
+  expect(response.status(), `E2E login failed: ${await response.text()}`).toBe(200);
   await page.waitForURL(/\/today(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
