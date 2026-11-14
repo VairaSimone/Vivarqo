@@ -8,7 +8,7 @@ import { PostgresRateLimitStore } from "../../middleware/postgres-rate-limit-sto
 import { prisma } from "../../db/prisma.js";
 import { issueSession, revokeCurrentSession, requireSession, type AuthContext } from "./session.js";
 import { setCsrfCookie } from "./csrf.js";
-import { createResendEmailSender, type EmailSender } from "./email-sender.js";
+import { createConfiguredEmailSender, type EmailSender } from "./email-sender.js";
 import {
   emailRequestSchema,
   loginSchema,
@@ -115,7 +115,7 @@ const genericEmailResponse = {
 
 export function createAuthRouter(sender?: EmailSender) {
   const router = Router();
-  const emailSender = sender ?? createResendEmailSender();
+  const emailSender = sender ?? createConfiguredEmailSender();
 
   router.get("/csrf", (_req, res) => {
     const csrfToken = setCsrfCookie(res);
