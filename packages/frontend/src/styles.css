@@ -2187,3 +2187,38 @@ svg {
 .help-contact-icon{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:13px;background:var(--surface-soft);color:var(--forest-2)}
 .help-contact-panel .btn{display:inline-flex;align-items:center;gap:8px;margin-top:13px;text-decoration:none}
 @media(max-width:680px){.help-guide-grid,.help-record-list{grid-template-columns:minmax(0,1fr)}.help-contact-panel{gap:12px}.help-contact-panel h2{font-size:17px}}
+
+
+/* Pricing cards: keep the three subscription choices readable on desktop and mobile. */
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 14px;
+}
+.billing-plans > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.billing-plans h2 { margin: 3px 0; font-size: 21px; }
+.billing-plans h2 small { font-size: 12px; }
+.billing-plans p {
+  display: block;
+  flex: 1;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.billing-plans button { margin-top: auto; }
+@media (max-width: 760px) {
+  .billing-plans { grid-template-columns: 1fr; }
+  .billing-plans > div { padding: 14px; }
+}
