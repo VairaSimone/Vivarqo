@@ -19,7 +19,7 @@ const steps: Array<{ key: Milestone; optional: boolean; icon: string; path: stri
 ];
 
 const contextual = [
-  { key: "animal-care", icon: "weight", title: { it: "Completa la scheda di cura", en: "Complete your care records" }, body: { it: "Hai già inserito animali: il prossimo passo utile è registrare un peso e un'alimentazione.", en: "You have animals in your collection. Next, record a weight and a feeding." }, path: "/animals?weigh=1", action: { it: "Registra un peso", en: "Record a weight" } },
+  { key: "animal-care", icon: "weight", title: { it: "Completa la scheda di cura", en: "Complete your care records" }, body: { it: "Hai già inserito animali: registra un peso per iniziare a seguirne la crescita.", en: "You have animals in your collection. Record a weight to start tracking their growth." }, path: "/animals?weigh=1", action: { it: "Registra un peso", en: "Record a weight" } },
   { key: "clutch-eggs", icon: "egg", title: { it: "Hai creato una covata", en: "You created a clutch" }, body: { it: "Aggiungi le singole uova per seguirne stato e incubazione.", en: "Add individual eggs to track their status and incubation." }, path: "/reproduction-cycles", action: { it: "Apri riproduzioni", en: "Open reproduction" } },
 ];
 
