@@ -35,7 +35,7 @@ function FeatureName({ value, locale }: { value: string; locale: Locale }) {
   return <>{labels[value]?.[locale] ?? value.replace(/[_-]+/g, " ")}</>;
 }
 
-export function PlanUsageSummary({ locale, compact = false }: { locale: Locale; compact?: boolean }) {
+export function PlanUsageSummary({ locale, compact = false, onNavigate }: { locale: Locale; compact?: boolean; onNavigate?: (path: string) => void }) {
   const resource = useResource<BillingSummary>("/billing/subscription");
   if (resource.loading && !resource.data) return null;
   if (resource.error || !resource.data?.entitlements) return null;
@@ -65,6 +65,6 @@ export function PlanUsageSummary({ locale, compact = false }: { locale: Locale; 
         : <p>{it ? "Consulta i dettagli del piano per conoscere le funzioni disponibili." : "Open plan details to see which features are available."}</p>}
     </div>
     {!compact && <p className="muted-note">{it ? "I limiti e le funzioni vengono letti dal tuo account. Lo spazio indica i file effettivamente archiviati." : "Limits and features are read from your account. Storage reflects the files currently stored."}</p>}
-    {compact && <div className="plan-usage-footer"><span>{it ? "Vuoi vedere tutti i dettagli?" : "Need the full details?"}</span><Button size="sm" variant="secondary" onClick={() => { window.history.pushState({}, "", "/billing"); window.dispatchEvent(new PopStateEvent("popstate")); }}>{it ? "Dettagli piano" : "Plan details"}<Icon name="arrow" size={13} /></Button></div>}
+    {compact && <div className="plan-usage-footer"><span>{it ? "Vuoi vedere tutti i dettagli?" : "Need the full details?"}</span><Button size="sm" variant="secondary" onClick={() => onNavigate?.("/billing")}>{it ? "Dettagli piano" : "Plan details"}<Icon name="arrow" size={13} /></Button></div>}
   </Panel>;
 }
