@@ -45,7 +45,7 @@ describe("file-backed runtime secrets", () => {
 
   it("rejects missing or empty secret files without exposing paths or contents", () => {
     expect(() => resolveSecretEnvironment({
-      RESEND_API_KEY_FILE: "/run/secrets/resend",
+      BREVO_API_KEY_FILE: "/run/secrets/brevo",
     }, () => "  \n")).toThrow(/empty/);
     expect(() => resolveSecretEnvironment({
       STRIPE_SECRET_KEY_FILE: "/run/secrets/stripe",
