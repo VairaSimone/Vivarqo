@@ -597,13 +597,17 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const tasksBody = await tasksResponse.json();
   const task = tasksBody.tasks.find((item) => item.title === "E2E Task follow-up");
   expect(task?.id).toBeTruthy();
+  // Scope the completion action to the target row: other open tasks can expose
+  // the same accessible name, otherwise the test may complete the wrong task.
+  const taskRow = page.locator(".task-row").filter({ hasText: "E2E Task follow-up" });
+  await expect(taskRow).toBeVisible();
   const taskCompletedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().includes("/api/v1/tasks/" + task.id + "/complete") &&
-    response.status() === 200
+    response.url().includes("/api/v1/tasks/" + task.id + "/complete")
   );
-  await page.getByRole("button", { name: "Completata" }).click();
-  await taskCompletedResponse;
+  await taskRow.getByRole("button", { name: "Completata" }).click();
+  const completionResponse = await taskCompletedResponse;
+  expect(completionResponse.status(), await completionResponse.text()).toBe(200);
   const completedTasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=completed");
   expect((await completedTasksResponse.json()).tasks.some((item) => item.id === task.id && item.status === "completed")).toBe(true);
 
