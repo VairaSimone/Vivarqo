@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Locale } from "../lib/domain";
 import { cookiePreferencesAreComplete, COOKIE_POLICY_VERSION, OPEN_COOKIE_PREFERENCES_EVENT, OPTIONAL_COOKIE_SERVICES, readCookiePreferences, saveCookiePreferences, type OptionalCookieCategory } from "../lib/cookieConsent";
 
 export function CookieConsentBanner({ locale }: { locale: Locale }) {
   const it = locale === "it";
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [record, setRecord] = useState(readCookiePreferences);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [choices, setChoices] = useState<Record<string, boolean>>(() => readCookiePreferences()?.services ?? {});
@@ -23,9 +25,25 @@ export function CookieConsentBanner({ locale }: { locale: Locale }) {
   }, []);
   useEffect(() => {
     if (!settingsOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setSettingsOpen(false); };
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const focusable = () => dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])') ?? [];
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSettingsOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const items = Array.from(focusable());
+      if (items.length === 0) { event.preventDefault(); return; }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      returnFocusRef.current?.focus();
+    };
   }, [settingsOpen]);
 
   function save(next: Record<string, boolean>) {
@@ -57,7 +75,7 @@ export function CookieConsentBanner({ locale }: { locale: Locale }) {
     </section>}
     {!visible && !settingsOpen && <button className="cookie-settings-reopen" type="button" onClick={() => setSettingsOpen(true)}>{it ? "Preferenze cookie" : "Cookie preferences"}</button>}
     {settingsOpen && <div className="cookie-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
-      <section className="cookie-dialog" role="dialog" aria-modal="true" aria-labelledby="cookie-dialog-title" aria-describedby="cookie-dialog-description">
+      <section ref={dialogRef} className="cookie-dialog" role="dialog" aria-modal="true" aria-labelledby="cookie-dialog-title" aria-describedby="cookie-dialog-description">
         <button className="cookie-dialog-close" type="button" aria-label={it ? "Chiudi preferenze cookie" : "Close cookie preferences"} onClick={() => setSettingsOpen(false)}>×</button>
         <p className="cookie-banner-eyebrow">{it ? "PREFERENZE COOKIE" : "COOKIE PREFERENCES"}</p><h2 id="cookie-dialog-title">{it ? "Gestisci le tue preferenze" : "Manage your preferences"}</h2>
         <p id="cookie-dialog-description">{it ? "Gli strumenti tecnici necessari sono sempre attivi perché richiesti per fornire il servizio e proteggere l’account. Non possono essere disattivati da questo pannello." : "Necessary technical tools are always active because they are required to provide the service and protect your account. They cannot be disabled here."}</p>
