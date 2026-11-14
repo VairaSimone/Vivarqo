@@ -2,6 +2,8 @@ const RULES = [
   { id: "vapid-incomplete", pattern: /configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together|Configurazione VAPID (?:non valida|incompleta)|VAPID_(?:PUBLIC_KEY|PRIVATE_KEY|SUBJECT).*required/i, title: "Configurazione notifiche Push incompleta", advice: "Configura tutte e tre le variabili VAPID oppure lascia tutte e tre vuote. Non generare o sostituire chiavi senza una decisione esplicita.", classification: "likely-persistent" },
   { id: "env-invalid", pattern: /Invalid environment configuration:|Invalid (?:development|staging|production) environment:/i, title: "Configurazione ambiente non valida", advice: "Controlla la variabile indicata in .env. I campi opzionali vuoti vengono ignorati; correggi solo i valori non vuoti non validi. Non inserire segreti nei log.", classification: "likely-persistent" },
   { id: "pnpm-build-scripts", pattern: /Ignored build scripts|approve-builds/i, title: "Script di installazione pnpm bloccati", advice: "Il Manager autorizza solo i pacchetti presenti in onlyBuiltDependencies. Per pacchetti nuovi e non riconosciuti, verifica la provenienza e poi usa pnpm approve-builds manualmente.", classification: "needs-review" },
+  { id: "docker-daemon", pattern: /Cannot connect to the Docker daemon|error during connect|dockerDesktopLinuxEngine|Is the docker daemon running/i, title: "Docker Desktop non disponibile", advice: "Avvia Docker Desktop e attendi che il motore Docker risulti operativo, poi riprova. Il Manager non arresta né modifica servizi esterni.", classification: "transient" },
+  { id: "docker-image", pattern: /pull access denied|failed to pull image|error pulling image|failed to resolve reference|manifest unknown|no matching manifest/i, title: "Immagine Docker non scaricabile", advice: "Controlla il nome/tag dell’immagine, la connessione e l’eventuale autenticazione al registry. Non eliminare volumi o database per risolvere un errore di pull.", classification: "needs-review" },
   { id: "docker-port-binding", pattern: /ports are not available|failed to bind host port|driver failed programming external connectivity|listen tcp.*bind:/i, title: "Porta PostgreSQL già occupata", advice: "Il Manager seleziona una porta host libera per PostgreSQL Docker e aggiorna .env senza terminare il processo che occupa la porta originale. Se il conflitto persiste, controlla il processo proprietario.", classification: "auto-repairable" },
   { id: "db-connection", pattern: /ECONNREFUSED|P1001|database.*(unavailable|does not exist)|connection terminated/i, title: "Database non raggiungibile", advice: "Verifica PostgreSQL, Docker e DATABASE_URL. Il Manager tenta prima il recupero del container e poi ripete il controllo.", classification: "transient" },
   { id: "network-transient", pattern: /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|socket hang up|fetch failed|network error|HTTP (502|503|504)/i, title: "Errore di rete temporaneo", advice: "Controlla la connettività e ripeti il controllo. Non considerarlo un guasto permanente dopo un singolo evento.", classification: "transient" },
@@ -33,24 +35,35 @@ export function diagnose(message) {
 export function primaryErrorMessage(message) {
   const text = String(message || "").slice(0, 20_000);
   const priorities = [
-    /Invalid environment configuration:[^\r\n]*/i,
-    /Invalid (?:development|staging|production) environment:[^\r\n]*/i,
-    /ports are not available:[^\r\n]*/i,
-    /Error response from daemon:[^\r\n]*/i,
-    /dependency failed to start:[^\r\n]*/i,
-    /(?:psql: error|FATAL:|ERROR:)[^\r\n]*/i,
-    /password authentication failed for user[^\r\n]*/i,
-    /database "\w+" does not exist[^\r\n]*/i,
-    /Ignored build scripts:[^\r\n]*/i,
-    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\r\n]*/i
+    /Invalid environment configuration:[^\\r\\n]*/i,
+    /Invalid (?:development|staging|production) environment:[^\\r\\n]*/i,
+    /Cannot connect to the Docker daemon[^\\r\\n]*|error during connect[^\\r\\n]*|dockerDesktopLinuxEngine[^\\r\\n]*/i,
+    /Error response from daemon:[^\\r\\n]*/i,
+    /pull access denied[^\\r\\n]*|failed to pull image[^\\r\\n]*|failed to resolve reference[^\\r\\n]*|manifest unknown[^\\r\\n]*/i,
+    /ports are not available[^\\r\\n]*|failed to bind host port[^\\r\\n]*|driver failed programming external connectivity[^\\r\\n]*/i,
+    /dependency failed to start:[^\\r\\n]*/i,
+    /(?:psql: error|FATAL:|ERROR:)[^\\r\\n]*/i,
+    /password authentication failed for user[^\\r\\n]*/i,
+    /database "\\w+" does not exist[^\\r\\n]*/i,
+    /Ignored build scripts:[^\\r\\n]*/i,
+    /(?:spawn .+ ENOENT|ERR_MODULE_NOT_FOUND|Cannot find package)[^\\r\\n]*/i
   ];
   for (const pattern of priorities) {
     const match = text.match(pattern);
-    if (match) return match[0].trim();
+    if (match) return match[0].trim().slice(0, 4000);
   }
-  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const firstError = lines.find(line => /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\bFATAL\b|\bERR_[A-Z_]+\b/i.test(line));
-  return (firstError || lines.at(-1) || "Errore sconosciuto").slice(0, 4000);
+
+  const lines = text.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+  const meaningful = lines.filter(line =>
+    !/^at\\s/.test(line) &&
+    !/^Error: docker(?:\\s|$)/i.test(line) &&
+    !/^ELIFECYCLE\\b/i.test(line) &&
+    !/^Command failed with exit code\\b/i.test(line)
+  );
+  const firstFailure = meaningful.find(line =>
+    /^(?:Error:|TypeError:|ReferenceError:|SyntaxError:)|\\bFATAL\\b|\\bERR_[A-Z_]+\\b/i.test(line)
+  );
+  return (firstFailure || meaningful[0] || lines.at(-1) || "Errore sconosciuto").slice(0, 4000);
 }
 
 export function summarizeDiagnostics(entries) {
