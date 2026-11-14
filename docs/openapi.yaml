@@ -2392,9 +2392,18 @@ paths:
     post:
       operationId: createBillingCheckout
       tags: [Billing]
-      summary: Crea una sessione Stripe Checkout
+      summary: Crea una sessione Stripe Checkout mensile o annuale
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: false
+        x-source-validation:
+          file: backend/api/src/modules/domain/billing.routes.ts
+          symbol: checkoutSchema
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingCheckoutRequest'
       responses:
         '200':
           description: Risposta JSON specifica dell'operazione.
@@ -6135,6 +6144,10 @@ components:
               "paid"
             ]
           },
+          "billingInterval": {
+            "type": ["string", "null"],
+            "enum": ["monthly", "annual", null]
+          },
           "paidSubscription": {
             "type": "boolean"
           },
@@ -8188,6 +8201,18 @@ components:
           }
         }
       }
+    BillingCheckoutRequest:
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": ["monthly", "annual"],
+            "default": "monthly"
+          }
+        }
+      }
     BillingCheckoutResponse:
       {
         "type": "object",
@@ -8229,12 +8254,22 @@ components:
         "additionalProperties": false,
         "required": [
           "configured",
+          "plans",
           "subscription",
           "entitlements"
         ],
         "properties": {
           "configured": {
             "type": "boolean"
+          },
+          "plans": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["monthly", "annual"],
+            "properties": {
+              "monthly": { "type": "boolean" },
+              "annual": { "type": "boolean" }
+            }
           },
           "subscription": {
             "oneOf": [
