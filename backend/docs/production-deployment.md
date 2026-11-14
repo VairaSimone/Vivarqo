@@ -109,11 +109,12 @@ Avviare da Actions → Vivarqo production deployment → Run workflow e incollar
 
 Il deploy:
 1. aggiorna il checkout al commit selezionato e valida la configurazione Compose;
-2. verifica che il percorso backup configurato sia un mountpoint;
-3. produce un dump PostgreSQL pre-deploy, ne verifica la leggibilità con `pg_restore --list` e calcola il checksum;
-4. costruisce le immagini prima di fermare/ricreare i servizi;
-5. esegue il servizio one-shot `migrate`; se la migrazione fallisce, non avvia la nuova API;
-6. aggiorna i servizi e attende `/readyz` tramite HTTPS.
+2. verifica che il percorso backup sia un mountpoint dedicato;
+3. avvia PostgreSQL solo se necessario, senza ricreare un container DB già attivo, e attende `pg_isready`;
+4. produce un dump pre-deploy, verifica `pg_restore --list` e pubblica checksum e archivio in modo che il dump sia visibile solo quando entrambi sono pronti;
+5. costruisce le immagini applicative;
+6. esegue `migrate` in foreground senza dipendenze Compose aggiuntive: un exit code non zero interrompe il deploy prima dell'aggiornamento di API/web/worker;
+7. aggiorna i servizi e attende `/readyz` tramite HTTPS.
 
 **Le migrazioni Prisma non vengono annullate automaticamente.** Prima di ogni rilascio, revisionare il SQL delle nuove migration e applicare la strategia expand/contract: aggiungere prima strutture compatibili, distribuire codice che supporti vecchio e nuovo schema, migrare i dati, rimuovere colonne/indici solo in un rilascio successivo. Evitare rename/drop o cambi di tipo incompatibili nello stesso deploy. Il dump pre-deploy è una rete di sicurezza, non un rollback automatico né garanzia di compatibilità. Se readiness fallisce dopo una migration, il workflow mostra log e stato ma non tenta un ripristino distruttivo del database.
 

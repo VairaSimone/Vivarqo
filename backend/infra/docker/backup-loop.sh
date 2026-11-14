@@ -35,10 +35,10 @@ while :; do
        --format=custom --no-owner --no-acl --file="$temporary" \
     && pg_restore --list "$temporary" >/dev/null; then
     hash="$(sha256sum "$temporary" | awk '{print $1}')"
-    if mv "$temporary" "$archive" \
-      && printf '%s  %s\n' "$hash" "$(basename "$archive")" > "$checksum" \
-      && chmod 600 "$archive" "$checksum" \
-      && mv "$checksum" "$archive.sha256"; then
+    if printf '%s  %s\n' "$hash" "$(basename "$archive")" > "$checksum" \
+      && chmod 600 "$temporary" "$checksum" \
+      && mv "$checksum" "$archive.sha256" \
+      && mv "$temporary" "$archive"; then
       echo "Backup archive created and verified: $(basename "$archive")"
       find /backups -maxdepth 1 -type f -name 'vivarqo-*.dump' -mtime "+$BACKUP_RETENTION_DAYS" -print |
         while IFS= read -r old_archive; do rm -f -- "$old_archive" "$old_archive.sha256"; done
