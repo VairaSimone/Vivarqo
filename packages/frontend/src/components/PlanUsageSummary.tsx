@@ -22,7 +22,7 @@ function usage(used: number, max: number | null): number | null {
   return Math.min(100, Math.max(0, used / max * 100));
 }
 function FeatureName({ locale }: { locale: Locale }) {
-  return <>{locale === "it" ? "Accesso alle funzioni con abbonamento attivo" : "Access to subscription features"}</>;
+  return <>{locale === "it" ? "Limiti rimossi per animali, documenti e spazio" : "Animal, document and storage limits removed"}</>;
 }
 
 export function PlanUsageSummary({ locale, compact = false, onNavigate }: { locale: Locale; compact?: boolean; onNavigate?: (path: string) => void }) {
