@@ -21,18 +21,8 @@ function usage(used: number, max: number | null): number | null {
   if (max === null || max <= 0) return null;
   return Math.min(100, Math.max(0, used / max * 100));
 }
-function FeatureName({ value, locale }: { value: string; locale: Locale }) {
-  const labels: Record<string, { it: string; en: string }> = {
-    reproduction: { it: "Gestione riproduzioni", en: "Breeding management" },
-    documents: { it: "Archivio documenti", en: "Document storage" },
-    inventory: { it: "Magazzino", en: "Inventory" },
-    finance: { it: "Gestione finanziaria", en: "Finance management" },
-    exports: { it: "Esportazione dati", en: "Data export" },
-    imports: { it: "Importazione dati", en: "Data import" },
-    notifications: { it: "Notifiche", en: "Notifications" },
-    public_shares: { it: "Condivisioni pubbliche", en: "Public sharing" },
-  };
-  return <>{labels[value]?.[locale] ?? value.replace(/[_-]+/g, " ")}</>;
+function FeatureName({ locale }: { locale: Locale }) {
+  return <>{locale === "it" ? "Accesso alle funzioni con abbonamento attivo" : "Access to subscription features"}</>;
 }
 
 export function PlanUsageSummary({ locale, compact = false, onNavigate }: { locale: Locale; compact?: boolean; onNavigate?: (path: string) => void }) {
@@ -61,8 +51,9 @@ export function PlanUsageSummary({ locale, compact = false, onNavigate }: { loca
     </div>
     <div className="plan-usage-features">
       <strong>{it ? "Funzioni incluse nel tuo piano" : "Features included in your plan"}</strong>
-      {features.length ? <div className="plan-feature-list">{features.map((feature) => <span key={feature}><Icon name="check" size={13} /><FeatureName value={feature} locale={locale} /></span>)}</div>
-        : <p>{it ? "Consulta i dettagli del piano per conoscere le funzioni disponibili." : "Open plan details to see which features are available."}</p>}
+      {e.paidSubscription ? <div className="plan-feature-list"><span><Icon name="check" size={13} /><FeatureName locale={locale} /></span></div>
+        : e.accessMode === "subscription_required" ? <p>{it ? "Le funzioni soggette ad abbonamento richiedono un piano attivo. Puoi continuare a usare le funzioni gratuite entro i limiti indicati." : "Features requiring a subscription need an active plan. You can keep using free features within the limits shown above."}</p>
+        : <p>{it ? "Il tuo account usa la modalità ad accesso libero; i limiti mostrati sopra si applicano comunque." : "Your account uses unrestricted access mode; the limits above still apply."}</p>}
     </div>
     {!compact && <p className="muted-note">{it ? "I limiti e le funzioni vengono letti dal tuo account. Lo spazio indica i file effettivamente archiviati." : "Limits and features are read from your account. Storage reflects the files currently stored."}</p>}
     {compact && <div className="plan-usage-footer"><span>{it ? "Vuoi vedere tutti i dettagli?" : "Need the full details?"}</span><Button size="sm" variant="secondary" onClick={() => onNavigate?.("/billing")}>{it ? "Dettagli piano" : "Plan details"}<Icon name="arrow" size={13} /></Button></div>}
