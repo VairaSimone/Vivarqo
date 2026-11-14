@@ -81,22 +81,22 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     setAppInstalled(standalone);
     const userAgent = navigator.userAgent;
     setIosDevice(/iPad|iPhone|iPod/.test(userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
-    const onBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
+    const readInstallPrompt = () => {
+      const deferred = (window as Window & { __deferredPwaInstallPrompt?: BeforeInstallPromptEvent }).__deferredPwaInstallPrompt;
+      if (deferred) setInstallPrompt(deferred);
     };
     const onAppInstalled = () => {
       setAppInstalled(true);
       setInstallPrompt(null);
       setInstallHelpOpen(false);
     };
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    readInstallPrompt();
+    window.addEventListener("pwa-install-available", readInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("pwa-install-available", readInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
-    };
-  }, []);
+    };  }, []);
 
   async function installApplication() {
     if (!installPrompt) return;
@@ -104,6 +104,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     await promptEvent.prompt();
     const choice = await promptEvent.userChoice;
     setInstallPrompt(null);
+    delete (window as Window & { __deferredPwaInstallPrompt?: BeforeInstallPromptEvent }).__deferredPwaInstallPrompt;
     if (choice.outcome === "accepted") setAppInstalled(true);
   }
   const route = path.split("?")[0] || "/today";
