@@ -51,7 +51,7 @@ export function OnboardingTour({ locale, onNavigate, onClose }: {
     <section className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <header className="onboarding-header">
         <span className="onboarding-brand"><span className="brand-mark"><Icon name="leaf" /></span><span><strong>SnakeBee</strong><small>{english ? "Your breeding workspace" : "Il tuo spazio di allevamento"}</small></span></span>
-        <button type="button" className="onboarding-close" onClick={finish} aria-label={english ? "Close tutorial" : "Chiudi tutorial"}><Icon name="x" /></button>
+        <button type="button" className="onboarding-close" onClick={finish} aria-label={english ? "Close tutorial" : "Chiudi tutorial"}><Icon name="close" /></button>
       </header>
       <div className="onboarding-progress" aria-label={english ? `Step ${step + 1} of ${steps.length}` : `Passaggio ${step + 1} di ${steps.length}`}>
         {steps.map((item, index) => <span key={item.path} className={index <= step ? "done" : ""} />)}
@@ -61,7 +61,7 @@ export function OnboardingTour({ locale, onNavigate, onClose }: {
         <div className="onboarding-icon"><Icon name={current.icon} size={25} /></div>
         <h2 id="onboarding-title">{copy[0]}</h2>
         <p className="onboarding-description">{copy[1]}</p>
-        {step === 0 && <div className="onboarding-tip"><Icon name="lightbulb" /><span>{english ? "Tip: add your animals first. The rest of the workspace becomes much more useful once records are linked to them." : "Consiglio: inizia inserendo gli animali. Il resto della piattaforma diventa molto più utile quando le registrazioni sono collegate ai loro profili."}</span></div>}
+        {step === 0 && <div className="onboarding-tip"><Icon name="leaf" /><span>{english ? "Tip: add your animals first. The rest of the workspace becomes much more useful once records are linked to them." : "Consiglio: inizia inserendo gli animali. Il resto della piattaforma diventa molto più utile quando le registrazioni sono collegate ai loro profili."}</span></div>}
         {step === steps.length - 1 && <div className="onboarding-plan">
           <strong>{english ? "Your current plan" : "Il tuo piano attuale"}</strong>
           {entitlements ? <>
@@ -80,8 +80,8 @@ export function OnboardingTour({ locale, onNavigate, onClose }: {
         <div className="onboarding-actions">
           {step > 0 && <Button variant="secondary" onClick={() => setStep((value) => value - 1)}>{english ? "Back" : "Indietro"}</Button>}
           {step < steps.length - 1
-            ? <Button onClick={() => setStep((value) => value + 1)}>{english ? "Continue" : "Continua"} <Icon name="arrow-right" size={15} /></Button>
-            : <Button onClick={() => { finish(); onNavigate("/animals"); }}>{english ? "Let's get started" : "Iniziamo"} <Icon name="arrow-right" size={15} /></Button>}
+            ? <Button onClick={() => setStep((value) => value + 1)}>{english ? "Continue" : "Continua"} <Icon name="arrow" size={15} /></Button>
+            : <Button onClick={() => { finish(); onNavigate("/animals"); }}>{english ? "Let's get started" : "Iniziamo"} <Icon name="arrow" size={15} /></Button>}
         </div>
       </footer>
     </section>
