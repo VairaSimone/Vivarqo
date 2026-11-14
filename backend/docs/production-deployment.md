@@ -235,3 +235,49 @@ Prima della produzione, applicare sul provider S3-compatible una configurazione 
 6. Registrare RPO effettivo, tempo di ripristino, oggetti mancanti e correzioni necessarie.
 
 Le API S3-compatible non espongono tutte le stesse funzionalità di versioning, replica, Object Lock e gestione dei delete marker. Il provider effettivo non è specificato nei file di configurazione: prima di scrivere policy automatiche o comandi provider-specifici bisogna identificare il servizio e verificare quali API supporta. Non è corretto dichiarare il backup S3 attivo finché non sono presenti una replica configurata e un restore drill riuscito.
+
+
+### Configurazione AWS S3 consigliata (bucket di produzione)
+
+Nel file di esempio `.env.production.example`, `S3_ENDPOINT` è vuoto e la regione predefinita è `eu-west-1`: con questi valori il codice usa l'endpoint AWS S3 standard. Il bucket è ancora un placeholder, quindi non è possibile verificare o attivare una replica reale finché non vengono scelti il nome/account del bucket e le credenziali.
+
+Per AWS S3, prima del lancio:
+
+1. Creare un bucket sorgente privato in `eu-west-1` e un bucket di destinazione in un account AWS separato, preferibilmente in una seconda regione.
+2. Abilitare versioning su entrambi i bucket e bloccare l'accesso pubblico sul bucket sorgente:
+
+   ```bash
+   aws s3api put-bucket-versioning --bucket "$SOURCE_BUCKET" \
+     --versioning-configuration Status=Enabled
+   aws s3api put-bucket-versioning --bucket "$REPLICA_BUCKET" \
+     --versioning-configuration Status=Enabled
+   aws s3api put-public-access-block --bucket "$SOURCE_BUCKET" \
+     --public-access-block-configuration \
+     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+   aws s3api get-bucket-versioning --bucket "$SOURCE_BUCKET"
+   aws s3api get-bucket-versioning --bucket "$REPLICA_BUCKET"
+   ```
+
+3. Abilitare la cifratura server-side su entrambi i bucket (SSE-S3 o SSE-KMS con chiavi e permessi separati). La cifratura server-side è aggiuntiva rispetto alla cifratura client-side Restic dei dump PostgreSQL.
+4. Configurare una regola di Cross-Region o Cross-Account Replication con un ruolo IAM dedicato. La regola deve replicare tutte le versioni oggetto ma **non replicare i delete marker**: una cancellazione applicativa nel bucket sorgente non deve nascondere anche la copia recuperabile nel bucket di destinazione. Entrambi i bucket devono avere versioning attivo prima di creare la regola.
+5. Applicare una retention delle versioni non correnti coerente con quella del database. Con 12 snapshot Restic mensili, mantenere le versioni S3 recuperabili per almeno 400 giorni; non applicare lifecycle che elimini prima le versioni necessarie al ripristino. Valutare Object Lock sul bucket di destinazione se serve protezione immutabile e il piano/costo AWS lo consente.
+6. Usare credenziali diverse per API, replica e amministrazione del bucket. Il ruolo applicativo non deve poter modificare versioning, replica, lifecycle o policy del bucket di destinazione.
+
+Verificare che la regola sia effettivamente attiva:
+
+```bash
+aws s3api get-bucket-replication --bucket "$SOURCE_BUCKET"
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix documents/
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix animal-photos/
+```
+
+Il codice genera chiavi casuali e nuove per ogni upload (ad esempio `documents/<uuid>.pdf` e `animal-photos/<uuid>.jpg`), quindi gli oggetti non vengono normalmente sovrascritti. Le cancellazioni producono delete marker sul sorgente; con la replica dei delete marker disabilitata, la versione precedente resta recuperabile nel bucket secondario. Per ripristinare un file, identificare la versione corretta nel bucket di replica e copiarla nuovamente sulla stessa chiave del bucket sorgente:
+
+```bash
+aws s3api copy-object --bucket "$SOURCE_BUCKET" --key "$STORAGE_KEY" \
+  --copy-source "$REPLICA_BUCKET/$STORAGE_KEY?versionId=$VERSION_ID"
+```
+
+Dopo il ripristino, verificare il download tramite API e confrontare il documento con il record del database ripristinato. Le chiavi S3 presenti nel DB e gli oggetti devono appartenere allo stesso punto temporale; le copie create dopo lo snapshot DB possono rimanere come oggetti orfani e vanno eliminate solo dopo aver concluso la verifica.
+
+Per provider S3-compatible diversi da AWS, verificare che siano supportati versioning, replica cross-account, delete marker e lifecycle; non tutte le implementazioni offrono le stesse garanzie o API.

@@ -98,7 +98,7 @@ jobs:
           "${compose[@]}" run --rm --no-deps --entrypoint /bin/sh backup -ec '
             umask 077
             export PGPASSWORD="$(cat "$POSTGRES_PASSWORD_FILE")"
-            stamp="$(date -u +%Y%m%dT%H%M%SZ)-$(date +%s%N)"
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)-$(cat /proc/sys/kernel/random/uuid)"
             temporary="/backups/vivarqo-predeploy-$stamp.dump.partial"
             archive="/backups/vivarqo-predeploy-$stamp.dump"
             checksum_partial="$archive.sha256.partial"
