@@ -2,7 +2,7 @@ name: Snakebee CI
 
 on:
   push:
-    branches: [main, frontend/rebuild]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -251,6 +251,11 @@ jobs:
           done
           cat /tmp/vivarqo-frontend.log
           exit 1
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-1.56.1
       - name: Install pinned Playwright runner and Chromium
         run: |
           npm install --global @playwright/test@1.56.1 @axe-core/playwright@4.10.2
