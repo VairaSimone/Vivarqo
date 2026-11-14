@@ -279,7 +279,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         </div>
       </header>
       <main id="main-content" className="page-content" tabIndex={-1}>{children}</main>
-      <footer className="app-footer"><span>Snakebee</span><span>{new Date().getFullYear()}</span></footer>
+      <footer className="app-footer"><span>SnakeBee · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><button type="button" onClick={() => onNavigate("/settings/privacy")}>{locale === "it" ? "Centro privacy" : "Privacy centre"}</button><button type="button" onClick={() => onNavigate("/legal/privacy")}>Privacy</button><button type="button" onClick={() => onNavigate("/legal/cookies")}>Cookie</button><button type="button" onClick={() => onNavigate("/legal/terms")}>{locale === "it" ? "Termini" : "Terms"}</button><button type="button" onClick={() => onNavigate("/legal/accessibility")}>{locale === "it" ? "Accessibilità" : "Accessibility"}</button></nav></footer>
     </div>
     <nav className="mobile-bottom-nav" aria-label={t("navWorkspace")} inert={mobileMenu}>
       {[

@@ -15,6 +15,7 @@ const SettingsPage = lazy(() => import("../features/SettingsPage").then((module)
 const HelpCenterPage = lazy(() => import("../features/HelpCenterPage").then((module) => ({ default: module.HelpCenterPage })));
 const DataTransferPage = lazy(() => import("../features/DataTransferPage").then((module) => ({ default: module.DataTransferPage })));
 const PublicAnimalPage = lazy(() => import("../features/PublicAnimalPage").then((module) => ({ default: module.PublicAnimalPage })));
+const LegalPage = lazy(() => import("../features/LegalPage").then((module) => ({ default: module.LegalPage })));
 import type { DisplayPreferences, Locale, WeightUnit, TemperatureUnit, DateFormat } from "../lib/domain";
 import { setDisplayPreferences as applyDisplayPreferences } from "../lib/domain";
 import { browserLocale, translate } from "../lib/i18n";
@@ -32,7 +33,8 @@ function routeOnly(path: string): string {
   return path.split("?")[0] || "/";
 }
 function isPublicPath(path: string): boolean {
-  return routeOnly(path).startsWith("/public/animals/");
+  const route = routeOnly(path);
+  return route.startsWith("/public/animals/") || ["/legal/privacy", "/legal/cookies", "/legal/terms", "/legal/accessibility"].includes(route);
 }
 function authMode(path: string): "login" | "register" | "forgot" | "reset" | "verify" | "resend" | null {
   const route = routeOnly(path);
@@ -214,7 +216,9 @@ export function App() {
   }
 
   if (isPublic) {
-    const slug = routeOnly(path).split("/").filter(Boolean).at(-1) ?? "";
+    const route = routeOnly(path);
+    if (route.startsWith("/legal/")) return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><LegalPage path={route} locale={locale} navigate={navigate} /></Suspense>;
+    const slug = route.split("/").filter(Boolean).at(-1) ?? "";
     return <Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><PublicAnimalPage slug={slug} locale={locale} /></Suspense>;
   }
 

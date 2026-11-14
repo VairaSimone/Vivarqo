@@ -1,44 +1,31 @@
-# Informativa cookie e altri strumenti di tracciamento — Snakebee (bozza)
+# Informativa cookie e strumenti analoghi — SnakeBee (bozza operativa)
 
-> **BOZZA INTERNA — NON PUBBLICARE PRIMA DI UN CONTROLLO TECNICO DELLA VERSIONE DISTRIBUITA.** Il contenuto del repository non dimostra quali cookie o script siano effettivamente caricati in produzione.
+> **BOZZA — NON PUBBLICARE PRIMA DELL'AUDIT DELLA BUILD E DEL DOMINIO DI PRODUZIONE.** Il repository non prova quali strumenti vengano effettivamente caricati in produzione.
 
-**Titolare:** [RAGIONE SOCIALE / NOME] — **Contatto:** [EMAIL PRIVACY] — **Versione:** [DATA]
+**Titolare:** [DATI] — **Contatto:** [EMAIL PRIVACY] — **Versione:** 0.2 / 14 novembre 2026.
 
-## 1. Ambito
+## Ambito e rilievi
 
-Questa informativa descrive cookie e tecnologie analoghe usati dal sito e dall'applicazione Snakebee, compresi strumenti di tracciamento attivi/passivi, SDK, tag, risorse di terze parti, CDN e componenti aggiunti dall'infrastruttura.
+L'informativa deve coprire cookie, local/session storage, SDK, pixel, tag, identificatori, richieste di rete e strumenti inseriti da CDN, hosting, monitoraggio o terze parti. La classificazione dipende da funzione e finalità effettive, non dal nome o dalla durata.
 
-La classificazione dipende dalle finalità e dal funzionamento effettivo dello strumento, non soltanto dal nome o dalla durata.
+Nel codice sono presenti funzioni di autenticazione e CSRF che possono usare cookie tecnici. Non è stato individuato un SDK esplicito analytics/advertising nel repository esaminato; ciò non esclude strumenti aggiunti in produzione o dall'infrastruttura.
 
-## 2. Rilievi preliminari sul codice
+## Strumenti necessari
 
-Nel repository sono presenti funzioni di autenticazione e protezione CSRF che possono utilizzare cookie tecnici. Nel repository esaminato non è stato individuato un SDK esplicito di analytics o advertising; questo rilievo non sostituisce un'ispezione della build distribuita e delle richieste di rete del dominio pubblico.
+Inventariare nome, dominio, durata, finalità, parte prima/terza e motivo di necessità per sessione, CSRF, preferenze e service worker/storage. Non classificare automaticamente come tecnico uno strumento solo perché proprietario.
 
-Prima della pubblicazione verificare cookie e storage in una nuova sessione browser, richieste di rete prima/dopo autenticazione, script da CDN/tag manager/monitoraggio/widget e risorse aggiunte da hosting o servizi esterni.
+## Strumenti non necessari
 
-## 3. Strumenti strettamente necessari
+Se analytics, advertising, profilazione o altri strumenti richiedono consenso, bloccarli prima della scelta; fornire rifiuto facile quanto accettazione, scelta granulare ove pertinente e possibilità di modifica/revoca. Non attivare tracker prima del consenso valido. Se sono presenti solo strumenti tecnici, non mostrare un banner ingannevole: fornire l'informativa appropriata.
 
-Gli strumenti strettamente necessari all'autenticazione, alla sicurezza e alla fornitura della funzione esplicitamente richiesta devono essere descritti con nome, finalità, durata e dominio effettivi. Non classificare automaticamente come tecnico uno strumento soltanto perché è proprietario o di prima parte.
+## Inventario da completare
 
-## 4. Analytics, marketing e strumenti non necessari
-
-Qualora siano attivati analytics, advertising, profilazione o altri strumenti non strettamente necessari, il titolare deve valutarne la base giuridica e applicare le regole di consenso e informativa pertinenti. Gli strumenti che richiedono consenso non devono essere attivati prima di una scelta valida. Il rifiuto deve essere agevole quanto l'accettazione; deve essere possibile modificare o revocare la scelta.
-
-Non dichiarare l'assenza di cookie di profilazione o di terze parti finché il controllo tecnico della versione pubblica non sia stato eseguito.
-
-## 5. Inventario da completare
-
-| Nome/fornitore | Dominio | Finalità e categoria | Durata | Prima/terza parte | Consenso/base |
+| Nome/fornitore | Dominio | Finalità/categoria | Durata | Parte | Base/consenso |
 |---|---|---|---|---|---|
-| [Cookie di sessione] | [DOMINIO] | [AUTENTICAZIONE] | [DURATA] | [PARTE] | [NECESSITÀ TECNICA] |
-| [Cookie CSRF] | [DOMINIO] | [PROTEZIONE RICHIESTE] | [DURATA] | [PARTE] | [NECESSITÀ TECNICA] |
-| [Cookie o SDK analytics] | [DOMINIO] | [ANALISI] | [DURATA] | [PARTE] | [BASE/CONSENSO] |
-| [Altri strumenti rilevati] | [DOMINIO] | [FINALITÀ] | [DURATA] | [PARTE] | [BASE/CONSENSO] |
+| Cookie sessione | [..] | Autenticazione | [..] | [..] | Necessità tecnica da verificare |
+| Cookie/token CSRF | [..] | Sicurezza | [..] | [..] | Necessità tecnica da verificare |
+| Analytics/marketing | [se presenti] | [..] | [..] | [..] | [consenso/base] |
 
-## 6. Banner e preferenze
+Prima del rilascio: browser pulito, prima/dopo login, desktop/mobile, network waterfall, cookie e storage, script CDN/tag manager, error tracking, widget, richieste server-side. Registrare evidenze e data audit. Se cambiano gli strumenti, aggiornare inventario e interfaccia di consenso.
 
-**[DESCRIVERE BANNER, SCELTE DISPONIBILI, RIFIUTO, GRANULARITÀ, MEMORIZZAZIONE DELLA SCELTA E LINK PER MODIFICARLA/REVOCARE. Se non sono usati strumenti che richiedono consenso, dichiarare solo quanto verificato.]**
-
-## 7. Contatti e riferimento
-
-Per richieste: **[EMAIL PRIVACY]**. Coordinare il testo con l'informativa privacy e verificare l'art. 122 del Codice Privacy, la direttiva ePrivacy e le [Linee guida cookie del Garante del 10 giugno 2021](https://www.garanteprivacy.it/web/guest/home/docweb/-/docweb-display/docweb/9677876).
+Riferimenti: art. 122 Codice Privacy, direttiva ePrivacy e Linee guida cookie del Garante 10 giugno 2021.

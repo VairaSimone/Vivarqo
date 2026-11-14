@@ -1,35 +1,37 @@
-# Checklist per il rilascio dei documenti legali e privacy
+# Checklist rilascio privacy e conformità — SnakeBee
 
-> Le informative sono bozze: non pubblicarle finché i punti obbligatori non sono verificati e approvati.
+> Non considerare questa checklist superata perché le pagine sono state implementate: la pubblicazione definitiva richiede evidenze tecniche e approvazione del titolare/professionista.
 
-## Dati che solo il gestore può fornire
+## Identità e documenti
+- [ ] Inserire ragione sociale/nome, sede, CF/P.IVA, email, PEC e contatto privacy.
+- [ ] Verificare DPO/RPD, età minima, paesi serviti e lingue.
+- [ ] Approvare finalità, basi giuridiche, categorie, destinatari e trasferimenti.
+- [ ] Completare retention per account, log, file, backup, contabilità e notifiche.
+- [ ] Approvare privacy notice, cookie notice, termini, condizioni abbonamento e accessibilità.
 
-- [ ] Ragione sociale/nome e cognome del titolare, sede, C.F./P.IVA, email e PEC.
-- [ ] Decisione sull'eventuale nomina di un DPO/RPD e relativi contatti.
-- [ ] Età minima, paesi/mercati serviti e lingue delle informative.
-- [ ] Provider reali e relative entità legali: hosting, database, storage, backup, email, Stripe, CDN, monitoraggio e supporto.
-- [ ] Regioni effettive, accessi del personale/subfornitori e trasferimenti fuori dallo SEE.
-- [ ] DPA, sub-responsabili, SCC/garanzie e verifiche dei provider.
-- [ ] Finalità e basi giuridiche approvate per account, sicurezza, email, push, pagamenti e assistenza.
-- [ ] Retention per account attivi/cancellati, tombstone, file eliminati, log, audit, notifiche, backup e contabilità.
-- [ ] Piani, prezzi, IVA, trial, rinnovi, disdetta, recesso, rimborsi e flusso di cancellazione.
-- [ ] Canale per diritti degli interessati, reclami e data breach.
-- [ ] Valutazione DSA per la condivisione pubblica e delle eventuali procedure di segnalazione/gestione contenuti.
+## Frontend e prodotto
+- [x] Collegamenti pubblici a privacy, cookie e termini in registrazione.
+- [x] Accettazione esplicita dei termini in registrazione (non consenso privacy generico).
+- [x] Centro privacy con accesso a export, correzione account e cancellazione account.
+- [ ] Tradurre e revisionare integralmente tutti i documenti per ogni lingua servita.
+- [ ] Verificare versionamento e prova tecnica dell'accettazione dei termini lato server.
 
-## Verifiche tecniche
+## Cookie e tracciamento
+- [ ] Audit su dominio/build reali: cookie, storage, richieste, CDN, analytics, error tracking e widget.
+- [ ] Se tracker non essenziali: CMP, blocco preventivo, rifiuto/accettazione equivalenti, granularità e revoca.
+- [ ] Verificare che nessun tracker parta prima del consenso e testare revoca.
 
-- [ ] Inventario cookie e richieste di rete su produzione, browser pulito e dispositivi mobili.
-- [ ] Verifica analytics, tag manager, advertising, monitoraggio e widget caricati fuori dal repository.
-- [ ] Se necessari, blocco preventivo degli strumenti che richiedono consenso, rifiuto, granularità e revoca.
-- [ ] Verifica dell'effettiva cancellazione account, documenti, oggetti storage, riferimenti Stripe e copie residue nei backup.
-- [ ] Verifica cifratura database/storage/backup, secret manager e accessi amministrativi.
-- [ ] Approvazione della matrice finalità/basi giuridiche e del piano di conservazione.
-- [ ] Verifica che i termini descrivano esattamente il comportamento del checkout e delle schermate.
+## Backend e organizzazione
+- [ ] Verificare cancellazione/cascade su DB, object storage, provider, backup e link pubblici.
+- [ ] Implementare/validare flusso richieste GDPR, identity check, SLA e audit log minimizzato.
+- [ ] Verificare DPA art. 28, sub-responsabili, regioni, SCC e misure supplementari.
+- [ ] Approvare retention e job automatici di cancellazione/anonimizzazione.
+- [ ] Registro trattamenti ove dovuto, DPIA se necessaria, incident response e data breach (72h quando dovuto).
+- [ ] Valutare DSA per pagine pubbliche, Consumer Code, servizi digitali, fiscalità e EAA/WCAG.
+- [ ] Pen test, access control, CSRF, backup restore, log minimization e incident tabletop.
 
-## Approvazione e pubblicazione
-
-- [ ] Revisione da parte di un professionista privacy/legale competente.
-- [ ] Approvazione documentata del titolare.
-- [ ] Versione, data di efficacia e URL stabili.
-- [ ] Link visibili in registrazione, impostazioni, checkout e footer, ove pertinente.
-- [ ] Processo per aggiornare i testi quando cambiano finalità, provider, prezzi o funzioni.
+## Rilascio
+- [ ] Nessun placeholder [..] nei documenti pubblici.
+- [ ] Checkout, prezzi, IVA, rinnovo, recesso e disdetta coerenti con condizioni.
+- [ ] Revisione legale e privacy professionale documentata.
+- [ ] Test E2E accessibilità, lingua, navigazione mobile e flussi diritti.

@@ -17,6 +17,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const token = new URLSearchParams(window.location.search).get("token") ?? "";
 
   async function submit(event: FormEvent) {
@@ -29,6 +30,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
         return;
       }
       if (mode === "register") {
+        if (!acceptedTerms) throw new Error(locale === "it" ? "Devi accettare i Termini e condizioni per creare l’account." : "You must accept the Terms to create an account.");
         await api.post("/auth/register", { displayName, email, password, locale });
         setNotice(t("registrationSent"));
       } else if (mode === "forgot") {
@@ -99,6 +101,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
           {mode === "register" && <Field label={t("displayName")}><Input required autoComplete="name" maxLength={120} value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></Field>}
           {needsEmail && <Field label={t("email")}><Input required type="email" autoComplete="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>}
           {needsPassword && <Field label={t("password")} hint={mode !== "login" ? t("passwordPolicy") : undefined}><Input required type="password" minLength={mode === "login" ? 1 : 12} maxLength={128} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>}
+          {mode === "register" && <label className="legal-acceptance"><input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} required /><span>{locale === "it" ? <>Dichiaro di aver letto e accetto i <a href="/legal/terms" target="_blank" rel="noreferrer">Termini e condizioni</a>. Ho preso visione dell’<a href="/legal/privacy" target="_blank" rel="noreferrer">Informativa privacy</a>.</> : <>I have read and accept the <a href="/legal/terms" target="_blank" rel="noreferrer">Terms and conditions</a>. I acknowledge the <a href="/legal/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</>}</span></label> }
           {(mode === "reset" || mode === "verify") && !token && <Alert tone="danger">{mode === "reset" ? t("invalidResetLink") : t("invalidVerificationLink")}</Alert>}
           <Button type="submit" size="lg" disabled={busy || ((mode === "reset" || mode === "verify") && !token)}>
             {busy ? t("loading") : mode === "login" ? t("signIn") : mode === "register" ? t("createAccount") : mode === "forgot" ? t("sendLink") : mode === "resend" ? t("resendVerification") : mode === "reset" ? t("resetPassword") : t("verifyEmail")}
@@ -112,7 +115,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
           {mode === "login" && <button type="button" onClick={() => navigate("/register")}>{t("noAccount")} · {t("createAccount")}</button>}
         </div>
       </div>
-      <div className="auth-legal">SnakeBee · {new Date().getFullYear()}</div>
+      <div className="auth-legal"><span>SnakeBee · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><a href="/legal/privacy">{locale === "it" ? "Privacy" : "Privacy"}</a><a href="/legal/cookies">{locale === "it" ? "Cookie" : "Cookies"}</a><a href="/legal/terms">{locale === "it" ? "Termini" : "Terms"}</a></nav></div>
     </div>
   </div>;
 }

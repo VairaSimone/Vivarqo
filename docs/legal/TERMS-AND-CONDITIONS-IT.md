@@ -1,75 +1,37 @@
-# Termini e condizioni del servizio Snakebee — bozza
+# Termini e condizioni SnakeBee (bozza operativa)
 
-> **BOZZA INTERNA — NON PUBBLICARE SENZA COMPILAZIONE E REVISIONE PROFESSIONALE.** I segnaposto devono essere sostituiti con condizioni realmente applicate. Questo documento non costituisce consulenza legale.
+> **BOZZA — NON PUBBLICARE SENZA COMPLETAMENTO E REVISIONE LEGALE.** Le condizioni devono corrispondere a checkout, Stripe, piani e comportamento reale del servizio.
 
-**Versione:** [NUMERO] — **Data:** [DATA] — **Entrata in vigore:** [DATA]
+**Versione:** 0.2 — **Data:** 14 novembre 2026.
 
-## 1. Gestore
+## 1. Gestore e servizio
 
-Il servizio Snakebee è gestito da **[RAGIONE SOCIALE / NOME E COGNOME]**, con sede in **[INDIRIZZO]**, C.F./P.IVA **[DATI]**, email **[EMAIL]**, PEC **[PEC, SE APPLICABILE]** (il “Gestore”).
+Gestore: [RAGIONE SOCIALE/NOME], sede [INDIRIZZO], C.F./P.IVA [DATI], email [EMAIL], PEC [PEC]. SnakeBee è un software gestionale per schede animali, cura, attività, riproduzione, documenti, inventario, dati economici, notifiche ed esportazioni.
 
-## 2. Oggetto del servizio
+Non è consulenza veterinaria, diagnosi, prescrizione, certificazione genealogica né registro fiscale. L'utente resta responsabile delle decisioni e degli obblighi relativi agli animali e alla propria attività.
 
-Snakebee mette a disposizione strumenti software per organizzare schede animali, registri di cura, attività, riproduzioni, documenti, inventario, informazioni economiche gestionali, notifiche ed esportazioni. Funzionalità e limiti dipendono dal piano e dalla versione.
+## 2. Account e uso
 
-Snakebee è uno strumento organizzativo: non costituisce parere veterinario, diagnosi o prescrizione sanitaria, certificazione genealogica, registro fiscale o servizio di consulenza legale/contabile. L'utente resta responsabile delle decisioni relative agli animali e delle verifiche professionali e normative necessarie.
+L'utente fornisce informazioni accurate, protegge credenziali e dispositivi, usa il servizio legalmente e carica solo dati che può trattare. Vietati malware, accessi non autorizzati e violazioni di diritti altrui. Sospensioni e limitazioni devono essere proporzionate, motivate e rispettare diritti inderogabili.
 
-## 3. Account e credenziali
+## 3. Contenuti e condivisioni
 
-L'utente deve fornire informazioni accurate, mantenere riservate le credenziali, proteggere i dispositivi e segnalare tempestivamente accessi non autorizzati tramite **[CONTATTO DI SICUREZZA]**. Il Gestore può applicare misure di sicurezza, limitazioni o sospensioni proporzionate in caso di abuso, rischio o obblighi di legge, rispettando i diritti inderogabili dell'utente.
+I documenti sono privati salvo condivisione esplicita. Le schede pubbliche mostrano i campi selezionati; link e contenuti possono essere copiati, inoltrati o salvati. Revocare il link lo disabilita sul servizio ma non rimuove copie esterne.
 
-## 4. Uso consentito e contenuti
+## 4. Piani e pagamenti — da completare
 
-L'utente si impegna a usare il servizio nel rispetto della legge e dei diritti di terzi, inserire solo dati che è autorizzato a trattare, non caricare malware o contenuti illeciti, verificare dati ed esportazioni e conservare copie autonome dei dati importanti. Resta responsabile della detenzione, del benessere, della gestione degli animali e della conformità normativa delle attività di allevamento.
+[INSERIRE TABELLA PIANI, FUNZIONI/LIMITI, PREZZI FINALI IVA INCLUSA/ESCLUSA, PERIODICITÀ, TRIAL, RINNOVO, DATA ADDEBITO, PROVIDER/ENTITÀ CONTRATTUALE, FATTURE E IMPOSTE]. Descrivere pagamenti falliti, sospensione, upgrade/downgrade, disdetta e data di efficacia. Non pubblicare finché condizioni e checkout non coincidono.
 
-## 5. Documenti e condivisioni pubbliche
+## 5. Recesso, cessazione e rimborsi
 
-I documenti sono privati salvo attivazione esplicita di una funzione di condivisione. Una pagina pubblica rende accessibili i soli campi selezionati dall'utente. Un URL pubblico può essere copiato, inoltrato, indicizzato o salvato da terzi; la revoca disabilita la pagina sul servizio ma non garantisce la cancellazione di copie o screenshot già raccolti.
+[DESCRIVERE DIRITTO DI RECESSO CONSUMATORI, EVENTUALI ECCEZIONI, RICHIESTE ESPRESSE/CONSENSI RICHIESTI DALLA LEGGE, RIMBORSI, RECLAMI E PROCEDURA DI CESSAZIONE]. Nessuna clausola limita diritti inderogabili.
 
-## 6. Piani, prezzi, prova e pagamenti
+## 6. Disponibilità, dati e cancellazione
 
-**[INSERIRE TABELLA DEI PIANI, FUNZIONI, LIMITI, PREZZI FINALI, IVA, PERIODICITÀ, DURATA E CONDIZIONI DI EVENTUALI PROVE GRATUITE.]**
+Manutenzioni e disponibilità [DESCRIVERE SOLO IMPEGNI REALI]. L'utente mantiene i diritti sui contenuti caricati; il gestore li tratta per fornire il servizio. Esportazione e cancellazione account sono disponibili nelle funzioni dell'app; indicare tempi, effetti su abbonamento, file, link pubblici, backup e dati conservati per obbligo legale [DA COMPLETARE].
 
-Il pagamento è gestito tramite **[ENTITÀ STRIPE CONTRATTUALE E PROVIDER EFFETTIVAMENTE CONFIGURATO]**. Il Gestore riceve identificativi e stato dell'abbonamento, ma non il numero completo della carta.
+## 7. Responsabilità e controversie
 
-Descrivere in modo coerente con la configurazione effettiva: rinnovo e data di addebito; durata; modifica piano; prezzi/imposte e variazioni; pagamenti falliti; sospensione/riattivazione; disdetta e data di efficacia; fatture/ricevute e soggetto emittente.
+Il gestore risponde secondo la normativa inderogabile, inclusa la disciplina consumer e dei servizi digitali. Non escludere responsabilità non escludibili per legge. Legge e foro [DEFINIRE dopo verifica sede/mercati/qualifica utente], senza pregiudicare tutele dei consumatori.
 
-**[NON PUBBLICARE FINCHÉ QUESTI PUNTI NON CORRISPONDONO ALLA CONFIGURAZIONE STRIPE, ALLE SCHERMATE CHECKOUT E ALLA LOGICA DI ACCESSO DEL BACKEND.]**
-
-## 7. Recesso, cessazione, rimborsi e reclami
-
-**[DESCRIVERE I DIRITTI APPLICABILI A CONSUMATORI E PROFESSIONISTI, IL DIRITTO DI RECESSO E LE EVENTUALI ECCEZIONI LEGALI, GLI EVENTUALI CONSENSI/RICHIESTE ESPRESSE, I RIMBORSI E LE PROCEDURE DI CESSAZIONE.]**
-
-Nessuna disposizione intende escludere o limitare diritti inderogabili riconosciuti dalla normativa applicabile. Reclami e assistenza: **[EMAIL E PROCEDURA]**.
-
-## 8. Disponibilità e manutenzione
-
-Il Gestore può effettuare manutenzioni, aggiornamenti e interventi di sicurezza. Canali di avviso, eventuali livelli di servizio e procedura incidenti: **[DEFINIRE SOLO SE ESISTONO IMPEGNI OPERATIVI MISURABILI]**.
-
-## 9. Proprietà intellettuale e dati
-
-Software, marchio e materiali appartengono al Gestore o ai rispettivi titolari. All'utente è concessa una licenza limitata e non esclusiva per utilizzare il servizio durante il rapporto. I diritti sui dati e contenuti caricati dall'utente restano soggetti alla legge; il Gestore li tratta tecnicamente per fornire le funzioni richieste.
-
-## 10. Esportazione e cancellazione
-
-L'utente può utilizzare le funzioni di esportazione e richiedere la cancellazione dell'account secondo la procedura disponibile. Prima della cancellazione è opportuno scaricare i dati da conservare.
-
-**[INDICARE TEMPI DI ELABORAZIONE, EFFETTI SULL'ABBONAMENTO, CONDIVISIONI PUBBLICHE, FILE, BACKUP E DATI DA CONSERVARE PER OBBLIGO DI LEGGE.]**
-
-## 11. Garanzie e responsabilità
-
-Il Gestore risponde secondo la normativa inderogabile applicabile, inclusa la disciplina dei contratti con consumatori e dei servizi/contenuti digitali. Nessuna clausola esclude responsabilità che non possono essere escluse per legge. Eventuali limitazioni devono essere specifiche, proporzionate e revisionate da un legale.
-
-## 12. Legge applicabile e controversie
-
-**[INDICARE LEGGE E FORO SOLO DOPO AVER VERIFICATO SEDE DEL GESTORE, PAESI SERVITI E QUALIFICA DELL'UTENTE; NON PREGIUDICARE LE TUTELE INDEROGABILI DEL CONSUMATORE.]**
-
-## 13. Modifiche e contatti
-
-Versione aggiornata: **[URL STABILE]**. Contatti: **[RAGIONE SOCIALE, INDIRIZZO, EMAIL SUPPORTO, PEC]**.
-
-## Riferimenti da sottoporre a revisione
-
-- [Direttiva (UE) 2019/770 sui contenuti e servizi digitali](https://eur-lex.europa.eu/eli/dir/2019/770/oj?locale=it).
-- [Direttiva 2011/83/UE sui diritti dei consumatori](https://eur-lex.europa.eu/eli/dir/2011/83/oj?locale=it).
-- [Regolamento (UE) 2022/2065 — Digital Services Act](https://eur-lex.europa.eu/eli/reg/2022/2065/oj?locale=it), da valutare in relazione alle funzioni di condivisione pubblica.
+Riferimenti da verificare: direttiva 2011/83/UE, direttiva (UE) 2019/770, Codice del Consumo, DSA ove applicabile.
