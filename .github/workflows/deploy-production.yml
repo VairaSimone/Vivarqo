@@ -94,7 +94,9 @@ jobs:
           # Build before touching the running services. Migrations run as a
           # separate one-shot service and must succeed before the API is started.
           "${compose[@]}" build api web worker migrate
-          "${compose[@]}" run --rm migrate
+          # Recreate the one-shot migration service explicitly. A non-zero
+          # migration exit stops this workflow before the app services change.
+          "${compose[@]}" up -d --no-build --force-recreate migrate
           "${compose[@]}" up -d --no-build --remove-orphans
 
           for attempt in $(seq 1 30); do
