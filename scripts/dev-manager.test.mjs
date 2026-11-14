@@ -161,7 +161,7 @@ test("classifica i problemi di binding Docker e i build script bloccati", () => 
 
 test("estrae lo stderr Docker invece dell'involucro generico del comando fallito", () => {
   const output = [
-    "Error: docker compose -f backend\infra\docker\compose.yaml up -d postgres exit 1:",
+    "Error: docker compose -f backend\\infra\\docker\\compose.yaml up -d postgres exit 1:",
     "failed to pull image 'postgres:18': failed to resolve reference",
     "    at ChildProcess.<anonymous> (scripts/dev-manager.mjs:80:16)",
     "ELIFECYCLE Command failed with exit code 1"
