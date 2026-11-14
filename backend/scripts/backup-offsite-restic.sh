@@ -7,7 +7,7 @@ set -Eeuo pipefail
 : "${RESTIC_PASSWORD_FILE:?Set RESTIC_PASSWORD_FILE to a protected password file}"
 : "${VIVARQO_BACKUP_DIR:?Set VIVARQO_BACKUP_DIR to the local PostgreSQL dump mount}"
 
-for command in restic find; do
+for command in restic find sha256sum; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Required command not found: $command" >&2
     exit 127
@@ -22,10 +22,18 @@ done
   echo "Local PostgreSQL backup directory does not exist" >&2
   exit 2
 }
-find "$VIVARQO_BACKUP_DIR" -maxdepth 1 -type f -name 'vivarqo-*.dump' -print -quit | grep -q . || {
-  echo "No verified PostgreSQL dump found; refusing an empty backup" >&2
+mapfile -d '' archives < <(find "$VIVARQO_BACKUP_DIR" -maxdepth 1 -type f -name 'vivarqo-*.dump' -print0)
+(("${#archives[@]}" > 0)) || {
+  echo "No PostgreSQL dump found; refusing an empty backup" >&2
   exit 3
 }
+for archive in "${archives[@]}"; do
+  [[ -s "${archive}.sha256" ]] || {
+    echo "Missing checksum sidecar for $archive" >&2
+    exit 3
+  }
+  (cd "$(dirname "$archive")" && sha256sum --check "$(basename "$archive").sha256")
+done
 
 export RESTIC_PASSWORD_FILE
 restic snapshots >/dev/null 2>&1 || {
