@@ -11,7 +11,9 @@ export interface BillingPolicy {
   freeMaxAnimals: number;
   freeMaxDocuments: number;
   freeMaxStorageBytes: number;
+  expectedPriceIds?: readonly string[];
   expectedPriceId?: string;
+  annualPriceId?: string;
 }
 export type QuotaResource = "animals" | "documents" | "storage";
 export interface PlanLimitDetails {
@@ -37,7 +39,10 @@ export function resolveBillingEntitlements(
   const status = subscription?.status ?? null;
   const periodEnd = subscription?.currentPeriodEnd ?? null;
   // Fail closed: without a configured paid price there is no valid paid entitlement.
-  const priceMatches = Boolean(policy.expectedPriceId) && subscription?.stripePriceId === policy.expectedPriceId;
+  const priceMatches = Boolean(subscription?.stripePriceId) && (
+    Boolean(policy.expectedPriceIds?.includes(subscription!.stripePriceId!)) ||
+    Boolean(policy.expectedPriceId && subscription?.stripePriceId === policy.expectedPriceId)
+  );
   let paidSubscription = false;
   let gracePeriodEndsAt: Date | null = null;
   if (subscription && priceMatches) {
@@ -54,6 +59,8 @@ export function resolveBillingEntitlements(
   const limit = (value: number): number | null => value > 0 ? value : null;
   return {
     plan: paidSubscription ? "paid" as const : "free" as const,
+    billingInterval: paidSubscription && subscription?.stripePriceId === policy.annualPriceId ? "annual" as const
+      : paidSubscription ? "monthly" as const : null,
     paidSubscription,
     accessMode: policy.accessMode,
     accessAllowed: policy.accessMode === "unrestricted" || paidSubscription,
