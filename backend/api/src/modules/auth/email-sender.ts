@@ -17,41 +17,72 @@ export class EmailDeliveryError extends Error {
   }
 }
 
-export function createResendEmailSender(): EmailSender {
+interface ProviderConfig {
+  apiKey?: string;
+  from?: string;
+}
+
+async function postTransactionalEmail(
+  url: string,
+  headers: Record<string, string>,
+  body: Record<string, unknown>,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+      redirect: "error",
+    });
+  } catch {
+    throw new EmailDeliveryError();
+  }
+
+  await response.body?.cancel().catch(() => undefined);
+  if (!response.ok) throw new EmailDeliveryError();
+}
+
+export function createBrevoEmailSender(config: ProviderConfig = {
+  apiKey: env.BREVO_API_KEY,
+  from: env.EMAIL_FROM,
+}): EmailSender {
   return {
     async send(message) {
-      if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-        throw new EmailDeliveryError();
-      }
-
-      let response: Response;
-      try {
-        response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: env.EMAIL_FROM,
-            to: [message.to],
-            subject: message.subject,
-            html: message.html,
-          }),
-          signal: AbortSignal.timeout(10_000),
-          redirect: "error",
-        });
-      } catch {
-        throw new EmailDeliveryError();
-      }
-
-      // The provider body is not used, so release it in both success and
-      // failure cases instead of retaining a connection while handling auth.
-      await response.body?.cancel().catch(() => undefined);
-      if (!response.ok) {
-        // Provider response bodies are deliberately not logged or returned.
-        throw new EmailDeliveryError();
-      }
+      if (!config.apiKey || !config.from) throw new EmailDeliveryError();
+      await postTransactionalEmail(
+        "https://api.brevo.com/v3/smtp/email",
+        { "api-key": config.apiKey, accept: "application/json" },
+        {
+          sender: { email: config.from },
+          to: [{ email: message.to }],
+          subject: message.subject,
+          htmlContent: message.html,
+        },
+      );
     },
   };
+}
+
+export function createResendEmailSender(config: ProviderConfig = {
+  apiKey: env.RESEND_API_KEY,
+  from: env.EMAIL_FROM,
+}): EmailSender {
+  return {
+    async send(message) {
+      if (!config.apiKey || !config.from) throw new EmailDeliveryError();
+      await postTransactionalEmail(
+        "https://api.resend.com/emails",
+        { Authorization: `Bearer ${config.apiKey}` },
+        { from: config.from, to: [message.to], subject: message.subject, html: message.html },
+      );
+    },
+  };
+}
+
+export function createConfiguredEmailSender(): EmailSender {
+  return env.EMAIL_PROVIDER === "brevo"
+    ? createBrevoEmailSender()
+    : createResendEmailSender();
 }
