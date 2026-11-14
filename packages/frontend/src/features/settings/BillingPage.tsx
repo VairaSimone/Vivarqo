@@ -39,7 +39,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
   const rawStatus = getString(subscription, "status", "none");
   const status = subscription?.cancelAtPeriodEnd ? "pending_cancellation" : rawStatus;
   const periodEnd = getString(subscription, "currentPeriodEnd");
-  const paid = Boolean(entitlements?.paidSubscription);
+  const hasActiveSubscription = rawStatus === "active" || rawStatus === "trialing";
   const labels: Record<string, string> = {
     active: locale === "it" ? "Attivo" : "Active",
     trialing: locale === "it" ? "Prova" : "Trial",
@@ -75,7 +75,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
           <span className="eyebrow">Premium</span>
           <h2>4,99 € <small>/ {locale === "it" ? "mese" : "month"}</small></h2>
           <p>{locale === "it" ? "Animali, documenti e spazio di archiviazione illimitati." : "Unlimited animals, documents and storage."}</p>
-          <Button onClick={() => void redirect("checkout", "monthly")} disabled={busy || !resource.data?.configured || !resource.data?.plans?.monthly || paid}>
+          <Button onClick={() => void redirect("checkout", "monthly")} disabled={busy || !resource.data?.configured || !resource.data?.plans?.monthly || hasActiveSubscription}>
             {locale === "it" ? "Scegli mensile" : "Choose monthly"}
           </Button>
         </div>
