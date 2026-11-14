@@ -17,6 +17,8 @@ Con Caddy → Nginx → Express impostare `TRUST_PROXY_HOPS=2`. Se cambia la cat
 
 ## File di configurazione e segreti
 
+L’invio email transazionali usa Brevo tramite API HTTPS (`EMAIL_PROVIDER=brevo`, predefinito nel Compose production). Creare una API key in Brevo e salvarla nel file `brevo_api_key` dentro la directory segreti; il mittente `EMAIL_FROM` deve essere verificato in Brevo e il dominio deve avere SPF/DKIM configurati. Non usare la password SMTP al posto della API key.
+
 `.env.production.example` e `.env.staging.example` contengono soltanto configurazione non segreta. Copiare il file giusto nel root del repository con nome `.env.production` oppure `.env.staging`, proteggerlo con `chmod 600` e non committarlo.
 
 Generare i segreti iniziali:
@@ -29,14 +31,14 @@ sudo backend/scripts/init-production-secrets.sh /etc/vivarqo/staging/secrets
 Ogni directory deve rimanere root-owned e mode `0700`. I file sono mode `0444` perché i file-backed secrets di Docker Compose montano i file host senza rimappare uid/gid: così li leggono soltanto i container a cui sono esplicitamente montati. La directory host non è attraversabile da utenti non privilegiati. Non mettere questi file in backup non cifrati o nel repository.
 
 Oltre ai quattro file generati, provisionare tramite secret manager:
-- `resend_api_key`
+- `brevo_api_key` (API key Brevo; non la SMTP key)
 - `stripe_secret_key` (`sk_live_...` in produzione, `sk_test_...` in staging)
 - `stripe_webhook_secret`
 - `vapid_private_key`
 - `s3_access_key_id`
 - `s3_secret_access_key`
 
-La chiave VAPID pubblica, il Price ID e le configurazioni dei provider non segrete restano nei rispettivi file environment. Le chiavi, i bucket, gli account Stripe e le directory secret di staging e produzione devono essere distinti.
+La chiave VAPID pubblica, il Price ID, `EMAIL_PROVIDER=brevo` e le configurazioni dei provider non segrete restano nei rispettivi file environment. Le chiavi, i bucket, gli account Stripe e le directory secret di staging e produzione devono essere distinti.
 
 Il loader applicativo supporta `VARIABLE_FILE`; legge i file a runtime e non inserisce i percorsi *_FILE o i valori dei segreti nell'ambiente del processo. Sia staging sia produzione esigono HTTPS, email, Stripe, VAPID e storage S3 reali; staging rifiuta chiavi Stripe Live e richiede Test Mode, mentre produzione richiede Live Mode. Il container Caddy riceve soltanto dominio pubblico ed email ACME, non l'intera configurazione applicativa. La password DB viene usata per costruire la URL PostgreSQL in memoria. Le chiavi Stripe Test Mode sono rifiutate quando `VIVARQO_NODE_ENV=production`.
 
