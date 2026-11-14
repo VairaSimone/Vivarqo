@@ -11,7 +11,7 @@ import { startDataJobsWorker } from "./modules/domain/data-jobs-worker.js";
 
 const workerId = randomUUID();
 const heartbeatKey = createHash("sha256").update(workerId).digest("hex");
-const HEARTBEAT_INTERVAL_MS = 10_000;
+const HEARTBEAT_INTERVAL_MS = env.WORKER_HEARTBEAT_INTERVAL_MS;
 const HEARTBEAT_TTL_MS = 45_000;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let stopNotificationWorker: () => void = () => undefined;
