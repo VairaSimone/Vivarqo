@@ -48,6 +48,7 @@ export interface BillingSubscriptionDto {
 
 export interface BillingEntitlementsDto {
   plan: BillingPlan;
+  billingInterval?: "monthly" | "annual" | null;
   paidSubscription: boolean;
   accessMode: BillingAccessMode;
   accessAllowed: boolean;
