@@ -104,7 +104,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
         <span className="onboarding-checklist-icon"><Icon name={item.icon} size={18} /></span>
         <div className="onboarding-checklist-copy"><strong>{english ? item.title.en : item.title.it}</strong><p>{english ? item.body.en : item.body.it}</p></div>
         <Button size="sm" onClick={() => onNavigate(item.path)}>{english ? item.action.en : item.action.it}<Icon name="arrow" size={14} /></Button>
-        <button className="onboarding-suggestion-dismiss" type="button" disabled={dismissing === item.key} onClick={() => void dismiss(item.key)} aria-label={english ? "Dismiss suggestion" : "Nascondi suggerimento"}><Icon name="x" size={16} /></button>
+        <button className="onboarding-suggestion-dismiss" type="button" disabled={dismissing === item.key} onClick={() => void dismiss(item.key)} aria-label={english ? "Dismiss suggestion" : "Nascondi suggerimento"}><Icon name="close" size={16} /></button>
       </article>)}
     </section>}
   </>;
