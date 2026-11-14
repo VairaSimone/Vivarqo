@@ -5,6 +5,7 @@ import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../../lib/
 import type { AccountPreferencesDto, BillingEntitlementsDto, BillingSubscriptionDto, NotificationDto, NotificationPreferencesDto, PushSubscriptionDto, SettingsUserDto } from "@vivarqo/contracts/settings";
 
 import { translate } from "../../lib/i18n";
+import { PlanUsageSummary } from "../../components/PlanUsageSummary";
 import { useResource } from "../../hooks/useResource";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function BillingPage({ locale }: { locale: Locale }) {
@@ -42,6 +43,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
       <div className="billing-actions">{subscription && <Button variant="secondary" onClick={() => void redirect("portal")} disabled={busy}>{t("portal")}</Button>}{status !== "active" && status !== "trialing" && <Button onClick={() => void redirect("checkout")} disabled={busy || !resource.data?.configured}>{t("checkout")}</Button>}</div>
     </div>
     {resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> : !resource.data?.configured ? <p className="muted-note">{t("billingUnavailable")}</p> : null}</Panel>
+    <PlanUsageSummary locale={locale} />
     <Panel><PanelHeader title={locale === "it" ? "Stato del pagamento" : "Payment status"} /><p className="detail-copy">{locale === "it" ? "Lo stato mostrato proviene dal backend, aggiornato dagli eventi Stripe verificati. Vivarqo non raccoglie né memorizza i dati della carta." : "The displayed state comes from the backend and is updated by verified Stripe events. Vivarqo does not collect or store card details."}</p></Panel>
     {toast}
   </div>;
