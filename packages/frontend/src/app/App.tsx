@@ -12,6 +12,7 @@ const ReproductionPage = lazy(() => import("../features/ReproductionPage").then(
 const InventoryDocumentsPage = lazy(() => import("../features/InventoryDocumentsPage").then((module) => ({ default: module.InventoryDocumentsPage })));
 const FinancePage = lazy(() => import("../features/FinancePage").then((module) => ({ default: module.FinancePage })));
 const SettingsPage = lazy(() => import("../features/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const HelpCenterPage = lazy(() => import("../features/HelpCenterPage").then((module) => ({ default: module.HelpCenterPage })));
 const DataTransferPage = lazy(() => import("../features/DataTransferPage").then((module) => ({ default: module.DataTransferPage })));
 const PublicAnimalPage = lazy(() => import("../features/PublicAnimalPage").then((module) => ({ default: module.PublicAnimalPage })));
 import type { DisplayPreferences, Locale, WeightUnit, TemperatureUnit, DateFormat } from "../lib/domain";
@@ -241,6 +242,7 @@ export function App() {
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/finance")) page = <FinancePage locale={locale} />;
+  else if (matches("/help")) page = <HelpCenterPage locale={locale} navigate={navigate} />;
   else if (matches("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (matches("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
   else if (matches("/notifications") || matches("/settings") || matches("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
