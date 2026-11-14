@@ -96,16 +96,31 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     return () => {
       window.removeEventListener("pwa-install-available", readInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
-    };  }, []);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!installHelpOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setInstallHelpOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [installHelpOpen]);
 
   async function installApplication() {
     if (!installPrompt) return;
     const promptEvent = installPrompt;
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
-    setInstallPrompt(null);
-    delete (window as Window & { __deferredPwaInstallPrompt?: BeforeInstallPromptEvent }).__deferredPwaInstallPrompt;
-    if (choice.outcome === "accepted") setAppInstalled(true);
+    try {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice.outcome === "accepted") setAppInstalled(true);
+    } catch {
+      // Keep the manual installation instructions available if the browser prompt fails.
+    } finally {
+      setInstallPrompt(null);
+      delete (window as Window & { __deferredPwaInstallPrompt?: BeforeInstallPromptEvent }).__deferredPwaInstallPrompt;
+    }
   }
   const route = path.split("?")[0] || "/today";
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
@@ -289,7 +304,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     </nav>
     {installHelpOpen && <div className="pwa-install-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setInstallHelpOpen(false); }}>
       <section className="pwa-install-dialog" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
-        <button className="pwa-install-close" type="button" onClick={() => setInstallHelpOpen(false)} aria-label={t("close")}>×</button>
+        <button autoFocus className="pwa-install-close" type="button" onClick={() => setInstallHelpOpen(false)} aria-label={t("close")}>×</button>
         <div className="pwa-install-icon"><Icon name="download" size={25} /></div>
         <p className="pwa-install-eyebrow">{t("pwaInstallEyebrow")}</p>
         <h2 id="pwa-install-title">{appInstalled ? t("pwaInstalledTitle") : t("pwaInstallTitle")}</h2>
@@ -304,7 +319,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
               <h3>{t("pwaAndroidTitle")}</h3>
               <ol><li>{t("pwaAndroidStep1")}</li><li>{t("pwaAndroidStep2")}</li></ol>
               <h3>{t("pwaDesktopTitle")}</h3>
-              <ol><li>{t("pwaDesktopStep1")}</li><li>{t("pwaDesktopStep2")}</li></ol>
+              <ol><li>{t("pwaDesktopStep1")}</li><li>{t("pwaDesktopStep2")}</li><li>{t("pwaDesktopStep3")}</li></ol>
             </>}
           </div>
           <p className="pwa-install-footnote">{t("pwaInstallFootnote")}</p>
