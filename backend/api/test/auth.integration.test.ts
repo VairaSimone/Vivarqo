@@ -43,7 +43,7 @@ describe.skipIf(!integrationEnabled)("Authentication and account integration", (
       .post("/api/v1/auth/register")
       .set("Origin", origin)
       .set("X-CSRF-Token", csrfToken)
-      .send({ displayName: "Integration Breeder", email, password });
+      .send({ displayName: "Integration Breeder", email, password, termsAccepted: true, termsVersion: "2026-11-14" });
     expect(registerResponse.status).toBe(202);
 
     const verificationEmail = [...emails].reverse().find((message) =>
@@ -72,6 +72,8 @@ describe.skipIf(!integrationEnabled)("Authentication and account integration", (
     const verifiedUser = await prisma.user.findUnique({ where: { email: account.email } });
     expect(verifiedUser?.emailVerifiedAt).toBeInstanceOf(Date);
     expect(verifiedUser?.passwordHash.startsWith("$argon2id$")).toBe(true);
+    expect(verifiedUser?.termsAcceptedAt).toBeInstanceOf(Date);
+    expect(verifiedUser?.termsVersion).toBe("2026-11-14");
 
     const loginResponse = await account.agent
       .post("/api/v1/auth/login")

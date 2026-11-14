@@ -16,6 +16,8 @@ model User {
   locale                  String                    @default("it") @db.VarChar(10)
   timezone                String                    @default("Europe/Rome") @db.VarChar(64)
   emailVerifiedAt         DateTime?                 @map("email_verified_at") @db.Timestamptz(6)
+  termsAcceptedAt         DateTime?                 @map("terms_accepted_at") @db.Timestamptz(6)
+  termsVersion            String?                   @map("terms_version") @db.VarChar(32)
   accountStatus           String                    @default("active") @map("account_status") @db.VarChar(20)
   createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

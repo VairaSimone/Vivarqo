@@ -31,7 +31,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
       }
       if (mode === "register") {
         if (!acceptedTerms) throw new Error(locale === "it" ? "Devi accettare i Termini e condizioni per creare l’account." : "You must accept the Terms to create an account.");
-        await api.post("/auth/register", { displayName, email, password, locale });
+        await api.post("/auth/register", { displayName, email, password, locale, termsAccepted: true, termsVersion: "2026-11-14" });
         setNotice(t("registrationSent"));
       } else if (mode === "forgot") {
         await api.post("/auth/forgot-password", { email });

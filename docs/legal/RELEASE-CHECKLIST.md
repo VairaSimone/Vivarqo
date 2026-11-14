@@ -14,7 +14,8 @@
 - [x] Accettazione esplicita dei termini in registrazione (non consenso privacy generico).
 - [x] Centro privacy con accesso a export, correzione account e cancellazione account.
 - [ ] Tradurre e revisionare integralmente tutti i documenti per ogni lingua servita.
-- [ ] Verificare versionamento e prova tecnica dell'accettazione dei termini lato server.
+- [x] Registrare lato server versione e timestamp di accettazione dei termini in fase di registrazione.
+- [ ] Definire il processo di nuova accettazione quando i termini vengono modificati e conservare le versioni storiche pubblicate.
 
 ## Cookie e tracciamento
 - [ ] Audit su dominio/build reali: cookie, storage, richieste, CDN, analytics, error tracking e widget.

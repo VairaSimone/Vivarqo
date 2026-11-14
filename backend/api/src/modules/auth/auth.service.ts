@@ -111,6 +111,8 @@ export async function registerAccount(
           passwordHash,
           locale: input.locale ?? "it",
           timezone: "Europe/Rome",
+          termsAcceptedAt: now,
+          termsVersion: input.termsVersion,
         },
       });
       await tx.authToken.create({
