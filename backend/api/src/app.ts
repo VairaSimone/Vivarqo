@@ -12,6 +12,7 @@ import { requestMetrics, metricsHandler } from "./middleware/observability.js";
 import { localizationMiddleware } from "./i18n/localization.js";
 import { csrfProtection } from "./modules/auth/csrf.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import { createOnboardingRouter } from "./modules/onboarding/onboarding.routes.js";
 import { loadOptionalSession } from "./modules/auth/session.js";
 import { createAccountRouter } from "./modules/account/account.routes.js";
 import type { EmailSender } from "./modules/auth/email-sender.js";
@@ -93,6 +94,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", subscriptionAccessGuard);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
+  app.use("/api/v1/onboarding", createOnboardingRouter());
   app.use("/api/v1/animals", createAnimalRouter());
   app.use("/api/v1", createAnimalPhotoRouter());
   app.use("/api/v1", createCareRouter());
