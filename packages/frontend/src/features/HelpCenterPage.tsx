@@ -70,15 +70,15 @@ export function HelpCenterPage({ locale, navigate }: { locale: Locale; navigate:
     guides: "Feature guides", guidesHint: "Choose a topic to see what it does and how to get started.", open: "Open section",
     faq: "Frequently asked questions", faqHint: "Answers to common questions about everyday use.",
     registers: "Understanding your records", registersHint: "Each register has a different purpose. Keeping tasks separate from completed events makes your history more reliable.",
-    purpose: "What it is for", examples: "What to record", contact: "Need more help?", contactHint: "If you cannot find the answer here, use the official SnakeBee website to find the current support contact details. We do not display an unverified email address here.",
-    website: "Visit SnakeBee website", quick: "Quick tip", quickText: "If you are unsure where to enter something, ask yourself: is it something I need to do, or something that has already happened? Use Tasks for the first and the relevant register for the second."
+    purpose: "What it is for", examples: "What to record", contact: "Need more help?", contactHint: "Write to our support team if you need help with your account or a feature. You can also visit the official website.",
+    email: "Email support", website: "Visit SnakeBee website", quick: "Quick tip", quickText: "If you are unsure where to enter something, ask yourself: is it something I need to do, or something that has already happened? Use Tasks for the first and the relevant register for the second."
   } : {
     eyebrow: "CENTRO ASSISTENZA", title: "Come possiamo aiutarti?", description: "Una guida pratica per usare SnakeBee, capire i registri e orientarti tra le funzioni.",
     guides: "Guide alle funzionalità", guidesHint: "Scegli un argomento per capire a cosa serve e come iniziare.", open: "Apri sezione",
     faq: "Domande frequenti", faqHint: "Risposte ai dubbi più comuni nell'utilizzo quotidiano.",
     registers: "Capire i registri", registersHint: "Ogni registro ha uno scopo diverso. Separare le attività da fare dagli eventi già avvenuti rende lo storico più affidabile.",
-    purpose: "A cosa serve", examples: "Cosa registrare", contact: "Ti serve altro aiuto?", contactHint: "Se non trovi qui la risposta, consulta il sito ufficiale SnakeBee per trovare i recapiti di assistenza aggiornati. Non mostriamo un indirizzo email non verificato.",
-    website: "Visita il sito SnakeBee", quick: "Un consiglio pratico", quickText: "Se non sai dove inserire un'informazione, chiediti: è qualcosa che devo ancora fare o qualcosa che è già successo? Usa Attività nel primo caso e il registro pertinente nel secondo."
+    purpose: "A cosa serve", examples: "Cosa registrare", contact: "Ti serve altro aiuto?", contactHint: "Se non trovi qui la risposta, puoi scrivere direttamente al supporto oppure visitare il sito ufficiale.",
+    email: "Scrivi all’assistenza", website: "Visita il sito SnakeBee", quick: "Un consiglio pratico", quickText: "Se non sai dove inserire un'informazione, chiediti: è qualcosa che devo ancora fare o qualcosa che è già successo? Usa Attività nel primo caso e il registro pertinente nel secondo."
   };
   return <div className="help-center-page">
     <PageHeader eyebrow={text.eyebrow} title={text.title} description={text.description} />
@@ -108,7 +108,7 @@ export function HelpCenterPage({ locale, navigate }: { locale: Locale; navigate:
     </Panel>
     <Panel className="help-contact-panel">
       <div className="help-contact-icon"><Icon name="message" size={24} /></div>
-      <div><h2>{text.contact}</h2><p>{text.contactHint}</p><a className="btn btn-secondary" href="https://snakebee.it/" target="_blank" rel="noreferrer">{text.website}<Icon name="external" size={14} /></a></div>
+      <div><h2>{text.contact}</h2><p>{text.contactHint}</p><div className="inline-actions"><a className="btn btn-primary" href="mailto:support@snakebee.it">{text.email}<Icon name="arrow" size={14} /></a><a className="btn btn-secondary" href="https://snakebee.it/" target="_blank" rel="noreferrer">{text.website}<Icon name="external" size={14} /></a></div></div>
     </Panel>
   </div>;
 }
