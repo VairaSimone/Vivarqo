@@ -124,7 +124,7 @@ Il backup Compose continua a creare dump locali verificati su `VIVARQO_BACKUP_DI
 Creare un repository remoto dedicato (ad esempio un bucket S3-compatible o un repository Restic su storage remoto) e inizializzarlo una sola volta, in modo interattivo e controllato:
 
 ```bash
-sudo restic -r "$RESTIC_REPOSITORY" init
+sudo bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; restic init'
 ```
 
 Creare `/etc/vivarqo/offsite-backup.env`, root-owned e mode `0600`, con almeno:
