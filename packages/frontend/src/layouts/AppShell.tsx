@@ -8,6 +8,7 @@ import { Icon, IconButton, Input, Modal } from "../components/ui";
 import { getString, queryString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
+import { OnboardingTour } from "../components/OnboardingTour";
 
 type User = { displayName: string; email: string; locale: Locale };
 type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" };
@@ -61,10 +62,16 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
   const [searchRetry, setSearchRetry] = useState(0);
+  const [showTour, setShowTour] = useState(false);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
   const route = path.split("?")[0] || "/today";
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
+
+  useEffect(() => {
+    try { setShowTour(localStorage.getItem("snakebee:onboarding:v1") !== "completed"); }
+    catch { setShowTour(false); }
+  }, []);
 
   useEffect(() => {
     if (!mobileMenu) return;
@@ -206,6 +213,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         <div className="topbar-context"><span className="topbar-dot" />{t(titleKey)}</div>
         <div className="topbar-actions">
           <button className="global-search" onClick={() => setSearchOpen(true)} aria-label={t("search")} aria-haspopup="dialog"><Icon name="search" size={16} /><span>{t("search")}</span></button>
+          <button type="button" className="tour-trigger" onClick={() => setShowTour(true)}><Icon name="circle-help" size={16} /><span>{locale === "it" ? "Guida" : "Guide"}</span></button>
           <IconButton label={t("notifications")} onClick={() => onNavigate("/notifications")}><Icon name="bell" />{unreadCount > 0 && <i className="notification-dot" />}</IconButton>
           <button className="topbar-avatar" onClick={() => onNavigate("/settings")} aria-label={t("profile")}>{user.displayName.trim().slice(0, 1).toUpperCase() || "S"}</button>
         </div>
@@ -237,6 +245,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       })}
       <button type="button" aria-label={t("more")} onClick={() => setMobileMenu(true)}><Icon name="more" size={18} /><span>{t("more")}</span></button>
     </nav>
+    {showTour && <OnboardingTour locale={locale} onNavigate={(next) => { onNavigate(next); setShowTour(false); }} onClose={() => setShowTour(false)} />}
     {searchOpen && <Modal title={t("search")} onClose={closeSearch} wide>
       <div className="global-search-panel">
         <Input type="search" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder={t("searchPlaceholder")} aria-label={t("searchPlaceholder")} />
