@@ -28,6 +28,13 @@ describe("billing entitlement policy", () => {
     }
   });
 
+  it("recognizes the annual Stripe Price as Premium and reports its cadence", () => {
+    const result = resolveBillingEntitlements({ status: "active", stripePriceId: "price_vivarqo_annual", currentPeriodEnd: new Date("2026-12-01T00:00:00.000Z") }, {
+      ...policy, expectedPriceId: undefined, expectedPriceIds: ["price_vivarqo_monthly", "price_vivarqo_annual"], annualPriceId: "price_vivarqo_annual",
+    }, now);
+    expect(result).toMatchObject({ plan: "paid", paidSubscription: true, billingInterval: "annual" });
+  });
+
   it("fails closed for active or trialing subscriptions without a synchronized period end", () => {
     for (const status of ["active", "trialing"]) {
       const result = resolveBillingEntitlements({
