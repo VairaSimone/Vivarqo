@@ -174,3 +174,63 @@ sha256sum -c vivarqo-<timestamp>.dump.sha256
 pg_restore --list vivarqo-<timestamp>.dump
 ```
 
+
+
+## Ripristino PostgreSQL da Restic
+
+Il ripristino deve essere eseguito su un host/volume separato, senza sovrascrivere il database di produzione. Installare la stessa versione principale di Restic o una versione compatibile e i client PostgreSQL 18. Recuperare la password Restic dal secret manager offline e predisporre un repository accessibile in sola lettura.
+
+1. Elencare gli snapshot e scegliere esplicitamente quello desiderato:
+
+   ```bash
+   sudo bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; restic snapshots --tag vivarqo --tag postgres'
+   ```
+
+2. Creare una directory vuota su un filesystem con spazio sufficiente e ripristinare/verificare i dump:
+
+   ```bash
+   sudo install -d -m 0700 /mnt/vivarqo-restore
+   sudo env RESTIC_SNAPSHOT='<snapshot-id>' VIVARQO_RESTORE_ROOT=/mnt/vivarqo-restore \
+     bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; exec /opt/vivarqo/app/backend/scripts/restore-postgres-restic.sh'
+   ```
+
+   Lo script richiede uno snapshot esplicito, rifiuta una directory di destinazione non vuota, verifica tutti i checksum SHA-256 e controlla la leggibilità dei dump con `pg_restore --list`. Non modifica alcun database.
+
+3. Creare un database nuovo e vuoto sul PostgreSQL di ripristino con un ruolo amministrativo. Non puntare mai il comando al database di produzione. Dopo aver individuato il dump corretto nella directory ripristinata:
+
+   ```bash
+   createdb --host=<restore-db-host> --username=<restore-admin> vivarqo_restore
+   pg_restore --host=<restore-db-host> --username=<restore-admin> \
+     --dbname=vivarqo_restore --no-owner --no-acl --exit-on-error \
+     /mnt/vivarqo-restore/mnt/vivarqo-prod-backups/<dump-scelto>.dump
+   ```
+
+   Se si ripristina su un servizio PostgreSQL remoto, usare un secret manager o `PGPASSFILE` con permessi `0600`; non inserire password nelle opzioni della riga di comando.
+
+4. Eseguire controlli applicativi su un ambiente isolato: migrazioni compatibili, conteggi e relazioni principali, login, accesso a documenti e immagini, processi worker e integrità degli allegati. Conservare log e durata del test. Solo dopo la validazione si può pianificare un cutover separato.
+
+## Strategia operativa per backup e restore S3
+
+Lo storage applicativo usa oggetti privati con chiavi generate e persistite nei record PostgreSQL. Gli oggetti non sono inclusi nei dump del database né nel repository Restic dei dump. Le chiavi sono immutabili e il codice esegue PUT/GET/DELETE sul bucket configurato da `S3_ENDPOINT`, `S3_REGION` e `S3_BUCKET`.
+
+Prima della produzione, applicare sul provider S3-compatible una configurazione equivalente a questa:
+
+- Bucket sorgente privato, accesso pubblico bloccato, TLS obbligatorio e cifratura server-side.
+- Versioning abilitato sul bucket sorgente. Conservare le versioni non correnti e i delete marker per un periodo almeno pari alla retention del database; evitare lifecycle che elimini versioni recuperabili prima della scadenza.
+- Replica cross-account o backup verso un secondo bucket in un account/credenziali separati, preferibilmente in una regione o provider indipendente. La replica deve includere le versioni nuove e le cancellazioni devono essere configurate in modo da non propagare una cancellazione accidentale in modo irreversibile.
+- Se il provider lo supporta, abilitare Object Lock/immutability sul bucket di destinazione con una retention approvata. Le credenziali runtime dell'applicazione non devono poter modificare policy, retention o replica.
+- Ruolo runtime dell'applicazione limitato al bucket sorgente e alle sole operazioni oggetto necessarie. Ruolo di replica/backup separato e con permessi minimi; access key distinte da quelle API.
+- Monitorare esito e ritardo della replica, errori di autorizzazione, quota/spazio, versioni non replicate e accessi anomali. Un semplice stato "versioning enabled" non dimostra che la replica funzioni.
+
+**Attenzione alle cancellazioni:** il backend invia DELETE per la chiave oggetto. Con versioning S3 questo normalmente crea un delete marker, quindi un GET sulla chiave può continuare a restituire 404 anche se la versione precedente è conservata. Per ripristinare un documento cancellato occorre recuperare la versione precedente e renderla nuovamente corrente (o copiarla su una nuova chiave aggiornando il record DB). Eseguire questa operazione prima o insieme al ripristino del database, mantenendo coerenti record e oggetti.
+
+### Prova periodica di ripristino S3
+
+1. Scegliere uno snapshot DB e il punto temporale corrispondente alla replica S3.
+2. Ripristinare il database in un ambiente isolato.
+3. Selezionare documenti e immagini campione dai relativi record e leggere le loro `storageKey`.
+4. Recuperare le versioni oggetto dal bucket di replica in un bucket di restore isolato; verificare dimensione, MIME e checksum quando disponibili.
+5. Rendere disponibili gli oggetti con le chiavi attese dal database ripristinato e verificare download tramite API autenticata e link pubblici autorizzati.
+6. Registrare RPO effettivo, tempo di ripristino, oggetti mancanti e correzioni necessarie.
+
+Le API S3-compatible non espongono tutte le stesse funzionalità di versioning, replica, Object Lock e gestione dei delete marker. Il provider effettivo non è specificato nei file di configurazione: prima di scrivere policy automatiche o comandi provider-specifici bisogna identificare il servizio e verificare quali API supporta. Non è corretto dichiarare il backup S3 attivo finché non sono presenti una replica configurata e un restore drill riuscito.
