@@ -6,7 +6,8 @@ x-application-environment: &application-environment
   DATABASE_USER: ${DATABASE_USER:?Set DATABASE_USER in the selected environment file}
   DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
   CSRF_SECRET_FILE: /run/secrets/csrf_secret
-  RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-brevo}
+  BREVO_API_KEY_FILE: /run/secrets/brevo_api_key
   STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
   STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
   VAPID_PRIVATE_KEY_FILE: /run/secrets/vapid_private_key
@@ -58,7 +59,7 @@ services:
     secrets:
       - postgres_admin_password
       - csrf_secret
-      - resend_api_key
+      - brevo_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
@@ -88,7 +89,7 @@ services:
     secrets:
       - postgres_app_password
       - csrf_secret
-      - resend_api_key
+      - brevo_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
@@ -139,7 +140,7 @@ services:
     secrets:
       - postgres_app_password
       - csrf_secret
-      - resend_api_key
+      - brevo_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
@@ -231,8 +232,8 @@ secrets:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/postgres_backup_password
   csrf_secret:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/csrf_secret
-  resend_api_key:
-    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/resend_api_key
+  brevo_api_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/brevo_api_key
   stripe_secret_key:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/stripe_secret_key
   stripe_webhook_secret:
