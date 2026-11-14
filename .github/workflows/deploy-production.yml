@@ -106,7 +106,7 @@ jobs:
             pg_dump --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom --no-owner --no-acl --file="$temporary"
             pg_restore --list "$temporary" >/dev/null
             hash="$(sha256sum "$temporary" | awk '\''{print $1}'\'')"
-            printf "%s  %s\\n" "$hash" "$(basename "$archive")" > "$checksum_partial"
+            printf "%s  %s\n" "$hash" "$(basename "$archive")" > "$checksum_partial"
             chmod 600 "$temporary" "$checksum_partial"
             mv "$checksum_partial" "$archive.sha256"
             mv "$temporary" "$archive"
