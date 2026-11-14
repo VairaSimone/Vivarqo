@@ -31,6 +31,8 @@ const optionalEmail = z.preprocess(emptyStringToUndefined, z.string().email().op
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "staging", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+  // Worker liveness is independent from the Dev Manager's HTTP health checks.
+  WORKER_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
   // Only set TRUST_PROXY_HOPS when the deployment topology has a known number
   // of trusted reverse proxies; never blindly trust all X-Forwarded-* headers.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
