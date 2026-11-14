@@ -14,6 +14,7 @@ type Entitlements = {
 };
 
 const steps = [
+  { icon: "leaf", path: "/today", it: ["Benvenuto in SnakeBee", "Il tuo allevamento, finalmente in un unico posto. Qui puoi organizzare gli animali, tenere traccia della gestione quotidiana, pianificare attività e conservare lo storico. Ti accompagniamo a conoscere le aree principali, senza attivare funzioni o modificare dati al posto tuo."], en: ["Welcome to SnakeBee", "Your collection, finally in one place. Organize animals, track daily care, plan tasks and keep a complete history. This short tour introduces the main areas without changing data or enabling features on your behalf."] },
   { icon: "home", path: "/today", it: ["La tua cabina di regia", "La pagina Oggi raccoglie scadenze arretrate, attività da completare, promemoria e attività recenti. Parti da qui ogni volta che apri SnakeBee."], en: ["Your control room", "The Today page brings together overdue items, tasks to complete, reminders and recent activity. Start here whenever you open SnakeBee."] },
   { icon: "snake", path: "/animals", it: ["Crea la tua anagrafica", "Aggiungi gli animali con specie, sesso, morph, identificativo, posizione, foto e dettagli. Puoi cercare, filtrare, archiviare e consultare la scheda completa di ogni esemplare."], en: ["Build your animal registry", "Add animals with species, sex, morph, identifier, location, photos and details. Search, filter, archive and open each animal's full record."] },
   { icon: "feed", path: "/feeding", it: ["Registra la gestione quotidiana", "Segna alimentazioni, pesate e mute. Lo storico resta associato all'animale: niente fogli Excel separati o appunti sparsi. Puoi registrare anche operazioni multiple dove previsto."], en: ["Track daily care", "Record feedings, weigh-ins and sheds. History stays attached to each animal, replacing scattered spreadsheets and notes. Bulk entries are available where supported."] },
@@ -61,7 +62,8 @@ export function OnboardingTour({ locale, onNavigate, onClose }: {
         <div className="onboarding-icon"><Icon name={current.icon} size={25} /></div>
         <h2 id="onboarding-title">{copy[0]}</h2>
         <p className="onboarding-description">{copy[1]}</p>
-        {step === 0 && <div className="onboarding-tip"><Icon name="leaf" /><span>{english ? "Tip: add your animals first. The rest of the workspace becomes much more useful once records are linked to them." : "Consiglio: inizia inserendo gli animali. Il resto della piattaforma diventa molto più utile quando le registrazioni sono collegate ai loro profili."}</span></div>}
+        <button type="button" className="onboarding-open-section" onClick={() => { finish(); onNavigate(current.path); }}>{english ? "Open this section" : "Apri questa sezione"} <Icon name="arrow" size={14} /></button>
+        {step === 0 && <div className="onboarding-tip"><Icon name="leaf" /><span>{english ? "A good starting point: add your animals first. The rest of the workspace becomes much more useful once records are linked to them." : "Un buon punto di partenza: inserisci prima gli animali. Il resto della piattaforma diventa molto più utile quando le registrazioni sono collegate ai loro profili."}</span></div>}
         {step === steps.length - 1 && <div className="onboarding-plan">
           <strong>{english ? "Your current plan" : "Il tuo piano attuale"}</strong>
           {entitlements ? <>
