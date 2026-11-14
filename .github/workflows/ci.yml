@@ -89,6 +89,7 @@ jobs:
           bash -n backend/scripts/backup-offsite-restic.sh
           bash -n backend/scripts/restore-postgres-restic.sh
           bash -n backend/scripts/verify-production-backup-mount.sh
+          sh -n backend/infra/docker/backup-loop.sh
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
       - name: Docker build and validate frontend web target
@@ -184,6 +185,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo_e2e?schema=public
       NODE_ENV: test

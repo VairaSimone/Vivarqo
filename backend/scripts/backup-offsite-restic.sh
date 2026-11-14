@@ -7,7 +7,7 @@ set -Eeuo pipefail
 : "${RESTIC_PASSWORD_FILE:?Set RESTIC_PASSWORD_FILE to a protected password file}"
 : "${VIVARQO_BACKUP_DIR:?Set VIVARQO_BACKUP_DIR to the local PostgreSQL dump mount}"
 
-for command in restic find sha256sum; do
+for command in restic find sha256sum mountpoint stat; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "Required command not found: $command" >&2
     exit 127
@@ -22,6 +22,15 @@ done
   echo "Local PostgreSQL backup directory does not exist" >&2
   exit 2
 }
+mountpoint -q "$VIVARQO_BACKUP_DIR" || {
+  echo "Local PostgreSQL backup path is not a mounted filesystem; refusing to back up an unexpected empty host directory" >&2
+  exit 2
+}
+password_mode="$(stat -c '%a' "$RESTIC_PASSWORD_FILE")"
+if (( (8#$password_mode & 077) != 0 )); then
+  echo "Restic password file must not be accessible by group or other users" >&2
+  exit 2
+fi
 mapfile -d '' archives < <(find "$VIVARQO_BACKUP_DIR" -maxdepth 1 -type f -name 'vivarqo-*.dump' -print0)
 (("${#archives[@]}" > 0)) || {
   echo "No PostgreSQL dump found; refusing an empty backup" >&2

@@ -150,7 +150,7 @@ sudo systemctl start vivarqo-offsite-backup.service
 sudo systemctl status vivarqo-offsite-backup.service
 ```
 
-La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
+Il servizio verifica anche che `/mnt/vivarqo-prod-backups` sia ancora un mountpoint e ha un timeout di sei ore, così un controllo Restic non viene terminato dopo il timeout breve predefinito di systemd. La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
 
 Il backup Restic copre i dump PostgreSQL locali e i relativi checksum. **Non copia gli oggetti del bucket applicativo S3**: configurare versioning e replica/backup separati per documenti e immagini, con credenziali distinte. Per un disaster recovery reale, effettuare periodicamente un restore drill su un host separato, ripristinando database e oggetti S3 dello stesso punto temporale e verificando i documenti dall'applicazione.
 

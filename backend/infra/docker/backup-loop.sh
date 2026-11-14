@@ -48,6 +48,6 @@ while :; do
   fi
 
   echo "Vivarqo PostgreSQL backup failed; partial artifacts removed and retry scheduled." >&2
-  rm -f -- "$temporary" "$checksum" "$archive"
+  rm -f -- "$temporary" "$checksum" "$archive" "$archive.sha256"
   sleep 300
 done

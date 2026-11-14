@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 : "${RESTIC_REPOSITORY:?Set RESTIC_REPOSITORY}"
 : "${RESTIC_PASSWORD_FILE:?Set RESTIC_PASSWORD_FILE}"
@@ -37,7 +38,7 @@ if [[ -n "$(find "$VIVARQO_RESTORE_ROOT" -mindepth 1 -maxdepth 1 -print -quit)" 
 fi
 
 export RESTIC_PASSWORD_FILE
-restic snapshots "$RESTIC_SNAPSHOT" >/dev/null
+restic ls "$RESTIC_SNAPSHOT" "$VIVARQO_BACKUP_DIR" >/dev/null
 
 echo "Restoring snapshot $RESTIC_SNAPSHOT into $VIVARQO_RESTORE_ROOT"
 restic restore "$RESTIC_SNAPSHOT" --target "$VIVARQO_RESTORE_ROOT" --include "$VIVARQO_BACKUP_DIR"

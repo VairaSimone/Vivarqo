@@ -71,33 +71,54 @@ jobs:
 
           compose=(docker compose --env-file .env.production -f backend/infra/docker/compose.production.yaml)
           "${compose[@]}" config --quiet
-          mountpoint -q "$(grep '^VIVARQO_BACKUP_DIR=' .env.production | cut -d= -f2-)" || {
+          backup_dir="$(grep '^VIVARQO_BACKUP_DIR=' .env.production | cut -d= -f2-)"
+          mountpoint -q "$backup_dir" || {
             echo "Configured PostgreSQL backup path is not a mounted filesystem" >&2
             exit 4
           }
+
+          # Ensure PostgreSQL is running and healthy before creating the pre-deploy dump.
+          # --no-recreate avoids restarting an already-running production database.
+          "${compose[@]}" up -d --no-build --no-recreate postgres
+          database_ready=0
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready >/dev/null 2>&1; then
+              database_ready=1
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$database_ready" != "1" ]]; then
+            echo "PostgreSQL did not become ready; deployment stopped before backup or migration." >&2
+            "${compose[@]}" logs --tail=100 postgres
+            exit 5
+          fi
 
           # Take and verify a fresh PostgreSQL dump before any schema change.
           "${compose[@]}" run --rm --no-deps --entrypoint /bin/sh backup -ec '
             umask 077
             export PGPASSWORD="$(cat "$POSTGRES_PASSWORD_FILE")"
-            stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)-$"
             temporary="/backups/vivarqo-predeploy-$stamp.dump.partial"
             archive="/backups/vivarqo-predeploy-$stamp.dump"
+            checksum_partial="$archive.sha256.partial"
+            trap '\''rm -f "$temporary" "$checksum_partial" "$archive.sha256"'\'' EXIT
             pg_dump --host="$POSTGRES_HOST" --port="$POSTGRES_PORT" --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom --no-owner --no-acl --file="$temporary"
             pg_restore --list "$temporary" >/dev/null
+            hash="$(sha256sum "$temporary" | awk '\''{print $1}'\'')"
+            printf "%s  %s\\n" "$hash" "$(basename "$archive")" > "$checksum_partial"
+            chmod 600 "$temporary" "$checksum_partial"
+            mv "$checksum_partial" "$archive.sha256"
             mv "$temporary" "$archive"
-            sha256sum "$archive" > "$archive.sha256"
-            chmod 600 "$archive" "$archive.sha256"
+            trap - EXIT
             echo "Verified pre-deploy database backup: $archive"
           '
 
-          # Build before touching the running services. Migrations run as a
-          # separate one-shot service and must succeed before the API is started.
+          # Build before changing API/web/worker. Run the one-shot migration
+          # without dependencies: PostgreSQL health was checked above, and this
+          # prevents Compose from stopping the live DB when migrate exits.
           "${compose[@]}" build api web worker migrate
-          # Compose waits for PostgreSQL health and the foreground migration.
-          # --exit-code-from propagates migration failure to this SSH step.
-          # The completed one-shot container is retained for app dependency checks.
-          "${compose[@]}" up --no-build --force-recreate --exit-code-from migrate migrate
+          "${compose[@]}" up --no-deps --no-build --force-recreate --exit-code-from migrate migrate
           "${compose[@]}" up -d --no-build --remove-orphans
 
           for attempt in $(seq 1 30); do
