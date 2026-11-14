@@ -20,6 +20,12 @@ export const requestContext: RequestHandler = (req, res, next) => {
       statusCode: res.statusCode,
       durationMs: Math.round(durationMs * 100) / 100,
     };
+    // Successful liveness/readiness probes are expected background traffic.
+    // Keep failures visible, but do not flood normal HTTP logs with probe noise.
+    const successfulHealthCheck = req.method === "GET" &&
+      (req.path === "/healthz" || req.path === "/readyz") &&
+      res.statusCode < 400;
+    if (successfulHealthCheck) return;
     if (res.statusCode >= 500) logger.error(entry, "HTTP request failed");
     else if (res.statusCode >= 400) logger.warn(entry, "HTTP request rejected");
     else logger.info(entry, "HTTP request completed");
