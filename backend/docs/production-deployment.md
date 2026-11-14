@@ -191,7 +191,7 @@ Il ripristino deve essere eseguito su un host/volume separato, senza sovrascrive
    ```bash
    sudo install -d -m 0700 /mnt/vivarqo-restore
    sudo env RESTIC_SNAPSHOT='<snapshot-id>' VIVARQO_RESTORE_ROOT=/mnt/vivarqo-restore \
-     bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; exec /opt/vivarqo/app/backend/scripts/restore-postgres-restic.sh'
+     bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; exec bash /opt/vivarqo/app/backend/scripts/restore-postgres-restic.sh'
    ```
 
    Lo script richiede uno snapshot esplicito, rifiuta una directory di destinazione non vuota, verifica tutti i checksum SHA-256 e controlla la leggibilità dei dump con `pg_restore --list`. Non modifica alcun database.
