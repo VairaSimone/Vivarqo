@@ -65,7 +65,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
     {error && <Alert tone="danger">{error}</Alert>}
     <Panel>
       <PanelHeader title={locale === "it" ? "Piani e prezzi" : "Plans and pricing"} />
-      <div className="billing-card">
+      <div className="billing-plans">
         <div>
           <span className="eyebrow">{locale === "it" ? "Gratuito" : "Free"}</span>
           <h2>0 €</h2>
