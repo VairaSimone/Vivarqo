@@ -49,13 +49,15 @@ const environmentSchema = z.object({
   EMAIL_FROM: optionalEmail,
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
+  STRIPE_PRICE_MONTHLY_ID: optionalString,
+  STRIPE_PRICE_ANNUAL_ID: optionalString,
   STRIPE_PRICE_ID: optionalString,
   BILLING_ACCESS_MODE: z.enum(["unrestricted", "subscription_required"]).default("unrestricted"),
   BILLING_PAST_DUE_GRACE_DAYS: z.coerce.number().int().min(0).max(30).default(7),
   // Zero means unlimited; configure positive values when free-plan quotas are launched.
-  BILLING_FREE_MAX_ANIMALS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
-  BILLING_FREE_MAX_DOCUMENTS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
-  BILLING_FREE_MAX_STORAGE_BYTES: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  BILLING_FREE_MAX_ANIMALS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(15),
+  BILLING_FREE_MAX_DOCUMENTS: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(30),
+  BILLING_FREE_MAX_STORAGE_BYTES: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(536_870_912),
   VAPID_PUBLIC_KEY: optionalString,
   VAPID_PRIVATE_KEY: optionalString,
   VAPID_SUBJECT: optionalString,
@@ -106,8 +108,9 @@ if (deployedEnvironment) {
   } else if (runtimeEnvironment.EMAIL_FROM.toLowerCase().includes("example.com")) {
     deploymentProblems.push("EMAIL_FROM must use a verified sender domain, not example.com");
   }
-  if (!runtimeEnvironment.STRIPE_SECRET_KEY || !runtimeEnvironment.STRIPE_WEBHOOK_SECRET || !runtimeEnvironment.STRIPE_PRICE_ID) {
-    deploymentProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID are required in deployed environments");
+  const monthlyPriceId = runtimeEnvironment.STRIPE_PRICE_MONTHLY_ID ?? runtimeEnvironment.STRIPE_PRICE_ID;
+  if (!runtimeEnvironment.STRIPE_SECRET_KEY || !runtimeEnvironment.STRIPE_WEBHOOK_SECRET || !monthlyPriceId || !runtimeEnvironment.STRIPE_PRICE_ANNUAL_ID) {
+    deploymentProblems.push("STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTHLY_ID and STRIPE_PRICE_ANNUAL_ID are required in deployed environments");
   } else {
     const expectedStripePrefix = stripeMode === "live" ? "sk_live_" : "sk_test_";
     if (!runtimeEnvironment.STRIPE_SECRET_KEY.startsWith(expectedStripePrefix)) {
@@ -116,8 +119,11 @@ if (deployedEnvironment) {
     if (!/^whsec_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_WEBHOOK_SECRET)) {
       deploymentProblems.push("STRIPE_WEBHOOK_SECRET must be a valid Stripe webhook signing secret");
     }
-    if (!/^price_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_PRICE_ID)) {
-      deploymentProblems.push("STRIPE_PRICE_ID must be a real Stripe Price identifier");
+    if (!/^price_[A-Za-z0-9]+$/.test(monthlyPriceId)) {
+      deploymentProblems.push("STRIPE_PRICE_MONTHLY_ID must be a real Stripe Price identifier");
+    }
+    if (!/^price_[A-Za-z0-9]+$/.test(runtimeEnvironment.STRIPE_PRICE_ANNUAL_ID ?? "")) {
+      deploymentProblems.push("STRIPE_PRICE_ANNUAL_ID must be a real Stripe Price identifier");
     }
   }
   if (!runtimeEnvironment.VAPID_PUBLIC_KEY || !runtimeEnvironment.VAPID_PRIVATE_KEY || !runtimeEnvironment.VAPID_SUBJECT) {
