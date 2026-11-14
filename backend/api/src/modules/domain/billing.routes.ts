@@ -20,6 +20,9 @@ function isUniqueViolation(error: unknown): boolean {
 export interface BillingRouterOptions {
   secretKey?: string;
   webhookSecret?: string;
+  monthlyPriceId?: string;
+  annualPriceId?: string;
+  /** @deprecated Compatibility alias for the monthly Price ID. */
   priceId?: string;
   appOrigin?: string;
   fetchImpl?: typeof fetch;
@@ -160,7 +163,7 @@ async function replayPendingInvoiceEvents(
   }
 }
 
-async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, priceId: string | undefined): Promise<boolean> {
+async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, prices: { monthly?: string; annual?: string }): Promise<boolean> {
   const object = event.data.object;
   const eventType = event.type;
   const eventCreatedAt = timestamp(event.created);
@@ -236,7 +239,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
-      stripePriceId: priceId ?? null,
+      stripePriceId: object.metadata?.plan === "annual" ? prices.annual ?? null : prices.monthly ?? null,
       // Checkout Session does not carry current_period_end. Keep the subscription
       // pending until customer.subscription.created/updated supplies the authoritative
       // status and paid-through date; otherwise a missing date could grant access forever.
@@ -284,12 +287,17 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
   const router = Router();
   const secretKey = options.secretKey ?? env.STRIPE_SECRET_KEY;
   const webhookSecret = options.webhookSecret ?? env.STRIPE_WEBHOOK_SECRET;
-  const priceId = options.priceId ?? env.STRIPE_PRICE_ID;
+  const monthlyPriceId = options.monthlyPriceId ?? options.priceId ?? env.STRIPE_PRICE_MONTHLY_ID ?? env.STRIPE_PRICE_ID;
+  const annualPriceId = options.annualPriceId ?? env.STRIPE_PRICE_ANNUAL_ID;
+  const configuredPriceIds = [monthlyPriceId, annualPriceId].filter((value): value is string => Boolean(value));
   const appOrigin = options.appOrigin ?? env.APP_ORIGIN;
 
-  router.post("/billing/checkout", requireSession, async (_req, res) => {
+  router.post("/billing/checkout", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    if (!priceId) throw new AppError(503, "BILLING_NOT_CONFIGURED", "A subscription price has not been configured");
+    const checkoutInput = z.object({ plan: z.enum(["monthly", "annual"]).default("monthly") }).safeParse(req.body ?? {});
+    if (!checkoutInput.success) throw new AppError(400, "INVALID_BILLING_PLAN", "Choose a valid subscription period");
+    const selectedPriceId = checkoutInput.data.plan === "annual" ? annualPriceId : monthlyPriceId;
+    if (!selectedPriceId) throw new AppError(503, "BILLING_NOT_CONFIGURED", "The selected subscription price has not been configured");
     const current = await prisma.subscription.findUnique({ where: { userId: auth.userId } });
     if (current && ["active", "trialing"].includes(current.status)) {
       throw new AppError(409, "SUBSCRIPTION_ALREADY_ACTIVE", "This account already has an active subscription");
@@ -300,10 +308,12 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
     form.set("cancel_url", `${appOrigin}/billing?checkout=cancelled`);
     form.set("client_reference_id", auth.userId);
     form.set("customer_email", auth.email);
-    form.set("line_items[0][price]", priceId);
+    form.set("line_items[0][price]", selectedPriceId);
     form.set("line_items[0][quantity]", "1");
     form.set("metadata[user_id]", auth.userId);
+    form.set("metadata[plan]", checkoutInput.data.plan);
     form.set("subscription_data[metadata][user_id]", auth.userId);
+    form.set("subscription_data[metadata][plan]", checkoutInput.data.plan);
     const session = await stripeRequest("checkout/sessions", form, `vivarqo-checkout-${auth.userId}-${randomUUID()}`, options);
     if (typeof session.url !== "string") throw new AppError(502, "BILLING_PROVIDER_ERROR", "The payment provider returned no checkout URL");
     res.status(200).json({ url: session.url, sessionId: session.id ?? null });
@@ -331,9 +341,9 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
           currentPeriodEnd: true, cancelAtPeriodEnd: true, createdAt: true, updatedAt: true,
         },
       }),
-      getUserEntitlements(auth.userId, priceId),
+      getUserEntitlements(auth.userId, configuredPriceIds, annualPriceId),
     ]);
-    res.status(200).json({ configured: Boolean(secretKey && priceId && webhookSecret), subscription, entitlements });
+    res.status(200).json({ configured: Boolean(secretKey && monthlyPriceId && annualPriceId && webhookSecret), plans: { monthly: Boolean(monthlyPriceId), annual: Boolean(annualPriceId) }, subscription, entitlements });
   });
 
   router.post("/webhooks/stripe", async (req, res) => {
@@ -365,7 +375,7 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
             result: "pending",
           },
         });
-        const pending = await syncStripeEvent(tx, event, priceId);
+        const pending = await syncStripeEvent(tx, event, { monthly: monthlyPriceId, annual: annualPriceId });
         await tx.stripeWebhookEvent.update({
           where: { stripeEventId: event.id },
           data: pending
