@@ -289,8 +289,12 @@ export function createCareRouter() {
     const animalId = parseUuid(req.params.animalId!, "animalId");
     await getOwnedAnimal(auth.userId, animalId, true);
     const input = parseBody(weightSchema, req.body);
-    const weight = await prisma.weightMeasurement.create({
-      data: { animalId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null },
+    const weight = await prisma.$transaction(async (tx) => {
+      const created = await tx.weightMeasurement.create({
+        data: { animalId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null },
+      });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "weight.created", entityType: "weight", entityId: created.id } });
+      return created;
     });
     res.status(201).json({ weight });
   });
@@ -339,7 +343,11 @@ export function createCareRouter() {
     const animalId = parseUuid(req.params.animalId!, "animalId");
     await getOwnedAnimal(auth.userId, animalId, true);
     const input = parseBody(shedSchema, req.body);
-    const shed = await prisma.shedRecord.create({ data: { animalId, occurredAt: new Date(input.occurredAt), outcome: input.outcome, notes: input.notes ?? null } });
+    const shed = await prisma.$transaction(async (tx) => {
+      const created = await tx.shedRecord.create({ data: { animalId, occurredAt: new Date(input.occurredAt), outcome: input.outcome, notes: input.notes ?? null } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "shed.created", entityType: "shed", entityId: created.id } });
+      return created;
+    });
     res.status(201).json({ shed });
   });
 
