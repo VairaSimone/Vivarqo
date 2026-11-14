@@ -97,7 +97,7 @@ Non considerare completo il disaster recovery finché non sono stati provati ins
 
 Il workflow `.github/workflows/deploy-production.yml` è intenzionalmente solo `workflow_dispatch`: un push su `main` non distribuisce automaticamente. Il job usa l'environment GitHub `production`; configura eventuali required reviewers nelle impostazioni del repository prima di abilitarlo.
 
-Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository. L'utente SSH di deploy deve poter leggere il repository Git (chiave deploy read-only o credenziale equivalente), aggiornare il checkout e usare Docker Compose. L'utente deve avere accesso ai file `.env.production` e alle directory configurate, ma non deve poter modificare segreti condivisi da altri servizi. L'accesso al gruppo Docker equivale di fatto a privilegi root: non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
+Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository. L'utente SSH di deploy deve poter leggere il repository Git (chiave deploy read-only o credenziale equivalente), aggiornare il checkout e usare Docker Compose. L'utente deve avere accesso ai file `.env.production` e alle directory configurate, ma non deve poter modificare segreti condivisi da altri servizi. Deve inoltre poter avviare esclusivamente il job Restic tramite sudo non interattivo: aggiungere in `/etc/sudoers.d/vivarqo-deploy` una regola `NOME_UTENTE ALL=(root) NOPASSWD: /usr/bin/systemctl start vivarqo-offsite-backup.service` e verificarla con `visudo -cf /etc/sudoers.d/vivarqo-deploy`. L'accesso al gruppo Docker equivale di fatto a privilegi root: non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
 
 - `VIVARQO_DEPLOY_HOST`: hostname/IP del VPS.
 - `VIVARQO_DEPLOY_USER`: utente SSH di deploy.
@@ -112,9 +112,10 @@ Il deploy:
 2. verifica che il percorso backup sia un mountpoint dedicato;
 3. avvia PostgreSQL solo se necessario, senza ricreare un container DB già attivo, e attende `pg_isready`;
 4. produce un dump pre-deploy, verifica `pg_restore --list` e pubblica checksum e archivio in modo che il dump sia visibile solo quando entrambi sono pronti;
-5. costruisce le immagini applicative;
-6. esegue `migrate` in foreground senza dipendenze Compose aggiuntive: un exit code non zero interrompe il deploy prima dell'aggiornamento di API/web/worker;
-7. aggiorna i servizi e attende `/readyz` tramite HTTPS.
+5. avvia il servizio systemd Restic e attende il completamento della copia cifrata off-site: se il repository remoto non è raggiungibile o la verifica fallisce, le migrazioni non partono;
+6. costruisce le immagini applicative;
+7. esegue `migrate` in foreground senza dipendenze Compose aggiuntive: un exit code non zero interrompe il deploy prima dell'aggiornamento di API/web/worker;
+8. aggiorna i servizi e attende `/readyz` tramite HTTPS.
 
 **Le migrazioni Prisma non vengono annullate automaticamente.** Prima di ogni rilascio, revisionare il SQL delle nuove migration e applicare la strategia expand/contract: aggiungere prima strutture compatibili, distribuire codice che supporti vecchio e nuovo schema, migrare i dati, rimuovere colonne/indici solo in un rilascio successivo. Evitare rename/drop o cambi di tipo incompatibili nello stesso deploy. Il dump pre-deploy è una rete di sicurezza, non un rollback automatico né garanzia di compatibilità. Se readiness fallisce dopo una migration, il workflow mostra log e stato ma non tenta un ripristino distruttivo del database.
 
@@ -151,7 +152,7 @@ sudo systemctl start vivarqo-offsite-backup.service
 sudo systemctl status vivarqo-offsite-backup.service
 ```
 
-Il servizio verifica anche che `/mnt/vivarqo-prod-backups` sia ancora un mountpoint e ha un timeout di sei ore, così un controllo Restic non viene terminato dopo il timeout breve predefinito di systemd. La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
+Il servizio verifica anche che `/mnt/vivarqo-prod-backups` sia ancora un mountpoint, ha un timeout di sei ore e riprova automaticamente in caso di errore (fino a tre avvii nell'intervallo configurato), così un problema temporaneo di rete non lascia il backup fermo fino al giorno successivo. La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
 
 Il backup Restic copre i dump PostgreSQL locali e i relativi checksum. **Non copia gli oggetti del bucket applicativo S3**: configurare versioning e replica/backup separati per documenti e immagini, con credenziali distinte. Per un disaster recovery reale, effettuare periodicamente un restore drill su un host separato, ripristinando database e oggetti S3 dello stesso punto temporale e verificando i documenti dall'applicazione.
 
@@ -269,9 +270,10 @@ Verificare che la regola sia effettivamente attiva:
 aws s3api get-bucket-replication --bucket "$SOURCE_BUCKET"
 aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix documents/
 aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix animal-photos/
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix exports/
 ```
 
-Il codice genera chiavi casuali e nuove per ogni upload (ad esempio `documents/<uuid>.pdf` e `animal-photos/<uuid>.jpg`), quindi gli oggetti non vengono normalmente sovrascritti. Le cancellazioni producono delete marker sul sorgente; con la replica dei delete marker disabilitata, la versione precedente resta recuperabile nel bucket secondario. Per ripristinare un file, identificare la versione corretta nel bucket di replica e copiarla nuovamente sulla stessa chiave del bucket sorgente:
+Il codice genera chiavi casuali e nuove per ogni upload (ad esempio `documents/<uuid>.pdf`, `animal-photos/<uuid>.jpg` ed `exports/<uuid>.zip`), quindi gli oggetti non vengono normalmente sovrascritti. Le cancellazioni producono delete marker sul sorgente; con la replica dei delete marker disabilitata, la versione precedente resta recuperabile nel bucket secondario. Per ripristinare un file, identificare la versione corretta nel bucket di replica e copiarla nuovamente sulla stessa chiave del bucket sorgente:
 
 ```bash
 aws s3api copy-object --bucket "$SOURCE_BUCKET" --key "$STORAGE_KEY" \

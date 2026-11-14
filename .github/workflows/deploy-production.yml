@@ -114,6 +114,13 @@ jobs:
             echo "Verified pre-deploy database backup: $archive"
           '
 
+          # Require a successful encrypted off-site copy of the pre-deploy dump.
+          # systemd runs Restic with root-only credentials and verifies the repository.
+          if ! sudo -n /usr/bin/systemctl start vivarqo-offsite-backup.service; then
+            echo "Off-site backup failed; refusing to run database migrations." >&2
+            exit 6
+          fi
+
           # Build before changing API/web/worker. Run the one-shot migration
           # without dependencies: PostgreSQL health was checked above, and this
           # prevents Compose from stopping the live DB when migrate exits.
