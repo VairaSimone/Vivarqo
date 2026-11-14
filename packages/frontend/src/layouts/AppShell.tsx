@@ -64,8 +64,44 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [searchFailed, setSearchFailed] = useState(false);
   const [searchRetry, setSearchRetry] = useState(0);
   const [showTour, setShowTour] = useState(false);
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [appInstalled, setAppInstalled] = useState(false);
+  const [iosDevice, setIosDevice] = useState(false);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
+
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+    setAppInstalled(standalone);
+    const userAgent = navigator.userAgent;
+    setIosDevice(/iPad|iPhone|iPod/.test(userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const onAppInstalled = () => {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+      setInstallHelpOpen(false);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  async function installApplication() {
+    if (!installPrompt) return;
+    const promptEvent = installPrompt;
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    setInstallPrompt(null);
+    if (choice.outcome === "accepted") setAppInstalled(true);
+  }
   const route = path.split("?")[0] || "/today";
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
 
@@ -246,6 +282,30 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       })}
       <button type="button" aria-label={t("more")} onClick={() => setMobileMenu(true)}><Icon name="more" size={18} /><span>{t("more")}</span></button>
     </nav>
+    {installHelpOpen && <div className="pwa-install-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setInstallHelpOpen(false); }}>
+      <section className="pwa-install-dialog" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
+        <button className="pwa-install-close" type="button" onClick={() => setInstallHelpOpen(false)} aria-label={t("close")}>×</button>
+        <div className="pwa-install-icon"><Icon name="download" size={25} /></div>
+        <p className="pwa-install-eyebrow">{t("pwaInstallEyebrow")}</p>
+        <h2 id="pwa-install-title">{appInstalled ? t("pwaInstalledTitle") : t("pwaInstallTitle")}</h2>
+        <p className="pwa-install-description">{t("pwaInstallDescription")}</p>
+        {appInstalled ? <div className="pwa-install-success" role="status">{t("pwaInstalledDescription")}</div> : <>
+          {installPrompt && <button className="btn btn-primary pwa-install-action" type="button" onClick={() => void installApplication()}><Icon name="download" size={17} />{t("pwaInstallNow")}</button>}
+          <div className="pwa-install-steps">
+            {iosDevice ? <>
+              <h3>{t("pwaIosTitle")}</h3>
+              <ol><li>{t("pwaIosStep1")}</li><li>{t("pwaIosStep2")}</li><li>{t("pwaIosStep3")}</li></ol>
+            </> : <>
+              <h3>{t("pwaAndroidTitle")}</h3>
+              <ol><li>{t("pwaAndroidStep1")}</li><li>{t("pwaAndroidStep2")}</li></ol>
+              <h3>{t("pwaDesktopTitle")}</h3>
+              <ol><li>{t("pwaDesktopStep1")}</li><li>{t("pwaDesktopStep2")}</li></ol>
+            </>}
+          </div>
+          <p className="pwa-install-footnote">{t("pwaInstallFootnote")}</p>
+        </>}
+      </section>
+    </div>}
     {showTour && <OnboardingTour locale={locale} onNavigate={(next) => { onNavigate(next); setShowTour(false); }} onClose={() => setShowTour(false)} />}
     {searchOpen && <Modal title={t("search")} onClose={closeSearch} wide>
       <div className="global-search-panel">
