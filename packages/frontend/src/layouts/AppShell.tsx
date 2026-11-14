@@ -270,6 +270,9 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         <div className="topbar-context"><span className="topbar-dot" />{t(titleKey)}</div>
         <div className="topbar-actions">
           <button className="global-search" onClick={() => setSearchOpen(true)} aria-label={t("search")} aria-haspopup="dialog"><Icon name="search" size={16} /><span>{t("search")}</span></button>
+          <button type="button" className="pwa-install-trigger" onClick={() => setInstallHelpOpen(true)} aria-haspopup="dialog" aria-label={t("pwaInstallTitle")}>
+            <Icon name="download" size={16} /><span>{appInstalled ? t("pwaInstalled") : t("pwaInstallButton")}</span>
+          </button>
           <button type="button" className="tour-trigger" onClick={() => setShowTour(true)}><Icon name="alert" size={16} /><span>{locale === "it" ? "Guida" : "Guide"}</span></button>
           <IconButton label={t("notifications")} onClick={() => onNavigate("/notifications")}><Icon name="bell" />{unreadCount > 0 && <i className="notification-dot" />}</IconButton>
           <button className="topbar-avatar" onClick={() => onNavigate("/settings")} aria-label={t("profile")}>{user.displayName.trim().slice(0, 1).toUpperCase() || "S"}</button>
