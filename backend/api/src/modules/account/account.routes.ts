@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, clearSessionCookie, type AuthContext } from "../auth/session.js";
-import { createResendEmailSender, type EmailSender } from "../auth/email-sender.js";
+import { createConfiguredEmailSender, type EmailSender } from "../auth/email-sender.js";
 import { accountPatchSchema } from "../auth/auth.schemas.js";
 import { patchAccount } from "../auth/auth.service.js";
 import { deleteUserAccount } from "./account-deletion.service.js";
@@ -37,7 +37,7 @@ const preferencesPatchSchema = z.object({
 
 export function createAccountRouter(sender?: EmailSender) {
   const router = Router();
-  const emailSender = sender ?? createResendEmailSender();
+  const emailSender = sender ?? createConfiguredEmailSender();
 
   router.get("/preferences", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
