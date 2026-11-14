@@ -41,7 +41,9 @@ const environmentSchema = z.object({
     { message: "must be a PostgreSQL connection URL" },
   ),
   CSRF_SECRET: z.string().min(32),
+  EMAIL_PROVIDER: z.enum(["brevo", "resend"]).default("resend"),
   RESEND_API_KEY: optionalString,
+  BREVO_API_KEY: optionalString,
   EMAIL_FROM: optionalEmail,
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
@@ -94,8 +96,11 @@ if (deployedEnvironment) {
   ) {
     deploymentProblems.push("CSRF_SECRET must be a unique random secret with at least 32 characters");
   }
-  if (!runtimeEnvironment.RESEND_API_KEY || !runtimeEnvironment.EMAIL_FROM) {
-    deploymentProblems.push("RESEND_API_KEY and EMAIL_FROM are required in deployed environments");
+  const emailProviderKey = runtimeEnvironment.EMAIL_PROVIDER === "brevo"
+    ? runtimeEnvironment.BREVO_API_KEY
+    : runtimeEnvironment.RESEND_API_KEY;
+  if (!emailProviderKey || !runtimeEnvironment.EMAIL_FROM) {
+    deploymentProblems.push(`${runtimeEnvironment.EMAIL_PROVIDER === "brevo" ? "BREVO_API_KEY" : "RESEND_API_KEY"} and EMAIL_FROM are required for the selected email provider in deployed environments`);
   } else if (runtimeEnvironment.EMAIL_FROM.toLowerCase().includes("example.com")) {
     deploymentProblems.push("EMAIL_FROM must use a verified sender domain, not example.com");
   }
