@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Snakebee — Breeder workspace",
-  "short_name": "Snakebee",
+  "name": "SnakeBee — Breeder workspace",
+  "short_name": "SnakeBee",
   "description": "Il gestionale per piccoli e medi allevatori di rettili.",
   "start_url": "/today",
   "scope": "/",
