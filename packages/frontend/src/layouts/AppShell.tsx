@@ -178,7 +178,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={locale === "it" ? "Navigazione principale" : "Main navigation"} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
       <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Snakebee home">
         <span className="brand-mark"><Icon name="leaf" size={21} /></span>
-        <span className="brand-copy"><strong>vivarqo</strong><small>{t("brandTagline")}</small></span>
+        <span className="brand-copy"><strong>SnakeBee</strong><small>{t("brandTagline")}</small></span>
       </button>
       <div className="nav-scroll">
         {groups.map((group) => <div className="nav-section" key={group.title}>
@@ -188,7 +188,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       </div>
       <div className="sidebar-bottom">
         <button className="profile-card" onClick={() => { onNavigate("/settings"); setMobileMenu(false); }}>
-          <span className="avatar">{user.displayName.trim().slice(0, 1).toUpperCase() || "V"}</span>
+          <span className="avatar">{user.displayName.trim().slice(0, 1).toUpperCase() || "S"}</span>
           <span className="profile-copy"><strong>{user.displayName}</strong><small>{user.email}</small></span>
           <Icon name="chevron" size={15} />
         </button>
@@ -207,7 +207,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         <div className="topbar-actions">
           <button className="global-search" onClick={() => setSearchOpen(true)} aria-label={t("search")} aria-haspopup="dialog"><Icon name="search" size={16} /><span>{t("search")}</span></button>
           <IconButton label={t("notifications")} onClick={() => onNavigate("/notifications")}><Icon name="bell" />{unreadCount > 0 && <i className="notification-dot" />}</IconButton>
-          <button className="topbar-avatar" onClick={() => onNavigate("/settings")} aria-label={t("profile")}>{user.displayName.trim().slice(0, 1).toUpperCase() || "V"}</button>
+          <button className="topbar-avatar" onClick={() => onNavigate("/settings")} aria-label={t("profile")}>{user.displayName.trim().slice(0, 1).toUpperCase() || "S"}</button>
         </div>
       </header>
       <main id="main-content" className="page-content" tabIndex={-1}>{children}</main>
