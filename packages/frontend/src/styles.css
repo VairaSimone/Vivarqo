@@ -2511,3 +2511,53 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .intro-mark { width: 48px; height: 48px; flex-basis: 48px; }
   .dashboard-priorities { padding: 13px; }
 }
+
+
+/* PWA installation entry point and platform-specific help */
+.pwa-install-trigger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 36px; padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--forest-2) 30%, var(--border));
+  border-radius: 9px; background: color-mix(in srgb, var(--accent-teal-bg) 78%, var(--surface));
+  color: var(--forest); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.pwa-install-trigger:hover { border-color: var(--forest-2); background: var(--accent-teal-bg); transform: translateY(-1px); }
+.pwa-install-trigger:focus-visible, .pwa-install-close:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 3px; }
+.pwa-install-backdrop {
+  position: fixed; z-index: 120; inset: 0; display: grid; place-items: center;
+  overflow-y: auto; padding: 20px; background: rgba(12, 22, 18, .62); backdrop-filter: blur(5px);
+}
+.pwa-install-dialog {
+  position: relative; width: min(100%, 510px); max-height: min(90vh, 760px); overflow-y: auto;
+  padding: 30px; border: 1px solid var(--border); border-radius: 20px;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-modal);
+}
+.pwa-install-close {
+  position: absolute; top: 14px; right: 14px; display: grid; place-items: center;
+  width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 50%;
+  background: var(--surface-soft); color: var(--muted); font-size: 23px; line-height: 1; cursor: pointer;
+}
+.pwa-install-icon {
+  display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 17px;
+  border-radius: 16px; background: var(--accent-teal-bg); color: var(--accent-teal);
+}
+.pwa-install-eyebrow { margin: 0 0 7px; color: var(--accent-teal); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.pwa-install-dialog h2 { max-width: 390px; margin: 0 30px 10px 0; font-size: clamp(23px, 4vw, 29px); line-height: 1.15; }
+.pwa-install-description { margin: 0 0 21px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.pwa-install-action { display: inline-flex; align-items: center; justify-content: center; gap: 9px; width: 100%; min-height: 46px; margin: 0 0 21px; font-size: 14px; }
+.pwa-install-steps { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-soft); }
+.pwa-install-steps h3 { margin: 0; font-size: 14px; letter-spacing: -.01em; }
+.pwa-install-steps ol { display: grid; gap: 8px; margin: 0 0 7px; padding-left: 21px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.pwa-install-steps ol:last-child { margin-bottom: 0; }
+.pwa-install-footnote { margin: 15px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.pwa-install-success { padding: 15px; border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border)); border-radius: 11px; background: var(--success-bg); color: var(--success); font-size: 13px; line-height: 1.55; }
+@media (max-width: 760px) {
+  .pwa-install-trigger { min-width: 36px; width: 36px; padding: 0; border-radius: 9px; }
+  .pwa-install-trigger span { display: none; }
+  .pwa-install-dialog { padding: 24px 20px; border-radius: 17px; }
+}
+@media (max-width: 380px) {
+  .pwa-install-backdrop { padding: 10px; }
+  .pwa-install-dialog { padding: 22px 16px; }
+}
