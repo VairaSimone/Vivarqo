@@ -536,7 +536,24 @@ async function waitHttp(label, url, timeout = 90_000) {
   }
   throw new Error(label + " non risponde su " + url + ". Ultimo errore: " + last);
 }
+async function getHealthCheckIntervalMs() {
+  const envContents = await readFile(path.join(ROOT, ".env"), "utf8").catch(() => "");
+  const configured = process.env.VIVARQO_MANAGER_HEALTH_INTERVAL_MS ??
+    readEnvValue(envContents, "VIVARQO_MANAGER_HEALTH_INTERVAL_MS");
+  if (configured === null || configured === undefined || configured.trim() === "") return 30_000;
+  const interval = Number(configured);
+  if (!Number.isInteger(interval) || interval < 1_000 || interval > 300_000) {
+    throw new Error("VIVARQO_MANAGER_HEALTH_INTERVAL_MS deve essere un intero tra 1000 e 300000 millisecondi.");
+  }
+  return interval;
+}
+
 async function monitor() {
+  const intervalMs = await getHealthCheckIntervalMs();
+  await log("INFO", "MANAGER", "Health check API/frontend ogni " + intervalMs + " ms; primo controllo dopo l'intervallo iniziale.");
+  // waitHttp already performed the immediate startup checks. Do not duplicate
+  // them as soon as the monitor starts.
+  await delay(intervalMs);
   const checks = [{ name: "api", url: API_URL }, { name: "frontend", url: WEB_URL }];
   const misses = new Map(checks.map(x => [x.name, 0]));
   while (!STOP.requested) {
@@ -564,7 +581,7 @@ async function monitor() {
       }
     }
     broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
-    await delay(10_000);
+    await delay(intervalMs);
   }
 }
 async function prepareProduction() {
