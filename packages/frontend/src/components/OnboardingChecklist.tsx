@@ -50,7 +50,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
     const results = await Promise.allSettled([
       api.get<CountResponse>("/animals?page=1&pageSize=1"),
       api.get<CountResponse>("/feeding-sessions?page=1&pageSize=1"),
-      api.get<CountResponse>("/reminder-rules?page=1&pageSize=1&enabled=true"),
+      api.get<CountResponse>("/tasks/reminder-rules?page=1&pageSize=1&enabled=true"),
     ]);
     if (signal?.aborted) return;
     if (results.some((result) => result.status === "rejected")) {
