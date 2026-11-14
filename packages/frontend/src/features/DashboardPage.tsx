@@ -7,6 +7,7 @@ import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { OnboardingChecklist } from "../components/OnboardingChecklist";
+import { PlanUsageSummary } from "../components/PlanUsageSummary";
 import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, PageHeader, Panel, PanelHeader, useToast } from "../components/ui";
 
 export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; timezone: string; navigate: (path: string) => void }) {
@@ -108,6 +109,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </Panel>
 
       <div className="dashboard-side">
+        <PlanUsageSummary locale={locale} compact onNavigate={navigate} />
         <Panel>
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
