@@ -94,9 +94,11 @@ jobs:
           # Build before touching the running services. Migrations run as a
           # separate one-shot service and must succeed before the API is started.
           "${compose[@]}" build api web worker migrate
-          # Recreate the one-shot migration service explicitly. A non-zero
-          # migration exit stops this workflow before the app services change.
-          "${compose[@]}" up -d --no-build --force-recreate migrate
+          # Start PostgreSQL explicitly, then run the migration in the foreground.
+          # --exit-code-from makes the SSH step fail on a non-zero migration exit.
+          # The completed one-shot container is retained for Compose dependency checks.
+          "${compose[@]}" up -d --no-build postgres
+          "${compose[@]}" up --no-deps --no-build --force-recreate --exit-code-from migrate migrate
           "${compose[@]}" up -d --no-build --remove-orphans
 
           for attempt in $(seq 1 30); do
