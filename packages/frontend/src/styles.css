@@ -2086,3 +2086,6 @@ svg {
  .onboarding-limits { grid-template-columns:1fr; }
  .tour-trigger span { display:none; }
 }
+
+.onboarding-open-section { display:inline-flex; align-items:center; gap:7px; margin-top:17px; padding:7px 0; border:0; background:transparent; color:var(--primary); font-size:13px; font-weight:700; cursor:pointer; }
+.onboarding-open-section:hover { text-decoration:underline; }
