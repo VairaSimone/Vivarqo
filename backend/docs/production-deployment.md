@@ -1,4 +1,4 @@
-# Deployment production/staging — Snakebee
+# Deployment production/staging — Vivarqo
 
 Questa configurazione separa sviluppo locale, staging e produzione. È una configurazione di deployment da applicare su un host reale; il suo inserimento in Git non significa che il servizio sia già stato distribuito.
 
@@ -93,6 +93,69 @@ Il ruolo S3 usato da API/worker deve essere limitato al bucket applicativo e all
 
 Non considerare completo il disaster recovery finché non sono stati provati insieme il ripristino del database e il recupero degli oggetti S3 corrispondenti allo stesso punto temporale. Il checksum SHA-256 dei dump PostgreSQL verifica l'integrità dell'archivio, ma non cifra i backup: il filesystem locale dei dump deve essere cifrato a riposo e la copia off-site deve usare cifratura end-to-end o del client di backup.
 
+## Deploy manuale tramite GitHub Actions
+
+Il workflow `.github/workflows/deploy-production.yml` è intenzionalmente solo `workflow_dispatch`: un push su `main` non distribuisce automaticamente. Il job usa l'environment GitHub `production`; configura eventuali required reviewers nelle impostazioni del repository prima di abilitarlo.
+
+Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository. L'utente SSH di deploy deve poter leggere il repository Git (chiave deploy read-only o credenziale equivalente), aggiornare il checkout e usare Docker Compose. L'utente deve avere accesso ai file `.env.production` e alle directory configurate, ma non deve poter modificare segreti condivisi da altri servizi. Deve inoltre poter avviare esclusivamente il job Restic tramite sudo non interattivo: aggiungere in `/etc/sudoers.d/vivarqo-deploy` una regola `NOME_UTENTE ALL=(root) NOPASSWD: /usr/bin/systemctl start vivarqo-offsite-backup.service` e verificarla con `visudo -cf /etc/sudoers.d/vivarqo-deploy`. L'accesso al gruppo Docker equivale di fatto a privilegi root: non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
+
+- `VIVARQO_DEPLOY_HOST`: hostname/IP del VPS.
+- `VIVARQO_DEPLOY_USER`: utente SSH di deploy.
+- `VIVARQO_DEPLOY_SSH_KEY`: chiave privata dedicata, senza passphrase oppure gestita da un agente compatibile.
+- `VIVARQO_DEPLOY_KNOWN_HOSTS`: riga host key verificata fuori banda (non usare `ssh-keyscan` durante il deploy).
+- `VIVARQO_PUBLIC_DOMAIN`: dominio TLS configurato in `.env.production`.
+
+Avviare da Actions → Vivarqo production deployment → Run workflow e incollare lo SHA completo di un commit già raggiungibile da `origin/main`. Il workflow rifiuta SHA non validi o non appartenenti alla storia di `main`.
+
+Il deploy:
+1. aggiorna il checkout al commit selezionato e valida la configurazione Compose;
+2. verifica che il percorso backup sia un mountpoint dedicato;
+3. avvia PostgreSQL solo se necessario, senza ricreare un container DB già attivo, e attende `pg_isready`;
+4. produce un dump pre-deploy, verifica `pg_restore --list` e pubblica checksum e archivio in modo che il dump sia visibile solo quando entrambi sono pronti;
+5. avvia il servizio systemd Restic e attende il completamento della copia cifrata off-site: se il repository remoto non è raggiungibile o la verifica fallisce, le migrazioni non partono;
+6. costruisce le immagini applicative;
+7. esegue `migrate` in foreground senza dipendenze Compose aggiuntive: un exit code non zero interrompe il deploy prima dell'aggiornamento di API/web/worker;
+8. aggiorna i servizi e attende `/readyz` tramite HTTPS.
+
+**Le migrazioni Prisma non vengono annullate automaticamente.** Prima di ogni rilascio, revisionare il SQL delle nuove migration e applicare la strategia expand/contract: aggiungere prima strutture compatibili, distribuire codice che supporti vecchio e nuovo schema, migrare i dati, rimuovere colonne/indici solo in un rilascio successivo. Evitare rename/drop o cambi di tipo incompatibili nello stesso deploy. Il dump pre-deploy è una rete di sicurezza, non un rollback automatico né garanzia di compatibilità. Se readiness fallisce dopo una migration, il workflow mostra log e stato ma non tenta un ripristino distruttivo del database.
+
+## Backup PostgreSQL off-site cifrato con Restic
+
+Il backup Compose continua a creare dump locali verificati su `VIVARQO_BACKUP_DIR`. Per replicarli fuori dal VPS, installare Restic sul server e usare il nuovo script `backend/scripts/backup-offsite-restic.sh`. Restic cifra e autentica i dati sul client prima dell'upload: il provider remoto non riceve dump in chiaro.
+
+Creare un repository remoto dedicato (ad esempio un bucket S3-compatible o un repository Restic su storage remoto) e inizializzarlo una sola volta, in modo interattivo e controllato:
+
+```bash
+sudo bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; restic init'
+```
+
+Creare `/etc/vivarqo/offsite-backup.env`, root-owned e mode `0600`, con almeno:
+
+```dotenv
+VIVARQO_BACKUP_DIR=/mnt/vivarqo-prod-backups
+RESTIC_REPOSITORY=s3:https://s3.eu-central-003.backblazeb2.com/vivarqo-backups
+RESTIC_PASSWORD_FILE=/etc/vivarqo/restic-repository-password
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+Per un endpoint diverso, sostituire URL e variabili richieste dal backend Restic scelto. La password Restic deve essere generata casualmente, salvata in un secret manager e custodita anche in una copia offline sicura: senza di essa il repository non è recuperabile. Non inserirla nel repository Git, nei log o in un backup non cifrato. Limitare le credenziali remote al bucket dedicato; se il provider supporta versioning/Object Lock, abilitarli con una retention coerente e credenziali amministrative separate.
+
+Installare il timer:
+
+```bash
+sudo install -m 0644 backend/systemd/vivarqo-offsite-backup.service /etc/systemd/system/
+sudo install -m 0644 backend/systemd/vivarqo-offsite-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now vivarqo-offsite-backup.timer
+sudo systemctl start vivarqo-offsite-backup.service
+sudo systemctl status vivarqo-offsite-backup.service
+```
+
+Il servizio verifica anche che `/mnt/vivarqo-prod-backups` sia ancora un mountpoint, ha un timeout di sei ore e riprova automaticamente in caso di errore (fino a tre avvii nell'intervallo configurato), così un problema temporaneo di rete non lascia il backup fermo fino al giorno successivo. La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
+
+Il backup Restic copre i dump PostgreSQL locali e i relativi checksum. **Non copia gli oggetti del bucket applicativo S3**: configurare versioning e replica/backup separati per documenti e immagini, con credenziali distinte. Per un disaster recovery reale, effettuare periodicamente un restore drill su un host separato, ripristinando database e oggetti S3 dello stesso punto temporale e verificando i documenti dall'applicazione.
+
 ## Database e privilegi
 
 La password admin, quella del ruolo applicativo e quella del ruolo backup sono generate separatamente. All'inizializzazione del volume PostgreSQL, `init-app-role.sh` crea il ruolo app senza privilegi SUPERUSER/CREATEDB/CREATEROLE e gli assegna DML sulle tabelle e uso delle sequenze. Crea anche il ruolo backup, senza privilegi di scrittura o amministrativi, con accesso predefinito `pg_read_all_data`. Le migrazioni usano il ruolo admin perché possono creare tabelle, indici ed estensioni. API e worker usano esclusivamente il ruolo app; il container backup usa esclusivamente il ruolo read-only.
@@ -113,3 +176,110 @@ sha256sum -c vivarqo-<timestamp>.dump.sha256
 pg_restore --list vivarqo-<timestamp>.dump
 ```
 
+
+
+## Ripristino PostgreSQL da Restic
+
+Il ripristino deve essere eseguito su un host/volume separato, senza sovrascrivere il database di produzione. Installare la stessa versione principale di Restic o una versione compatibile e i client PostgreSQL 18. Recuperare la password Restic dal secret manager offline e predisporre un repository accessibile in sola lettura.
+
+1. Elencare gli snapshot e scegliere esplicitamente quello desiderato:
+
+   ```bash
+   sudo bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; restic snapshots --tag vivarqo --tag postgres'
+   ```
+
+2. Creare una directory vuota su un filesystem con spazio sufficiente e ripristinare/verificare i dump:
+
+   ```bash
+   sudo install -d -m 0700 /mnt/vivarqo-restore
+   sudo env RESTIC_SNAPSHOT='<snapshot-id>' VIVARQO_RESTORE_ROOT=/mnt/vivarqo-restore \
+     bash -c 'set -a; . /etc/vivarqo/offsite-backup.env; set +a; exec bash /opt/vivarqo/app/backend/scripts/restore-postgres-restic.sh'
+   ```
+
+   Lo script richiede uno snapshot esplicito, rifiuta una directory di destinazione non vuota, verifica tutti i checksum SHA-256 e controlla la leggibilità dei dump con `pg_restore --list`. Non modifica alcun database.
+
+3. Creare un database nuovo e vuoto sul PostgreSQL di ripristino con un ruolo amministrativo. Non puntare mai il comando al database di produzione. Dopo aver individuato il dump corretto nella directory ripristinata:
+
+   ```bash
+   createdb --host=<restore-db-host> --username=<restore-admin> vivarqo_restore
+   pg_restore --host=<restore-db-host> --username=<restore-admin> \
+     --dbname=vivarqo_restore --no-owner --no-acl --exit-on-error \
+     /mnt/vivarqo-restore/mnt/vivarqo-prod-backups/<dump-scelto>.dump
+   ```
+
+   Se si ripristina su un servizio PostgreSQL remoto, usare un secret manager o `PGPASSFILE` con permessi `0600`; non inserire password nelle opzioni della riga di comando.
+
+4. Eseguire controlli applicativi su un ambiente isolato: migrazioni compatibili, conteggi e relazioni principali, login, accesso a documenti e immagini, processi worker e integrità degli allegati. Conservare log e durata del test. Solo dopo la validazione si può pianificare un cutover separato.
+
+## Strategia operativa per backup e restore S3
+
+Lo storage applicativo usa oggetti privati con chiavi generate e persistite nei record PostgreSQL. Gli oggetti non sono inclusi nei dump del database né nel repository Restic dei dump. Le chiavi sono immutabili e il codice esegue PUT/GET/DELETE sul bucket configurato da `S3_ENDPOINT`, `S3_REGION` e `S3_BUCKET`.
+
+Prima della produzione, applicare sul provider S3-compatible una configurazione equivalente a questa:
+
+- Bucket sorgente privato, accesso pubblico bloccato, TLS obbligatorio e cifratura server-side.
+- Versioning abilitato sul bucket sorgente. Conservare le versioni non correnti e i delete marker per un periodo almeno pari alla retention del database; evitare lifecycle che elimini versioni recuperabili prima della scadenza.
+- Replica cross-account o backup verso un secondo bucket in un account/credenziali separati, preferibilmente in una regione o provider indipendente. La replica deve includere le versioni nuove e le cancellazioni devono essere configurate in modo da non propagare una cancellazione accidentale in modo irreversibile.
+- Se il provider lo supporta, abilitare Object Lock/immutability sul bucket di destinazione con una retention approvata. Le credenziali runtime dell'applicazione non devono poter modificare policy, retention o replica.
+- Ruolo runtime dell'applicazione limitato al bucket sorgente e alle sole operazioni oggetto necessarie. Ruolo di replica/backup separato e con permessi minimi; access key distinte da quelle API.
+- Monitorare esito e ritardo della replica, errori di autorizzazione, quota/spazio, versioni non replicate e accessi anomali. Un semplice stato "versioning enabled" non dimostra che la replica funzioni.
+
+**Attenzione alle cancellazioni:** il backend invia DELETE per la chiave oggetto. Con versioning S3 questo normalmente crea un delete marker, quindi un GET sulla chiave può continuare a restituire 404 anche se la versione precedente è conservata. Per ripristinare un documento cancellato occorre recuperare la versione precedente e renderla nuovamente corrente (o copiarla su una nuova chiave aggiornando il record DB). Eseguire questa operazione prima o insieme al ripristino del database, mantenendo coerenti record e oggetti.
+
+### Prova periodica di ripristino S3
+
+1. Scegliere uno snapshot DB e il punto temporale corrispondente alla replica S3.
+2. Ripristinare il database in un ambiente isolato.
+3. Selezionare documenti e immagini campione dai relativi record e leggere le loro `storageKey`.
+4. Recuperare le versioni oggetto dal bucket di replica in un bucket di restore isolato; verificare dimensione, MIME e checksum quando disponibili.
+5. Rendere disponibili gli oggetti con le chiavi attese dal database ripristinato e verificare download tramite API autenticata e link pubblici autorizzati.
+6. Registrare RPO effettivo, tempo di ripristino, oggetti mancanti e correzioni necessarie.
+
+Le API S3-compatible non espongono tutte le stesse funzionalità di versioning, replica, Object Lock e gestione dei delete marker. Il provider effettivo non è specificato nei file di configurazione: prima di scrivere policy automatiche o comandi provider-specifici bisogna identificare il servizio e verificare quali API supporta. Non è corretto dichiarare il backup S3 attivo finché non sono presenti una replica configurata e un restore drill riuscito.
+
+
+### Configurazione AWS S3 consigliata (bucket di produzione)
+
+Nel file di esempio `.env.production.example`, `S3_ENDPOINT` è vuoto e la regione predefinita è `eu-west-1`: con questi valori il codice usa l'endpoint AWS S3 standard. Il bucket è ancora un placeholder, quindi non è possibile verificare o attivare una replica reale finché non vengono scelti il nome/account del bucket e le credenziali.
+
+Per AWS S3, prima del lancio:
+
+1. Creare un bucket sorgente privato in `eu-west-1` e un bucket di destinazione in un account AWS separato, preferibilmente in una seconda regione.
+2. Abilitare versioning su entrambi i bucket e bloccare l'accesso pubblico sul bucket sorgente:
+
+   ```bash
+   aws s3api put-bucket-versioning --bucket "$SOURCE_BUCKET" \
+     --versioning-configuration Status=Enabled
+   aws s3api put-bucket-versioning --bucket "$REPLICA_BUCKET" \
+     --versioning-configuration Status=Enabled
+   aws s3api put-public-access-block --bucket "$SOURCE_BUCKET" \
+     --public-access-block-configuration \
+     BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+   aws s3api get-bucket-versioning --bucket "$SOURCE_BUCKET"
+   aws s3api get-bucket-versioning --bucket "$REPLICA_BUCKET"
+   ```
+
+3. Abilitare la cifratura server-side su entrambi i bucket (SSE-S3 o SSE-KMS con chiavi e permessi separati). La cifratura server-side è aggiuntiva rispetto alla cifratura client-side Restic dei dump PostgreSQL.
+4. Configurare una regola di Cross-Region o Cross-Account Replication con un ruolo IAM dedicato. La regola deve replicare tutte le versioni oggetto ma **non replicare i delete marker**: una cancellazione applicativa nel bucket sorgente non deve nascondere anche la copia recuperabile nel bucket di destinazione. Entrambi i bucket devono avere versioning attivo prima di creare la regola.
+5. Applicare una retention delle versioni non correnti coerente con quella del database. Con 12 snapshot Restic mensili, mantenere le versioni S3 recuperabili per almeno 400 giorni; non applicare lifecycle che elimini prima le versioni necessarie al ripristino. Valutare Object Lock sul bucket di destinazione se serve protezione immutabile e il piano/costo AWS lo consente.
+6. Usare credenziali diverse per API, replica e amministrazione del bucket. Il ruolo applicativo non deve poter modificare versioning, replica, lifecycle o policy del bucket di destinazione.
+
+Verificare che la regola sia effettivamente attiva:
+
+```bash
+aws s3api get-bucket-replication --bucket "$SOURCE_BUCKET"
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix documents/
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix animal-photos/
+aws s3api list-object-versions --bucket "$REPLICA_BUCKET" --prefix exports/
+```
+
+Il codice genera chiavi casuali e nuove per ogni upload (ad esempio `documents/<uuid>.pdf`, `animal-photos/<uuid>.jpg` ed `exports/<uuid>.zip`), quindi gli oggetti non vengono normalmente sovrascritti. Le cancellazioni producono delete marker sul sorgente; con la replica dei delete marker disabilitata, la versione precedente resta recuperabile nel bucket secondario. Per ripristinare un file, identificare la versione corretta nel bucket di replica e copiarla nuovamente sulla stessa chiave del bucket sorgente:
+
+```bash
+aws s3api copy-object --bucket "$SOURCE_BUCKET" --key "$STORAGE_KEY" \
+  --copy-source "$REPLICA_BUCKET/$STORAGE_KEY?versionId=$VERSION_ID"
+```
+
+Dopo il ripristino, verificare il download tramite API e confrontare il documento con il record del database ripristinato. Le chiavi S3 presenti nel DB e gli oggetti devono appartenere allo stesso punto temporale; le copie create dopo lo snapshot DB possono rimanere come oggetti orfani e vanno eliminate solo dopo aver concluso la verifica.
+
+Per provider S3-compatible diversi da AWS, verificare che siano supportati versioning, replica cross-account, delete marker e lifecycle; non tutte le implementazioni offrono le stesse garanzie o API.

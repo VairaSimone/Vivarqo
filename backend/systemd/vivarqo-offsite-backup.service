@@ -1,0 +1,28 @@
+[Unit]
+Description=Vivarqo encrypted off-site PostgreSQL backup
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+StartLimitIntervalSec=1d
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/vivarqo/app
+EnvironmentFile=/etc/vivarqo/offsite-backup.env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=RESTIC_CACHE_DIR=/var/cache/vivarqo-restic
+ExecStartPre=/usr/bin/install -d -m 0700 /var/cache/vivarqo-restic
+ExecStartPre=/usr/bin/mountpoint -q /mnt/vivarqo-prod-backups
+ExecStart=/usr/bin/bash /opt/vivarqo/app/backend/scripts/backup-offsite-restic.sh
+UMask=0077
+TimeoutStartSec=6h
+Restart=on-failure
+RestartSec=5m
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/mnt/vivarqo-prod-backups /var/cache/vivarqo-restic

@@ -7,10 +7,10 @@ if (env.NODE_ENV !== "test" || !/(test|e2e)/i.test(databaseName)) {
   throw new Error("E2E fixtures are restricted to NODE_ENV=test and a test/e2e database");
 }
 
-const password = "Snakebee-E2E-Only-2026!";
+const password = "Vivarqo-E2E-Only-2026!";
 const accounts = [
-  { email: "e2e-owner@snakebee.test", displayName: "E2E Owner" },
-  { email: "e2e-other@snakebee.test", displayName: "E2E Other" },
+  { email: "e2e-owner@vivarqo.test", displayName: "E2E Owner" },
+  { email: "e2e-other@vivarqo.test", displayName: "E2E Other" },
 ];
 
 async function cleanAccounts() {

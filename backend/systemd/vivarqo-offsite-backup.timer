@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Vivarqo encrypted off-site backup schedule
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=1m
+Unit=vivarqo-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

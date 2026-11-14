@@ -16,7 +16,13 @@ async function signIn(page, account) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Password").fill(account.password);
+  const loginResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/auth/login"
+  );
   await page.getByRole("button", { name: "Accedi" }).click();
+  const response = await loginResponse;
+  expect(response.status(), `E2E login failed: ${await response.text()}`).toBe(200);
   await page.waitForURL(/\/today(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
@@ -566,11 +572,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   page.once("dialog", (dialog) => dialog.accept());
   const feedingDeletedResponse = page.waitForResponse((response) =>
     response.request().method() === "DELETE" &&
-    response.url().includes("/api/v1/feeding-entries/" + feedingEntry.id) &&
-    response.status() === 204
+    response.url().includes("/api/v1/feeding-entries/" + feedingEntry.id)
   );
   await page.getByRole("button", { name: "Elimina" }).click();
-  await feedingDeletedResponse;
+  const feedingDeleteResult = await feedingDeletedResponse;
+  expect(feedingDeleteResult.status()).toBe(204);
   const deletedFeedings = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=25");
   expect((await deletedFeedings.json()).sessions.flatMap((session) => session.entries).some((entry) => entry.id === feedingEntry.id)).toBe(false);
 
@@ -581,23 +587,27 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await taskDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const taskCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().endsWith("/api/v1/tasks") &&
-    response.status() === 201
+    response.url().endsWith("/api/v1/tasks")
   );
   await taskDialog.getByRole("button", { name: "Salva modifiche" }).click();
-  await taskCreatedResponse;
+  const taskCreateResult = await taskCreatedResponse;
+  expect(taskCreateResult.status()).toBe(201);
   const tasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=open");
   expect(tasksResponse.status()).toBe(200);
   const tasksBody = await tasksResponse.json();
   const task = tasksBody.tasks.find((item) => item.title === "E2E Task follow-up");
   expect(task?.id).toBeTruthy();
+  // Scope the completion action to the target row: other open tasks can expose
+  // the same accessible name, otherwise the test may complete the wrong task.
+  const taskRow = page.locator(".task-row").filter({ hasText: "E2E Task follow-up" });
+  await expect(taskRow).toBeVisible();
   const taskCompletedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().includes("/api/v1/tasks/" + task.id + "/complete") &&
-    response.status() === 200
+    response.url().includes("/api/v1/tasks/" + task.id + "/complete")
   );
-  await page.getByRole("button", { name: "Completata" }).click();
-  await taskCompletedResponse;
+  await taskRow.getByRole("button", { name: "Completata" }).click();
+  const completionResponse = await taskCompletedResponse;
+  expect(completionResponse.status()).toBe(200);
   const completedTasksResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/tasks?page=1&pageSize=25&status=completed");
   expect((await completedTasksResponse.json()).tasks.some((item) => item.id === task.id && item.status === "completed")).toBe(true);
 
@@ -614,11 +624,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await financeDialog.getByRole("combobox", { name: "Scheda animale" }).selectOption(animal.id);
   const financeCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().endsWith("/api/v1/finance/entries") &&
-    response.status() === 201
+    response.url().endsWith("/api/v1/finance/entries")
   );
   await financeDialog.getByRole("button", { name: "Salva modifiche" }).click();
-  await financeCreatedResponse;
+  const financeCreateResult = await financeCreatedResponse;
+  expect(financeCreateResult.status()).toBe(201);
   const financeResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/finance/entries?page=1&pageSize=25");
   expect(financeResponse.status()).toBe(200);
   const financeBody = await financeResponse.json();
@@ -634,11 +644,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await inventoryDialog.getByLabel("Scorta minima").fill("1");
   const inventoryCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().endsWith("/api/v1/inventory/items") &&
-    response.status() === 201
+    response.url().endsWith("/api/v1/inventory/items")
   );
   await inventoryDialog.getByRole("button", { name: "Salva modifiche" }).click();
-  await inventoryCreatedResponse;
+  const inventoryCreateResult = await inventoryCreatedResponse;
+  expect(inventoryCreateResult.status()).toBe(201);
   const inventoryResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=true");
   expect(inventoryResponse.status()).toBe(200);
   const inventoryBody = await inventoryResponse.json();
@@ -646,17 +656,21 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(stockItem?.id).toBeTruthy();
   expect(Number(stockItem.quantityOnHand)).toBe(2);
 
-  await page.getByRole("button", { name: "Movimenti" }).last().click();
+  // Select the row by the item we just created. A previous import test leaves
+  // another inventory record in the same account, so a global .last() is unsafe.
+  const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
+  await expect(stockItemRow).toBeVisible();
+  await stockItemRow.getByRole("button", { name: "Movimenti" }).click();
   await page.getByLabel("Tipo movimento").selectOption("in");
   await page.getByLabel("Giacenza").fill("1");
   await page.getByLabel("Costo unitario (€)").fill("5.00");
   const movementCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/movements") &&
-    response.status() === 201
+    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/movements")
   );
   await page.getByRole("button", { name: "Registra movimento" }).click();
-  await movementCreatedResponse;
+  const movementCreateResult = await movementCreatedResponse;
+  expect(movementCreateResult.status()).toBe(201);
   const movementsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items/" + stockItem.id + "/movements?page=1&pageSize=100");
   expect(movementsResponse.status()).toBe(200);
   const movementsBody = await movementsResponse.json();
@@ -665,11 +679,11 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   page.once("dialog", (dialog) => dialog.accept());
   const itemArchivedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
-    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/archive") &&
-    response.status() === 200
+    response.url().includes("/api/v1/inventory/items/" + stockItem.id + "/archive")
   );
-  await page.getByRole("button", { name: "Archivia" }).last().click();
-  await itemArchivedResponse;
+  await stockItemRow.getByRole("button", { name: "Archivia" }).click();
+  const archiveResult = await itemArchivedResponse;
+  expect(archiveResult.status()).toBe(200);
   const archivedResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=25&active=false");
   expect(archivedResponse.status()).toBe(200);
   expect((await archivedResponse.json()).items.some((item) => item.id === stockItem.id && item.isActive === false)).toBe(true);

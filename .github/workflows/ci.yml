@@ -2,7 +2,7 @@ name: Snakebee CI
 
 on:
   push:
-    branches: [main, frontend/rebuild]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -46,6 +46,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
       - name: Verify OpenAPI routes and specification structure
         run: pnpm check:openapi
       - name: Install dependencies
@@ -83,6 +84,12 @@ jobs:
         run: pnpm build:api
       - name: Validate production Docker Compose and secret mounts
         run: bash backend/scripts/check-production-compose.sh
+      - name: Syntax-check production backup and restore scripts
+        run: |
+          bash -n backend/scripts/backup-offsite-restic.sh
+          bash -n backend/scripts/restore-postgres-restic.sh
+          bash -n backend/scripts/verify-production-backup-mount.sh
+          sh -n backend/infra/docker/backup-loop.sh
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
       - name: Docker build and validate frontend web target
@@ -178,6 +185,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo_e2e?schema=public
       NODE_ENV: test
@@ -251,6 +259,11 @@ jobs:
           done
           cat /tmp/vivarqo-frontend.log
           exit 1
+      - name: Cache Playwright browser binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-1.56.1
       - name: Install pinned Playwright runner and Chromium
         run: |
           npm install --global @playwright/test@1.56.1 @axe-core/playwright@4.10.2
