@@ -30,7 +30,7 @@ create_random_secret csrf_secret
 cat <<EOF
 Created/verified database and CSRF secrets in: $secrets_dir
 Provision provider secrets in this directory via your secret manager:
-  resend_api_key
+  brevo_api_key
   stripe_secret_key
   stripe_webhook_secret
   vapid_private_key
