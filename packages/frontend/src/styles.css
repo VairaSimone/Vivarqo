@@ -2089,3 +2089,33 @@ svg {
 
 .onboarding-open-section { display:inline-flex; align-items:center; gap:7px; margin-top:17px; padding:7px 0; border:0; background:transparent; color:var(--primary); font-size:13px; font-weight:700; cursor:pointer; }
 .onboarding-open-section:hover { text-decoration:underline; }
+
+
+/* Account-backed first-run checklist */
+.onboarding-checklist { display:flex; flex-direction:column; gap:15px; border-color:color-mix(in srgb,var(--sage) 48%,var(--border)); }
+.onboarding-checklist-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.onboarding-checklist-heading h2 { margin:5px 0 5px; font-size:clamp(18px,2vw,22px); letter-spacing:-.025em; }
+.onboarding-checklist-heading p,.onboarding-checklist-description { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
+.onboarding-checklist-progress { display:flex; flex-direction:column; align-items:flex-end; flex:0 0 auto; gap:2px; }
+.onboarding-checklist-progress strong { font-size:24px; line-height:1; font-variant-numeric:tabular-nums; }
+.onboarding-checklist-progress span { color:var(--muted); font-size:11px; }
+.onboarding-checklist-track { height:6px; overflow:hidden; border-radius:99px; background:var(--surface-soft); }
+.onboarding-checklist-track span { display:block; height:100%; border-radius:inherit; background:var(--forest-2); transition:width .2s ease; }
+.onboarding-checklist-items { display:flex; flex-direction:column; gap:0; margin:0; padding:0; list-style:none; }
+.onboarding-checklist-items li { display:flex; align-items:center; gap:13px; min-width:0; padding:13px 0; border-top:1px solid var(--border); }
+.onboarding-checklist-icon { display:grid; place-items:center; width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--surface-soft); color:var(--forest-2); }
+.onboarding-checklist-copy { flex:1; min-width:0; }
+.onboarding-checklist-copy strong { display:block; font-size:14px; }
+.onboarding-checklist-copy p { margin:4px 0 0; color:var(--muted); font-size:12px; line-height:1.45; }
+.onboarding-checklist-items li.is-complete .onboarding-checklist-icon { background:color-mix(in srgb,var(--success) 12%,var(--surface)); color:var(--success); }
+.onboarding-checklist-items li.is-complete .onboarding-checklist-copy strong { color:var(--muted); }
+.onboarding-checklist-done { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; color:var(--success); font-size:12px; font-weight:700; }
+.onboarding-checklist-items .btn { flex:0 0 auto; min-height:36px; }
+.onboarding-checklist-footnote { margin:0; color:var(--muted); font-size:11px; line-height:1.45; }
+@media(max-width:600px) {
+ .onboarding-checklist { padding:15px; }
+ .onboarding-checklist-items li { flex-wrap:wrap; gap:9px; }
+ .onboarding-checklist-copy { flex-basis:calc(100% - 52px); }
+ .onboarding-checklist-items li > .btn,.onboarding-checklist-done { margin-left:47px; }
+ .onboarding-checklist-items li > .btn { width:calc(100% - 47px); justify-content:center; }
+}
