@@ -11,10 +11,12 @@ Group=root
 WorkingDirectory=/opt/vivarqo/app
 EnvironmentFile=/etc/vivarqo/offsite-backup.env
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=RESTIC_CACHE_DIR=/var/cache/vivarqo-restic
+ExecStartPre=/usr/bin/install -d -m 0700 /var/cache/vivarqo-restic
 ExecStart=/opt/vivarqo/app/backend/scripts/backup-offsite-restic.sh
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/mnt/vivarqo-prod-backups /root/.cache
+ReadWritePaths=/mnt/vivarqo-prod-backups /var/cache/vivarqo-restic
