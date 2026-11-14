@@ -1,4 +1,4 @@
-# Deployment production/staging — Snakebee
+# Deployment production/staging — Vivarqo
 
 Questa configurazione separa sviluppo locale, staging e produzione. È una configurazione di deployment da applicare su un host reale; il suo inserimento in Git non significa che il servizio sia già stato distribuito.
 
@@ -92,6 +92,67 @@ Prima del lancio, configurare direttamente sul provider S3-compatible:
 Il ruolo S3 usato da API/worker deve essere limitato al bucket applicativo e alle operazioni necessarie al runtime. La replica/backup deve usare credenziali separate: non riutilizzare le chiavi applicative per amministrare il bucket di destinazione. La copia locale PostgreSQL, il versioning S3 e la replica off-site devono essere monitorati come tre controlli distinti.
 
 Non considerare completo il disaster recovery finché non sono stati provati insieme il ripristino del database e il recupero degli oggetti S3 corrispondenti allo stesso punto temporale. Il checksum SHA-256 dei dump PostgreSQL verifica l'integrità dell'archivio, ma non cifra i backup: il filesystem locale dei dump deve essere cifrato a riposo e la copia off-site deve usare cifratura end-to-end o del client di backup.
+
+## Deploy manuale tramite GitHub Actions
+
+Il workflow `.github/workflows/deploy-production.yml` è intenzionalmente solo `workflow_dispatch`: un push su `main` non distribuisce automaticamente. Il job usa l'environment GitHub `production`; configura eventuali required reviewers nelle impostazioni del repository prima di abilitarlo.
+
+Provisionare sul server un checkout Git in `/opt/vivarqo/app`, con remote `origin` puntato al repository, e l'utente SSH di deploy autorizzato a eseguire Docker Compose. L'utente deve poter aggiornare il checkout e usare Docker; non esporre il socket Docker a utenti non fidati. Configurare questi GitHub Actions secrets:
+
+- `VIVARQO_DEPLOY_HOST`: hostname/IP del VPS.
+- `VIVARQO_DEPLOY_USER`: utente SSH di deploy.
+- `VIVARQO_DEPLOY_SSH_KEY`: chiave privata dedicata, senza passphrase oppure gestita da un agente compatibile.
+- `VIVARQO_DEPLOY_KNOWN_HOSTS`: riga host key verificata fuori banda (non usare `ssh-keyscan` durante il deploy).
+- `VIVARQO_PUBLIC_DOMAIN`: dominio TLS configurato in `.env.production`.
+
+Avviare da Actions → Vivarqo production deployment → Run workflow e incollare lo SHA completo di un commit già raggiungibile da `origin/main`. Il workflow rifiuta SHA non validi o non appartenenti alla storia di `main`.
+
+Il deploy:
+1. aggiorna il checkout al commit selezionato e valida la configurazione Compose;
+2. verifica che il percorso backup configurato sia un mountpoint;
+3. produce un dump PostgreSQL pre-deploy, ne verifica la leggibilità con `pg_restore --list` e calcola il checksum;
+4. costruisce le immagini prima di fermare/ricreare i servizi;
+5. esegue il servizio one-shot `migrate`; se la migrazione fallisce, non avvia la nuova API;
+6. aggiorna i servizi e attende `/readyz` tramite HTTPS.
+
+**Le migrazioni Prisma non vengono annullate automaticamente.** Prima di ogni rilascio, revisionare il SQL delle nuove migration e applicare la strategia expand/contract: aggiungere prima strutture compatibili, distribuire codice che supporti vecchio e nuovo schema, migrare i dati, rimuovere colonne/indici solo in un rilascio successivo. Evitare rename/drop o cambi di tipo incompatibili nello stesso deploy. Il dump pre-deploy è una rete di sicurezza, non un rollback automatico né garanzia di compatibilità. Se readiness fallisce dopo una migration, il workflow mostra log e stato ma non tenta un ripristino distruttivo del database.
+
+## Backup PostgreSQL off-site cifrato con Restic
+
+Il backup Compose continua a creare dump locali verificati su `VIVARQO_BACKUP_DIR`. Per replicarli fuori dal VPS, installare Restic sul server e usare il nuovo script `backend/scripts/backup-offsite-restic.sh`. Restic cifra e autentica i dati sul client prima dell'upload: il provider remoto non riceve dump in chiaro.
+
+Creare un repository remoto dedicato (ad esempio un bucket S3-compatible o un repository Restic su storage remoto) e inizializzarlo una sola volta, in modo interattivo e controllato:
+
+```bash
+sudo restic -r "$RESTIC_REPOSITORY" init
+```
+
+Creare `/etc/vivarqo/offsite-backup.env`, root-owned e mode `0600`, con almeno:
+
+```dotenv
+VIVARQO_BACKUP_DIR=/mnt/vivarqo-prod-backups
+RESTIC_REPOSITORY=s3:https://s3.eu-central-003.backblazeb2.com/vivarqo-backups
+RESTIC_PASSWORD_FILE=/etc/vivarqo/restic-repository-password
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+Per un endpoint diverso, sostituire URL e variabili richieste dal backend Restic scelto. La password Restic deve essere generata casualmente, salvata in un secret manager e custodita anche in una copia offline sicura: senza di essa il repository non è recuperabile. Non inserirla nel repository Git, nei log o in un backup non cifrato. Limitare le credenziali remote al bucket dedicato; se il provider supporta versioning/Object Lock, abilitarli con una retention coerente e credenziali amministrative separate.
+
+Installare il timer:
+
+```bash
+sudo install -m 0644 backend/systemd/vivarqo-offsite-backup.service /etc/systemd/system/
+sudo install -m 0644 backend/systemd/vivarqo-offsite-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now vivarqo-offsite-backup.timer
+sudo systemctl start vivarqo-offsite-backup.service
+sudo systemctl status vivarqo-offsite-backup.service
+```
+
+La prima esecuzione non inizializza il repository automaticamente: fallisce se `restic init` non è stato eseguito, evitando di creare per errore un repository nuovo al posto di quello esistente. Il job mantiene 7 snapshot giornalieri, 5 settimanali e 12 mensili, quindi esegue prune e un controllo del repository. Monitorare `systemctl status`, i log e lo spazio/quote del provider; un timer attivo non dimostra che gli upload siano riusciti.
+
+Il backup Restic copre i dump PostgreSQL locali e i relativi checksum. **Non copia gli oggetti del bucket applicativo S3**: configurare versioning e replica/backup separati per documenti e immagini, con credenziali distinte. Per un disaster recovery reale, effettuare periodicamente un restore drill su un host separato, ripristinando database e oggetti S3 dello stesso punto temporale e verificando i documenti dall'applicazione.
 
 ## Database e privilegi
 
