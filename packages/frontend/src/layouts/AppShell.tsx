@@ -10,6 +10,10 @@ import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { OnboardingTour } from "../components/OnboardingTour";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 type User = { displayName: string; email: string; locale: Locale };
 type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" | "help" };
 
