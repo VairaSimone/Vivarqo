@@ -157,3 +157,28 @@ test("classifica i problemi di binding Docker e i build script bloccati", () => 
   assert.equal(diagnose("DEP0190 shell option true").id, "shell-deprecation");
 });
 
+
+
+test("estrae lo stderr Docker invece dell'involucro generico del comando fallito", () => {
+  const output = [
+    "Error: docker compose -f backend\\infra\\docker\\compose.yaml up -d postgres exit 1:",
+    "failed to pull image 'postgres:18': failed to resolve reference",
+    "    at ChildProcess.<anonymous> (scripts/dev-manager.mjs:80:16)",
+    "ELIFECYCLE Command failed with exit code 1"
+  ].join("\\n");
+  assert.equal(primaryErrorMessage(output), "failed to pull image 'postgres:18': failed to resolve reference");
+  assert.equal(diagnose(primaryErrorMessage(output)).id, "docker-image");
+});
+
+test("riconosce Docker Desktop spento e non confonde il messaggio con un errore sconosciuto", () => {
+  const message = "Error: docker compose up exit 1:\\nerror during connect: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.";
+  const primary = primaryErrorMessage(message);
+  assert.match(primary, /error during connect/);
+  assert.equal(diagnose(primary).id, "docker-daemon");
+});
+
+test("mantiene la diagnosi prioritaria per gli errori Docker di binding porta", () => {
+  const message = "Error: docker compose up exit 1:\\nError response from daemon: ports are not available: listen tcp 127.0.0.1:5433";
+  assert.match(primaryErrorMessage(message), /ports are not available/);
+  assert.equal(diagnose(primaryErrorMessage(message)).id, "docker-port-binding");
+});
