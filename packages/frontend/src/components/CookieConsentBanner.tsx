@@ -73,7 +73,6 @@ export function CookieConsentBanner({ locale }: { locale: Locale }) {
         ? <button className="btn btn-primary" type="button" onClick={acknowledge}>{it ? "Ho capito" : "Got it"}</button>
         : <><button className="btn btn-secondary" type="button" onClick={rejectAll}>{it ? "Rifiuta facoltativi" : "Reject optional"}</button><button className="btn btn-secondary" type="button" onClick={() => setSettingsOpen(true)}>{it ? "Personalizza" : "Customize"}</button><button className="btn btn-primary" type="button" onClick={acceptAll}>{it ? "Accetta tutti" : "Accept all"}</button></>}</div>
     </section>}
-    {!visible && !settingsOpen && <button className="cookie-settings-reopen" type="button" onClick={() => setSettingsOpen(true)}>{it ? "Preferenze cookie" : "Cookie preferences"}</button>}
     {settingsOpen && <div className="cookie-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
       <section ref={dialogRef} className="cookie-dialog" role="dialog" aria-modal="true" aria-labelledby="cookie-dialog-title" aria-describedby="cookie-dialog-description">
         <button className="cookie-dialog-close" type="button" aria-label={it ? "Chiudi preferenze cookie" : "Close cookie preferences"} onClick={() => setSettingsOpen(false)}>×</button>
