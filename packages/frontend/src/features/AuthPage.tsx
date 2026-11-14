@@ -75,15 +75,15 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
       <div className="auth-brand"><span className="brand-mark"><Icon name="leaf" size={23} /></span><strong>vivarqo</strong></div>
       <div className="auth-visual-copy">
         <span className="eyebrow">{locale === "it" ? "IL GESTIONALE PER ALLEVATORI" : "BUILT FOR ANIMAL BREEDERS"}</span>
-        <h1>{locale === "it" ? "Meno fogli.\\nPiù controllo." : "Less paperwork.\\nMore control."}</h1>
+        <h1>{locale === "it" ? "Meno fogli.\nPiù controllo." : "Less paperwork.\nMore control."}</h1>
         <p>{locale === "it"
           ? "Vivarqo riunisce in un unico spazio le informazioni e le attività quotidiane del tuo allevamento. Sai sempre cosa hai registrato e cosa richiede attenzione."
           : "Vivarqo brings your collection records and daily breeding work into one workspace, so you can see what is documented and what needs attention."}</p>
         <ul className="auth-benefits">
-          <li><Icon name="layers" size={18} /><span><strong>{locale === "it" ? "Schede animali" : "Animal records"}</strong><small>{locale === "it" ? "Anagrafica, foto, identificativi e storico." : "Profiles, photos, identifiers and history."}</small></span></li>
-          <li><Icon name="clipboard-list" size={18} /><span><strong>{locale === "it" ? "Cura e monitoraggio" : "Care and tracking"}</strong><small>{locale === "it" ? "Pasti, mute, pesi e note in ordine cronologico." : "Feeding, sheds, weights and chronological notes."}</small></span></li>
-          <li><Icon name="calendar-check" size={18} /><span><strong>{locale === "it" ? "Attività e promemoria" : "Tasks and reminders"}</strong><small>{locale === "it" ? "Scadenze e calendario per non perdere passaggi." : "A calendar that keeps important tasks visible."}</small></span></li>
-          <li><Icon name="chart-no-axes-combined" size={18} /><span><strong>{locale === "it" ? "Gestione dell'allevamento" : "Breeding management"}</strong><small>{locale === "it" ? "Riproduzione, inventario, documenti e finanze." : "Reproduction, inventory, documents and finances."}</small></span></li>
+          <li><Icon name="snake" size={18} /><span><strong>{locale === "it" ? "Schede animali" : "Animal records"}</strong><small>{locale === "it" ? "Anagrafica, foto, identificativi e storico." : "Profiles, photos, identifiers and history."}</small></span></li>
+          <li><Icon name="feed" size={18} /><span><strong>{locale === "it" ? "Cura e monitoraggio" : "Care and tracking"}</strong><small>{locale === "it" ? "Pasti, mute, pesi e note in ordine cronologico." : "Feeding, sheds, weights and chronological notes."}</small></span></li>
+          <li><Icon name="calendar" size={18} /><span><strong>{locale === "it" ? "Attività e promemoria" : "Tasks and reminders"}</strong><small>{locale === "it" ? "Scadenze e calendario per non perdere passaggi." : "A calendar that keeps important tasks visible."}</small></span></li>
+          <li><Icon name="box" size={18} /><span><strong>{locale === "it" ? "Gestione dell'allevamento" : "Breeding management"}</strong><small>{locale === "it" ? "Riproduzione, inventario, documenti e finanze." : "Reproduction, inventory, documents and finances."}</small></span></li>
         </ul>
       </div>
       <div className="auth-visual-foot"><span>V / 01</span><span>{t("brandTagline")}</span></div>
