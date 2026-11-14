@@ -45,6 +45,9 @@ jobs:
           for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS PUBLIC_DOMAIN; do
             [[ -n "${!name}" ]] || { echo "Missing GitHub secret: $name" >&2; exit 2; }
           done
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Invalid deploy host" >&2; exit 2; }
+          [[ "$DEPLOY_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "Invalid deploy user" >&2; exit 2; }
+          [[ "$PUBLIC_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "Invalid public domain" >&2; exit 2; }
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/vivarqo_deploy
           chmod 600 ~/.ssh/vivarqo_deploy
