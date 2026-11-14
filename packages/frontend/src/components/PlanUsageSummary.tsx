@@ -33,7 +33,6 @@ export function PlanUsageSummary({ locale, compact = false, onNavigate }: { loca
   const animalPct = usage(e.animalsUsed, e.maxAnimals);
   const documentPct = usage(e.documentsUsed, e.maxDocuments);
   const storagePct = usage(Number(e.storageBytesUsed), e.maxStorageBytes);
-  const features = e.features ?? [];
   const it = locale === "it";
   const row = (label: string, used: number, max: number | null, percent: number | null) => <div className="plan-usage-row" key={label}>
     <div className="plan-usage-label"><span>{label}</span><strong>{formatNumber(used, locale, 0)} / {quantity(max, locale)}</strong></div>
