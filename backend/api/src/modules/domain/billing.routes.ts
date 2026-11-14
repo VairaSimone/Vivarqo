@@ -294,7 +294,8 @@ export function createBillingRouter(options: BillingRouterOptions = {}) {
 
   router.post("/billing/checkout", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const checkoutInput = z.object({ plan: z.enum(["monthly", "annual"]).default("monthly") }).safeParse(req.body ?? {});
+    const checkoutSchema = z.object({ plan: z.enum(["monthly", "annual"]).default("monthly") });
+    const checkoutInput = checkoutSchema.safeParse(req.body ?? {});
     if (!checkoutInput.success) throw new AppError(400, "INVALID_BILLING_PLAN", "Choose a valid subscription period");
     const selectedPriceId = checkoutInput.data.plan === "annual" ? annualPriceId : monthlyPriceId;
     if (!selectedPriceId) throw new AppError(503, "BILLING_NOT_CONFIGURED", "The selected subscription price has not been configured");
