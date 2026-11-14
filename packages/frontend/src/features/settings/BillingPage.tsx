@@ -75,7 +75,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
           <span className="eyebrow">Premium</span>
           <h2>4,99 € <small>/ {locale === "it" ? "mese" : "month"}</small></h2>
           <p>{locale === "it" ? "Animali, documenti e spazio di archiviazione illimitati." : "Unlimited animals, documents and storage."}</p>
-          <Button onClick={() => void redirect("checkout", "monthly")} disabled={busy || !resource.data?.plans?.monthly || paid}>
+          <Button onClick={() => void redirect("checkout", "monthly")} disabled={busy || !resource.data?.configured || !resource.data?.plans?.monthly || paid}>
             {locale === "it" ? "Scegli mensile" : "Choose monthly"}
           </Button>
         </div>
@@ -83,7 +83,7 @@ export function BillingPage({ locale }: { locale: Locale }) {
           <span className="eyebrow">Premium annuale</span>
           <h2>49,99 € <small>/ {locale === "it" ? "anno" : "year"}</small></h2>
           <p>{locale === "it" ? "Risparmi 9,89 € rispetto a dodici pagamenti mensili." : "Save €9.89 compared with twelve monthly payments."}</p>
-          <Button onClick={() => void redirect("checkout", "annual")} disabled={busy || !resource.data?.plans?.annual || paid}>
+          <Button onClick={() => void redirect("checkout", "annual")} disabled={busy || !resource.data?.configured || !resource.data?.plans?.annual || paid}>
             {locale === "it" ? "Scegli annuale" : "Choose annual"}
           </Button>
         </div>
