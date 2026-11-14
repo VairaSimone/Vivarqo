@@ -2151,3 +2151,39 @@ svg {
 .plan-usage-compact{gap:12px}
 .plan-usage-compact .plan-usage-features{padding-top:10px}
 @media(min-width:900px){.plan-usage-grid{gap:16px}}
+
+
+/* In-app help center */
+.help-center-page{display:grid;gap:20px}
+.help-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+.help-section-heading h2,.help-contact-panel h2{margin:0;font-size:19px;letter-spacing:-.02em}
+.help-section-heading p,.help-contact-panel p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.help-section-heading>svg{flex:0 0 auto;color:var(--forest-2)}
+.help-guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.help-guide-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:17px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
+.help-guide-number{color:var(--forest-2);font-size:11px;font-weight:800;letter-spacing:.1em}
+.help-guide-card h3,.help-record h3{margin:7px 0 5px;font-size:15px}
+.help-guide-card>p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+.help-guide-card ol{display:grid;gap:6px;margin:12px 0 16px;padding-left:19px;color:var(--text);font-size:12px;line-height:1.55}
+.help-guide-card .btn{margin-top:auto}
+.help-faq-list{display:grid}
+.help-faq-item{border-top:1px solid var(--border)}
+.help-faq-item:last-child{border-bottom:1px solid var(--border)}
+.help-faq-item summary{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:52px;padding:12px 2px;font-size:14px;font-weight:650;cursor:pointer;list-style:none}
+.help-faq-item summary::-webkit-details-marker{display:none}
+.help-faq-item summary svg{flex:0 0 auto;color:var(--muted);transition:transform .15s ease}
+.help-faq-item[open] summary svg{transform:rotate(90deg)}
+.help-faq-item>p{max-width:850px;margin:0;padding:0 30px 16px 2px;color:var(--muted);font-size:13px;line-height:1.7}
+.help-record-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.help-record{display:grid;align-content:start;gap:9px;padding:15px;border:1px solid var(--border);border-radius:12px}
+.help-record h3{margin:0}
+.help-record strong{font-size:12px}
+.help-record p{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.55}
+.help-tip{display:flex;gap:12px;margin-top:16px;padding:15px;border-radius:12px;background:var(--surface-soft)}
+.help-tip>svg{flex:0 0 auto;color:var(--forest-2)}
+.help-tip strong{font-size:13px}
+.help-tip p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.6}
+.help-contact-panel{display:flex;align-items:flex-start;gap:16px}
+.help-contact-icon{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:13px;background:var(--surface-soft);color:var(--forest-2)}
+.help-contact-panel .btn{display:inline-flex;align-items:center;gap:8px;margin-top:13px;text-decoration:none}
+@media(max-width:680px){.help-guide-grid,.help-record-list{grid-template-columns:minmax(0,1fr)}.help-contact-panel{gap:12px}.help-contact-panel h2{font-size:17px}}
