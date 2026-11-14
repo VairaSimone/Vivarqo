@@ -86,13 +86,12 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
           <li><Icon name="box" size={18} /><span><strong>{locale === "it" ? "Gestione dell'allevamento" : "Breeding management"}</strong><small>{locale === "it" ? "Riproduzione, inventario, documenti e finanze." : "Reproduction, inventory, documents and finances."}</small></span></li>
         </ul>
       </div>
-      <div className="auth-visual-foot"><span>V / 01</span><span>{t("brandTagline")}</span></div>
+      
       <div className="auth-orbit orbit-one" /><div className="auth-orbit orbit-two" />
     </div>
     <div className="auth-form-side">
-      <div className="auth-top"><span>{t("language")}</span><button type="button" onClick={() => onLocaleChange?.(locale === "it" ? "en" : "it")}>{locale === "it" ? "Italiano" : "English"} · <b>{locale === "it" ? "Switch to English" : "Passa all'italiano"}</b></button></div>
+      <div className="auth-top"><button type="button" onClick={() => onLocaleChange?.(locale === "it" ? "en" : "it")}>{locale === "it" ? "Italiano" : "English"} · <b>{locale === "it" ? "Switch to English" : "Passa all'italiano"}</b></button></div>
       <div className="auth-card">
-        <span className="eyebrow">{mode === "login" ? (locale === "it" ? "BENTORNATO" : "WELCOME BACK") : (locale === "it" ? "INIZIA QUI" : "GET STARTED")}</span>
         <h2>{title}</h2><p className="auth-subtitle">{subtitle}</p>
         {error && <Alert tone="danger">{error}</Alert>}
         {notice && <Alert tone="success">{notice}</Alert>}
@@ -113,7 +112,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
           {mode === "login" && <button type="button" onClick={() => navigate("/register")}>{t("noAccount")} · {t("createAccount")}</button>}
         </div>
       </div>
-      <div className="auth-legal">SnakeBee · {new Date().getFullYear()} <span>{locale === "it" ? "Spazio privato" : "Private workspace"}</span></div>
+      <div className="auth-legal">SnakeBee · {new Date().getFullYear()}</div>
     </div>
   </div>;
 }
