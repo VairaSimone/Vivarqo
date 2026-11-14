@@ -6,6 +6,7 @@ import { formatDateTime, getNumber, getString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
+import { OnboardingChecklist } from "../components/OnboardingChecklist";
 import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, PageHeader, Panel, PanelHeader, useToast } from "../components/ui";
 
 export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; timezone: string; navigate: (path: string) => void }) {
@@ -65,6 +66,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </div>
       <div className="intro-mark"><Icon name="leaf" size={34} /></div>
     </div>
+
+    <OnboardingChecklist locale={locale} onNavigate={navigate} />
 
     <div className="dashboard-grid">
       <Panel className="dashboard-tasks dashboard-priorities">
