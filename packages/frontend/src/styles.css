@@ -2119,3 +2119,14 @@ svg {
  .onboarding-checklist-items li > .btn,.onboarding-checklist-done { margin-left:47px; }
  .onboarding-checklist-items li > .btn { width:calc(100% - 47px); justify-content:center; }
 }
+
+
+/* Contextual onboarding suggestions */
+.onboarding-contextual{display:grid;gap:12px}
+.onboarding-contextual-card{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.onboarding-contextual-card .onboarding-checklist-copy{flex:1;min-width:0}
+.onboarding-contextual-card .onboarding-checklist-copy strong{display:block}
+.onboarding-contextual-card .onboarding-checklist-copy p{margin:4px 0 0}
+.onboarding-suggestion-dismiss{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.onboarding-suggestion-dismiss:hover{background:var(--surface-muted);color:var(--text)}
+@media(max-width:640px){.onboarding-contextual-card{align-items:flex-start;flex-wrap:wrap}.onboarding-contextual-card .onboarding-checklist-copy{flex:1 1 calc(100% - 52px)}.onboarding-contextual-card>button:not(.onboarding-suggestion-dismiss){margin-left:48px}}
