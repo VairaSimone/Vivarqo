@@ -28,6 +28,15 @@ export function createOnboardingRouter() {
 
     const current = { animal: animals > 0, feeding: feedings > 0, weight: weights > 0, shed: sheds > 0, reminder: reminders > 0, clutch: clutches > 0, egg: eggs > 0 };
     const historical = new Set(events.filter((event) => event.action === "onboarding.milestone_completed").map((event) => event.entityType).filter((key): key is string => Boolean(key)));
+    for (const event of events) {
+      if (event.action === "animal.created" || event.action === "animal.bulk_created") historical.add("animal");
+      if (event.action === "feeding.created" || event.action === "feeding.bulk_created") historical.add("feeding");
+      if (event.action === "reminder_rule.created") historical.add("reminder");
+      if (event.action === "clutch.created") historical.add("clutch");
+      if (event.action === "egg.created") historical.add("egg");
+      if (event.action === "weight.created") historical.add("weight");
+      if (event.action === "shed.created") historical.add("shed");
+    }
     const dismissed = new Set(events.filter((event) => event.action === "onboarding.suggestion_dismissed").map((event) => event.entityType).filter((key): key is string => Boolean(key)));
 
     // Persist milestones as soon as they are observed. This also recognizes Excel imports
