@@ -22,10 +22,15 @@ function signature(rawBody: Buffer, secret: string, timestamp = Math.floor(Date.
 
 describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode contracts", () => {
   let app: Express;
+  const checkoutPriceIds: string[] = [];
   const stripeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     expect(url.startsWith("https://api.stripe.com/v1/")).toBe(true);
     expect((init?.headers as Record<string, string>).Authorization).toBe(`Bearer ${fakeStripeSecret}`);
+    if (url.endsWith("/checkout/sessions")) {
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      checkoutPriceIds.push(body.get("line_items[0][price]") ?? "");
+    }
     const result = url.endsWith("/checkout/sessions")
       ? { id: "cs_test_vivarqo", url: "https://checkout.stripe.com/c/pay/cs_test_vivarqo" }
       : { id: "bps_test_vivarqo", url: "https://billing.stripe.com/p/session/bps_test_vivarqo" };
@@ -38,7 +43,8 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
       billing: {
         secretKey: fakeStripeSecret,
         webhookSecret,
-        priceId: "price_test_vivarqo",
+        monthlyPriceId: "price_test_vivarqo",
+        annualPriceId: "price_test_vivarqo_annual",
         appOrigin: origin,
         fetchImpl: stripeFetch as typeof fetch,
       },
@@ -84,11 +90,18 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
       .send(body.toString("utf8"));
   }
 
+  it("selects the annual recurring Stripe Price for annual checkout", async () => {
+    const owner = await account();
+    await owner.agent.post("/api/v1/billing/checkout").set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ plan: "annual" }).expect(200);
+    expect(checkoutPriceIds.at(-1)).toBe("price_test_vivarqo_annual");
+  });
+
   it("creates checkout and portal sessions, verifies signed events, syncs subscription states and deduplicates retries", async () => {
     const owner = await account();
     const checkout = await owner.agent.post("/api/v1/billing/checkout")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
     expect(checkout.body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_vivarqo");
+    expect(checkoutPriceIds[0]).toBe("price_test_vivarqo");
 
     const checkoutEvent = {
       id: `evt_vivarqo_${randomUUID()}`,
