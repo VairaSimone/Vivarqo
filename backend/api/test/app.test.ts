@@ -17,6 +17,17 @@ describe("API infrastructure", () => {
     expect(response.headers["x-request-id"]).toBe(response.body.requestId);
   });
 
+  it("does not write successful health probes to normal HTTP logs", async () => {
+    const info = vi.spyOn(logger, "info");
+    try {
+      await request(createApp({ checkDatabase: async () => undefined })).get("/healthz").expect(200);
+      await request(createApp({ checkDatabase: async () => undefined })).get("/readyz").expect(200);
+      expect(info).not.toHaveBeenCalledWith(expect.anything(), "HTTP request completed");
+    } finally {
+      info.mockRestore();
+    }
+  });
+
   it("reports readiness when the database check succeeds", async () => {
     const checkDatabase = vi.fn(async () => undefined);
     const response = await request(createApp({ checkDatabase })).get("/readyz");
