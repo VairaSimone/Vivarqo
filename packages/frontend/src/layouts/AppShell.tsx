@@ -11,7 +11,7 @@ import { translate } from "../lib/i18n";
 import { OnboardingTour } from "../components/OnboardingTour";
 
 type User = { displayName: string; email: string; locale: Locale };
-type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" };
+type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" | "help" };
 
 const groups: Array<{ title: string; items: NavItem[] }> = [
   { title: "navWorkspace", items: [
@@ -34,6 +34,7 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
     { path: "/exports", label: "navExports", icon: "box" }
   ] },
   { title: "navPreferences", items: [
+    { path: "/help", label: "navHelp", icon: "help" },
     { path: "/notifications", label: "navNotifications", icon: "bell" },
     { path: "/billing", label: "navBilling", icon: "wallet" },
     { path: "/settings", label: "navSettings", icon: "settings" }
@@ -46,7 +47,7 @@ const routeTitles: Record<string, string> = {
   "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",
-  "/billing": "navBilling", "/settings": "navSettings"
+  "/billing": "navBilling", "/settings": "navSettings", "/help": "navHelp"
 };
 
 export function AppShell({ children, path, user, locale, onNavigate, onLocaleChange, onSignOut, unreadCount = 0 }: {
