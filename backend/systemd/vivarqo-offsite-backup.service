@@ -13,7 +13,7 @@ EnvironmentFile=/etc/vivarqo/offsite-backup.env
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=RESTIC_CACHE_DIR=/var/cache/vivarqo-restic
 ExecStartPre=/usr/bin/install -d -m 0700 /var/cache/vivarqo-restic
-ExecStart=/opt/vivarqo/app/backend/scripts/backup-offsite-restic.sh
+ExecStart=/usr/bin/bash /opt/vivarqo/app/backend/scripts/backup-offsite-restic.sh
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
