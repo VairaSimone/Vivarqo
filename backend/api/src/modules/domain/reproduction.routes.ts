@@ -566,7 +566,8 @@ export function createReproductionRouter() {
         take: query.pageSize,
         include: {
           offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } },
-          history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },\n          measurements: { orderBy: [{ measuredAt: "asc" }, { id: "asc" }] },
+          history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },
+          measurements: { orderBy: [{ measuredAt: "asc" }, { id: "asc" }] },
         },
       }),
     ]);
