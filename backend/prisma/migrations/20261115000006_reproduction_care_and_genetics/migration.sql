@@ -1,4 +1,8 @@
-ALTER TABLE "eggs"\n  ADD COLUMN "laid_at" TIMESTAMPTZ(6),\n  ADD COLUMN "expected_hatch_at" DATE;\n\nALTER TABLE "animal_genetic_traits"
+ALTER TABLE "eggs"
+  ADD COLUMN "laid_at" TIMESTAMPTZ(6),
+  ADD COLUMN "expected_hatch_at" DATE;
+
+ALTER TABLE "animal_genetic_traits"
   ADD COLUMN "inheritance_mode" VARCHAR(32),
   ADD COLUMN "genotype" VARCHAR(32),
   ADD COLUMN "certainty" VARCHAR(24) NOT NULL DEFAULT 'unverified';
