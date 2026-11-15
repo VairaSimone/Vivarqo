@@ -545,6 +545,8 @@ model HatchlingCare {
   firstFeedingAccepted  Boolean? @map("first_feeding_accepted")
   firstShedAt           DateTime? @map("first_shed_at") @db.Timestamptz(6)
   readyForRehomingAt    DateTime? @map("ready_for_rehoming_at") @db.Timestamptz(6)
+  healthStatus          String   @default("unknown") @map("health_status") @db.VarChar(24)
+  healthNotes           String?  @map("health_notes")
   notes                 String?
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
