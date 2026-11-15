@@ -7,7 +7,7 @@ import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
-const categories = ["feeding", "weighing", "shed_check", "cleaning", "reproduction", "document", "inventory", "custom"] as const;
+const categories = ["feeding", "weighing", "shed_check", "cleaning", "reproduction", "incubation", "document", "inventory", "custom"] as const;
 
 export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path: string; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
