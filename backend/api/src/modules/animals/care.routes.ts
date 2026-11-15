@@ -6,6 +6,7 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { decimalToScaledInteger } from "../domain/decimal-precision.js";
+import { calculateFeedingMetrics } from "./feeding-metrics.js";
 import {
   feedingSessionSchema,
   noteSchema,
@@ -341,20 +342,7 @@ export function createCareRouter() {
       orderBy: [{ session: { performedAt: "desc" } }, { id: "desc" }],
       select: { outcome: true, session: { select: { performedAt: true } } },
     });
-    const accepted = entries.filter((entry) => entry.outcome === "ate");
-    const refused = entries.filter((entry) => entry.outcome === "refused");
-    const offeredCount = accepted.length + refused.length;
-    let consecutiveRefusals = 0;
-    for (const entry of entries) {
-      if (entry.outcome === "ate") break;
-      if (entry.outcome === "refused") consecutiveRefusals += 1;
-    }
-    const lastAcceptedAt = accepted[0]?.session.performedAt ?? null;
-    const now = new Date();
-    const daysSinceLastFeeding = lastAcceptedAt ? Math.max(0, Math.floor((now.getTime() - lastAcceptedAt.getTime()) / 86_400_000)) : null;
-    const nextMealAt = lastAcceptedAt && animal.feedingIntervalDays
-      ? new Date(lastAcceptedAt.getTime() + animal.feedingIntervalDays * 86_400_000)
-      : null;
+    const metrics = calculateFeedingMetrics(entries.map((entry) => ({ outcome: entry.outcome, performedAt: entry.session.performedAt })), animal.feedingIntervalDays);
     res.status(200).json({
       feedingIntervalDays: animal.feedingIntervalDays,
       lastAcceptedAt,
@@ -371,28 +359,7 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
     await getOwnedAnimal(auth.userId, animalId);
-    const page = pageOptions(req.query);
-    const [total, weights] = await Promise.all([
-      prisma.weightMeasurement.count({ where: { animalId } }),
-      prisma.weightMeasurement.findMany({
-        where: { animalId },
-        orderBy: { measuredAt: "desc" },
-        skip: (page.page - 1) * page.pageSize,
-        take: page.pageSize,
-      }),
-    ]);
-    res.status(200).json({ weights, pagination: { page: page.page, pageSize: page.pageSize, total, totalPages: Math.ceil(total / page.pageSize) } });
-  });
-
-  router.post("/animals/:animalId/weights", requireSession, async (req, res) => {
-    const auth = res.locals.auth as AuthContext;
-    const animalId = parseUuid(req.params.animalId!, "animalId");
-    await getOwnedAnimal(auth.userId, animalId, true);
-    const input = parseBody(weightSchema, req.body);
-    const weight = await prisma.$transaction(async (tx) => {
-      const created = await tx.weightMeasurement.create({
-        data: { animalId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null },
-      });
+    const page     res.status(200).json(metrics);
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "weight.created", entityType: "weight", entityId: created.id } });
       return created;
     });
