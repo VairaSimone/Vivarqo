@@ -18,6 +18,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const t = (key: string) => translate(locale, key);
   const animalResource = useResource<{ animal: AnimalDto }>(`/animals/${encodeURIComponent(id)}`);
   const [tab, setTab] = useState("overview");
+  const [internalQrBusy, setInternalQrBusy] = useState(false);
   const [animalEditModal, setAnimalEditModal] = useState(false);
   const [animalEditBusy, setAnimalEditBusy] = useState(false);
   const [animalEditError, setAnimalEditError] = useState("");
@@ -339,6 +340,19 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     ["traits", t("traits")], ["share", t("publicShare")]
   ];
 
+  async function downloadInternalQr() {
+    setInternalQrBusy(true);
+    try {
+      const result = await api.get<{ path: string }>(`/animals/${encodeURIComponent(id)}/internal-qr`);
+      downloadQrSvg(window.location.origin + result.path, "vivarqo-internal-" + id + ".svg");
+      show(locale === "it" ? "QR interno scaricato." : "Internal QR downloaded.");
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally {
+      setInternalQrBusy(false);
+    }
+  }
+
   async function restoreAnimal() {
     if (!window.confirm(t("confirmRestoreAnimal"))) return;
     try {
@@ -362,7 +376,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         </div>
       </div>
       <div className="animal-hero-actions">
-        <Button variant="secondary" onClick={openAnimalEdit}><Icon name="edit" size={16} />{t("edit")}</Button>
+        <Button variant="secondary" onClick={() => window.print()}><Icon name="download" size={16} />{locale === "it" ? "Stampa / PDF" : "Print / PDF"}</Button><Button variant="secondary" onClick={() => void downloadInternalQr()} disabled={internalQrBusy}><Icon name="qr-code" size={16} />{locale === "it" ? "QR interno" : "Internal QR"}</Button><Button variant="secondary" onClick={openAnimalEdit}><Icon name="edit" size={16} />{t("edit")}</Button>
         {isArchived && <Button onClick={() => void restoreAnimal()}><Icon name="restore" size={16} />{t("restoreAnimal")}</Button>}
       </div>
     </section>
