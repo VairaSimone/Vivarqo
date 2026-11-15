@@ -503,7 +503,7 @@ export function createReproductionRouter() {
             birthDate: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
             birthDateEstimated: animal.birthDateEstimated ?? false,
             geneticsNotes: animal.geneticsNotes ?? null, notes: animal.notes ?? null,
-            locationLabel: animal.locationLabel ?? null, originDescription: animal.originDescription ?? "Nato in allevamento",
+            locationLabel: animal.locationLabel ?? null, originDescription: animal.originDescription ?? null,
             acquiredDate: animal.acquiredDate ? validDate(animal.acquiredDate) : null,
             motherAnimalId: animal.motherAnimalId ?? batch.cycle.parentAAnimalId,
             fatherAnimalId: animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
