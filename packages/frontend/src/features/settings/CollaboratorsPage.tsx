@@ -51,7 +51,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
           setMessage(en ? "Invitation accepted. You can now switch to the shared workspace." : "Invito accettato. Ora puoi passare al workspace condiviso.");
           await load();
         })
-        .catch((reason) => { if (active) setError(reason instanceof ApiError ? reason.message : (en ? "Invitation could not be accepted." : "Impossibile accettare l'invito.")); })
+        .catch(async (reason) => { if (active) setError(reason instanceof ApiError ? reason.message : (en ? "Invitation could not be accepted." : "Impossibile accettare l'invito.")); if (active) await load().catch(() => undefined); })
         .finally(() => { if (active) setBusy(false); });
     } else {
       load().catch((reason) => { if (active) setError(reason instanceof ApiError ? reason.message : (en ? "Could not load collaborators." : "Impossibile caricare i collaboratori.")); });
@@ -108,7 +108,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
     finally { setBusy(false); }
   }
 
-  if (!data && !error) return <div className="page-stack"><LoadingState /></div>;
+  if (!data) return <div className="page-stack"><PageHeader eyebrow="Workspace" title={en ? "Collaborators" : "Collaboratori"} description={en ? "Manage shared access to your workspace." : "Gestisci gli accessi condivisi al tuo workspace."} />{error ? <Alert tone="danger">{error}</Alert> : <LoadingState />}<Button variant="secondary" onClick={() => void load()}>{en ? "Retry" : "Riprova"}</Button></div>;
   return <div className="page-stack">
     <PageHeader eyebrow={en ? "Workspace" : "Workspace"} title={en ? "Collaborators" : "Collaboratori"} description={en ? "Invite your team and decide what each person can see and change." : "Invita il tuo team e scegli cosa ogni persona può vedere e modificare."} action={<Button variant="secondary" onClick={() => navigate("/billing")}>{en ? "Subscription" : "Abbonamento"}</Button>} />
     {error && <Alert tone="danger">{error}</Alert>}
