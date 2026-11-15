@@ -155,7 +155,7 @@ export function createCareRouter() {
             notes: entry.notes ?? null,
           },
         });
-        if (entry.inventoryItemId && entry.outcome === "ate") {
+        if (entry.inventoryItemId && (entry.outcome === "ate" || entry.outcome === "refused")) {
           const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string; is_active: boolean; category: string; name: string }>>`
             SELECT quantity_on_hand::text, is_active, category, name
             FROM inventory_items
@@ -274,7 +274,7 @@ export function createCareRouter() {
         const nextOutcome = input.outcome ?? owned.outcome;
         const nextItemId = input.inventoryItemId !== undefined ? input.inventoryItemId : owned.inventoryItemId;
         const nextQuantity = input.inventoryQuantity !== undefined ? input.inventoryQuantity : (owned.inventoryQuantity === null ? null : Number(owned.inventoryQuantity));
-        if (nextOutcome === "ate" && nextItemId && nextQuantity) {
+        if ((nextOutcome === "ate" || nextOutcome === "refused") && nextItemId && nextQuantity) {
           const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string; is_active: boolean; category: string; name: string }>>`SELECT quantity_on_hand::text, is_active, category, name FROM inventory_items WHERE id = ${nextItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
           const item = locked[0];
           if (!item) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Food inventory item not found");
