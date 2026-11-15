@@ -180,6 +180,12 @@ export interface ReproductiveEventDto {
   animal?: Pick<AnimalSummaryDto, "id" | "name"> | null;
 }
 
+export interface EggHistoryDto {
+  id: string;
+  status: typeof eggStatuses[number];
+  occurredAt: string;
+  notes: string | null;
+}
 export interface EggDto {
   id: string;
   clutchId: string;
@@ -188,6 +194,7 @@ export interface EggDto {
   hatchedAt?: string | null;
   offspringAnimalId?: string | null;
   offspringAnimal?: AnimalSummaryDto | null;
+  history?: EggHistoryDto[];
   notes: string | null;
 }
 
