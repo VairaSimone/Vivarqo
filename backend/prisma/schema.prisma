@@ -263,11 +263,13 @@ model Task {
   status         String        @default("open") @db.VarChar(16)
   completedAt    DateTime?     @map("completed_at") @db.Timestamptz(6)
   reminderRuleId String?       @map("reminder_rule_id") @db.Uuid
+  healthRecordId String?       @unique @map("health_record_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal         Animal?       @relation(fields: [animalId], references: [id], onDelete: Restrict)
   reminderRule   ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+  healthRecord   HealthRecord? @relation(fields: [healthRecordId], references: [id], onDelete: Cascade)
   @@index([userId, status, dueAt], map: "tasks_user_status_due_idx")
   @@index([animalId], map: "tasks_animal_idx")
   @@index([reminderRuleId], map: "tasks_reminder_rule_idx")
@@ -952,6 +954,7 @@ model HealthRecord {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   animal             Animal   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  reminderTask       Task?
   @@index([animalId, occurredAt(sort: Desc)], map: "health_records_animal_occurred_idx")
   @@index([animalId, status], map: "health_records_animal_status_idx")
   @@map("health_records")
