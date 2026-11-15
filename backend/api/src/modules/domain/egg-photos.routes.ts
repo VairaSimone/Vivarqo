@@ -47,7 +47,7 @@ export function createEggPhotoRouter() {
     const auth = res.locals.auth as AuthContext;
     const eggId = parseEggId(req.params.id);
     const egg = await prisma.egg.findFirst({
-      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
       select: { photoKey: true },
     });
     if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
@@ -59,7 +59,7 @@ export function createEggPhotoRouter() {
     const auth = res.locals.auth as AuthContext;
     const eggId = parseEggId(req.params.id);
     const egg = await prisma.egg.findFirst({
-      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+      where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
       select: { id: true },
     });
     if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
@@ -75,7 +75,7 @@ export function createEggPhotoRouter() {
     try {
       const updated = await prisma.$transaction(async (tx) => {
         const existing = await tx.egg.findFirst({
-          where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+          where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
           select: { id: true, photoKey: true },
         });
         if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
@@ -101,7 +101,7 @@ export function createEggPhotoRouter() {
     const eggId = parseEggId(req.params.id);
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.egg.findFirst({
-        where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } },
+        where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
         select: { id: true, photoKey: true },
       });
       if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
