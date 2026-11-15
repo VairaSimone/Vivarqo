@@ -172,7 +172,7 @@ export function createCareRouter() {
           if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
           const balance = (available - requested) / 1000;
           await tx.stockMovement.create({
-            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after accepted feeding" },
+            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after prey was offered" },
           });
           await tx.inventoryItem.update({ where: { id: entry.inventoryItemId }, data: { quantityOnHand: balance } });
           await tx.feedingEntry.update({ where: { id: createdEntry.id }, data: { inventoryDeducted: true } });
@@ -284,7 +284,7 @@ export function createCareRouter() {
           const requested = decimalToScaledInteger(nextQuantity, 3);
           if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
           if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
-          await tx.stockMovement.create({ data: { itemId: nextItemId, movementType: "out", quantity: nextQuantity, occurredAt: performedAt ? new Date(performedAt) : owned.session.performedAt, reference: "Feeding entry " + id, notes: "Automatic deduction after accepted feeding edit" } });
+          await tx.stockMovement.create({ data: { itemId: nextItemId, movementType: "out", quantity: nextQuantity, occurredAt: performedAt ? new Date(performedAt) : owned.session.performedAt, reference: "Feeding entry " + id, notes: "Automatic deduction after prey offer was edited" } });
           await tx.inventoryItem.update({ where: { id: nextItemId }, data: { quantityOnHand: (available - requested) / 1000 } });
           await tx.feedingEntry.update({ where: { id }, data: { inventoryDeducted: true } });
         }
