@@ -24,7 +24,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<CycleDetailEditTarget | null>(null);
   const [eventForm, setEventForm] = useState({ eventType: "pairing", occurredAt: localDateTimeValue(), animalId: "", details: "", temperatureC: "", humidityPct: "" });
-  const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubationStartedAt: "", notes: "" });
+  const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubationStartedAt: "", targetTemperatureMinC: "", targetTemperatureMaxC: "", targetHumidityMinPct: "", targetHumidityMaxPct: "", checkIntervalHours: "", notes: "" });
   const [batchForm, setBatchForm] = useState({ clutchId: "", bornOn: todayDate(), count: "1", notes: "" });
   const { toast, show } = useToast();
   const cycle = resource.data?.cycle;
@@ -65,6 +65,11 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       status: getString(clutch, "status", "active"),
       incubatorLabel: getString(clutch, "incubatorLabel"),
       incubationStartedAt: getString(clutch, "incubationStartedAt") ? localDateTimeValue(new Date(getString(clutch, "incubationStartedAt"))) : "",
+      targetTemperatureMinC: getString(clutch, "targetTemperatureMinC"),
+      targetTemperatureMaxC: getString(clutch, "targetTemperatureMaxC"),
+      targetHumidityMinPct: getString(clutch, "targetHumidityMinPct"),
+      targetHumidityMaxPct: getString(clutch, "targetHumidityMaxPct"),
+      checkIntervalHours: getString(clutch, "checkIntervalHours"),
       notes: getString(clutch, "notes")
     });
     setError(""); setModal("clutch");
@@ -72,7 +77,17 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   async function saveClutch(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
-      const body = { laidOn: clutchForm.laidOn, eggCount: Number(clutchForm.eggCount), status: clutchForm.status, incubatorLabel: clutchForm.incubatorLabel || null, incubationStartedAt: clutchForm.incubationStartedAt ? new Date(clutchForm.incubationStartedAt).toISOString() : null, notes: clutchForm.notes || null };
+      const body = {
+        laidOn: clutchForm.laidOn, eggCount: Number(clutchForm.eggCount), status: clutchForm.status,
+        incubatorLabel: clutchForm.incubatorLabel || null,
+        incubationStartedAt: clutchForm.incubationStartedAt ? new Date(clutchForm.incubationStartedAt).toISOString() : null,
+        targetTemperatureMinC: clutchForm.targetTemperatureMinC === "" ? null : Number(clutchForm.targetTemperatureMinC),
+        targetTemperatureMaxC: clutchForm.targetTemperatureMaxC === "" ? null : Number(clutchForm.targetTemperatureMaxC),
+        targetHumidityMinPct: clutchForm.targetHumidityMinPct === "" ? null : Number(clutchForm.targetHumidityMinPct),
+        targetHumidityMaxPct: clutchForm.targetHumidityMaxPct === "" ? null : Number(clutchForm.targetHumidityMaxPct),
+        checkIntervalHours: clutchForm.checkIntervalHours === "" ? null : Number(clutchForm.checkIntervalHours),
+        notes: clutchForm.notes || null
+      };
       if (editing) await api.patch("/clutches/" + getString(editing, "id"), body);
       else await api.post("/clutches", { cycleId: id, ...body });
       setEditing(null); setModal(null); resource.reload(); show(t("saveSuccess"));
