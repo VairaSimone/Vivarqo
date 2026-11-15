@@ -310,12 +310,20 @@ export function createCareRouter() {
   router.delete("/feeding-entries/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
-    const owned = await prisma.feedingEntry.findFirst({
-      where: { id, session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } },
-      select: { id: true, sessionId: true },
-    });
-    if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
     await prisma.$transaction(async (tx) => {
+      const owned = await tx.feedingEntry.findFirst({
+        where: { id, session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } },
+        include: { session: { select: { id: true, performedAt: true } } },
+      });
+      if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
+      if (owned.inventoryDeducted && owned.inventoryItemId && owned.inventoryQuantity) {
+        const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string }>>`SELECT quantity_on_hand::text FROM inventory_items WHERE id = ${owned.inventoryItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
+        const current = decimalToScaledInteger(locked[0]?.quantity_on_hand ?? "0", 3);
+        const restore = decimalToScaledInteger(owned.inventoryQuantity, 3);
+        if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
+        await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry deletion " + id, notes: "Automatic stock restoration after deleting feeding entry" } });
+        await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: (current + restore) / 1000 } });
+      }
       await tx.feedingEntry.delete({ where: { id } });
       const remaining = await tx.feedingEntry.count({ where: { sessionId: owned.sessionId } });
       if (remaining === 0) await tx.feedingSession.deleteMany({ where: { id: owned.sessionId, userId: auth.userId } });
@@ -323,6 +331,41 @@ export function createCareRouter() {
     res.status(204).send();
   });
 
+  router.get("/animals/:animalId/feeding-summary", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = parseUuid(req.params.animalId!, "animalId");
+    const animal = await getOwnedAnimal(auth.userId, animalId);
+    const entries = await prisma.feedingEntry.findMany({
+      where: { animalId, session: { is: { userId: auth.userId } } },
+      orderBy: [{ session: { performedAt: "desc" } }, { id: "desc" }],
+      select: { outcome: true, session: { select: { performedAt: true } } },
+    });
+    const accepted = entries.filter((entry) => entry.outcome === "ate");
+    const refused = entries.filter((entry) => entry.outcome === "refused");
+    const offeredCount = accepted.length + refused.length;
+    let consecutiveRefusals = 0;
+    for (const entry of entries) {
+      if (entry.outcome === "ate") break;
+      if (entry.outcome === "refused") consecutiveRefusals += 1;
+    }
+    const lastAcceptedAt = accepted[0]?.session.performedAt ?? null;
+    const now = new Date();
+    const daysSinceLastFeeding = lastAcceptedAt ? Math.max(0, Math.floor((now.getTime() - lastAcceptedAt.getTime()) / 86_400_000)) : null;
+    const nextMealAt = lastAcceptedAt && animal.feedingIntervalDays
+      ? new Date(lastAcceptedAt.getTime() + animal.feedingIntervalDays * 86_400_000)
+      : null;
+    res.status(200).json({
+      feedingIntervalDays: animal.feedingIntervalDays,
+      lastAcceptedAt,
+      daysSinceLastFeeding,
+      nextMealAt,
+      consecutiveRefusals,
+      acceptedCount: accepted.length,
+      refusedCount: refused.length,
+      offeredCount,
+      acceptanceRate: offeredCount > 0 ? accepted.length / offeredCount : null,
+    });
+  });
   router.get("/animals/:animalId/weights", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
