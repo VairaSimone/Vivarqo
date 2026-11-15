@@ -43,7 +43,7 @@ function canWriteAsOperator(path: string): boolean {
   ].some((prefix) => startsWithPath(path, prefix));
 }
 
-function assertRolePermission(role: string, method: string, path: string): void {
+export function assertRolePermission(role: string, method: string, path: string): void {
   // Financial records and complete data exports always remain owner-only.
   if (startsWithPath(path, "/finance") || startsWithPath(path, "/exports")) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Only the workspace owner can access financial data and full exports");
