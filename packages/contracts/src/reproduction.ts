@@ -148,6 +148,7 @@ export const newAnimalSchema = z.object({
   birthDateEstimated: z.boolean().optional(),
   motherAnimalId: nullableUuid,
   fatherAnimalId: nullableUuid,
+  eggId: nullableUuid,
 }).strict();
 
 export type ReproductionCycleStatus = z.infer<typeof reproductionCycleStatusSchema>;
