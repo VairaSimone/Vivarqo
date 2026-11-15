@@ -1208,3 +1208,85 @@ for (const viewport of responsiveViewports) {
     expect(failures, "responsive failures at " + viewport.name + "; all routes were visited").toEqual([]);
   });
 }
+
+
+test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow", async ({ page }) => {
+  test.setTimeout(120_000);
+  const name = "E2E Location Animal " + Date.now();
+  const room = "E2E Room " + Date.now();
+  const rack = "E2E Rack " + Date.now();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await signIn(page, owner);
+
+  await page.goto("/animals");
+  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.getByLabel("Nome").fill(name);
+  await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
+  const createdResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/animals" &&
+    response.status() === 201
+  );
+  await page.getByRole("button", { name: "Salva modifiche" }).click();
+  await createdResponse;
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  const management = page.locator(".panel").filter({ hasText: "Posizioni e movimentazione" });
+  await management.getByLabel("Livello").selectOption("room");
+  await management.getByLabel("Nome posizione").fill(room);
+  await management.getByRole("button", { name: "Crea posizione" }).click();
+  await expect(management.getByText(room, { exact: true })).toBeVisible();
+
+  await management.getByLabel("Livello").selectOption("rack");
+  await management.getByLabel("Posizione superiore").selectOption({ label: room });
+  await management.getByLabel("Nome posizione").fill(rack);
+  await management.getByRole("button", { name: "Crea posizione" }).click();
+  await expect(management.getByText(rack, { exact: true })).toBeVisible();
+
+  const animalRow = management.locator(".record-row").filter({ hasText: name });
+  await animalRow.locator('input[type="checkbox"]').check();
+  await management.getByLabel("Destinazione").selectOption({ label: room + " / " + rack });
+  const moveResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/animals/move" &&
+    response.status() === 200
+  );
+  await management.getByRole("button", { name: "Sposta 1 selezionati" }).click();
+  await moveResponse;
+
+  await page.getByRole("button", { name: new RegExp(name) }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+
+  const qrDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "QR interno" }).click();
+  const qrFile = await qrDownload;
+  expect(qrFile.suggestedFilename()).toContain(".svg");
+
+  await page.evaluate(() => { window.print = () => { window.__vivarqoPrintCalled = true; }; });
+  await page.getByRole("button", { name: "Stampa / PDF" }).click();
+  expect(await page.evaluate(() => Boolean(window.__vivarqoPrintCalled))).toBe(true);
+
+  await page.getByRole("tab", { name: "Storico cure" }).click();
+  await page.getByLabel("Tipo").selectOption("sale");
+  await page.getByLabel("Destinatario").fill("E2E Recipient");
+  await page.getByLabel("Email").fill("recipient@vivarqo.test");
+  await page.getByLabel("Prezzo (€)").fill("125.50");
+  const transferResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/animals/" + new URL(page.url()).pathname.split("/").pop() + "/transfers" &&
+    response.status() === 201
+  );
+  await page.getByRole("button", { name: "Registra cessione" }).click();
+  await transferResponse;
+  await expect(page.getByText("E2E Recipient", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth
+  }));
+  expect(dimensions.content, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.viewport);
+  expect(errors).toEqual([]);
+});
