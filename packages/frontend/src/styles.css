@@ -2627,3 +2627,16 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .animal-editor-photo-copy { flex-basis: calc(100% - 80px); }
   .animal-editor-photo > .btn { margin-left: 78px; }
 }
+
+
+/* Pedigree fields inside the animal editor. */
+.animal-editor-parent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.animal-editor-parent-card { display: grid; align-content: start; gap: 13px; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-soft); }
+.animal-editor-parent-title { display: flex; align-items: center; gap: 10px; }
+.animal-editor-parent-symbol { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 9px; background: var(--accent-plum-bg); color: var(--accent-plum); font-size: 21px; }
+.animal-editor-parent-card:nth-child(2) .animal-editor-parent-symbol { background: var(--accent-blue-bg); color: var(--accent-blue); }
+.animal-editor-parent-title > div { display: grid; gap: 2px; }
+.animal-editor-parent-title strong { font-size: 13px; }
+.animal-editor-parent-title small { color: var(--muted); font-size: 11px; }
+.animal-editor-genealogy-hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 680px) { .animal-editor-parent-grid { grid-template-columns: 1fr; } }
