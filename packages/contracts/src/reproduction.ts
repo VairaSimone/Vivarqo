@@ -119,8 +119,6 @@ export const patchEggSchema = z.object({
   hatchedAt: dateOnly.nullable().optional(),
   offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
-  incubatorId: nullableUuid,
-  incubatorPosition: z.string().trim().max(80).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 export const eggMeasurementSchema = z.object({
