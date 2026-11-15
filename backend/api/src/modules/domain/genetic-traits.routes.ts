@@ -85,7 +85,7 @@ export function createGeneticTraitsRouter() {
         data: {
           animalId, traitName: input.traitName, traitValue: input.traitValue,
           sourceAnimalId: input.sourceAnimalId ?? null, confidenceNote: input.confidenceNote ?? null,
-          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, phenotypeRules: input.phenotypeRules ?? null, certainty: input.certainty ?? "unverified",
+          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, phenotypeRules: input.phenotypeRules as never, certainty: input.certainty ?? "unverified",
         },
         include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
       });
