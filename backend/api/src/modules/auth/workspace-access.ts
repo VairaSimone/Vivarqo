@@ -66,7 +66,8 @@ export function assertRolePermission(role: string, method: string, path: string)
   }
 }
 
-export const workspaceAccessGuard: RequestHandler = async (req, res, next) => {
+export function createWorkspaceAccessGuard(hasPremium: (ownerUserId: string) => Promise<boolean> = hasPaidSubscriptionEntitlement): RequestHandler {
+  return async (req, res, next) => {
   try {
     const path = req.path;
     if (personalPrefixes.some((prefix) => startsWithPath(path, prefix)) ||
@@ -96,7 +97,7 @@ export const workspaceAccessGuard: RequestHandler = async (req, res, next) => {
       throw new AppError(403, "WORKSPACE_ACCESS_REVOKED", "Access to this workspace is no longer available. Switch back to your personal workspace.");
     }
 
-    if (!await hasPaidSubscriptionEntitlement(ownerUserId)) {
+    if (!await hasPremium(ownerUserId)) {
       throw new AppError(403, "PREMIUM_REQUIRED", "The workspace owner must have an active Premium subscription to share this workspace", {
         upgradeRequired: true, billingPath: "/billing",
       });
