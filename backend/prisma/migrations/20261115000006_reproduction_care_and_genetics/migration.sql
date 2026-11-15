@@ -53,7 +53,7 @@ CREATE TABLE "incubator_maintenance" (
 );
 CREATE INDEX "incubator_maintenance_incubator_date_idx" ON "incubator_maintenance"("incubator_id", "occurred_at" DESC);
 
-CREATE TABLE "hatchling_care" (
+CREATE TABLE IF NOT EXISTS "hatchling_care" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "animal_id" UUID NOT NULL,
   "first_feeding_at" TIMESTAMPTZ(6),
@@ -66,4 +66,4 @@ CREATE TABLE "hatchling_care" (
   CONSTRAINT "hatchling_care_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "hatchling_care_animal_id_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "hatchling_care_animal_id_key" ON "hatchling_care"("animal_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "hatchling_care_animal_id_key" ON "hatchling_care"("animal_id");
