@@ -23,6 +23,15 @@ describe("feeding metrics", () => {
     expect(result.daysSinceLastFeeding).toBe(7);
   });
 
+  it("does not assume an unknown outcome was a refusal", () => {
+    const result = calculateFeedingMetrics([
+      { outcome: "refused", performedAt: daysAgo(1) },
+      { outcome: "unknown", performedAt: daysAgo(2) },
+      { outcome: "refused", performedAt: daysAgo(3) },
+    ], null, now);
+    expect(result.consecutiveRefusals).toBe(1);
+  });
+
   it("calculates acceptance only from offered meals", () => {
     const result = calculateFeedingMetrics([
       { outcome: "unknown", performedAt: daysAgo(1) },
