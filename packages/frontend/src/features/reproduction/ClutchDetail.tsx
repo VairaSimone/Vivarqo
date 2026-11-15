@@ -271,7 +271,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
           <small>{locale === "it" ? "JPEG, PNG o WebP; massimo 5 MB." : "JPEG, PNG or WebP; maximum 5 MB."}</small>
         </Field>
         <Field label={locale === "it" ? "Incubatrice" : "Incubator"}>
-          <Select value={getString(editingEgg, "incubatorId")} onChange={(e) => setEditingEgg({ ...editingEgg, incubatorId: e.target.value || null, incubatorPosition: e.target.value ? getString(editingEgg, "incubatorPosition") : null })}>
+          <Select value={getString(editingEgg, "incubatorId")} onChange={(e) => setEditingEgg({ ...editingEgg, incubatorId: e.target.value || null, incubatorPosition: e.target.value && e.target.value === getString(editingEgg, "incubatorId") ? getString(editingEgg, "incubatorPosition") : null })}>
             <option value="">{locale === "it" ? "Non assegnata" : "Not assigned"}</option>
             {(incubatorsResource.data?.incubators ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}{item.identifier ? ` · ${item.identifier}` : ""}</option>)}
           </Select>
