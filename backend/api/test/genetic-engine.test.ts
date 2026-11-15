@@ -58,8 +58,16 @@ describe("calculateInbreeding", () => {
     expect(result.coefficient).toBeNull();
     expect(result.completeness).toBe("partial");
   });
+  it("calculates half-sibling parentage as 12.5 percent", () => {
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "g", fatherId: "m2" }, { id: "f", motherId: "g", fatherId: "f2" }, { id: "g" }, { id: "m2" }, { id: "f2" }], "child");
+    expect(result.coefficient).toBe(0.125);
+  });
+  it("calculates full-sibling parentage as 25 percent", () => {
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "g1", fatherId: "g2" }, { id: "f", motherId: "g1", fatherId: "g2" }, { id: "g1" }, { id: "g2" }], "child");
+    expect(result.coefficient).toBe(0.25);
+  });
   it("detects first-cousin parentage through shared grandparents", () => {
-    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "gm1", fatherId: "gm2" }, { id: "f", motherId: "gm1", fatherId: "gm2" }, { id: "gm1" }, { id: "gm2" }], "child");
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "p1", fatherId: "p2" }, { id: "f", motherId: "p3", fatherId: "p4" }, { id: "p1", motherId: "gm1", fatherId: "gm2" }, { id: "p3", motherId: "gm1", fatherId: "gm2" }, { id: "p2" }, { id: "p4" }, { id: "gm1" }, { id: "gm2" }], "child");
     expect(result.coefficient).toBe(0.0625);
   });
   it("returns zero for a complete unrelated founder pedigree", () => {
