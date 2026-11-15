@@ -25,6 +25,10 @@ model User {
   sessions                UserSession[]
   authTokens              AuthToken[]
   animals                 Animal[]
+  animalLocations         AnimalLocation[]
+  animalLocationMoves     AnimalLocationMove[]
+  savedAnimalFilters      SavedAnimalFilter[]
+  animalTransfers         AnimalTransfer[]
   feedingSessions         FeedingSession[]
   reminderRules           ReminderRule[]
   tasks                   Task[]
@@ -96,6 +100,8 @@ model Animal {
   originDescription      String?               @map("origin_description")
   previousBreeder        String?               @map("previous_breeder") @db.VarChar(160)
   locationLabel          String?               @map("location_label") @db.VarChar(160)
+  locationId             String?               @map("location_id") @db.Uuid
+  qrToken                String?               @unique @map("qr_token") @db.VarChar(64)
   status                 String                @default("active") @db.VarChar(20)
   notes                  String?
   photoKey               String?               @map("photo_key")
@@ -105,6 +111,9 @@ model Animal {
   createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location               AnimalLocation?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  locationMoves          AnimalLocationMove[]
+  transfers              AnimalTransfer[]
   mother                 Animal?               @relation("AnimalMother", fields: [motherAnimalId], references: [id], onDelete: SetNull)
   father                 Animal?               @relation("AnimalFather", fields: [fatherAnimalId], references: [id], onDelete: SetNull)
   childrenAsMother       Animal[]              @relation("AnimalMother")
@@ -841,4 +850,72 @@ model PushDeliveryAttempt {
   @@index([userId, createdAt(sort: Desc)], map: "push_delivery_attempts_user_created_idx")
   @@index([notificationId], map: "push_delivery_attempts_notification_idx")
   @@map("push_delivery_attempts")
+}
+
+
+model AnimalLocation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  parentId String? @map("parent_id") @db.Uuid
+  kind String @db.VarChar(16)
+  name String @db.VarChar(120)
+  sortOrder Int @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent AnimalLocation? @relation("AnimalLocationTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children AnimalLocation[] @relation("AnimalLocationTree")
+  animals Animal[]
+  movesFrom AnimalLocationMove[] @relation("AnimalLocationMoveFrom")
+  movesTo AnimalLocationMove[] @relation("AnimalLocationMoveTo")
+  @@unique([id,userId], map: "animal_locations_id_user_id_unique")
+  @@index([userId,parentId,sortOrder], map: "animal_locations_user_parent_sort_idx")
+  @@index([userId,kind], map: "animal_locations_user_kind_idx")
+  @@map("animal_locations")
+}
+model AnimalLocationMove {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  fromLocationId String? @map("from_location_id") @db.Uuid
+  toLocationId String? @map("to_location_id") @db.Uuid
+  movedAt DateTime @default(now()) @map("moved_at") @db.Timestamptz(6)
+  reason String? @db.VarChar(500)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  fromLocation AnimalLocation? @relation("AnimalLocationMoveFrom", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation AnimalLocation? @relation("AnimalLocationMoveTo", fields: [toLocationId], references: [id], onDelete: SetNull)
+  @@index([userId,movedAt(sort: Desc)], map: "animal_location_moves_user_moved_idx")
+  @@index([animalId,movedAt(sort: Desc)], map: "animal_location_moves_animal_moved_idx")
+  @@map("animal_location_moves")
+}
+model SavedAnimalFilter {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  name String @db.VarChar(80)
+  filters Json @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId,name], map: "saved_animal_filters_user_name_unique")
+  @@index([userId,updatedAt(sort: Desc)], map: "saved_animal_filters_user_updated_idx")
+  @@map("saved_animal_filters")
+}
+model AnimalTransfer {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  transferType String @map("transfer_type") @db.VarChar(16)
+  recipientName String @map("recipient_name") @db.VarChar(160)
+  recipientEmail String? @map("recipient_email") @db.VarChar(254)
+  recipientBreeder String? @map("recipient_breeder") @db.VarChar(160)
+  transferredAt DateTime @map("transferred_at") @db.Timestamptz(6)
+  priceCents BigInt? @map("price_cents")
+  notes String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([userId,transferredAt(sort: Desc)], map: "animal_transfers_user_date_idx")
+  @@index([animalId,transferredAt(sort: Desc)], map: "animal_transfers_animal_date_idx")
+  @@map("animal_transfers")
 }
