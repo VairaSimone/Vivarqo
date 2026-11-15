@@ -5,6 +5,7 @@ import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
+import { decimalToScaledInteger } from "../domain/decimal-precision.js";
 import {
   feedingSessionSchema,
   noteSchema,
@@ -139,17 +140,43 @@ export function createCareRouter() {
       const session = await tx.feedingSession.create({
         data: { userId: auth.userId, performedAt: new Date(input.performedAt), notes: input.notes ?? null },
       });
-      await tx.feedingEntry.createMany({
-        data: input.entries.map((entry) => ({
-          sessionId: session.id,
-          animalId: entry.animalId,
-          outcome: entry.outcome,
-          foodType: entry.foodType ?? null,
-          foodSize: entry.foodSize ?? null,
-          foodWeightG: entry.foodWeightG ?? null,
-          notes: entry.notes ?? null,
-        })),
-      });
+      for (const entry of input.entries) {
+        const createdEntry = await tx.feedingEntry.create({
+          data: {
+            sessionId: session.id,
+            animalId: entry.animalId,
+            outcome: entry.outcome,
+            foodType: entry.foodType ?? null,
+            foodSize: entry.foodSize ?? null,
+            foodWeightG: entry.foodWeightG ?? null,
+            preyState: entry.preyState,
+            inventoryItemId: entry.inventoryItemId ?? null,
+            inventoryQuantity: entry.inventoryQuantity ?? null,
+            notes: entry.notes ?? null,
+          },
+        });
+        if (entry.inventoryItemId && entry.outcome === "ate") {
+          const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string; is_active: boolean; category: string; name: string }>>`
+            SELECT quantity_on_hand::text, is_active, category, name
+            FROM inventory_items
+            WHERE id = ${entry.inventoryItemId}::uuid AND user_id = ${auth.userId}::uuid
+            FOR UPDATE
+          `;
+          const item = locked[0];
+          if (!item) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Food inventory item not found");
+          if (!item.is_active || item.category !== "food") throw new AppError(409, "INVENTORY_ITEM_UNAVAILABLE", "Selected prey inventory item is not active food");
+          const available = decimalToScaledInteger(item.quantity_on_hand, 3);
+          const requested = decimalToScaledInteger(entry.inventoryQuantity!, 3);
+          if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
+          if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
+          const balance = (available - requested) / 1000;
+          await tx.stockMovement.create({
+            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after accepted feeding" },
+          });
+          await tx.inventoryItem.update({ where: { id: entry.inventoryItemId }, data: { quantityOnHand: balance } });
+          await tx.feedingEntry.update({ where: { id: createdEntry.id }, data: { inventoryDeducted: true } });
+        }
+      }
       await tx.auditEvent.create({
         data: {
           userId: auth.userId,
