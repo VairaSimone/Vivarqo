@@ -131,6 +131,7 @@ model Animal {
   originClutch           Clutch?               @relation("AnimalOriginClutch", fields: [originClutchId], references: [id], onDelete: Restrict)
   originOffspringBatch   OffspringBatch?       @relation("AnimalOriginBatch", fields: [originOffspringBatchId], references: [id], onDelete: Restrict)
   documents              Document[]
+  healthRecords          HealthRecord[]
   publicShare            PublicShare?
   financeEntries         FinanceEntry[]
   geneticTraits          AnimalGeneticTrait[]  @relation("GeneticTraitAnimal")
@@ -927,4 +928,31 @@ model AnimalTransfer {
   @@index([userId,transferredAt(sort: Desc)], map: "animal_transfers_user_date_idx")
   @@index([animalId,transferredAt(sort: Desc)], map: "animal_transfers_animal_date_idx")
   @@map("animal_transfers")
+}
+
+model HealthRecord {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId           String   @map("animal_id") @db.Uuid
+  recordType         String   @map("record_type") @db.VarChar(20)
+  status             String   @default("ongoing") @db.VarChar(16)
+  occurredAt         DateTime @map("occurred_at") @db.Timestamptz(6)
+  title              String   @db.VarChar(160)
+  symptoms           String?
+  diagnosis          String?
+  suspectedCondition String?  @map("suspected_condition")
+  veterinarian       String?  @db.VarChar(160)
+  clinic             String?  @db.VarChar(160)
+  medication         String?  @db.VarChar(160)
+  dosage             String?  @db.VarChar(120)
+  frequency          String?  @db.VarChar(120)
+  treatmentStartAt   DateTime? @map("treatment_start_at") @db.Timestamptz(6)
+  treatmentEndAt     DateTime? @map("treatment_end_at") @db.Timestamptz(6)
+  nextDueAt          DateTime? @map("next_due_at") @db.Timestamptz(6)
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal             Animal   @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  @@index([animalId, occurredAt(sort: Desc)], map: "health_records_animal_occurred_idx")
+  @@index([animalId, status], map: "health_records_animal_status_idx")
+  @@map("health_records")
 }
