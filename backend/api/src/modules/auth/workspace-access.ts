@@ -46,6 +46,9 @@ function canWriteAsOperator(path: string): boolean {
 }
 
 export function assertRolePermission(role: string, method: string, path: string): void {
+  if (!["admin", "operator", "breeding", "viewer"].includes(role)) {
+    throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "The collaborator role is not recognized");
+  }
   // Financial records and complete data exports always remain owner-only.
   if (startsWithPath(path, "/finance") || startsWithPath(path, "/exports")) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Only the workspace owner can access financial data and full exports");
