@@ -36,7 +36,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [traitBusy, setTraitBusy] = useState(false);
   const [traitError, setTraitError] = useState("");
   const [traitForm, setTraitForm] = useState({
-    traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "",
+    traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", certainty: "unverified",
   });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
   const [feedingPage, setFeedingPage] = useState(1);
@@ -216,6 +216,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       traitValue: existing?.traitValue ?? "",
       sourceAnimalId: existing?.sourceAnimalId ?? "",
       confidenceNote: existing?.confidenceNote ?? "",
+      inheritanceMode: existing?.inheritanceMode ?? "",
+      genotype: existing?.genotype ?? "",
+      certainty: existing?.certainty ?? "unverified",
     });
     setTraitModal(true);
   }
@@ -237,6 +240,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       traitValue: traitForm.traitValue.trim(),
       sourceAnimalId: traitForm.sourceAnimalId || null,
       confidenceNote: traitForm.confidenceNote.trim() || null,
+      inheritanceMode: traitForm.inheritanceMode || null,
+      genotype: traitForm.genotype || null,
+      certainty: traitForm.certainty,
     };
     try {
       if (traitEdit) await api.patch("/genetic-traits/" + traitEdit.id, payload);
@@ -400,7 +406,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <span className="simple-row-icon"><Icon name="leaf" /></span>
           <div className="genetic-trait-copy">
             <strong>{trait.traitName}</strong>
-            <span>{trait.traitValue}</span>
+            <span>{trait.traitValue}{trait.genotype ? ` · ${trait.genotype}` : ""}{trait.inheritanceMode ? ` · ${trait.inheritanceMode}` : ""}</span>
             <small>{t("geneticSourceAnimal")}: {trait.sourceAnimal
               ? trait.sourceAnimal.name + (trait.sourceAnimal.identifier ? " · " + trait.sourceAnimal.identifier : "")
               : t("geneticSourceUnknown")}</small>
@@ -434,6 +440,28 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           locale={locale}
         />
         {traitForm.sourceAnimalId === id && <Alert tone="danger">{t("geneticSelfSourceError")}</Alert>}
+        <div className="form-grid">
+          <Field label={locale === "it" ? "Modalità di ereditarietà" : "Inheritance mode"}>
+            <Select value={traitForm.inheritanceMode} onChange={(e) => setTraitForm({ ...traitForm, inheritanceMode: e.target.value })}>
+              <option value="">{locale === "it" ? "Non specificata" : "Not specified"}</option>
+              <option value="autosomal_recessive">{locale === "it" ? "Recessiva autosomica" : "Autosomal recessive"}</option>
+              <option value="incomplete_dominant">{locale === "it" ? "Dominanza incompleta / codominante" : "Incomplete dominance / codominant"}</option>
+              <option value="dominant">{locale === "it" ? "Dominante" : "Dominant"}</option>
+            </Select>
+          </Field>
+          <Field label={locale === "it" ? "Genotipo (es. Aa)" : "Genotype (e.g. Aa)"} hint={locale === "it" ? "Due alleli; non dedurre il genotipo dal solo morph." : "Two alleles; never infer genotype from morph alone."}>
+            <Input maxLength={2} pattern="[A-Za-z]{2}" value={traitForm.genotype} onChange={(e) => setTraitForm({ ...traitForm, genotype: e.target.value })} />
+          </Field>
+          <Field label={locale === "it" ? "Attendibilità" : "Certainty"}>
+            <Select value={traitForm.certainty} onChange={(e) => setTraitForm({ ...traitForm, certainty: e.target.value })}>
+              <option value="confirmed">{locale === "it" ? "Confermato" : "Confirmed"}</option>
+              <option value="carrier">{locale === "it" ? "Portatore noto" : "Known carrier"}</option>
+              <option value="visual">{locale === "it" ? "Fenotipo osservato" : "Observed phenotype"}</option>
+              <option value="possible">{locale === "it" ? "Possibile" : "Possible"}</option>
+              <option value="unverified">{locale === "it" ? "Non verificato" : "Unverified"}</option>
+            </Select>
+          </Field>
+        </div>
         <Field label={t("geneticConfidenceNote")} hint={t("geneticConfidenceHint")}>
           <Textarea rows={4} maxLength={10000} value={traitForm.confidenceNote} onChange={(e) => setTraitForm({ ...traitForm, confidenceNote: e.target.value })} />
         </Field>
