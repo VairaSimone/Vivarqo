@@ -14,6 +14,8 @@ export interface OffspringAnimalDraft {
   geneticsNotes: string;
   birthDate: string;
   birthDateEstimated: boolean;
+  acquiredDate: string;
+  originDescription: string;
   locationLabel: string;
   notes: string;
   photo: File | null;
@@ -21,7 +23,7 @@ export interface OffspringAnimalDraft {
 }
 const emptyAnimal = (): OffspringAnimalDraft => ({
   name: "", species: "", sex: "unknown", morph: "", identifier: "",
-  geneticsNotes: "", birthDate: "", birthDateEstimated: false,
+  geneticsNotes: "", birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "Nato in allevamento",
   locationLabel: "", notes: "", photo: null, eggId: "",
 });
 
@@ -79,6 +81,7 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
           <Field label={t("morph")}><Input maxLength={200} value={animal.morph} onChange={(e) => update(index, { morph: e.target.value })} /></Field>
           <Field label={t("birthDate")}><Input type="date" value={animal.birthDate || batch.bornOn} onChange={(e) => update(index, { birthDate: e.target.value })} /></Field>
           <Field label={t("location")}><Input maxLength={160} value={animal.locationLabel} onChange={(e) => update(index, { locationLabel: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Data acquisizione" : "Acquired date"}><Input type="date" value={animal.acquiredDate} onChange={(e) => update(index, { acquiredDate: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Uovo di origine" : "Source egg"}><Select value={animal.eggId} disabled={!batch.clutchId || clutchResource.loading} onChange={(e) => update(index, { eggId: e.target.value })}>
             <option value="">{locale === "it" ? "Non collegare un uovo" : "Do not link an egg"}</option>
             {availableEggs.map((egg) => <option key={egg.id} value={egg.id}>{egg.code || egg.id.slice(0, 8)} · {egg.status}</option>)}
@@ -93,6 +96,8 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
             }} />
           </Field>
         </div>
+        <Field label={locale === "it" ? "Provenienza" : "Origin"}><Input maxLength={20000} value={animal.originDescription} onChange={(e) => update(index, { originDescription: e.target.value })} /></Field>
+        <label className="checkbox-field"><input type="checkbox" checked={animal.birthDateEstimated} onChange={(e) => update(index, { birthDateEstimated: e.target.checked })} />{locale === "it" ? "Data di nascita stimata" : "Estimated birth date"}</label>
         <Field label={t("geneticsNotes")}><Textarea rows={2} value={animal.geneticsNotes} onChange={(e) => update(index, { geneticsNotes: e.target.value })} /></Field>
         <Field label={t("notes")}><Textarea rows={2} value={animal.notes} onChange={(e) => update(index, { notes: e.target.value })} /></Field>
       </section>)}
