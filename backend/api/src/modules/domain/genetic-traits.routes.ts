@@ -336,14 +336,14 @@ export function createGeneticTraitsRouter() {
     ]);
     if (catalog.length !== input.locusIds.length || new Set(input.locusIds).size !== input.locusIds.length) throw new AppError(400, "GENETIC_LOCUS_INVALID", "One or more loci are unavailable");
     const inputs: GeneticLocusInput[] = catalog.map((locus) => {
-      const mother = traits.find((trait) => trait.animalId === input.motherAnimalId && trait.locusId === locus.id);
-      const father = traits.find((trait) => trait.animalId === input.fatherAnimalId && trait.locusId === locus.id);
-      const genotypeFor = (trait: typeof mother) => trait?.confirmedGenotype
-        ?? (trait && ["confirmed", "carrier"].includes(trait.certainty) ? trait.genotype : null)
-        ?? trait?.theoreticalGenotype ?? "?|?";
+      const motherTraits = traits.filter((trait) => trait.animalId === input.motherAnimalId && trait.locusId === locus.id);
+      const fatherTraits = traits.filter((trait) => trait.animalId === input.fatherAnimalId && trait.locusId === locus.id);
+      const genotypeFor = (records: typeof motherTraits) => records.find((trait) => trait.confirmedGenotype)?.confirmedGenotype
+        ?? records.find((trait) => ["confirmed", "carrier"].includes(trait.certainty) && trait.genotype)?.genotype
+        ?? records.find((trait) => trait.theoreticalGenotype)?.theoreticalGenotype ?? "?|?";
       const rules: Record<string, string> = {};
       let conflict = false;
-      for (const ruleSet of [mother?.phenotypeRules, father?.phenotypeRules]) {
+      for (const ruleSet of [...motherTraits.map((trait) => trait.phenotypeRules), ...fatherTraits.map((trait) => trait.phenotypeRules)]) {
         if (!ruleSet || typeof ruleSet !== "object" || Array.isArray(ruleSet)) continue;
         for (const [genotype, value] of Object.entries(ruleSet as Record<string, unknown>)) {
           if (typeof value !== "string") continue;
@@ -354,7 +354,7 @@ export function createGeneticTraitsRouter() {
       return {
         locusId: locus.id, name: locus.name,
         inheritanceMode: locus.inheritanceMode as GeneticLocusInput["inheritanceMode"],
-        motherGenotype: genotypeFor(mother), fatherGenotype: genotypeFor(father),
+        motherGenotype: genotypeFor(motherTraits), fatherGenotype: genotypeFor(fatherTraits),
         referenceAllele: locus.alleles.find((allele) => allele.isReference)?.symbol ?? null,
         allowedAlleles: locus.alleles.map((allele) => allele.symbol),
         phenotypeRules: conflict ? null : rules,
