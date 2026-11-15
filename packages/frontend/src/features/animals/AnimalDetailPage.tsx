@@ -35,7 +35,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [traitEdit, setTraitEdit] = useState<GeneticTraitDto | null>(null);
   const [traitBusy, setTraitBusy] = useState(false);
   const [traitError, setTraitError] = useState("");
-  const [traitForm, setTraitForm] = useState({
+  const [hatchlingCareModal, setHatchlingCareModal] = useState(false);
+  const [hatchlingCareBusy, setHatchlingCareBusy] = useState(false);
+  const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", notes: "" });
+  const [traitForm, setTraitForm = useState({
     traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", certainty: "unverified",
   });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
@@ -56,6 +59,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
+  const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
 
   useEffect(() => {
@@ -258,6 +262,36 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     }
   }
 
+  function openHatchlingCare() {
+    const care = hatchlingCare.data?.care;
+    setHatchlingCareForm({
+      firstFeedingAt: care?.firstFeedingAt?.slice(0, 10) ?? "",
+      firstFeedingAccepted: care?.firstFeedingAccepted == null ? "" : care.firstFeedingAccepted ? "yes" : "no",
+      firstShedAt: care?.firstShedAt?.slice(0, 10) ?? "",
+      readyForRehomingAt: care?.readyForRehomingAt?.slice(0, 10) ?? "",
+      notes: care?.notes ?? "",
+    });
+    setHatchlingCareModal(true);
+  }
+  async function saveHatchlingCare(event: FormEvent) {
+    event.preventDefault();
+    setHatchlingCareBusy(true);
+    const toIso = (value: string) => value ? new Date(value + "T12:00:00").toISOString() : null;
+    try {
+      await api.patch(`/animals/${encodeURIComponent(id)}/hatchling-care`, {
+        firstFeedingAt: toIso(hatchlingCareForm.firstFeedingAt),
+        firstFeedingAccepted: hatchlingCareForm.firstFeedingAccepted === "" ? null : hatchlingCareForm.firstFeedingAccepted === "yes",
+        firstShedAt: toIso(hatchlingCareForm.firstShedAt),
+        readyForRehomingAt: toIso(hatchlingCareForm.readyForRehomingAt),
+        notes: hatchlingCareForm.notes || null,
+      });
+      setHatchlingCareModal(false);
+      hatchlingCare.reload();
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setHatchlingCareBusy(false); }
+  }
+
   async function deleteGeneticTrait(trait: GeneticTraitDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try {
@@ -328,7 +362,20 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     <div className="tabs-line" role="tablist">{tabItems.map(([key, label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
 
     {tab === "overview" && <div className="detail-grid">
-      <Panel><PanelHeader title={t("overview")} /><div className="detail-fields">
+      {animal.originOffspringBatchId && <Panel>
+        <PanelHeader title={locale === "it" ? "Crescita e prime cure" : "Hatchling care"} action={!isArchived ? <Button size="sm" variant="secondary" onClick={openHatchlingCare}>{locale === "it" ? "Aggiorna tappe" : "Update milestones"}</Button> : undefined} />
+        <div className="detail-fields">
+          <Detail label={locale === "it" ? "Prime alimentazioni" : "Feedings"} value={hatchlingCare.data ? `${hatchlingCare.data.acceptedFeedings}/${hatchlingCare.data.feedingCount} ${locale === "it" ? "accettate" : "accepted"}` : "—"} />
+          <Detail label={locale === "it" ? "Misurazioni peso" : "Weight records"} value={String(hatchlingCare.data?.weights.length ?? 0)} />
+          <Detail label={locale === "it" ? "Mute registrate" : "Sheds recorded"} value={String(hatchlingCare.data?.sheds.length ?? 0)} />
+          <Detail label={locale === "it" ? "Prima alimentazione" : "First feeding"} value={formatDate(hatchlingCare.data?.care?.firstFeedingAt ?? "", locale)} />
+          <Detail label={locale === "it" ? "Prima muta" : "First shed"} value={formatDate(hatchlingCare.data?.care?.firstShedAt ?? "", locale)} />
+          <Detail label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming"} value={formatDate(hatchlingCare.data?.care?.readyForRehomingAt ?? "", locale)} />
+        </div>
+        {hatchlingCare.data?.care?.notes && <p className="detail-copy">{hatchlingCare.data.care.notes}</p>}
+        <p className="muted-note">{locale === "it" ? "Le alimentazioni, i pesi e le mute provengono dai normali registri di cura dell'animale." : "Feedings, weights and sheds are sourced from the animal's standard care records."}</p>
+      </Panel>}
+            <Panel><PanelHeader title={t("overview")} /><div className="detail-fields">
         <Detail label={t("identifier")} value={getString(animal, "identifier")} /><Detail label={t("species")} value={getString(animal, "species")} />
         <Detail label={t("sex")} value={getString(animal, "sex") ? t(getString(animal, "sex")) : ""} /><Detail label={t("morph")} value={getString(animal, "morph")} />
         <Detail label={t("birthDate")} value={formatDate(getString(animal, "birthDate"), locale)} /><Detail label={t("acquiredDate")} value={formatDate(getString(animal, "acquiredDate"), locale)} />
@@ -421,6 +468,16 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     </Panel>}
 
     {tab === "share" && <PublicSharePanel animalId={id} locale={locale} hasPhoto={Boolean(getString(animal, "photoUrl"))} resource={share.data?.share ?? null} reload={share.reload} show={show} />}
+    {hatchlingCareModal && <Modal title={locale === "it" ? "Prime cure del piccolo" : "Hatchling care milestones"} onClose={() => setHatchlingCareModal(false)}>
+      <form className="form-stack" onSubmit={saveHatchlingCare}>
+        <Field label={locale === "it" ? "Data prima alimentazione" : "First feeding date"}><Input type="date" value={hatchlingCareForm.firstFeedingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAt: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Prima alimentazione accettata?" : "First feeding accepted?"}><Select value={hatchlingCareForm.firstFeedingAccepted} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAccepted: e.target.value })}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="yes">{locale === "it" ? "Sì" : "Yes"}</option><option value="no">{locale === "it" ? "No" : "No"}</option></Select></Field>
+        <Field label={locale === "it" ? "Data prima muta" : "First shed date"}><Input type="date" value={hatchlingCareForm.firstShedAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstShedAt: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming from"}><Input type="date" value={hatchlingCareForm.readyForRehomingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, readyForRehomingAt: e.target.value })} /></Field>
+        <Field label={t("notes")}><Textarea rows={3} value={hatchlingCareForm.notes} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, notes: e.target.value })} /></Field>
+        <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setHatchlingCareModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={hatchlingCareBusy}>{t("save")}</Button></div>
+      </form>
+    </Modal>}
     {traitModal && <Modal title={traitEdit ? t("editGeneticTrait") : t("addGeneticTrait")} onClose={() => setTraitModal(false)}>
       <form className="form-stack" onSubmit={saveGeneticTrait}>
         {traitError && <Alert tone="danger">{traitError}</Alert>}
