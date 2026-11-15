@@ -8948,6 +8948,56 @@ paths:
             application/json:
               schema: { type: object, required: [transfer], properties: { transfer: { type: object } } }
 
+
+  /api/v1/eggs/{id}/photo:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Recupera la foto privata di un uovo
+      responses:
+        '200':
+          description: Immagine dell'uovo.
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '404': { description: Uovo o foto non trovato. }
+    post:
+      operationId: postEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Carica o sostituisce la foto privata di un uovo
+      requestBody:
+        required: true
+        content:
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          image/webp: { schema: { type: string, format: binary } }
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        '200':
+          description: Foto caricata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photoUrl]
+                properties:
+                  photoUrl: { type: string }
+        '400': { description: File non valido. }
+        '404': { description: Uovo non trovato. }
+    delete:
+      operationId: deleteEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Elimina la foto privata di un uovo
+      responses:
+        '204': { description: Foto eliminata. }
+        '404': { description: Uovo non trovato. }
+
 components:
   securitySchemes:
     sessionCookieDev:
