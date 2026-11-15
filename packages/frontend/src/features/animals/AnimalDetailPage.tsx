@@ -480,7 +480,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <RecordList readOnly={isArchived} records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
         </Panel>
       </div>
-      <AnimalMovementHistory id={id} locale={locale} readOnly={isArchived} />
+      <AnimalMovementHistory id={id} locale={locale} readOnly={isArchived} onTransferRecorded={animalResource.reload} />
     </div>}
 
     {tab === "documents" && <Panel><PanelHeader title={t("documentsTab")} action={!isArchived ? <Button onClick={() => navigate(`/documents?animalId=${id}`)}><Icon name="upload" size={15} />{t("uploadDocument")}</Button> : undefined} />
