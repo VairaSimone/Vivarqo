@@ -2085,6 +2085,164 @@ paths:
       responses:
         '204':
           description: Tratto eliminato.
+  /api/v1/genetics/catalog:
+    get:
+      operationId: getGeneticsCatalog
+      tags: [Genetics]
+      summary: Elenca geni, loci e alleli del proprietario autenticato
+      parameters:
+        - name: species
+          in: query
+          schema: { type: string, maxLength: 160 }
+      responses:
+        '200':
+          description: Catalogo genetico.
+          content:
+            application/json:
+              schema: { type: object, properties: { genes: { type: array, items: { type: object } } } }
+  /api/v1/genetics/genes:
+    post:
+      operationId: createGeneticGene
+      tags: [Genetics]
+      summary: Crea un gene nel catalogo personale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [species, symbol, name]
+              properties:
+                species: { type: string, maxLength: 160 }
+                symbol: { type: string, maxLength: 40 }
+                name: { type: string, maxLength: 160 }
+                description: { type: [string, 'null'] }
+      responses:
+        '201': { description: Gene creato. }
+  /api/v1/genetics/genes/{geneId}/loci:
+    post:
+      operationId: createGeneticLocus
+      tags: [Genetics]
+      summary: Crea un locus collegato a un gene
+      parameters:
+        - name: geneId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol, name, inheritanceMode]
+              properties:
+                symbol: { type: string, maxLength: 40 }
+                name: { type: string, maxLength: 160 }
+                inheritanceMode: { type: string, enum: [autosomal_recessive, dominant, incomplete_dominant, codominant] }
+      responses:
+        '201': { description: Locus creato. }
+  /api/v1/genetics/loci/{locusId}/alleles:
+    post:
+      operationId: createGeneticAllele
+      tags: [Genetics]
+      summary: Registra un allele nel locus
+      parameters:
+        - name: locusId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol, name]
+              properties:
+                symbol: { type: string, maxLength: 24 }
+                name: { type: string, maxLength: 120 }
+                isReference: { type: boolean }
+      responses:
+        '201': { description: Allele creato. }
+  /api/v1/genetics/calculate:
+    post:
+      operationId: calculateGeneticCross
+      tags: [Genetics]
+      summary: Calcola probabilità mendeliane multi-locus da genotipi espliciti
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loci]
+              properties:
+                loci:
+                  type: array
+                  maxItems: 12
+                  items:
+                    type: object
+                    required: [locusId, motherGenotype, fatherGenotype]
+                    properties:
+                      locusId: { type: string, format: uuid }
+                      motherGenotype: { type: string, maxLength: 64 }
+                      fatherGenotype: { type: string, maxLength: 64 }
+      responses:
+        '200': { description: Probabilità teoriche e assunzioni del calcolo. }
+  /api/v1/genetics/calculate-pairing:
+    post:
+      operationId: calculateAnimalPairingGenetics
+      tags: [Genetics]
+      summary: Calcola un incrocio usando i genotipi salvati dei due animali
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motherAnimalId, fatherAnimalId, locusIds]
+              properties:
+                motherAnimalId: { type: string, format: uuid }
+                fatherAnimalId: { type: string, format: uuid }
+                locusIds: { type: array, minItems: 1, maxItems: 12, items: { type: string, format: uuid } }
+      responses:
+        '200': { description: Probabilità teoriche multi-locus con eventuali loci incompleti. }
+  /api/v1/animals/{animalId}/genetic-history:
+    get:
+      operationId: getAnimalGeneticHistory
+      tags: [Genetics]
+      summary: Restituisce lo storico immutabile dei tratti genetici
+      parameters:
+        - $ref: '#/components/parameters/AnimalId'
+      responses:
+        '200': { description: Storico delle modifiche genetiche. }
+  /api/v1/animals/{animalId}/inbreeding:
+    get:
+      operationId: getAnimalInbreeding
+      tags: [Genetics]
+      summary: Calcola la consanguineità quando la genealogia è sufficientemente completa
+      parameters:
+        - $ref: '#/components/parameters/AnimalId'
+      responses:
+        '200': { description: Coefficiente o stato incompleto con motivazione. }
+  /api/v1/animals/{animalId}/pedigree:
+    get:
+      operationId: getAnimalPedigree
+      tags: [Genetics]
+      summary: Restituisce la genealogia registrata fino a otto generazioni
+      parameters:
+        - $ref: '#/components/parameters/AnimalId'
+      responses:
+        '200': { description: Nodi, relazioni e genitori non registrati. }
   /api/v1/finance/entries:
     get:
       operationId: getFinanceEntries
