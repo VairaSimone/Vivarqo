@@ -85,7 +85,7 @@ export function createHealthRouter() {
   router.patch("/health-records/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = parseId(req.params.id);
-    const existing = await prisma.healthRecord.findFirst({ where: { id, animal: { userId: auth.userId } }, include: { animal: { select: { id: true, status: true, archivedAt: true } } } });
+    const existing = await prisma.healthRecord.findFirst({ where: { id, animal: { is: { userId: auth.userId } } }, include: { animal: { select: { id: true, status: true, archivedAt: true } } } });
     if (!existing) throw new AppError(404, "HEALTH_RECORD_NOT_FOUND", "Health record not found");
     await ownedAnimal(auth.userId, existing.animalId, true);
     const input = parseBody(req.body);
