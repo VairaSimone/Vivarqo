@@ -129,4 +129,7 @@ export function createWorkspaceAccessGuard(hasPremium: (ownerUserId: string) => 
   } catch (error) {
     next(error);
   }
-};
+  };
+}
+
+export const workspaceAccessGuard = createWorkspaceAccessGuard();
