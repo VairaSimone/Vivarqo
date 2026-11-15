@@ -333,6 +333,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <div className="detail-fields">
           <div className="detail-field"><span>{locale === "it" ? "Madre" : "Mother"}</span>{animal.mother ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.mother!.id)}`)}>{animal.mother.name}{animal.mother.morph ? ` · ${animal.mother.morph}` : ""}</button> : <strong>{getString(animal, "motherDescription") || "—"}</strong>}</div>
           <div className="detail-field"><span>{locale === "it" ? "Padre" : "Father"}</span>{animal.father ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.father!.id)}`)}>{animal.father.name}{animal.father.morph ? ` · ${animal.father.morph}` : ""}</button> : <strong>{getString(animal, "fatherDescription") || "—"}</strong>}</div>
+          <div className="detail-field"><span>{locale === "it" ? "Covata di provenienza" : "Source clutch"}</span>{animal.originClutchId ? <button className="text-link" onClick={() => navigate(`/clutches/${encodeURIComponent(animal.originClutchId!)}`)}>{locale === "it" ? "Apri covata" : "Open clutch"}</button> : <strong>—</strong>}</div>
         </div>
         <p className="muted-note">{locale === "it" ? "La genealogia completa si esplora seguendo i collegamenti dei genitori, generazione dopo generazione." : "Explore the full pedigree by following parent links, generation by generation."}</p>
       </Panel>
