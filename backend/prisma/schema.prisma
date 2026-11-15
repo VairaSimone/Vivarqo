@@ -385,6 +385,7 @@ model Egg {
   hatchedAt DateTime? @map("hatched_at") @db.Date
   offspringAnimalId String? @unique @map("offspring_animal_id") @db.Uuid
   notes     String?
+  photoKey  String?   @map("photo_key")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   clutch    Clutch    @relation(fields: [clutchId], references: [id], onDelete: Restrict)
