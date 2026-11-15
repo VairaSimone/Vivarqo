@@ -31,10 +31,11 @@ export function createWeightGrowthRouter() {
     const previousFrom = periodDays == null ? null : new Date(now.getTime() - periodDays * 2 * 86_400_000);
     const measurements = await prisma.weightMeasurement.findMany({
       where: { animalId, ...(previousFrom ? { measuredAt: { gte: previousFrom, lte: now } } : { measuredAt: { lte: now } }) },
-      orderBy: [{ measuredAt: "asc" }, { id: "asc" }],
+      orderBy: [{ measuredAt: "desc" }, { id: "desc" }],
       take: 2000,
       select: { id: true, measuredAt: true, weightG: true, notes: true },
     });
+    measurements.reverse();
     const current = measurements.filter((item) => !currentFrom || item.measuredAt >= currentFrom);
     const previous = periodDays == null ? [] : measurements.filter((item) => item.measuredAt < currentFrom!);
     const summarize = (items: typeof measurements) => {

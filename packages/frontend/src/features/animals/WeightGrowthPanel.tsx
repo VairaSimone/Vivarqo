@@ -3,7 +3,7 @@ import { api, ApiError } from "../../lib/api";
 import type { Locale } from "../../lib/domain";
 import { formatWeight } from "../../lib/domain";
 import { translate } from "../../lib/i18n";
-import { Alert, Button, Field, Input, Panel, PanelHeader } from "../../components/ui";
+import { Alert, Button, Field, Input, PanelHeader } from "../../components/ui";
 
 type Measurement = { id: string; measuredAt: string; weightG: string | number; notes?: string | null };
 type GrowthResponse = {
@@ -84,7 +84,7 @@ export function WeightGrowthPanel({ animalId, locale, readOnly }: { animalId: st
   const current = data?.current;
   const previous = data?.previous;
   const number = (value: number | null) => value == null ? "—" : `${value > 0 ? "+" : ""}${value.toLocaleString(locale === "it" ? "it-IT" : "en-GB", { maximumFractionDigits: 2 })}`;
-  return <Panel>
+  return <div className="weight-growth-analysis">
     <PanelHeader title={locale === "it" ? "Analisi della crescita" : "Growth analysis"} action={<Button size="sm" variant="secondary" disabled={exportBusy || points.length === 0} onClick={() => void exportHistory()}>{exportBusy ? t("loading") : (locale === "it" ? "Esporta CSV" : "Export CSV")}</Button>} />
     <div className="weight-growth-controls">
       <Field label={locale === "it" ? "Periodo analizzato" : "Analysis period"}>
@@ -129,5 +129,5 @@ export function WeightGrowthPanel({ animalId, locale, readOnly }: { animalId: st
       </div>
       {reminderMessage && <p className="muted-note" role="status">{reminderMessage}</p>}
     </div>}
-  </Panel>;
+  </div>;
 }
