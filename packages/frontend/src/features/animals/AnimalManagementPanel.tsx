@@ -30,7 +30,7 @@ export function AnimalManagementPanel({ locale }: { locale: Locale }) {
       api.get<{ animals: Animal[]; pagination?: { totalPages: number } }>("/animals?page=1&pageSize=100&status=active")
     ]);
     const allAnimals = [...a.animals];
-    for (let page = 2; page <= Math.min(100, a.pagination?.totalPages ?? 1); page++) {
+    for (let page = 2; page <= (a.pagination?.totalPages ?? 1); page++) {
       const next = await api.get<{ animals: Animal[] }>("/animals?page=" + page + "&pageSize=100&status=active");
       allAnimals.push(...next.animals);
     }
