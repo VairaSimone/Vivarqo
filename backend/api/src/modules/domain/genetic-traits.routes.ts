@@ -57,7 +57,7 @@ async function ownedAnimal(userId: string, animalId: string) {
   return animal;
 }
 async function ownedLocus(userId: string, locusId: string | null | undefined) {
-  if (!locusId) return [];
+  if (!locusId) return null;
   const locus = await prisma.geneticLocus.findFirst({
     where: { id: locusId, gene: { is: { userId } } },
     include: { alleles: { select: { symbol: true } }, gene: { select: { species: true } } },
