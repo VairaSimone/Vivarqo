@@ -722,6 +722,18 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const restoredStock = (await restoredStockResponse.json()).items.find((item) => item.id === stockItem.id);
   expect(Number(restoredStock.quantityOnHand)).toBe(1.88);
 
+  page.once("dialog", (dialog) => dialog.accept());
+  const deleteDeductedEntry = page.waitForResponse((response) =>
+    response.request().method() === "DELETE" &&
+    response.url().includes("/api/v1/feeding-entries/") &&
+    response.status() === 204
+  );
+  await page.getByRole("button", { name: "Elimina" }).last().click();
+  await deleteDeductedEntry;
+  const stockAfterDeleteResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=100&category=food");
+  const stockAfterDelete = (await stockAfterDeleteResponse.json()).items.find((item) => item.id === stockItem.id);
+  expect(Number(stockAfterDelete.quantityOnHand)).toBe(2);
+
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
   const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
