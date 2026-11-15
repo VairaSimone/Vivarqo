@@ -8,6 +8,10 @@ describe("prey inventory quantity", () => {
   it("keeps grams when inventory is measured in grams", () => {
     expect(suggestedInventoryQuantity("g", 120)).toBe("120");
   });
+  it("converts to ounce and pound inventory units", () => {
+    expect(suggestedInventoryQuantity("oz", 28.349523125)).toBe("1");
+    expect(suggestedInventoryQuantity("lb", 453.59237)).toBe("1");
+  });
   it("uses one item for count-based stock and when weight is unavailable", () => {
     expect(suggestedInventoryQuantity("unit", 120)).toBe("1");
     expect(suggestedInventoryQuantity("kg", null)).toBe("1");
