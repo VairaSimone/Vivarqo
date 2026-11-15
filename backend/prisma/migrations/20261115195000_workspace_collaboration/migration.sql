@@ -44,6 +44,9 @@ CREATE TABLE "workspace_invitations" (
   CONSTRAINT "workspace_invitations_role_check" CHECK ("role" IN ('admin', 'operator', 'breeding', 'viewer')),
   CONSTRAINT "workspace_invitations_token_hash_key" UNIQUE ("token_hash")
 );
+CREATE UNIQUE INDEX "workspace_invitations_pending_owner_email_key"
+  ON "workspace_invitations"("owner_user_id", "email")
+  WHERE "accepted_at" IS NULL AND "revoked_at" IS NULL;
 CREATE INDEX "workspace_invitations_owner_expires_idx"
   ON "workspace_invitations"("owner_user_id", "expires_at");
 CREATE INDEX "workspace_invitations_email_expires_idx"
