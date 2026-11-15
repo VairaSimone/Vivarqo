@@ -140,6 +140,10 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     if (identifier === null) return;
     const capacityValue = window.prompt(locale === "it" ? "Capacità in uova (vuoto = non specificata)" : "Egg capacity (blank = unspecified)", incubator.capacity == null ? "" : String(incubator.capacity));
     if (capacityValue === null) return;
+    const intervalValue = window.prompt(locale === "it" ? "Intervallo manutenzione in giorni (vuoto = disattivato)" : "Maintenance interval in days (blank = disabled)", incubator.maintenanceIntervalDays == null ? "" : String(incubator.maintenanceIntervalDays));
+    if (intervalValue === null) return;
+    const maintenanceIntervalDays = intervalValue.trim() ? Number(intervalValue) : null;
+    if (maintenanceIntervalDays !== null && (!Number.isInteger(maintenanceIntervalDays) || maintenanceIntervalDays < 1 || maintenanceIntervalDays > 3650)) { show(locale === "it" ? "L’intervallo deve essere tra 1 e 3650 giorni." : "Interval must be between 1 and 3650 days."); return; }
     const notes = window.prompt(locale === "it" ? "Note (facoltative)" : "Notes (optional)", incubator.notes ?? "");
     if (notes === null) return;
     const capacity = capacityValue.trim() === "" ? null : Number(capacityValue);
@@ -149,7 +153,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     }
     try {
       await api.patch(`/incubators/${encodeURIComponent(incubator.id)}`, {
-        name: name.trim(), identifier: identifier.trim() || null, capacity, notes: notes.trim() || null,
+        name: name.trim(), identifier: identifier.trim() || null, capacity, maintenanceIntervalDays, notes: notes.trim() || null,
       });
       await incubatorsResource.reload();
       show(t("saveSuccess"));
@@ -300,7 +304,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       <PanelHeader title={locale === "it" ? "Incubatrici" : "Incubators"} action={<Button size="sm" variant="secondary" onClick={() => void addIncubator()}><Icon name="plus" />{locale === "it" ? "Aggiungi" : "Add"}</Button>} />
       {incubatorsResource.loading && !incubatorsResource.data ? <LoadingState /> : (incubatorsResource.data?.incubators ?? []).length
         ? <div className="record-list">{(incubatorsResource.data?.incubators ?? []).map((incubator) => <div className="record-row" key={incubator.id}>
-            <div><strong>{incubator.name}</strong><small>{[incubator.identifier, incubator.capacity != null ? `${incubator.capacity} ${locale === "it" ? "uova" : "eggs"}` : null].filter(Boolean).join(" · ") || (locale === "it" ? "Nessun dettaglio aggiuntivo" : "No additional details")}</small>{incubator.notes && <p>{incubator.notes}</p>}</div>
+            <div><strong>{incubator.name}</strong><small>{[incubator.identifier, incubator.capacity != null ? `${incubator.capacity} ${locale === "it" ? "uova" : "eggs"}` : null].filter(Boolean).join(" · ") || (locale === "it" ? "Nessun dettaglio aggiuntivo" : "No additional details")}</small>{incubator.maintenanceIntervalDays != null && <small>{locale === "it" ? `Manutenzione ogni ${incubator.maintenanceIntervalDays} giorni` : `Maintenance every ${incubator.maintenanceIntervalDays} days`}{incubator.nextMaintenanceAt ? ` · ${locale === "it" ? "prossima" : "next"}: ${formatDate(incubator.nextMaintenanceAt, locale)}` : ""}</small>}{incubator.notes && <p>{incubator.notes}</p>}</div>
             <div className="row-actions"><IconButton label={t("edit")} onClick={() => void editIncubator(incubator)}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteIncubator(incubator)}><Icon name="trash" size={15} /></IconButton></div>
           </div>)}</div>
         : <EmptyState title={locale === "it" ? "Nessuna incubatrice registrata" : "No incubators registered"} />}
