@@ -210,6 +210,11 @@ export function App() {
       const result = await api.get<{ user: User }>("/auth/me");
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
+      const inviteToken = new URLSearchParams(window.location.search).get("invite");
+      if (inviteToken && routeOnly(window.location.pathname) === "/settings/collaborators") {
+        navigate("/settings/collaborators?invite=" + encodeURIComponent(inviteToken));
+        return;
+      }
       const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
       const landing = getString(preferenceResult?.preferences, "defaultLandingPage", "today");
       navigate(landing === "animals" || landing === "calendar" ? "/" + landing : "/today");
@@ -231,7 +236,7 @@ export function App() {
 
   if (!authReady) return <div className="app-boot"><span className="brand-mark"><Icon name="leaf" /></span><LoadingState /></div>;
 
-  if (!user && routeOnly(path) === "/") {
+  if (!user && (routeOnly(path) === "/" || routeOnly(path) === "/settings/collaborators")) {
     return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>);
   }
 
