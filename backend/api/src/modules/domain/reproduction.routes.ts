@@ -263,11 +263,11 @@ export function createReproductionRouter() {
     const nextCheckDueAt = lastCheckAt && clutch.checkIntervalHours
       ? new Date(new Date(lastCheckAt).getTime() + clutch.checkIntervalHours * 60 * 60 * 1000).toISOString()
       : null;
-    res.status(200).json({ clutch, monitoring: {
+    res.status(200).json({ clutch: { ...clutch, monitoring: {
       temperatureOutOfRange, humidityOutOfRange, lastCheckAt, nextCheckDueAt,
       averageTemperatureC: temperatures.length ? temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length : null,
       averageHumidityPct: humidities.length ? humidities.reduce((sum, value) => sum + value, 0) / humidities.length : null,
-    } });
+    } } });
   });
 
   router.patch("/clutches/:id", requireSession, async (req, res) => {
