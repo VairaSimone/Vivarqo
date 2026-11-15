@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateGenetics, calculateInbreeding } from "./genetic-engine.js";
+import { calculateGenetics, calculateInbreeding } from "../src/modules/domain/genetic-engine.js";
 
 describe("calculateGenetics", () => {
   it("calculates a heterozygous recessive cross", () => {
