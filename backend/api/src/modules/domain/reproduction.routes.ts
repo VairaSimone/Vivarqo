@@ -1133,8 +1133,8 @@ export function createReproductionRouter() {
         action: "incubation.log.updated",
         details: {
           logId,
-          before: { recordedAt: existing.recordedAt, temperatureC: existing.temperatureC?.toString() ?? null, humidityPct: existing.humidityPct?.toString() ?? null, eventType: existing.eventType, notes: existing.notes },
-          after: { recordedAt: updated.recordedAt, temperatureC: updated.temperatureC?.toString() ?? null, humidityPct: updated.humidityPct?.toString() ?? null, eventType: updated.eventType, notes: updated.notes },
+          before: { recordedAt: existing.recordedAt.toISOString(), temperatureC: existing.temperatureC?.toString() ?? null, humidityPct: existing.humidityPct?.toString() ?? null, eventType: existing.eventType, notes: existing.notes },
+          after: { recordedAt: updated.recordedAt.toISOString(), temperatureC: updated.temperatureC?.toString() ?? null, humidityPct: updated.humidityPct?.toString() ?? null, eventType: updated.eventType, notes: updated.notes },
         },
         notes: "Registrazione di incubazione modificata",
       } });
@@ -1168,7 +1168,7 @@ export function createReproductionRouter() {
       await tx.clutchHistory.create({ data: {
         clutchId: existing.clutchId,
         action: "incubation.log.deleted",
-        details: { logId, recordedAt: existing.recordedAt, temperatureC: existing.temperatureC, humidityPct: existing.humidityPct, eventType: existing.eventType, notes: existing.notes },
+        details: { logId, recordedAt: existing.recordedAt.toISOString(), temperatureC: existing.temperatureC, humidityPct: existing.humidityPct, eventType: existing.eventType, notes: existing.notes },
         notes: "Registrazione di incubazione eliminata",
       } });
       const clutch = await tx.clutch.findUnique({ where: { id: existing.clutchId } });
