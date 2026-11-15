@@ -4855,6 +4855,11 @@ paths:
               "null"
             ]
           },
+          "feedingIntervalDays": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 365
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5143,6 +5148,21 @@ paths:
               "number",
               "null"
             ]
+          },
+          "preyState": {
+            "type": "string",
+            "enum": ["unknown", "frozen", "thawed", "live"]
+          },
+          "inventoryItemId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "inventoryQuantity": {
+            "type": ["number", "null"],
+            "exclusiveMinimum": 0
+          },
+          "inventoryDeducted": {
+            "type": "boolean"
           },
           "notes": {
             "type": [
