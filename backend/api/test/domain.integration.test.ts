@@ -314,6 +314,83 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     expect(prefs.body.preferences.quietHoursStart).toBe("22:00");
   });
 
+
+  it("manages finance budgets, automatic recurrence generation, linked profitability and CSV export", async () => {
+    const owner = await account();
+    const other = await account();
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
+    const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const monthStartIso = monthStart.toISOString().slice(0, 10);
+    const previousMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+    const previousMonthStartIso = previousMonthStart.toISOString().slice(0, 10);
+
+    const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "Finance-linked animal", species: "Python regius" } });
+    const cycle = await prisma.reproductionCycle.create({ data: { userId: owner.userId, startedOn: monthStart } });
+    const clutch = await prisma.clutch.create({ data: { cycleId: cycle.id, laidOn: monthStart, eggCount: 4 } });
+    const batch = await prisma.offspringBatch.create({ data: { cycleId: cycle.id, clutchId: clutch.id, bornOn: monthStart, count: 3 } });
+
+    await owner.agent.post("/api/v1/finance/entries")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        entryType: "expense", occurredOn: todayIso, amountCents: 1200, currency: "EUR",
+        category: "breeding", description: "Incubation supplies", animalId: animal.id,
+        reproductionCycleId: cycle.id, clutchId: clutch.id, offspringBatchId: batch.id,
+      }).expect(201);
+    await owner.agent.post("/api/v1/finance/entries")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        entryType: "income", occurredOn: todayIso, amountCents: 5000, currency: "EUR",
+        category: "sale", description: "Hatchling sale", animalId: animal.id,
+        reproductionCycleId: cycle.id, clutchId: clutch.id, offspringBatchId: batch.id,
+      }).expect(201);
+
+    const budget = await owner.agent.post("/api/v1/finance/budgets")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ period: "month", periodStart: monthStartIso, category: "all", amountCents: 10000, currency: "EUR" })
+      .expect(200);
+    expect(budget.body.budget.amountCents).toBe("10000");
+    const duplicateBudget = await owner.agent.post("/api/v1/finance/budgets")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ period: "month", periodStart: monthStartIso, category: "all", amountCents: 15000, currency: "EUR" })
+      .expect(200);
+    expect(duplicateBudget.body.budget.id).toBe(budget.body.budget.id);
+    expect(duplicateBudget.body.budget.amountCents).toBe("15000");
+
+    const recurrence = await owner.agent.post("/api/v1/finance/recurrences")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({
+        entryType: "expense", amountCents: 500, currency: "EUR", category: "utilities",
+        description: "Monthly electricity", frequency: "monthly", nextOccurrenceOn: previousMonthStartIso,
+      }).expect(201);
+    const generated = await owner.agent.post(`/api/v1/finance/recurrences/${recurrence.body.recurrence.id}/generate`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    expect(generated.body.generated).toBe(2);
+    expect(generated.body.nextOccurrenceOn).toBe(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)).toISOString().slice(0, 10));
+    const repeat = await owner.agent.post(`/api/v1/finance/recurrences/${recurrence.body.recurrence.id}/generate`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    expect(repeat.body.generated).toBe(0);
+
+    const budgets = await owner.agent.get(`/api/v1/finance/budgets?period=month&year=${today.getUTCFullYear()}&month=${today.getUTCMonth() + 1}`).expect(200);
+    expect(budgets.body.budgets[0].spentCents).toBe("1700");
+    const profitability = await owner.agent.get("/api/v1/finance/profitability").expect(200);
+    expect(profitability.body.marginCents).toBe("2800");
+    expect(profitability.body.animals).toContainEqual(expect.objectContaining({ id: animal.id, marginCents: "3800" }));
+    expect(profitability.body.reproductionCycles).toContainEqual(expect.objectContaining({ id: cycle.id, marginCents: "3800" }));
+    expect(profitability.body.clutches).toContainEqual(expect.objectContaining({ id: clutch.id, marginCents: "3800" }));
+    expect(profitability.body.offspringBatches).toContainEqual(expect.objectContaining({ id: batch.id, marginCents: "3800" }));
+
+    const csv = await owner.agent.get("/api/v1/finance/export.csv").expect(200);
+    expect(csv.headers["content-type"]).toContain("text/csv");
+    expect(csv.text).toContain("Incubation supplies");
+    expect(csv.text).toContain("offspring_batch_id");
+
+    expect((await other.agent.get("/api/v1/finance/budgets").expect(200)).body.budgets).toHaveLength(0);
+    expect((await other.agent.get("/api/v1/finance/recurrences").expect(200)).body.recurrences).toHaveLength(0);
+    await other.agent.post(`/api/v1/finance/recurrences/${recurrence.body.recurrence.id}/generate`)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf).send({}).expect(404);
+  });
+
   it("includes the full local calendar day when filtering feeding sessions by date", async () => {
     const owner = await account();
     const animal = await prisma.animal.create({
