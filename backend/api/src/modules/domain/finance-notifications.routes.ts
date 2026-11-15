@@ -357,13 +357,15 @@ export function createFinanceRouter() {
     if (!existing) throw new AppError(404, "FINANCE_RECURRENCE_NOT_FOUND", "Recurrence not found");
     const data: Record<string, unknown> = { ...input };
     if (input.amountCents !== undefined) data.amountCents = BigInt(input.amountCents);
+    const effectiveNext = input.nextOccurrenceOn ? validDate(input.nextOccurrenceOn) : existing.nextOccurrenceOn;
+    const effectiveEnd = input.endOn !== undefined ? (input.endOn ? validDate(input.endOn) : null) : existing.endOn;
+    if (effectiveEnd && effectiveEnd < effectiveNext) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede the next occurrence");
     if (input.nextOccurrenceOn) {
-      const nextDate = validDate(input.nextOccurrenceOn);
-      data.nextOccurrenceOn = nextDate;
-      data.anchorMonth = nextDate.getUTCMonth() + 1;
-      data.anchorDay = nextDate.getUTCDate();
+      data.nextOccurrenceOn = effectiveNext;
+      data.anchorMonth = effectiveNext.getUTCMonth() + 1;
+      data.anchorDay = effectiveNext.getUTCDate();
     }
-    if (input.endOn !== undefined) data.endOn = input.endOn ? validDate(input.endOn) : null;
+    if (input.endOn !== undefined) data.endOn = effectiveEnd;
     const recurrence = await prisma.financeRecurrence.update({ where: { id }, data: data as never });
     res.status(200).json({ recurrence: { ...recurrence, amountCents: recurrence.amountCents.toString() } });
   });
