@@ -101,7 +101,7 @@ model Animal {
   previousBreeder        String?               @map("previous_breeder") @db.VarChar(160)
   locationLabel          String?               @map("location_label") @db.VarChar(160)
   locationId             String?               @map("location_id") @db.Uuid
-  qrToken                String?               @unique @map("qr_token") @db.VarChar(64)
+  qrToken                String?               @unique(map: "animals_qr_token_unique") @map("qr_token") @db.VarChar(64)
   status                 String                @default("active") @db.VarChar(20)
   notes                  String?
   photoKey               String?               @map("photo_key")
