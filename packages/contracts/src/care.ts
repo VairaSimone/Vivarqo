@@ -13,6 +13,10 @@ export const feedingEntryResponseSchema = z.object({
   foodType: z.string().nullable(),
   foodSize: z.string().nullable(),
   foodWeightG: careDecimalSchema.nullable(),
+  preyState: z.enum(["unknown", "frozen", "thawed", "live"]).default("unknown"),
+  inventoryItemId: z.string().nullable(),
+  inventoryQuantity: careDecimalSchema.nullable(),
+  inventoryDeducted: z.boolean().default(false),
   notes: z.string().nullable(),
   animal: z.object({
     id: z.string(),
