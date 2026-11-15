@@ -422,16 +422,30 @@ export function createFinanceRouter() {
     }), req.query);
     if (query.from && query.to && query.to < query.from) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede start date");
     const where = { userId: auth.userId, currency: query.currency, ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}) };
-    const entries = await prisma.financeEntry.findMany({ where, orderBy: [{ occurredOn: "asc" }, { createdAt: "asc" }], take: 50000 });
-    const header = ["date","type","amount_cents","currency","category","description","animal_id","reproduction_cycle_id","clutch_id","offspring_batch_id","document_id"];
-    const lines = [header.map(csvCell).join(";"), ...entries.map((entry) => [
-      financeDateString(entry.occurredOn), entry.entryType, entry.amountCents.toString(), entry.currency, entry.category, entry.description,
-      entry.animalId, entry.reproductionCycleId, entry.clutchId, entry.offspringBatchId, entry.documentId,
-    ].map(csvCell).join(";"))];
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="vivarqo-finanze-${query.from ?? "inizio"}-${query.to ?? "oggi"}.csv"`);
     res.setHeader("Cache-Control", "private, no-store");
-    res.status(200).send("\uFEFF" + lines.join("\r\n"));
+    res.status(200);
+    const header = ["date","type","amount_cents","currency","category","description","animal_id","reproduction_cycle_id","clutch_id","offspring_batch_id","document_id"];
+    res.write("\uFEFF" + header.map(csvCell).join(";") + "\r\n");
+    let cursorId: string | undefined;
+    while (!res.writableEnded) {
+      const batch = await prisma.financeEntry.findMany({
+        where, orderBy: [{ occurredOn: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        take: 1000, ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      });
+      if (!batch.length) break;
+      for (const entry of batch) {
+        const line = [
+          financeDateString(entry.occurredOn), entry.entryType, entry.amountCents.toString(), entry.currency, entry.category, entry.description,
+          entry.animalId, entry.reproductionCycleId, entry.clutchId, entry.offspringBatchId, entry.documentId,
+        ].map(csvCell).join(";") + "\r\n";
+        if (!res.write(line)) await new Promise<void>((resolve) => res.once("drain", resolve));
+      }
+      cursorId = batch[batch.length - 1]?.id;
+      if (batch.length < 1000) break;
+    }
+    res.end();
   });
 
   return router;
