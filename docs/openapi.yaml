@@ -690,6 +690,31 @@ paths:
       responses:
         '204':
           description: Voce eliminata.
+  /api/v1/animals/{animalId}/feeding-summary:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      operationId: getAnimalsByAnimalIdFeedingSummary
+      tags: [Care]
+      summary: Statistiche alimentari, ultimo pasto accettato e prossima previsione
+      responses:
+        '200':
+          description: Metriche calcolate dai registri di alimentazione.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [feedingIntervalDays, lastAcceptedAt, daysSinceLastFeeding, nextMealAt, consecutiveRefusals, acceptedCount, refusedCount, offeredCount, acceptanceRate]
+                properties:
+                  feedingIntervalDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
+                  lastAcceptedAt: { type: [string, 'null'], format: date-time }
+                  daysSinceLastFeeding: { type: [integer, 'null'], minimum: 0 }
+                  nextMealAt: { type: [string, 'null'], format: date-time }
+                  consecutiveRefusals: { type: integer, minimum: 0 }
+                  acceptedCount: { type: integer, minimum: 0 }
+                  refusedCount: { type: integer, minimum: 0 }
+                  offeredCount: { type: integer, minimum: 0 }
+                  acceptanceRate: { type: [number, 'null'], minimum: 0, maximum: 1 }
   /api/v1/animals/{animalId}/weights:
     parameters:
       - $ref: '#/components/parameters/AnimalId'
@@ -3135,6 +3160,7 @@ paths:
         originDescription: { type: [string, 'null'], maxLength: 5000 }
         previousBreeder: { type: [string, 'null'], maxLength: 160 }
         locationLabel: { type: [string, 'null'], maxLength: 160 }
+        feedingIntervalDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
         status: { type: string, enum: [active, sold, transferred, deceased], default: active }
         notes: { type: [string, 'null'], maxLength: 10000 }
     AnimalPatch:
@@ -3176,6 +3202,9 @@ paths:
               foodType: { type: [string, 'null'], maxLength: 120 }
               foodSize: { type: [string, 'null'], maxLength: 120 }
               foodWeightG: { type: [number, 'null'], exclusiveMinimum: 0 }
+              preyState: { type: string, enum: [unknown, frozen, thawed, live], default: unknown }
+              inventoryItemId: { type: [string, 'null'], format: uuid }
+              inventoryQuantity: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 999999999.999 }
               notes: { type: [string, 'null'], maxLength: 5000 }
     FeedingEntryPatch:
       type: object
@@ -3187,6 +3216,9 @@ paths:
         foodType: { type: [string, 'null'], maxLength: 120 }
         foodSize: { type: [string, 'null'], maxLength: 120 }
         foodWeightG: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000 }
+        preyState: { type: string, enum: [unknown, frozen, thawed, live] }
+        inventoryItemId: { type: [string, 'null'], format: uuid }
+        inventoryQuantity: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 999999999.999 }
         notes: { type: [string, 'null'], maxLength: 5000 }
     WeightWrite:
       type: object
