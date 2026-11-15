@@ -2723,3 +2723,5 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .feeding-insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .feeding-interval-form { align-items: stretch; flex-direction: column; }
 }
+
+.feeding-insights-panel { grid-column: 1 / -1; }
