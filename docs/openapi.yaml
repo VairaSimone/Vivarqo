@@ -2928,6 +2928,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/animal-management.routes.ts
+          symbol: locationPatchSchema
         content:
           application/json:
             schema: { type: object, properties: { name: { type: string }, sortOrder: { type: integer } } }
