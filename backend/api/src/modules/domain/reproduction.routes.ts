@@ -19,8 +19,7 @@ import {
   patchOffspringSchema,
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
-  reproductionCycleStatusSchema,
-} from "@vivarqo/contracts/reproduction";
+  reproductionCycleStatusSchema,\n  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema,\n} from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -80,7 +79,7 @@ export function createReproductionRouter() {
       select: {
         id: true, name: true, species: true, sex: true, morph: true, geneticsNotes: true,
         birthDate: true, motherAnimalId: true, fatherAnimalId: true,
-        geneticTraits: { select: { id: true, traitName: true, traitValue: true, confidenceNote: true, sourceAnimalId: true } },
+        geneticTraits: { select: { id: true, traitName: true, traitValue: true, confidenceNote: true, sourceAnimalId: true, inheritanceMode: true, genotype: true, certainty: true } },
         weightMeasurements: { orderBy: [{ measuredAt: "desc" }, { id: "desc" }], take: 1, select: { measuredAt: true, weightG: true } },
       },
     });
@@ -119,6 +118,42 @@ export function createReproductionRouter() {
     const commonAncestorIds = new Set(fatherAncestors.flat().map((item) => item.id).filter((id) => motherAncestorIds.has(id)));
     const commonAncestors = [...motherAncestors.flat(), ...fatherAncestors.flat()]
       .filter((item, index, all) => commonAncestorIds.has(item.id) && all.findIndex((candidate) => candidate.id === item.id) === index);
+    const motherLevels = new Map(motherAncestors.map((level, index) => [index + 1, level]));
+    const fatherLevels = new Map(fatherAncestors.map((level, index) => [index + 1, level]));
+    const ancestorDepths = (levels: Array<Array<{ id: string; name: string }>>) => {
+      const depths = new Map<string, number>();
+      levels.forEach((items, index) => items.forEach((item) => { if (!depths.has(item.id)) depths.set(item.id, index + 1); }));
+      return depths;
+    };
+    const motherDepths = ancestorDepths(motherAncestors);
+    const fatherDepths = ancestorDepths(fatherAncestors);
+    const inbreedingCoefficientEstimate = commonAncestors.reduce((sum, ancestor) => {
+      const m = motherDepths.get(ancestor.id);
+      const f = fatherDepths.get(ancestor.id);
+      return m && f ? sum + Math.pow(0.5, m + f + 1) : sum;
+    }, 0);
+    const geneticPredictions = mother.geneticTraits.flatMap((maternalTrait) => {
+      const paternalTrait = father.geneticTraits.find((trait) => trait.traitName.trim().toLocaleLowerCase() === maternalTrait.traitName.trim().toLocaleLowerCase());
+      if (!paternalTrait || !maternalTrait.genotype || !paternalTrait.genotype ||
+          maternalTrait.genotype.length !== 2 || paternalTrait.genotype.length !== 2 ||
+          maternalTrait.inheritanceMode !== paternalTrait.inheritanceMode ||
+          !maternalTrait.inheritanceMode ||
+          !["confirmed", "carrier"].includes(maternalTrait.certainty) ||
+          !["confirmed", "carrier"].includes(paternalTrait.certainty)) return [];
+      const outcomes = new Map<string, number>();
+      for (const maternalAllele of maternalTrait.genotype) {
+        for (const paternalAllele of paternalTrait.genotype) {
+          const genotype = [maternalAllele, paternalAllele].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()) || a.localeCompare(b)).join("");
+          outcomes.set(genotype, (outcomes.get(genotype) ?? 0) + 25);
+        }
+      }
+      return [{
+        traitName: maternalTrait.traitName,
+        inheritanceMode: maternalTrait.inheritanceMode,
+        probabilities: [...outcomes.entries()].map(([genotype, probabilityPct]) => ({ genotype, probabilityPct })),
+        certainty: "theoretical_single_locus",
+      }];
+    });
     const pairingEvents = pairCycles.flatMap((cycle) => cycle.events.filter((event) => event.eventType === "pairing"));
     const sortedPairings = pairingEvents.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
     const allEvents = pairCycles.flatMap((cycle) => cycle.events);
@@ -152,7 +187,7 @@ export function createReproductionRouter() {
           cycles: pairCycles.map((cycle) => ({ id: cycle.id, name: cycle.name, startedOn: cycle.startedOn, status: cycle.status, clutchCount: cycle._count.clutches, offspringBatchCount: cycle._count.offspringBatches })),
         },
         geneticDataIsIncomplete: !mother.geneticTraits.length || !father.geneticTraits.length,
-        inbreedingCoefficient: null,
+        inbreedingCoefficientEstimate: commonAncestors.length ? Math.min(1, inbreedingCoefficientEstimate) : 0,\n        inbreedingCoefficientAssumption: "Common-ancestor path estimate through at most 8 generations; assumes unrelated founders and no additional inbreeding in ancestors.",\n        geneticPredictions,
       },
     });
   });
