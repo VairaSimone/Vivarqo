@@ -83,6 +83,10 @@ model Animal {
   species                String                @db.VarChar(160)
   sex                    String                @default("unknown") @db.VarChar(12)
   morph                  String?               @db.VarChar(200)
+  motherAnimalId         String?               @map("mother_animal_id") @db.Uuid
+  fatherAnimalId         String?               @map("father_animal_id") @db.Uuid
+  motherDescription      String?               @map("mother_description") @db.VarChar(240)
+  fatherDescription      String?               @map("father_description") @db.VarChar(240)
   geneticsNotes          String?               @map("genetics_notes")
   birthDate              DateTime?             @map("birth_date") @db.Date
   birthDateEstimated     Boolean               @default(false) @map("birth_date_estimated")
@@ -99,6 +103,10 @@ model Animal {
   createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mother                 Animal?               @relation("AnimalMother", fields: [motherAnimalId], references: [id], onDelete: SetNull)
+  father                 Animal?               @relation("AnimalFather", fields: [fatherAnimalId], references: [id], onDelete: SetNull)
+  childrenAsMother       Animal[]              @relation("AnimalMother")
+  childrenAsFather       Animal[]              @relation("AnimalFather")
   feedingEntries         FeedingEntry[]
   weightMeasurements     WeightMeasurement[]
   shedRecords            ShedRecord[]
@@ -120,6 +128,8 @@ model Animal {
   @@index([userId, status], map: "animals_user_status_idx")
   @@index([userId, name], map: "animals_user_name_idx")
   @@index([userId, species], map: "animals_user_species_idx")
+  @@index([motherAnimalId], map: "animals_mother_idx")
+  @@index([fatherAnimalId], map: "animals_father_idx")
   @@index([userId, locationLabel], map: "animals_user_location_idx")
   @@index([originClutchId], map: "animals_origin_clutch_idx")
   @@index([originOffspringBatchId], map: "animals_origin_batch_idx")
