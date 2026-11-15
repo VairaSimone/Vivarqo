@@ -181,7 +181,7 @@ model FeedingEntry {
   updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   session     FeedingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   animal      Animal         @relation(fields: [animalId], references: [id], onDelete: Restrict)
-  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
   @@index([inventoryItemId], map: "feeding_entries_inventory_item_idx")
   @@index([animalId, sessionId], map: "feeding_entries_animal_session_idx")
   @@index([sessionId], map: "feeding_entries_session_idx")
