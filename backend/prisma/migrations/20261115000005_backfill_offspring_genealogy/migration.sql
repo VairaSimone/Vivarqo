@@ -8,4 +8,6 @@ FROM "offspring_batches" AS batch
 JOIN "reproduction_cycles" AS cycle ON cycle."id" = batch."cycle_id"
 WHERE offspring."origin_offspring_batch_id" = batch."id"
   AND offspring."user_id" = cycle."user_id"
+  AND offspring."id" <> COALESCE(cycle."parent_a_animal_id", offspring."id")
+  AND offspring."id" <> COALESCE(cycle."parent_b_animal_id", offspring."id")
   AND (offspring."mother_animal_id" IS NULL OR offspring."father_animal_id" IS NULL);
