@@ -942,7 +942,15 @@ export function createReproductionRouter() {
       const currentBatch = await tx.offspringBatch.findUnique({ where: { id: batchId }, select: { count: true } });
       if (!currentBatch) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found");
       const existingAnimals = await tx.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
-      if (existingAnimals + input.animals.length > currentBatch.count) {
+      // Conversion is a single atomic operation per batch. This prevents a retried
+      // request from creating duplicate hatchlings when the client loses the response.
+      if (existingAnimals > 0) {
+        throw new AppError(409, "OFFSPRING_BATCH_ALREADY_CONVERTED", "This offspring batch already has animal records; edit the existing animals instead of converting it again", {
+          registeredCount: existingAnimals,
+          declaredCount: currentBatch.count,
+        });
+      }
+      if (input.animals.length > currentBatch.count) {
         throw new AppError(409, "OFFSPRING_COUNT_EXCEEDED", "Animal records cannot exceed the declared offspring count", {
           declaredCount: currentBatch.count, registeredCount: existingAnimals, requestedCount: input.animals.length,
         });
