@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import type { OffspringBatchDto } from "@vivarqo/contracts/reproduction";
+import type { ClutchDetailDto, OffspringBatchDto } from "@vivarqo/contracts/reproduction";
 import type { Locale } from "../../lib/domain";
 import { translate } from "../../lib/i18n";
+import { useResource } from "../../hooks/useResource";
 import { Alert, Button, Field, Icon, Input, Modal, Select, Textarea } from "../../components/ui";
 
 export interface OffspringAnimalDraft {
@@ -16,11 +17,12 @@ export interface OffspringAnimalDraft {
   locationLabel: string;
   notes: string;
   photo: File | null;
+  eggId: string;
 }
 const emptyAnimal = (): OffspringAnimalDraft => ({
   name: "", species: "", sex: "unknown", morph: "", identifier: "",
   geneticsNotes: "", birthDate: "", birthDateEstimated: false,
-  locationLabel: "", notes: "", photo: null,
+  locationLabel: "", notes: "", photo: null, eggId: "",
 });
 
 export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmit }: {
@@ -33,6 +35,8 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
   const t = (key: string) => translate(locale, key);
   const maximum = Math.max(1, Math.min(500, batch.count || 1));
   const [animals, setAnimals] = useState<OffspringAnimalDraft[]>([emptyAnimal()]);
+  const clutchResource = useResource<{ clutch: ClutchDetailDto }>(batch.clutchId ? `/clutches/${encodeURIComponent(batch.clutchId)}` : null);
+  const availableEggs = (clutchResource.data?.clutch.eggs ?? []).filter((egg) => !egg.offspringAnimalId);
   const [error, setError] = useState("");
   const update = (index: number, patch: Partial<OffspringAnimalDraft>) =>
     setAnimals((current) => current.map((animal, i) => i === index ? { ...animal, ...patch } : animal));
@@ -75,6 +79,10 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
           <Field label={t("morph")}><Input maxLength={200} value={animal.morph} onChange={(e) => update(index, { morph: e.target.value })} /></Field>
           <Field label={t("birthDate")}><Input type="date" value={animal.birthDate || batch.bornOn} onChange={(e) => update(index, { birthDate: e.target.value })} /></Field>
           <Field label={t("location")}><Input maxLength={160} value={animal.locationLabel} onChange={(e) => update(index, { locationLabel: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Uovo di origine" : "Source egg"}><Select value={animal.eggId} disabled={!batch.clutchId || clutchResource.loading} onChange={(e) => update(index, { eggId: e.target.value })}>
+            <option value="">{locale === "it" ? "Non collegare un uovo" : "Do not link an egg"}</option>
+            {availableEggs.map((egg) => <option key={egg.id} value={egg.id}>{egg.code || egg.id.slice(0, 8)} · {egg.status}</option>)}
+          </Select></Field>
           <Field label={locale === "it" ? "Foto (JPG, PNG, WebP · max 5 MB)" : "Photo (JPG, PNG, WebP · max 5 MB)"}>
             <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const file = e.target.files?.[0] ?? null;
