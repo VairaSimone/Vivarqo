@@ -373,6 +373,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <Detail label={locale === "it" ? "Misurazioni peso" : "Weight records"} value={String(hatchlingCare.data?.weights.length ?? 0)} />
           <Detail label={locale === "it" ? "Mute registrate" : "Sheds recorded"} value={String(hatchlingCare.data?.sheds.length ?? 0)} />
           <Detail label={locale === "it" ? "Prima alimentazione" : "First feeding"} value={formatDate(hatchlingCare.data?.care?.firstFeedingAt ?? "", locale)} />
+          <Detail label={locale === "it" ? "Prima alimentazione accettata" : "First feeding accepted"} value={hatchlingCare.data?.care?.firstFeedingAccepted == null ? "—" : hatchlingCare.data.care.firstFeedingAccepted ? (locale === "it" ? "Sì" : "Yes") : (locale === "it" ? "No" : "No")} />
           <Detail label={locale === "it" ? "Prima muta" : "First shed"} value={formatDate(hatchlingCare.data?.care?.firstShedAt ?? "", locale)} />
           <Detail label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming"} value={formatDate(hatchlingCare.data?.care?.readyForRehomingAt ?? "", locale)} />
         </div>
