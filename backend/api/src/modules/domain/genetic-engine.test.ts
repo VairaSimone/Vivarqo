@@ -28,7 +28,7 @@ describe("calculateGenetics", () => {
 });
 describe("calculateInbreeding", () => {
   it("does not report a precise coefficient for incomplete pedigrees", () => {
-    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m" }, { id: "f" }], "child");
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m" }], "child");
     expect(result.coefficient).toBeNull();
     expect(result.completeness).toBe("partial");
   });
