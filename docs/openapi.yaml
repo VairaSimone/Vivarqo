@@ -2200,6 +2200,9 @@ paths:
         content:
           application/json:
             schema:
+              x-source-validation:
+                file: backend/api/src/modules/domain/finance-notifications.routes.ts
+                symbol: financeBudgetInput
               type: object
               additionalProperties: false
               required: [period, periodStart, amountCents]
@@ -2248,6 +2251,9 @@ paths:
         content:
           application/json:
             schema:
+              x-source-validation:
+                file: backend/api/src/modules/domain/finance-notifications.routes.ts
+                symbol: financeRecurrenceInput
               type: object
               additionalProperties: false
               required: [entryType, amountCents, category, description, frequency, nextOccurrenceOn]
@@ -2282,6 +2288,9 @@ paths:
         content:
           application/json:
             schema:
+              x-source-validation:
+                file: backend/api/src/modules/domain/finance-notifications.routes.ts
+                symbol: financeRecurrencePatch
               type: object
               additionalProperties: false
               properties:
