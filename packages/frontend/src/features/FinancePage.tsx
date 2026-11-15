@@ -131,6 +131,8 @@ export function FinancePage({ locale }: { locale: Locale }) {
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
+  const monthlyTrend = Array.isArray(profitability.data?.monthlyTrend) ? profitability.data.monthlyTrend as Array<Record<string, unknown>> : [];
+  const annualComparison = Array.isArray(profitability.data?.annualComparison) ? profitability.data.annualComparison as Array<Record<string, unknown>> : [];
   const categories = summary.data?.categories ?? [];
   const maxCategory = Math.max(1, ...categories.map((item) => Number(getString(item, "amountCents")) || 0));
   const rows = (resource.data?.entries ?? []).map((entry) => [
@@ -228,6 +230,18 @@ export function FinancePage({ locale }: { locale: Locale }) {
         <FinanceMetric label={locale === "it" ? "Ricavi" : "Revenue"} value={getString(profitability.data, "incomeCents", "0")} locale={locale} tone="success" />
         <FinanceMetric label={locale === "it" ? "Costi" : "Costs"} value={getString(profitability.data, "expenseCents", "0")} locale={locale} tone="warning" />
         <FinanceMetric label={locale === "it" ? "Margine" : "Margin"} value={getString(profitability.data, "marginCents", "0")} locale={locale} tone="primary" />
+      </div>
+      <div className="finance-management-grid">
+        <div>
+          <strong>{locale === "it" ? "Andamento mensile" : "Monthly trend"}</strong>
+          {monthlyTrend.length ? monthlyTrend.map((item) => <div className="finance-detail-row" key={getString(item, "month")}><span>{getString(item, "month")}</span><span>{locale === "it" ? "Ricavi" : "Income"}: {formatMoneyCents(getString(item, "incomeCents"), locale)} · {locale === "it" ? "Costi" : "Costs"}: {formatMoneyCents(getString(item, "expenseCents"), locale)}</span><strong>{formatMoneyCents(getString(item, "marginCents"), locale)}</strong></div>) : <p className="muted-note">{locale === "it" ? "Nessun movimento nel periodo" : "No entries in this period"}</p>}
+        </div>
+        <div>
+          <strong>{locale === "it" ? "Confronto annuale" : "Annual comparison"}</strong>
+          {annualComparison.length ? annualComparison.map((item) => <div className="finance-detail-row" key={getString(item, "year")}><span>{getString(item, "year")}</span><span>{locale === "it" ? "Ricavi" : "Income"}: {formatMoneyCents(getString(item, "incomeCents"), locale)} · {locale === "it" ? "Costi" : "Costs"}: {formatMoneyCents(getString(item, "expenseCents"), locale)}</span><strong>{formatMoneyCents(getString(item, "marginCents"), locale)}</strong></div>) : <p className="muted-note">{locale === "it" ? "Nessun confronto disponibile" : "No comparison available"}</p>}
+          <p className="muted-note">{locale === "it" ? "Costi indiretti" : "Overhead"}: {formatMoneyCents(getString(profitability.data, "overheadExpenseCents", "0"), locale)} · {locale === "it" ? "Allocati" : "Allocated"}: {formatMoneyCents(getString(profitability.data, "allocatedOverheadCents", "0"), locale)} · {locale === "it" ? "Non allocati" : "Unallocated"}: {formatMoneyCents(getString(profitability.data, "unallocatedOverheadCents", "0"), locale)}</p>
+          <p className="muted-note">{getString(profitability.data?.overheadAllocation as Record<string, unknown> | undefined, "method") === "proportional-to-direct-expenses" ? (locale === "it" ? "Ripartizione proporzionale ai costi diretti dei singoli animali" : "Allocated proportionally to each animal's direct costs") : (locale === "it" ? "Ripartizione uguale tra gli animali con movimenti finanziari" : "Allocated equally among animals with financial entries")}</p>
+        </div>
       </div>
       <div className="finance-profit-columns">
         {(["animals", "reproductionCycles", "clutches", "offspringBatches"] as const).map((key) => {
