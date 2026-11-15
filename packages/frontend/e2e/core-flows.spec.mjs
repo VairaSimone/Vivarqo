@@ -667,11 +667,12 @@ test("care, tasks, finance and inventory mutations persist through the live API"
     await preyDialog.getByLabel("Data e ora").fill(mealDate.toISOString().slice(0, 16));
     await preyDialog.getByLabel("Esito").selectOption(outcome);
     await preyDialog.getByLabel("Alimento").fill("Rat");
+    await preyDialog.getByLabel(/Peso alimento/).fill("120");
     await preyDialog.getByLabel("Stato della preda").selectOption("thawed");
     const inventorySelect = preyDialog.getByLabel("Collega preda all'inventario");
     await expect(inventorySelect.locator('option[value="' + stockItem.id + '"]')).toHaveCount(1);
     await inventorySelect.selectOption(stockItem.id);
-    await preyDialog.getByLabel("Quantità da scaricare").fill("1");
+    await expect(preyDialog.getByLabel("Quantità da scaricare")).toHaveValue("0.12");
     const responsePromise = page.waitForResponse((response) =>
       response.request().method() === "POST" &&
       response.url().includes("/api/v1/feeding-sessions") &&
@@ -683,7 +684,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   const stockAfterFeedingsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=100&category=food");
   const stockAfterFeedings = (await stockAfterFeedingsResponse.json()).items.find((item) => item.id === stockItem.id);
-  expect(Number(stockAfterFeedings.quantityOnHand)).toBe(0);
+  expect(Number(stockAfterFeedings.quantityOnHand)).toBe(1.76);
   const detailedFeedingsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=100&animalId=" + animal.id);
   const detailedEntries = (await detailedFeedingsResponse.json()).sessions.flatMap((session) => session.entries);
   expect(detailedEntries.filter((entry) => entry.inventoryDeducted).length).toBe(2);
@@ -719,7 +720,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await updatePreyResponse;
   const restoredStockResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=100&category=food");
   const restoredStock = (await restoredStockResponse.json()).items.find((item) => item.id === stockItem.id);
-  expect(Number(restoredStock.quantityOnHand)).toBe(1);
+  expect(Number(restoredStock.quantityOnHand)).toBe(1.88);
 
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
