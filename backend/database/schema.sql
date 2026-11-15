@@ -1355,3 +1355,54 @@ CREATE INDEX IF NOT EXISTS finance_entries_cycle_idx ON finance_entries(reproduc
 CREATE INDEX IF NOT EXISTS finance_entries_clutch_idx ON finance_entries(clutch_id);
 CREATE INDEX IF NOT EXISTS finance_entries_offspring_batch_idx ON finance_entries(offspring_batch_id);
 CREATE INDEX IF NOT EXISTS finance_entries_recurrence_idx ON finance_entries(recurrence_id);
+
+
+-- Premium shared workspaces and collaborators.
+ALTER TABLE user_sessions
+  ADD COLUMN IF NOT EXISTS active_workspace_owner_id UUID;
+DO $workspace_session_fk$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_sessions_active_workspace_owner_id_fkey') THEN
+    ALTER TABLE user_sessions ADD CONSTRAINT user_sessions_active_workspace_owner_id_fkey
+      FOREIGN KEY (active_workspace_owner_id) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$workspace_session_fk$;
+CREATE INDEX IF NOT EXISTS user_sessions_active_workspace_idx ON user_sessions(active_workspace_owner_id);
+
+CREATE TABLE IF NOT EXISTS workspace_memberships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  collaborator_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  role VARCHAR(24) NOT NULL CHECK (role IN ('admin', 'operator', 'breeding', 'viewer')),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMPTZ(6),
+  CONSTRAINT workspace_memberships_distinct_users_check CHECK (owner_user_id <> collaborator_user_id),
+  CONSTRAINT workspace_memberships_owner_collaborator_key UNIQUE (owner_user_id, collaborator_user_id)
+);
+CREATE INDEX IF NOT EXISTS workspace_memberships_collaborator_revoked_idx
+  ON workspace_memberships(collaborator_user_id, revoked_at);
+CREATE INDEX IF NOT EXISTS workspace_memberships_owner_revoked_idx
+  ON workspace_memberships(owner_user_id, revoked_at);
+
+CREATE TABLE IF NOT EXISTS workspace_invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  email CITEXT NOT NULL,
+  token_hash VARCHAR(128) NOT NULL,
+  role VARCHAR(24) NOT NULL CHECK (role IN ('admin', 'operator', 'breeding', 'viewer')),
+  expires_at TIMESTAMPTZ(6) NOT NULL,
+  accepted_at TIMESTAMPTZ(6),
+  revoked_at TIMESTAMPTZ(6),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_invitations_token_hash_key
+  ON workspace_invitations(token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_invitations_pending_owner_email_key
+  ON workspace_invitations(owner_user_id, email)
+  WHERE (accepted_at IS NULL) AND (revoked_at IS NULL);
+CREATE INDEX IF NOT EXISTS workspace_invitations_owner_expires_idx
+  ON workspace_invitations(owner_user_id, expires_at);
+CREATE INDEX IF NOT EXISTS workspace_invitations_email_expires_idx
+  ON workspace_invitations(email, expires_at);
