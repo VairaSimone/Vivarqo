@@ -1,7 +1,7 @@
 import type { RequestHandler } from "express";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
-import { getUserEntitlements } from "../domain/billing-entitlements.js";
+import { hasPaidSubscriptionEntitlement } from "../domain/billing-entitlements.js";
 import type { AuthContext } from "./session.js";
 
 const personalPrefixes = [
@@ -49,6 +49,9 @@ function assertRolePermission(role: string, method: string, path: string): void 
   if (role === "viewer") {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "This collaborator has read-only access");
   }
+  if (role === "operator" && isBreedingPath(path)) {
+    throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Genetics and reproduction changes require the reproduction role");
+  }
   if (role === "breeding" && !isBreedingPath(path)) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "This collaborator can modify reproduction and genetics data only");
   }
@@ -90,8 +93,7 @@ export const workspaceAccessGuard: RequestHandler = async (req, res, next) => {
       throw new AppError(403, "WORKSPACE_ACCESS_REVOKED", "Access to this workspace is no longer available. Switch back to your personal workspace.");
     }
 
-    const entitlements = await getUserEntitlements(ownerUserId);
-    if (!entitlements.features.includes("paidSubscription")) {
+    if (!await hasPaidSubscriptionEntitlement(ownerUserId)) {
       throw new AppError(403, "PREMIUM_REQUIRED", "The workspace owner must have an active Premium subscription to share this workspace", {
         upgradeRequired: true, billingPath: "/billing",
       });
