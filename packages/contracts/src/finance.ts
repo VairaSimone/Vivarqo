@@ -12,6 +12,10 @@ export const financeEntryResponseSchema = z.object({
   description: z.string(),
   animalId: z.string().nullable(),
   documentId: z.string().nullable(),
+  reproductionCycleId: z.string().nullable().optional(),
+  clutchId: z.string().nullable().optional(),
+  offspringBatchId: z.string().nullable().optional(),
+  recurrenceId: z.string().nullable().optional(),
   animal: z.object({ id: z.string(), name: z.string(), identifier: z.string().nullable() }).passthrough().nullable().optional(),
   document: z.object({ id: z.string(), originalFilename: z.string(), deletedAt: z.string().nullable() }).passthrough().nullable().optional(),
 }).passthrough();

@@ -2760,3 +2760,16 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .health-next-due { font-weight:650; color:var(--accent,#315f4b); }
 .health-record-actions { margin-top:12px; }
 @media(max-width:640px) { .health-form-grid { grid-template-columns:1fr; } .health-panel-actions { width:100%; } .health-panel-actions .btn { flex:1; } .health-record-heading { flex-direction:column; } }
+
+.finance-management-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; align-items: start; }
+.finance-detail-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.finance-detail-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.finance-detail-row > div:first-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.finance-detail-row small { color: var(--muted); }
+.finance-detail-row .bar-track { grid-column: 1 / -2; }
+.finance-detail-row .budget-over { background: var(--danger) !important; }
+.finance-profit-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-top: 18px; }
+.finance-profit-columns > div { min-width: 0; }
+.finance-profit-columns > div > strong { display: block; margin-bottom: 8px; }
+@media (max-width: 900px) { .finance-management-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .finance-profit-columns { grid-template-columns: 1fr; } .finance-detail-row { grid-template-columns: minmax(0,1fr) auto; } .finance-detail-row .bar-track { grid-column: 1 / -1; } }
