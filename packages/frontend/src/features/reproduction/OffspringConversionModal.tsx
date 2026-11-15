@@ -23,7 +23,7 @@ export interface OffspringAnimalDraft {
 }
 const emptyAnimal = (): OffspringAnimalDraft => ({
   name: "", species: "", sex: "unknown", morph: "", identifier: "",
-  geneticsNotes: "", birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "Nato in allevamento",
+  geneticsNotes: "", birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "",
   locationLabel: "", notes: "", photo: null, eggId: "",
 });
 
