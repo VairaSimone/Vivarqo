@@ -18,6 +18,12 @@ describe("animal management API access boundaries", () => {
     expect(transfers.status).toBe(401);
   });
 
+  it("protects per-animal feeding analytics behind authentication", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const response = await request(app).get("/api/v1/animals/" + id + "/feeding-summary");
+    expect(response.status).toBe(401);
+  });
+
   it("does not expose internal QR resolution without an authenticated session", async () => {
     const token = "A".repeat(32);
     const response = await request(app).get("/api/v1/animals/qr/" + token);
