@@ -218,7 +218,7 @@ export function createReproductionRouter() {
     });
     // Independent-locus combinations are calculated as a Cartesian product.
     // Linkage, recombination and epistasis are intentionally not assumed.
-    const combinedGeneticOutcomes = geneticPredictions.reduce<Array<{ loci: Array<{ traitName: string; genotype: string }>; probabilityPct: number }>>(
+    const combinedGeneticOutcomes = geneticPredictions.reduce<Array<{ loci: Array<{ traitName: string; genotype: string; phenotype: string | null }>; phenotype: string | null; probabilityPct: number }>>(
       (combinations, prediction) => {
         if (!combinations.length) return prediction.probabilities.map((outcome) => ({
           loci: [{ traitName: prediction.traitName, genotype: outcome.genotype, phenotype: outcome.phenotype }],
