@@ -461,15 +461,15 @@ export function createFinanceRouter() {
     const overheadCents = overheadRows._sum.amountCents ?? 0n;
     const directAnimalExpenses = animalMargins.reduce((sum, row) => sum + BigInt(row.expenseCents), 0n);
     const allocatedOverheadCents = animalMargins.length ? overheadCents : 0n;
+    let overheadAllocatedSoFar = 0n;
     const animalMarginsWithOverhead = animalMargins.map((row, index) => {
       const directExpense = BigInt(row.expenseCents);
-      const share = directAnimalExpenses > 0n
-        ? (index === animalMargins.length - 1
-          ? allocatedOverheadCents - animalMargins.slice(0, index).reduce((sum, previous) => sum + BigInt(previous.allocatedOverheadCents ?? "0"), 0n)
-          : allocatedOverheadCents * directExpense / directAnimalExpenses)
-        : (index === animalMargins.length - 1
-          ? allocatedOverheadCents - allocatedOverheadCents / BigInt(animalMargins.length) * BigInt(index)
-          : allocatedOverheadCents / BigInt(animalMargins.length));
+      const share = index === animalMargins.length - 1
+        ? allocatedOverheadCents - overheadAllocatedSoFar
+        : directAnimalExpenses > 0n
+          ? allocatedOverheadCents * directExpense / directAnimalExpenses
+          : allocatedOverheadCents / BigInt(animalMargins.length);
+      overheadAllocatedSoFar += share;
       return { ...row, allocatedOverheadCents: share.toString(), marginAfterOverheadCents: (BigInt(row.marginCents) - share).toString() };
     });
     const monthlyMap = new Map<string, { income: bigint; expense: bigint }>();
