@@ -310,6 +310,14 @@ export function createReproductionRouter() {
     if (input.laidOn) data.laidOn = validDate(input.laidOn);
     if (input.incubationStartedAt !== undefined) data.incubationStartedAt = input.incubationStartedAt ? new Date(input.incubationStartedAt) : null;
     const clutch = await prisma.$transaction(async (tx) => {
+      if (input.eggCount !== undefined) {
+        const registeredEggs = await tx.egg.count({ where: { clutchId } });
+        if (input.eggCount < registeredEggs) {
+          throw new AppError(409, "CLUTCH_EGG_COUNT_BELOW_REGISTERED", "Declared egg count cannot be lower than the number of registered eggs", {
+            declaredCount: input.eggCount, registeredCount: registeredEggs,
+          });
+        }
+      }
       const updated = await tx.clutch.update({ where: { id: clutchId }, data: data as never });
       const lastLog = await tx.incubationLog.findFirst({ where: { clutchId }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }] });
       const title = "Controllo incubazione · " + clutchId;
@@ -350,6 +358,12 @@ export function createReproductionRouter() {
     const codes = input.eggs.map((egg) => egg.code?.trim().toLocaleLowerCase("it-IT")).filter((code): code is string => Boolean(code));
     if (new Set(codes).size !== codes.length) throw new AppError(400, "DUPLICATE_EGG_CODES", "Egg codes must be unique within the request");
     const eggs = await prisma.$transaction(async (tx) => {
+      const registeredEggs = await tx.egg.count({ where: { clutchId } });
+      if (registeredEggs + input.eggs.length > clutch.eggCount) {
+        throw new AppError(409, "CLUTCH_EGG_COUNT_EXCEEDED", "Registered eggs cannot exceed the declared clutch egg count", {
+          declaredCount: clutch.eggCount, registeredCount: registeredEggs, requestedCount: input.eggs.length,
+        });
+      }
       const results = [];
       for (const egg of input.eggs) {
         const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, notes: egg.notes ?? null } });
@@ -489,6 +503,12 @@ export function createReproductionRouter() {
       if (eggs.some((egg) => egg.offspringAnimalId)) throw new AppError(409, "EGG_ALREADY_LINKED", "One or more eggs are already linked to an animal");
     }
     const created = await prisma.$transaction(async (tx) => {
+      const existingAnimals = await tx.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
+      if (existingAnimals + input.animals.length > batch.count) {
+        throw new AppError(409, "OFFSPRING_COUNT_EXCEEDED", "Animal records cannot exceed the declared offspring count", {
+          declaredCount: batch.count, registeredCount: existingAnimals, requestedCount: input.animals.length,
+        });
+      }
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
       for (const animal of input.animals) {
@@ -634,6 +654,14 @@ export function createReproductionRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.bornOn) data.bornOn = validDate(input.bornOn);
     const batch = await prisma.$transaction(async (tx) => {
+      if (input.count !== undefined) {
+        const registeredAnimals = await tx.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
+        if (input.count < registeredAnimals) {
+          throw new AppError(409, "OFFSPRING_COUNT_BELOW_REGISTERED", "Declared offspring count cannot be lower than the number of registered animals", {
+            declaredCount: input.count, registeredCount: registeredAnimals,
+          });
+        }
+      }
       const updated = await tx.offspringBatch.update({ where: { id: batchId }, data: data as never });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "offspring_batch.updated", entityType: "offspring_batch", entityId: batchId } });
       return updated;
