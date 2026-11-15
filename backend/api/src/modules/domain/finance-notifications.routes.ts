@@ -415,12 +415,35 @@ export function createFinanceRouter() {
     }), req.query);
     if (query.from && query.to && query.to < query.from) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede start date");
     const where = { userId: auth.userId, currency: query.currency, ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}) };
-    const [totals, animals, cycles, clutches, batches] = await Promise.all([
+    const now = new Date();
+    const trendFrom = query.from ? validDate(query.from) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
+    const trendTo = query.to ? validDate(query.to) : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const annualFrom = new Date(Date.UTC(trendFrom.getUTCFullYear(), 0, 1));
+    const annualToExclusive = new Date(Date.UTC(trendTo.getUTCFullYear() + 1, 0, 1));
+    const [totals, animals, cycles, clutches, batches, monthlyRows, annualRows, overheadRows] = await Promise.all([
       prisma.financeEntry.groupBy({ by: ["entryType"], where, _sum: { amountCents: true } }),
       prisma.financeEntry.groupBy({ by: ["animalId", "entryType"], where: { ...where, animalId: { not: null } }, _sum: { amountCents: true } }),
       prisma.financeEntry.groupBy({ by: ["reproductionCycleId", "entryType"], where: { ...where, reproductionCycleId: { not: null } }, _sum: { amountCents: true } }),
       prisma.financeEntry.groupBy({ by: ["clutchId", "entryType"], where: { ...where, clutchId: { not: null } }, _sum: { amountCents: true } }),
       prisma.financeEntry.groupBy({ by: ["offspringBatchId", "entryType"], where: { ...where, offspringBatchId: { not: null } }, _sum: { amountCents: true } }),
+      prisma.$queryRaw<Array<{ month: Date; entry_type: string; total_cents: bigint }>>`
+        SELECT date_trunc('month', occurred_on)::date AS month, entry_type, SUM(amount_cents)::bigint AS total_cents
+        FROM finance_entries
+        WHERE user_id = ${auth.userId}::uuid AND currency = ${query.currency}
+          AND occurred_on >= ${trendFrom}::date AND occurred_on <= ${trendTo}::date
+        GROUP BY 1, 2 ORDER BY 1 ASC
+      `,
+      prisma.$queryRaw<Array<{ year: number; entry_type: string; total_cents: bigint }>>`
+        SELECT EXTRACT(YEAR FROM occurred_on)::int AS year, entry_type, SUM(amount_cents)::bigint AS total_cents
+        FROM finance_entries
+        WHERE user_id = ${auth.userId}::uuid AND currency = ${query.currency}
+          AND occurred_on >= ${annualFrom}::date AND occurred_on < ${annualToExclusive}::date
+        GROUP BY 1, 2 ORDER BY 1 ASC
+      `,
+      prisma.financeEntry.aggregate({
+        where: { ...where, entryType: "expense", animalId: null, reproductionCycleId: null, clutchId: null, offspringBatchId: null },
+        _sum: { amountCents: true },
+      }),
     ]);
     const income = totals.find((row) => row.entryType === "income")?._sum.amountCents ?? 0n;
     const expense = totals.find((row) => row.entryType === "expense")?._sum.amountCents ?? 0n;
@@ -435,6 +458,33 @@ export function createFinanceRouter() {
       return [...map].map(([id, value]) => ({ id, incomeCents: value.income.toString(), expenseCents: value.expense.toString(), marginCents: (value.income - value.expense).toString() }));
     }
     const animalMargins = mergeGroups(animals, (row) => row.animalId);
+    const overheadCents = overheadRows._sum.amountCents ?? 0n;
+    const directAnimalExpenses = animalMargins.reduce((sum, row) => sum + BigInt(row.expenseCents), 0n);
+    const allocatedOverheadCents = animalMargins.length ? overheadCents : 0n;
+    const animalMarginsWithOverhead = animalMargins.map((row, index) => {
+      const directExpense = BigInt(row.expenseCents);
+      const share = directAnimalExpenses > 0n
+        ? (index === animalMargins.length - 1
+          ? allocatedOverheadCents - animalMargins.slice(0, index).reduce((sum, previous) => sum + BigInt(previous.allocatedOverheadCents ?? "0"), 0n)
+          : allocatedOverheadCents * directExpense / directAnimalExpenses)
+        : (index === animalMargins.length - 1
+          ? allocatedOverheadCents - allocatedOverheadCents / BigInt(animalMargins.length) * BigInt(index)
+          : allocatedOverheadCents / BigInt(animalMargins.length));
+      return { ...row, allocatedOverheadCents: share.toString(), marginAfterOverheadCents: (BigInt(row.marginCents) - share).toString() };
+    });
+    const monthlyMap = new Map<string, { income: bigint; expense: bigint }>();
+    for (const row of monthlyRows) {
+      const month = financeDateString(row.month).slice(0, 7);
+      const value = monthlyMap.get(month) ?? { income: 0n, expense: 0n };
+      if (row.entry_type === "income") value.income += row.total_cents; else value.expense += row.total_cents;
+      monthlyMap.set(month, value);
+    }
+    const annualMap = new Map<number, { income: bigint; expense: bigint }>();
+    for (const row of annualRows) {
+      const value = annualMap.get(row.year) ?? { income: 0n, expense: 0n };
+      if (row.entry_type === "income") value.income += row.total_cents; else value.expense += row.total_cents;
+      annualMap.set(row.year, value);
+    }
     const cycleMargins = mergeGroups(cycles, (row) => row.reproductionCycleId);
     const clutchMargins = mergeGroups(clutches, (row) => row.clutchId);
     const batchMargins = mergeGroups(batches, (row) => row.offspringBatchId);
@@ -451,7 +501,13 @@ export function createFinanceRouter() {
     res.status(200).json({
       currency: query.currency, from: query.from ?? null, to: query.to ?? null,
       incomeCents: income.toString(), expenseCents: expense.toString(), marginCents: (income - expense).toString(),
-      animals: animalMargins.map((row) => ({ ...row, name: animalById.get(row.id)?.name ?? row.id, identifier: animalById.get(row.id)?.identifier ?? null })),
+      overheadExpenseCents: overheadCents.toString(),
+      allocatedOverheadCents: allocatedOverheadCents.toString(),
+      unallocatedOverheadCents: (overheadCents - allocatedOverheadCents).toString(),
+      monthlyTrend: [...monthlyMap].map(([month, value]) => ({ month, incomeCents: value.income.toString(), expenseCents: value.expense.toString(), marginCents: (value.income - value.expense).toString() })),
+      annualComparison: [...annualMap].map(([year, value]) => ({ year, incomeCents: value.income.toString(), expenseCents: value.expense.toString(), marginCents: (value.income - value.expense).toString() })),
+      overheadAllocation: { method: directAnimalExpenses > 0n ? "proportional-to-direct-expenses" : "equal-among-animals-with-finance-entries", basisExpenseCents: directAnimalExpenses.toString() },
+      animals: animalMarginsWithOverhead.map((row) => ({ ...row, name: animalById.get(row.id)?.name ?? row.id, identifier: animalById.get(row.id)?.identifier ?? null })),
       reproductionCycles: cycleMargins.map((row) => ({ ...row, name: cycleById.get(row.id)?.name ?? null, startedOn: financeDateString(cycleById.get(row.id)!.startedOn) })),
       clutches: clutchMargins.map((row) => ({ ...row, laidOn: financeDateString(clutchById.get(row.id)!.laidOn) })),
       offspringBatches: batchMargins.map((row) => ({ ...row, bornOn: financeDateString(batchById.get(row.id)!.bornOn), count: batchById.get(row.id)!.count })),
