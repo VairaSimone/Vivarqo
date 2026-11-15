@@ -89,6 +89,16 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
     catch (reason) { setError(reason instanceof ApiError ? reason.message : (en ? "Invitation could not be revoked." : "Impossibile revocare l'invito.")); }
     finally { setBusy(false); }
   }
+  async function leaveWorkspace(workspace: Workspace) {
+    if (!window.confirm(en ? `Leave ${workspace.owner.displayName}'s workspace?` : `Uscire dal workspace di ${workspace.owner.displayName}?`)) return;
+    setBusy(true); setError("");
+    try {
+      await api.post("/collaborators/leave", { ownerUserId: workspace.ownerUserId });
+      if (workspace.active) window.location.assign("/today");
+      else await load();
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : (en ? "Could not leave workspace." : "Impossibile uscire dal workspace.")); }
+    finally { setBusy(false); }
+  }
   async function switchWorkspace(ownerUserId: string | null) {
     setBusy(true); setError("");
     try {
@@ -113,7 +123,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
         </div>
         {data.workspaces.map((workspace) => <div className="workspace-switch-row" key={workspace.ownerUserId}>
           <div><strong>{workspace.owner.displayName}</strong><p className="muted-note">{workspace.owner.email} · {roleNames[workspace.role][en ? "en" : "it"]}</p></div>
-          <Button size="sm" variant={workspace.active ? "primary" : "secondary"} disabled={busy || workspace.active} onClick={() => void switchWorkspace(workspace.ownerUserId)}>{workspace.active ? (en ? "Active" : "Attivo") : (en ? "Switch" : "Passa")}</Button>
+          <div className="inline-actions"><Button size="sm" variant={workspace.active ? "primary" : "secondary"} disabled={busy || workspace.active} onClick={() => void switchWorkspace(workspace.ownerUserId)}>{workspace.active ? (en ? "Active" : "Attivo") : (en ? "Switch" : "Passa")}</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => void leaveWorkspace(workspace)}>{en ? "Leave" : "Esci"}</Button></div>
         </div>)}
         {data.workspaces.length === 0 && <p className="muted-note">{en ? "You have not joined any shared workspace yet." : "Non hai ancora aderito a workspace condivisi."}</p>}
       </div>
