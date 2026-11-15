@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { Alert, Button, Field, Input, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 import type { Locale } from "../../lib/domain";
@@ -38,7 +38,6 @@ export function AnimalManagementPanel({ locale }: { locale: Locale }) {
     setAnimals(allAnimals);
   }
   useEffect(() => { void reload().catch((e) => setError(e instanceof ApiError ? e.message : "Unable to load animal locations")); }, []);
-  const byId = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
   const pathOf = (id: string | null | undefined): string => getLocationPath(locations, id, it ? "Non assegnato" : "Unassigned");
   const descendants = (id: string): string[] => getLocationDescendantIds(locations, id);
   const visibleAnimals = animals.filter((a) => !filter || descendants(filter).includes(a.locationId ?? ""));
