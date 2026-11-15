@@ -228,6 +228,16 @@ export function createCareRouter() {
       });
       if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
 
+      const stockFieldsChanged = input.outcome !== undefined || input.inventoryItemId !== undefined || input.inventoryQuantity !== undefined;
+      if (stockFieldsChanged && owned.inventoryDeducted && owned.inventoryItemId && owned.inventoryQuantity) {
+        const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string }>>`SELECT quantity_on_hand::text FROM inventory_items WHERE id = ${owned.inventoryItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
+        const current = decimalToScaledInteger(locked[0]?.quantity_on_hand ?? "0", 3);
+        const restore = decimalToScaledInteger(owned.inventoryQuantity, 3);
+        if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
+        await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry reversal " + id, notes: "Automatic stock restoration after feeding edit" } });
+        await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: (current + restore) / 1000 } });
+      }
+
       let dateChanged = false;
       if (performedAt) {
         const nextDate = new Date(performedAt);
@@ -241,7 +251,7 @@ export function createCareRouter() {
             });
             await tx.feedingEntry.update({
               where: { id },
-              data: { ...entryFields, sessionId: separatedSession.id } as never,
+              data: { ...entryFields, ...(stockFieldsChanged ? { inventoryDeducted: false } : {}), sessionId: separatedSession.id } as never,
             });
           } else {
             await tx.feedingSession.update({
@@ -249,7 +259,7 @@ export function createCareRouter() {
               data: { performedAt: nextDate },
             });
             if (Object.keys(entryFields).length > 0) {
-              await tx.feedingEntry.update({ where: { id }, data: entryFields as never });
+              await tx.feedingEntry.update({ where: { id }, data: { ...entryFields, ...(stockFieldsChanged ? { inventoryDeducted: false } : {}) } as never });
             }
           }
         }
@@ -257,6 +267,25 @@ export function createCareRouter() {
 
       if (!dateChanged && Object.keys(entryFields).length > 0) {
         await tx.feedingEntry.update({ where: { id }, data: entryFields as never });
+      }
+
+      if (stockFieldsChanged) {
+        const nextOutcome = input.outcome ?? owned.outcome;
+        const nextItemId = input.inventoryItemId !== undefined ? input.inventoryItemId : owned.inventoryItemId;
+        const nextQuantity = input.inventoryQuantity !== undefined ? input.inventoryQuantity : (owned.inventoryQuantity === null ? null : Number(owned.inventoryQuantity));
+        if (nextOutcome === "ate" && nextItemId && nextQuantity) {
+          const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string; is_active: boolean; category: string; name: string }>>`SELECT quantity_on_hand::text, is_active, category, name FROM inventory_items WHERE id = ${nextItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
+          const item = locked[0];
+          if (!item) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Food inventory item not found");
+          if (!item.is_active || item.category !== "food") throw new AppError(409, "INVENTORY_ITEM_UNAVAILABLE", "Selected prey inventory item is not active food");
+          const available = decimalToScaledInteger(item.quantity_on_hand, 3);
+          const requested = decimalToScaledInteger(nextQuantity, 3);
+          if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
+          if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
+          await tx.stockMovement.create({ data: { itemId: nextItemId, movementType: "out", quantity: nextQuantity, occurredAt: performedAt ? new Date(performedAt) : owned.session.performedAt, reference: "Feeding entry " + id, notes: "Automatic deduction after accepted feeding edit" } });
+          await tx.inventoryItem.update({ where: { id: nextItemId }, data: { quantityOnHand: (available - requested) / 1000 } });
+          await tx.feedingEntry.update({ where: { id }, data: { inventoryDeducted: true } });
+        }
       }
 
       await tx.auditEvent.create({
