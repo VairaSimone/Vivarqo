@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const statuses = ["planned", "active", "completed", "cancelled"] as const;
-const eventTypes = ["pairing", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "loss", "other"] as const;
+const eventTypes = ["pairing", "pairing_failed", "no_deposition", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "infertile_clutch", "embryonic_loss", "stillbirth", "post_hatch_loss", "loss", "other"] as const;
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nullableUuid = z.string().uuid().nullable().optional();
 export const eggStatuses = ["unknown", "fertile", "infertile", "damaged", "lost", "incubating", "hatched"] as const;
