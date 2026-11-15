@@ -29,9 +29,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [animalPage, setAnimalPage] = useState(1);
   const [selected, setSelected] = useState<string[]>(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
   const [selectedNames, setSelectedNames] = useState<Record<string, string>>({});
-  const [entries, setEntries] = useState<Record<string, { outcome: string; foodType: string; foodSize: string; foodWeightG: string; notes: string }>>({});
+  const [entries, setEntries] = useState<Record<string, { outcome: string; foodType: string; foodSize: string; foodWeightG: string; preyState: string; inventoryItemId: string; inventoryQuantity: string; notes: string }>>({});
   const [editEntry, setEditEntry] = useState<FeedingEntryDto | null>(null);
-  const [editData, setEditData] = useState({ outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" });
+  const [editData, setEditData] = useState({ outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", preyState: "unknown", inventoryItemId: "", inventoryQuantity: "", notes: "" });
   const { toast, show } = useToast();
 
   const listUrl = "/feeding-sessions" + queryString({ page, pageSize: 25, animalId, outcome, q });
@@ -39,6 +39,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const animalsResource = useResource<{ animals: AnimalOption[]; pagination: { total: number; page: number; totalPages: number } }>(
     modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, status: "active", sort: "name" }) : null
   );
+  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(modal || editEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
 
   useEffect(() => { if (animalSearch) setAnimalPage(1); }, [animalSearch]);
 
@@ -68,7 +69,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
     setFormDirty(true);
     setEntries((current) => ({
       ...current,
-      [id]: { ...(current[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" }), [field]: value }
+      [id]: { ...(current[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", preyState: "unknown", inventoryItemId: "", inventoryQuantity: "", notes: "" }), [field]: value }
     }));
   }
 
@@ -93,6 +94,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
             foodType: entry.foodType || null,
             foodSize: entry.foodSize || null,
             foodWeightG: entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null,
+            preyState: entry.preyState || "unknown",
+            inventoryItemId: entry.inventoryItemId || null,
+            inventoryQuantity: entry.inventoryItemId && entry.inventoryQuantity ? Number(entry.inventoryQuantity) : null,
             notes: entry.notes || null
           };
         })
@@ -113,7 +117,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
     event.preventDefault(); if (!editEntry || busy) return; setBusy(true); setError("");
     const payload = {
       outcome: editData.outcome, foodType: editData.foodType || null, foodSize: editData.foodSize || null,
-      foodWeightG: editData.foodWeightG ? weightToGrams(editData.foodWeightG) : null, notes: editData.notes || null
+      foodWeightG: editData.foodWeightG ? weightToGrams(editData.foodWeightG) : null,
+      preyState: editData.preyState, inventoryItemId: editData.inventoryItemId || null,
+      inventoryQuantity: editData.inventoryItemId && editData.inventoryQuantity ? Number(editData.inventoryQuantity) : null, notes: editData.notes || null
     };
     try { await api.patch(`/feeding-entries/${getString(editEntry, "id")}`, payload); setEditEntry(null); resource.reload(); show(t("saveSuccess")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -159,6 +165,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
                     foodType: getString(entry, "foodType"),
                     foodSize: getString(entry, "foodSize"),
                     foodWeightG: foodWeightValue ? String(gramsToWeight(foodWeightValue)) : "",
+                    preyState: getString(entry, "preyState", "unknown"),
+                    inventoryItemId: getString(entry, "inventoryItemId"),
+                    inventoryQuantity: getString(entry, "inventoryQuantity"),
                     notes: getString(entry, "notes"),
                   });
                   setEditEntry(entry);
@@ -196,6 +205,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
                 <Field label={t("foodType")}><Input value={entry.foodType} onChange={(e) => updateEntry(id, "foodType", e.target.value)} /></Field>
                 <Field label={t("foodSize")}><Input value={entry.foodSize} onChange={(e) => updateEntry(id, "foodSize", e.target.value)} /></Field>
                 <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={entry.foodWeightG} onChange={(e) => updateEntry(id, "foodWeightG", e.target.value)} /></Field>
+                <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={entry.preyState} onChange={(e) => updateEntry(id, "preyState", e.target.value)}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+                <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={entry.inventoryItemId} onChange={(e) => { updateEntry(id, "inventoryItemId", e.target.value); if (e.target.value && !entry.inventoryQuantity) updateEntry(id, "inventoryQuantity", "1"); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+                {entry.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={entry.inventoryQuantity} onChange={(e) => updateEntry(id, "inventoryQuantity", e.target.value)} /></Field>}
               </div>
             </div>;
           })}
@@ -210,6 +222,9 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
         <Field label={t("foodType")}><Input value={editData.foodType} onChange={(e) => setEditData({ ...editData, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input value={editData.foodSize} onChange={(e) => setEditData({ ...editData, foodSize: e.target.value })} /></Field>
         <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={editData.foodWeightG} onChange={(e) => setEditData({ ...editData, foodWeightG: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={editData.preyState} onChange={(e) => setEditData({ ...editData, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+        <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={editData.inventoryItemId} onChange={(e) => setEditData({ ...editData, inventoryItemId: e.target.value, inventoryQuantity: e.target.value ? (editData.inventoryQuantity || "1") : "" })}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+        {editData.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={editData.inventoryQuantity} onChange={(e) => setEditData({ ...editData, inventoryQuantity: e.target.value })} /></Field>}
         <Field label={t("notes")}><Textarea rows={3} value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>
