@@ -2773,3 +2773,9 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .finance-profit-columns > div > strong { display: block; margin-bottom: 8px; }
 @media (max-width: 900px) { .finance-management-grid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .finance-profit-columns { grid-template-columns: 1fr; } .finance-detail-row { grid-template-columns: minmax(0,1fr) auto; } .finance-detail-row .bar-track { grid-column: 1 / -1; } }
+
+.finance-detail-row strong { font-size: 13px; }
+.finance-detail-row small { font-size: 12px; }
+.finance-profit-columns > div > strong { font-size: 14px; }
+.finance-grid .category-bar-row > div:first-child { font-size: 12px; }
+.finance-grid .category-bar-row strong { font-size: 12px; }

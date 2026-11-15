@@ -233,7 +233,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
         {(["animals", "reproductionCycles", "clutches", "offspringBatches"] as const).map((key) => {
           const values = Array.isArray(profitability.data?.[key]) ? profitability.data[key] as Array<Record<string, unknown>> : [];
           const title = key === "animals" ? (locale === "it" ? "Per animale" : "By animal") : key === "reproductionCycles" ? (locale === "it" ? "Per ciclo" : "By cycle") : key === "clutches" ? (locale === "it" ? "Per covata" : "By clutch") : (locale === "it" ? "Per gruppo di piccoli" : "By offspring batch");
-          return <div key={key}><strong>{title}</strong>{values.length ? values.map((item) => <div className="finance-detail-row" key={getString(item, "id")}><span>{getString(item, "id").slice(0, 8)}</span><strong>{formatMoneyCents(getString(item, "marginCents"), locale)}</strong></div>) : <p className="muted-note">{locale === "it" ? "Nessun costo o ricavo collegato" : "No linked costs or revenue"}</p>}</div>;
+          return <div key={key}><strong>{title}</strong>{values.length ? values.map((item) => <div className="finance-detail-row" key={getString(item, "id")}><span>{getString(item, "label") || getString(item, "id").slice(0, 8)}</span><strong>{formatMoneyCents(getString(item, "marginCents"), locale)}</strong></div>) : <p className="muted-note">{locale === "it" ? "Nessun costo o ricavo collegato" : "No linked costs or revenue"}</p>}</div>;
         })}
       </div>
     </Panel>

@@ -434,13 +434,27 @@ export function createFinanceRouter() {
       }
       return [...map].map(([id, value]) => ({ id, incomeCents: value.income.toString(), expenseCents: value.expense.toString(), marginCents: (value.income - value.expense).toString() }));
     }
+    const animalMargins = mergeGroups(animals, (row) => row.animalId);
+    const cycleMargins = mergeGroups(cycles, (row) => row.reproductionCycleId);
+    const clutchMargins = mergeGroups(clutches, (row) => row.clutchId);
+    const batchMargins = mergeGroups(batches, (row) => row.offspringBatchId);
+    const [animalLabels, cycleLabels, clutchLabels, batchLabels] = await Promise.all([
+      animalMargins.length ? prisma.animal.findMany({ where: { id: { in: animalMargins.map((row) => row.id) }, userId: auth.userId }, select: { id: true, name: true, identifier: true } }) : Promise.resolve([]),
+      cycleMargins.length ? prisma.reproductionCycle.findMany({ where: { id: { in: cycleMargins.map((row) => row.id) }, userId: auth.userId }, select: { id: true, name: true, startedOn: true } }) : Promise.resolve([]),
+      clutchMargins.length ? prisma.clutch.findMany({ where: { id: { in: clutchMargins.map((row) => row.id) }, cycle: { userId: auth.userId } }, select: { id: true, laidOn: true } }) : Promise.resolve([]),
+      batchMargins.length ? prisma.offspringBatch.findMany({ where: { id: { in: batchMargins.map((row) => row.id) }, cycle: { userId: auth.userId } }, select: { id: true, bornOn: true, count: true } }) : Promise.resolve([]),
+    ]);
+    const animalById = new Map(animalLabels.map((item) => [item.id, item]));
+    const cycleById = new Map(cycleLabels.map((item) => [item.id, item]));
+    const clutchById = new Map(clutchLabels.map((item) => [item.id, item]));
+    const batchById = new Map(batchLabels.map((item) => [item.id, item]));
     res.status(200).json({
       currency: query.currency, from: query.from ?? null, to: query.to ?? null,
       incomeCents: income.toString(), expenseCents: expense.toString(), marginCents: (income - expense).toString(),
-      animals: mergeGroups(animals, (row) => row.animalId),
-      reproductionCycles: mergeGroups(cycles, (row) => row.reproductionCycleId),
-      clutches: mergeGroups(clutches, (row) => row.clutchId),
-      offspringBatches: mergeGroups(batches, (row) => row.offspringBatchId),
+      animals: animalMargins.map((row) => ({ ...row, label: [animalById.get(row.id)?.name, animalById.get(row.id)?.identifier].filter(Boolean).join(" · ") || row.id })),
+      reproductionCycles: cycleMargins.map((row) => ({ ...row, label: cycleById.get(row.id)?.name || `Cycle ${financeDateString(cycleById.get(row.id)!.startedOn)}` })),
+      clutches: clutchMargins.map((row) => ({ ...row, label: `Clutch ${financeDateString(clutchById.get(row.id)!.laidOn)}` })),
+      offspringBatches: batchMargins.map((row) => ({ ...row, label: `Offspring ${financeDateString(batchById.get(row.id)!.bornOn)} · ${batchById.get(row.id)!.count}` })),
     });
   });
 
