@@ -105,12 +105,20 @@ export function calculateGenetics(inputs: GeneticLocusInput[]): GeneticCalculati
 
 export interface PedigreeAnimal { id: string; motherId?: string | null; fatherId?: string | null }
 export interface InbreedingResult { coefficient: number | null; completeness: "complete" | "partial" | "unknown"; knownAncestors: number; missingParentLinks: number; generations: number; note: string }
-export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string, maxGenerations = 8): InbreedingResult {
+export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string, maxGenerations = 8, cache = new Map<string, InbreedingResult>(), active = new Set<string>()): InbreedingResult {
+  const cacheKey = `${subjectId}:${maxGenerations}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  if (active.has(subjectId)) return { coefficient: null, completeness: "partial", knownAncestors: 0, missingParentLinks: 1, generations: maxGenerations, note: "Ciclo genealogico rilevato." };
+  const nextActive = new Set(active);
+  nextActive.add(subjectId);
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
   if (!byId.has(subjectId)) return { coefficient: null, completeness: "unknown", knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale non presente nella genealogia fornita." };
   const root = byId.get(subjectId)!;
   if (!root.motherId && !root.fatherId) {
-    return { coefficient: 0, completeness: "complete", knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale trattato come fondatore: i genitori non registrati sono assunti non imparentati." };
+    const founder = { coefficient: 0, completeness: "complete" as const, knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale trattato come fondatore: i genitori non registrati sono assunti non imparentati." };
+    cache.set(cacheKey, founder);
+    return founder;
   }
   const missing = new Set<string>();
   const ancestors = new Set<string>();
@@ -151,7 +159,7 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
       );
       if (hasCloserCommonAncestor) continue;
       const remainingGenerations = Math.max(0, maxGenerations - Math.max(left.generation, right.generation));
-      const ancestorInbreeding = calculateInbreeding(animals, ancestorId, remainingGenerations);
+      const ancestorInbreeding = calculateInbreeding(animals, ancestorId, remainingGenerations, cache, nextActive);
       if (ancestorInbreeding.coefficient === null) {
         missing.add(`ancestor-incomplete:${ancestorId}`);
         continue;
@@ -160,10 +168,12 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
     }
   }
   const complete = missing.size === 0;
-  return {
+  const result: InbreedingResult = {
     coefficient: complete ? Number(estimate.toFixed(6)) : null,
     completeness: complete ? "complete" : ancestors.size ? "partial" : "unknown",
     knownAncestors: ancestors.size, missingParentLinks: missing.size, generations: maxGenerations,
     note: complete ? "Coefficiente di Wright stimato sui percorsi registrati; gli animali senza genitori registrati sono assunti fondatori non imparentati." : "Genealogia incompleta, ciclica o oltre il limite di generazioni: coefficiente non pubblicato per evitare falsa precisione.",
   };
+  if (result.coefficient !== null) cache.set(cacheKey, result);
+  return result;
 }
