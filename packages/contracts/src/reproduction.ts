@@ -83,6 +83,7 @@ export const patchClutchSchema = z.object({
   eggCount: z.coerce.number().int().min(0).max(10_000).optional(),
   status: z.string().trim().min(1).max(20).optional(),
   incubatorLabel: z.string().trim().max(120).nullable().optional(),
+  incubatorId: nullableUuid,
   incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
   targetTemperatureMinC: z.coerce.number().min(-20).max(60).nullable().optional(),
   targetTemperatureMaxC: z.coerce.number().min(-20).max(60).nullable().optional(),
