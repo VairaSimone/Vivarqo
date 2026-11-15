@@ -23,6 +23,11 @@ function policy(expectedPriceIds: readonly string[] = configuredPriceIds(), annu
   };
 }
 
+export async function hasPaidSubscriptionEntitlement(userId: string): Promise<boolean> {
+  const subscription = await prisma.subscription.findUnique({ where: { userId }, select: subscriptionSelect });
+  return resolveBillingEntitlements(subscription, policy()).features.includes("paidSubscription");
+}
+
 export async function getUserEntitlements(userId: string, expectedPriceIds: readonly string[] = configuredPriceIds(), annualPriceId = env.STRIPE_PRICE_ANNUAL_ID): Promise<BillingEntitlementsDto> {
   const [subscription, animalsUsed, documentsUsed, storage] = await Promise.all([
     prisma.subscription.findUnique({ where: { userId }, select: subscriptionSelect }),
