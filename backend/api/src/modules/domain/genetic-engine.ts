@@ -32,6 +32,12 @@ function canonical(a: string, b: string): string {
 }
 function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: string | null, rules?: Record<string, string> | null): string | null {
   if (rules && Object.prototype.hasOwnProperty.call(rules, genotype)) return rules[genotype]!;
+  if (rules) {
+    for (const [ruleGenotype, rulePhenotype] of Object.entries(rules)) {
+      const rulePair = alleles(ruleGenotype);
+      if (rulePair && canonical(rulePair[0], rulePair[1]) === genotype) return rulePhenotype;
+    }
+  }
   const pair = alleles(genotype);
   if (!pair) return null;
   const [a, b] = pair;
