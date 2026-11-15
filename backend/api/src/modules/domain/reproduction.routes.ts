@@ -582,11 +582,22 @@ export function createReproductionRouter() {
     const logId = routeUuid(req.params.id, "incubation log id");
     const existing = await prisma.incubationLog.findFirst({
       where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
-      select: { id: true },
+      select: { id: true, clutchId: true },
     });
     if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
     await prisma.$transaction(async (tx) => {
       await tx.incubationLog.delete({ where: { id: logId } });
+      const clutch = await tx.clutch.findUnique({ where: { id: existing.clutchId } });
+      if (clutch) {
+        const title = "Controllo incubazione · " + clutch.id;
+        const lastLog = await tx.incubationLog.findFirst({ where: { clutchId: clutch.id }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }] });
+        const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubation", title, status: "open" }, select: { id: true } });
+        if (clutch.checkIntervalHours && lastLog) {
+          const dueAt = new Date(lastLog.recordedAt.getTime() + clutch.checkIntervalHours * 60 * 60 * 1000);
+          if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt } });
+          else await tx.task.create({ data: { userId: auth.userId, title, category: "incubation", dueAt, description: "Controllo programmato per la covata " + (clutch.incubatorLabel || clutch.id) } });
+        } else if (reminder) await tx.task.delete({ where: { id: reminder.id } });
+      }
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "incubation_log.deleted", entityType: "incubation_log", entityId: logId } });
     });
     res.status(204).send();
