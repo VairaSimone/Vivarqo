@@ -367,6 +367,7 @@ model Clutch {
   eggs                Egg[]
   incubationLogs      IncubationLog[]
   incubator           Incubator?         @relation(fields: [incubatorId], references: [id], onDelete: SetNull)
+  history             ClutchHistory[]
   offspringBatches    OffspringBatch[]
   originAnimals       Animal[]            @relation("AnimalOriginClutch")
   @@unique([id, cycleId], map: "clutches_id_cycle_id_unique")
