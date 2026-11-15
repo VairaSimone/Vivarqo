@@ -120,8 +120,6 @@ export function createReproductionRouter() {
     const commonAncestorIds = new Set(fatherAncestors.flat().map((item) => item.id).filter((id) => motherAncestorIds.has(id)));
     const commonAncestors = [...motherAncestors.flat(), ...fatherAncestors.flat()]
       .filter((item, index, all) => commonAncestorIds.has(item.id) && all.findIndex((candidate) => candidate.id === item.id) === index);
-    const motherLevels = new Map(motherAncestors.map((level, index) => [index + 1, level]));
-    const fatherLevels = new Map(fatherAncestors.map((level, index) => [index + 1, level]));
     const ancestorDepths = (levels: Array<Array<{ id: string; name: string }>>) => {
       const depths = new Map<string, number>();
       levels.forEach((items, index) => items.forEach((item) => { if (!depths.has(item.id)) depths.set(item.id, index + 1); }));
@@ -460,6 +458,10 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(createClutchSchema, req.body);
     await ownedCycle(auth.userId, input.cycleId);
+    if (input.incubatorId) {
+      const incubator = await prisma.incubator.findFirst({ where: { id: input.incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
+      if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    }
     const clutch = await prisma.$transaction(async (tx) => {
       const created = await tx.clutch.create({
         data: {
@@ -519,6 +521,10 @@ export function createReproductionRouter() {
     const clutchId = routeUuid(req.params.id, "clutch id");
     await ownedClutch(auth.userId, clutchId);
     const input = parseBody(patchClutchSchema, req.body);
+    if (input.incubatorId) {
+      const incubator = await prisma.incubator.findFirst({ where: { id: input.incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
+      if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    }
     const data: Record<string, unknown> = { ...input };
     if (input.laidOn) data.laidOn = validDate(input.laidOn);
     if (input.incubationStartedAt !== undefined) data.incubationStartedAt = input.incubationStartedAt ? new Date(input.incubationStartedAt) : null;
