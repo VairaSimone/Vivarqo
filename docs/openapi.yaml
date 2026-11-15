@@ -2168,6 +2168,202 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FinanceSummaryResponse'
+  /api/v1/finance/budgets:
+    get:
+      operationId: getFinanceBudgets
+      tags: [Finance]
+      summary: Elenca budget e spesa effettiva del periodo
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [month, year], default: month }
+        - name: year
+          in: query
+          schema: { type: integer, minimum: 2000, maximum: 2200 }
+        - name: month
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 12 }
+      responses:
+        '200':
+          description: Budget e importi spesi per categoria.
+          content:
+            application/json:
+              schema: { type: object, required: [budgets, period, periodStart, from, to, currency], properties: { budgets: { type: array, items: { type: object } }, period: { type: string }, periodStart: { type: string, format: date }, from: { type: string, format: date }, to: { type: string, format: date }, currency: { type: string } } }
+    post:
+      operationId: createFinanceBudgets
+      tags: [Finance]
+      summary: Crea o aggiorna un budget mensile o annuale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period, periodStart, amountCents]
+              properties:
+                period: { type: string, enum: [month, year] }
+                periodStart: { type: string, format: date, description: Primo giorno del mese o 1 gennaio }
+                category: { type: string, maxLength: 80, default: all }
+                amountCents: { type: integer, minimum: 1 }
+                currency: { type: string, minLength: 3, maxLength: 3, default: EUR }
+      responses:
+        '200':
+          description: Budget creato o aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [budget], properties: { budget: { type: object } } }
+  /api/v1/finance/budgets/{id}:
+    delete:
+      operationId: deleteFinanceBudgetsById
+      tags: [Finance]
+      summary: Elimina un budget dell'account
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Budget eliminato.
+  /api/v1/finance/recurrences:
+    get:
+      operationId: getFinanceRecurrences
+      tags: [Finance]
+      summary: Elenca le entrate e uscite ricorrenti
+      responses:
+        '200':
+          description: Regole ricorrenti dell'account.
+          content:
+            application/json:
+              schema: { type: object, required: [recurrences], properties: { recurrences: { type: array, items: { type: object } } } }
+    post:
+      operationId: createFinanceRecurrences
+      tags: [Finance]
+      summary: Crea una regola economica ricorrente
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [entryType, amountCents, category, description, frequency, nextOccurrenceOn]
+              properties:
+                entryType: { type: string, enum: [income, expense] }
+                amountCents: { type: integer, minimum: 1 }
+                currency: { type: string, minLength: 3, maxLength: 3, default: EUR }
+                category: { type: string, minLength: 1, maxLength: 80 }
+                description: { type: string, minLength: 1, maxLength: 240 }
+                animalId: { type: [string, 'null'], format: uuid }
+                documentId: { type: [string, 'null'], format: uuid }
+                frequency: { type: string, enum: [monthly, yearly] }
+                nextOccurrenceOn: { type: string, format: date }
+                endOn: { type: [string, 'null'], format: date }
+      responses:
+        '201':
+          description: Regola ricorrente creata.
+          content:
+            application/json:
+              schema: { type: object, required: [recurrence], properties: { recurrence: { type: object } } }
+  /api/v1/finance/recurrences/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateFinanceRecurrencesById
+      tags: [Finance]
+      summary: Modifica o sospende una regola ricorrente
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                amountCents: { type: integer, minimum: 1 }
+                category: { type: string, minLength: 1, maxLength: 80 }
+                description: { type: string, minLength: 1, maxLength: 240 }
+                frequency: { type: string, enum: [monthly, yearly] }
+                nextOccurrenceOn: { type: string, format: date }
+                endOn: { type: [string, 'null'], format: date }
+                isActive: { type: boolean }
+      responses:
+        '200':
+          description: Regola aggiornata.
+          content:
+            application/json:
+              schema: { type: object, required: [recurrence], properties: { recurrence: { type: object } } }
+    delete:
+      operationId: deleteFinanceRecurrencesById
+      tags: [Finance]
+      summary: Elimina una regola ricorrente
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Regola eliminata.
+  /api/v1/finance/recurrences/{id}/generate:
+    post:
+      operationId: generateFinanceRecurrencesById
+      tags: [Finance]
+      summary: Registra le occorrenze ricorrenti già scadute
+      description: Genera al massimo 36 scadenze per richiesta; l'operazione è serializzata e idempotente per regola e data.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Numero di voci create e prossima scadenza.
+          content:
+            application/json:
+              schema: { type: object, required: [generated, nextOccurrenceOn, isActive], properties: { generated: { type: integer }, nextOccurrenceOn: { type: string, format: date }, isActive: { type: boolean } } }
+  /api/v1/finance/profitability:
+    get:
+      operationId: getFinanceProfitability
+      tags: [Finance]
+      summary: Calcola margini per animale, ciclo, covata e gruppo di piccoli
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: currency
+          in: query
+          schema: { type: string, minLength: 3, maxLength: 3, default: EUR }
+      responses:
+        '200':
+          description: Ricavi, costi e margini per ogni entità collegata.
+          content:
+            application/json:
+              schema: { type: object, required: [incomeCents, expenseCents, marginCents, animals, reproductionCycles, clutches, offspringBatches], properties: { incomeCents: { type: string }, expenseCents: { type: string }, marginCents: { type: string }, animals: { type: array, items: { type: object } }, reproductionCycles: { type: array, items: { type: object } }, clutches: { type: array, items: { type: object } }, offspringBatches: { type: array, items: { type: object } } } }
+  /api/v1/finance/export.csv:
+    get:
+      operationId: exportFinanceCsv
+      tags: [Finance]
+      summary: Esporta il registro economico in CSV
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: currency
+          in: query
+          schema: { type: string, minLength: 3, maxLength: 3, default: EUR }
+      responses:
+        '200':
+          description: CSV in streaming con separatore punto e virgola e importi in centesimi.
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
   /api/v1/notifications:
     get:
       operationId: getNotifications
@@ -4771,7 +4967,10 @@ components:
               "null"
             ],
             "format": "uuid"
-          }
+          },
+          "reproductionCycleId": { "type": ["string", "null"], "format": "uuid" },
+          "clutchId": { "type": ["string", "null"], "format": "uuid" },
+          "offspringBatchId": { "type": ["string", "null"], "format": "uuid" }
         }
       }
     FinanceEntryPatch:
@@ -4823,7 +5022,10 @@ components:
               "null"
             ],
             "format": "uuid"
-          }
+          },
+          "reproductionCycleId": { "type": ["string", "null"], "format": "uuid" },
+          "clutchId": { "type": ["string", "null"], "format": "uuid" },
+          "offspringBatchId": { "type": ["string", "null"], "format": "uuid" }
         }
       }
     NotificationPreferencesPatch:
