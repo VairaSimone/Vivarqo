@@ -726,6 +726,7 @@ export function createReproductionRouter() {
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
         include: {
+          currentIncubator: { select: { id: true, name: true, identifier: true } },
           offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } },
           history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },
           measurements: { orderBy: [{ measuredAt: "asc" }, { id: "asc" }] },
