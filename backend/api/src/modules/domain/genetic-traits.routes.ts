@@ -212,6 +212,75 @@ export function createGeneticTraitsRouter() {
     res.status(201).json({ allele });
   });
 
+
+  router.patch("/genetics/genes/:geneId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const geneId = uuid(req.params.geneId, "gene id");
+    const input = parseBody(z.object({
+      species: z.string().trim().min(1).max(160).optional(),
+      symbol: z.string().trim().min(1).max(40).optional(),
+      name: z.string().trim().min(1).max(160).optional(),
+      description: z.string().max(10000).nullable().optional(),
+    }).strict().refine((value) => Object.keys(value).length > 0), req.body);
+    const existing = await prisma.geneticGene.findFirst({ where: { id: geneId, userId: auth.userId }, select: { id: true } });
+    if (!existing) throw new AppError(404, "GENETIC_GENE_NOT_FOUND", "Genetic gene not found");
+    const gene = await prisma.geneticGene.update({ where: { id: geneId }, data: input });
+    res.status(200).json({ gene });
+  });
+  router.delete("/genetics/genes/:geneId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const geneId = uuid(req.params.geneId, "gene id");
+    const existing = await prisma.geneticGene.findFirst({ where: { id: geneId, userId: auth.userId }, select: { id: true } });
+    if (!existing) throw new AppError(404, "GENETIC_GENE_NOT_FOUND", "Genetic gene not found");
+    await prisma.geneticGene.delete({ where: { id: geneId } });
+    res.status(204).send();
+  });
+  router.patch("/genetics/loci/:locusId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const locusId = uuid(req.params.locusId, "locus id");
+    const input = parseBody(z.object({
+      symbol: z.string().trim().min(1).max(40).optional(),
+      name: z.string().trim().min(1).max(160).optional(),
+      inheritanceMode: z.enum(["autosomal_recessive", "dominant", "incomplete_dominant", "codominant"]).optional(),
+      description: z.string().max(10000).nullable().optional(),
+    }).strict().refine((value) => Object.keys(value).length > 0), req.body);
+    await ownedLocus(auth.userId, locusId);
+    const locus = await prisma.geneticLocus.update({ where: { id: locusId }, data: input });
+    res.status(200).json({ locus });
+  });
+  router.delete("/genetics/loci/:locusId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const locusId = uuid(req.params.locusId, "locus id");
+    await ownedLocus(auth.userId, locusId);
+    await prisma.geneticLocus.delete({ where: { id: locusId } });
+    res.status(204).send();
+  });
+  router.patch("/genetics/alleles/:alleleId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const alleleId = uuid(req.params.alleleId, "allele id");
+    const input = parseBody(z.object({
+      symbol: z.string().trim().min(1).max(24).optional(),
+      name: z.string().trim().min(1).max(120).optional(),
+      description: z.string().max(10000).nullable().optional(),
+      isReference: z.boolean().optional(),
+    }).strict().refine((value) => Object.keys(value).length > 0), req.body);
+    const existing = await prisma.geneticAllele.findFirst({ where: { id: alleleId, locus: { is: { gene: { is: { userId: auth.userId } } } } }, select: { id: true, locusId: true } });
+    if (!existing) throw new AppError(404, "GENETIC_ALLELE_NOT_FOUND", "Genetic allele not found");
+    const allele = await prisma.$transaction(async (tx) => {
+      if (input.isReference) await tx.geneticAllele.updateMany({ where: { locusId: existing.locusId, isReference: true, id: { not: alleleId } }, data: { isReference: false } });
+      return tx.geneticAllele.update({ where: { id: alleleId }, data: input });
+    });
+    res.status(200).json({ allele });
+  });
+  router.delete("/genetics/alleles/:alleleId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const alleleId = uuid(req.params.alleleId, "allele id");
+    const existing = await prisma.geneticAllele.findFirst({ where: { id: alleleId, locus: { is: { gene: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    if (!existing) throw new AppError(404, "GENETIC_ALLELE_NOT_FOUND", "Genetic allele not found");
+    await prisma.geneticAllele.delete({ where: { id: alleleId } });
+    res.status(204).send();
+  });
+
   router.get("/animals/:animalId/genetic-history", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = uuid(req.params.animalId, "animal id");
