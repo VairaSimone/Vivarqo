@@ -364,7 +364,7 @@ export function createGeneticTraitsRouter() {
         motherGenotype: genotypeFor(motherTraits), fatherGenotype: genotypeFor(fatherTraits),
         referenceAllele: locus.alleles.find((allele) => allele.isReference)?.symbol ?? null,
         allowedAlleles: locus.alleles.map((allele) => allele.symbol),
-        phenotypeRules: conflict ? null : rules,
+        phenotypeRules: conflict ? null : rules, phenotypeRulesConflict: conflict,
       };
     });
     res.status(200).json({ calculation: calculateGenetics(inputs) });
