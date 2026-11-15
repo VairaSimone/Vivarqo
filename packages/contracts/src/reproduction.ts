@@ -217,12 +217,20 @@ export interface EggHistoryDto {
   occurredAt: string;
   notes: string | null;
 }
-export interface EggMeasurementDto { id: string; eggId: string; measuredAt: string; weightG: number; notes: string | null; }\nexport interface IncubatorDto { id: string; name: string; identifier: string | null; capacity: number | null; notes: string | null; isActive: boolean; }\nexport interface IncubatorMaintenanceDto { id: string; incubatorId: string; occurredAt: string; eventType: string; notes: string | null; }\nexport interface HatchlingCareDto { id: string; animalId: string; firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; notes: string | null; }\n\nexport interface EggDto {
+export interface EggMeasurementDto { id: string; eggId: string; measuredAt: string; weightG: number; notes: string | null; }
+export interface IncubatorDto { id: string; name: string; identifier: string | null; capacity: number | null; notes: string | null; isActive: boolean; }
+export interface IncubatorMaintenanceDto { id: string; incubatorId: string; occurredAt: string; eventType: string; notes: string | null; }
+export interface HatchlingCareDto { id: string; animalId: string; firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; notes: string | null; }
+
+export interface EggDto {
   id: string;
   clutchId: string;
   code: string | null;
   status: typeof eggStatuses[number];
-  hatchedAt?: string | null;\n  laidAt?: string | null;\n  expectedHatchAt?: string | null;\n  measurements?: EggMeasurementDto[];
+  hatchedAt?: string | null;
+  laidAt?: string | null;
+  expectedHatchAt?: string | null;
+  measurements?: EggMeasurementDto[];
   offspringAnimalId?: string | null;
   offspringAnimal?: AnimalSummaryDto | null;
   history?: EggHistoryDto[];
@@ -245,7 +253,8 @@ export interface ClutchDto {
   laidOn: string;
   eggCount: number;
   status: string;
-  incubatorLabel: string | null;\n  incubatorId?: string | null;
+  incubatorLabel: string | null;
+  incubatorId?: string | null;
   incubationStartedAt: string | null;
   targetTemperatureMinC?: number | null;
   targetTemperatureMaxC?: number | null;
