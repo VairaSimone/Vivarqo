@@ -101,7 +101,7 @@ describe.skipIf(!enabled)("Stripe billing lifecycle with deterministic Test Mode
     const checkout = await owner.agent.post("/api/v1/billing/checkout")
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
     expect(checkout.body.url).toBe("https://checkout.stripe.com/c/pay/cs_test_vivarqo");
-    expect(checkoutPriceIds[0]).toBe("price_test_vivarqo");
+    expect(checkoutPriceIds.at(-1)).toBe("price_test_vivarqo");
 
     const checkoutEvent = {
       id: `evt_vivarqo_${randomUUID()}`,
