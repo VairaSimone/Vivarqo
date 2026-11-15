@@ -220,6 +220,7 @@ export function createCareRouter() {
     const id = parseUuid(req.params.id!);
     const input = parseBody(patchFeedingEntrySchema, req.body);
     const { performedAt, ...entryFields } = input;
+    if (input.inventoryItemId === null && input.inventoryQuantity === undefined) entryFields.inventoryQuantity = null;
 
     const entry = await prisma.$transaction(async (tx) => {
       const owned = await tx.feedingEntry.findFirst({
@@ -232,7 +233,7 @@ export function createCareRouter() {
       if (stockFieldsChanged && owned.inventoryDeducted && owned.inventoryItemId && owned.inventoryQuantity) {
         const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string }>>`SELECT quantity_on_hand::text FROM inventory_items WHERE id = ${owned.inventoryItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
         const current = decimalToScaledInteger(locked[0]?.quantity_on_hand ?? "0", 3);
-        const restore = decimalToScaledInteger(owned.inventoryQuantity, 3);
+        const restore = decimalToScaledInteger(String(owned.inventoryQuantity), 3);
         if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
         await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry reversal " + id, notes: "Automatic stock restoration after feeding edit" } });
         await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: (current + restore) / 1000 } });
@@ -266,7 +267,7 @@ export function createCareRouter() {
       }
 
       if (!dateChanged && Object.keys(entryFields).length > 0) {
-        await tx.feedingEntry.update({ where: { id }, data: entryFields as never });
+        await tx.feedingEntry.update({ where: { id }, data: { ...entryFields, ...(stockFieldsChanged ? { inventoryDeducted: false } : {}) } as never });
       }
 
       if (stockFieldsChanged) {
@@ -319,7 +320,7 @@ export function createCareRouter() {
       if (owned.inventoryDeducted && owned.inventoryItemId && owned.inventoryQuantity) {
         const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string }>>`SELECT quantity_on_hand::text FROM inventory_items WHERE id = ${owned.inventoryItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
         const current = decimalToScaledInteger(locked[0]?.quantity_on_hand ?? "0", 3);
-        const restore = decimalToScaledInteger(owned.inventoryQuantity, 3);
+        const restore = decimalToScaledInteger(String(owned.inventoryQuantity), 3);
         if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
         await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry deletion " + id, notes: "Automatic stock restoration after deleting feeding entry" } });
         await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: (current + restore) / 1000 } });
