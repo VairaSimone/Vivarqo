@@ -671,11 +671,21 @@ export function createReproductionRouter() {
       if (input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
     }
     if (input.status === "hatched" && input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
+    const historyNotes = [
+      input.code !== undefined ? "Codice aggiornato" : null,
+      input.laidAt !== undefined ? "Data di deposizione aggiornata" : null,
+      input.expectedHatchAt !== undefined ? "Data prevista di schiusa aggiornata" : null,
+      input.hatchedAt !== undefined ? "Data di schiusa aggiornata" : null,
+      input.offspringAnimalId !== undefined ? "Collegamento al piccolo aggiornato" : null,
+      input.notes !== undefined && input.notes !== existing.notes ? "Note aggiornate" : null,
+    ].filter((value): value is string => Boolean(value));
     const egg = await prisma.$transaction(async (tx) => {
       const updated = await tx.egg.update({ where: { id: eggId }, data: data as never });
-      if ((input.status && input.status !== existing.status) || (input.notes !== undefined && input.notes !== existing.notes)) {
-        await tx.eggHistory.create({ data: { eggId, status: input.status ?? existing.status, notes: input.notes ?? existing.notes } });
+      const resultingStatus = input.status ?? (input.offspringAnimalId ? "hatched" : existing.status);
+      if (resultingStatus !== existing.status || historyNotes.length > 0) {
+        await tx.eggHistory.create({ data: { eggId, status: resultingStatus, notes: historyNotes.join("; ") || input.notes || existing.notes } });
       }
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.updated", entityType: "egg", entityId: eggId } });
       return updated;
     });
     res.status(200).json({ egg: serializeEgg(egg) });
