@@ -96,7 +96,7 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
     const animal = byId.get(id);
     if (!animal) { missing.add(id); return; }
     for (const [index, parentId] of [animal.motherId, animal.fatherId].entries()) {
-      if (!parentId) { missing.add(`${id}:${index}`); continue; }
+      if (!parentId) {\n        if (Boolean(animal.motherId) !== Boolean(animal.fatherId)) missing.add(`${id}:${index}`);\n        continue;\n      }
       if (path.includes(parentId)) { missing.add(`cycle:${parentId}`); continue; }
       ancestors.add(parentId);
       const next = [...path, parentId];
