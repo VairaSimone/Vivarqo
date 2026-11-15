@@ -8,6 +8,7 @@ x-application-environment: &application-environment
   CSRF_SECRET_FILE: /run/secrets/csrf_secret
   EMAIL_PROVIDER: ${EMAIL_PROVIDER:-brevo}
   BREVO_API_KEY_FILE: /run/secrets/brevo_api_key
+  RESEND_API_KEY_FILE: /run/secrets/resend_api_key
   STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
   STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
   VAPID_PRIVATE_KEY_FILE: /run/secrets/vapid_private_key
@@ -60,6 +61,7 @@ services:
       - postgres_admin_password
       - csrf_secret
       - brevo_api_key
+      - resend_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
@@ -234,6 +236,8 @@ secrets:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/csrf_secret
   brevo_api_key:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/brevo_api_key
+  resend_api_key:
+    file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/resend_api_key
   stripe_secret_key:
     file: ${VIVARQO_SECRETS_DIR:?Set VIVARQO_SECRETS_DIR}/stripe_secret_key
   stripe_webhook_secret:
