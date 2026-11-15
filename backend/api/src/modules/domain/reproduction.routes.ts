@@ -192,13 +192,28 @@ export function createReproductionRouter() {
           outcomes.set(genotype, (outcomes.get(genotype) ?? 0) + 25);
         }
       }
+      const asRules = (value: unknown): Record<string, string> | null =>
+        value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, string> : null;
+      const maternalRules = asRules(maternalTrait.phenotypeRules);
+      const paternalRules = asRules(paternalTrait.phenotypeRules);
+      const phenotypeRulesConflict = Boolean(maternalRules && paternalRules && JSON.stringify(maternalRules) !== JSON.stringify(paternalRules));
+      const phenotypeRules = phenotypeRulesConflict ? null : maternalRules ?? paternalRules;
+      const probabilities = [...outcomes.entries()].map(([genotype, probabilityPct]) => ({
+        genotype,
+        probabilityPct,
+        phenotype: phenotypeRules?.[genotype] ?? null,
+      }));
+      const phenotypeTotals = new Map<string, number>();
+      for (const outcome of probabilities) if (outcome.phenotype) {
+        phenotypeTotals.set(outcome.phenotype, (phenotypeTotals.get(outcome.phenotype) ?? 0) + outcome.probabilityPct);
+      }
       return [{
         traitName: maternalTrait.traitName,
         inheritanceMode: maternalTrait.inheritanceMode,
-        probabilities: [...outcomes.entries()].map(([genotype, probabilityPct]) => ({ genotype, probabilityPct })),
+        probabilities,
+        phenotypePredictions: [...phenotypeTotals.entries()].map(([phenotype, probabilityPct]) => ({ phenotype, probabilityPct })),
+        phenotypePredictionStatus: phenotypeRulesConflict ? "rules_conflict" : !phenotypeRules ? "not_configured" : probabilities.some((outcome) => !outcome.phenotype) ? "partial" : "mapped",
         certainty: "theoretical_single_locus",
-        phenotypePrediction: null,
-        phenotypeLimitation: "Phenotype is not inferred without an explicit, validated allele-to-phenotype rule.",
       }];
     });
     // Independent-locus combinations are calculated as a Cartesian product.
@@ -206,11 +221,13 @@ export function createReproductionRouter() {
     const combinedGeneticOutcomes = geneticPredictions.reduce<Array<{ loci: Array<{ traitName: string; genotype: string }>; probabilityPct: number }>>(
       (combinations, prediction) => {
         if (!combinations.length) return prediction.probabilities.map((outcome) => ({
-          loci: [{ traitName: prediction.traitName, genotype: outcome.genotype }],
+          loci: [{ traitName: prediction.traitName, genotype: outcome.genotype, phenotype: outcome.phenotype }],
+          phenotype: outcome.phenotype,
           probabilityPct: outcome.probabilityPct,
         }));
         return combinations.flatMap((combination) => prediction.probabilities.map((outcome) => ({
-          loci: [...combination.loci, { traitName: prediction.traitName, genotype: outcome.genotype }],
+          loci: [...combination.loci, { traitName: prediction.traitName, genotype: outcome.genotype, phenotype: outcome.phenotype }],
+          phenotype: combination.phenotype && outcome.phenotype ? `${combination.phenotype} · ${prediction.traitName}: ${outcome.phenotype}` : null,
           probabilityPct: Number((combination.probabilityPct * outcome.probabilityPct / 100).toFixed(6)),
         }))).slice(0, 256);
       },
