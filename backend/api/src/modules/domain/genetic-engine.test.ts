@@ -32,6 +32,10 @@ describe("calculateInbreeding", () => {
     expect(result.coefficient).toBeNull();
     expect(result.completeness).toBe("partial");
   });
+  it("detects first-cousin parentage through shared grandparents", () => {
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "gm1", fatherId: "gm2" }, { id: "f", motherId: "gm1", fatherId: "gm2" }, { id: "gm1" }, { id: "gm2" }], "child");
+    expect(result.coefficient).toBe(0.0625);
+  });
   it("returns zero for a complete unrelated founder pedigree", () => {
     const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "mm", fatherId: "mf" }, { id: "f", motherId: "fm", fatherId: "ff" }, ...["mm","mf","fm","ff"].map((id) => ({ id }))], "child");
     expect(result.coefficient).toBe(0);
