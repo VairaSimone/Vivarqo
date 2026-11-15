@@ -50,7 +50,7 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
     <PanelHeader title={it ? "Andamento alimentazione" : "Feeding overview"} />
     {summary.loading && !summary.data ? <LoadingState /> : summary.error ? <Alert tone="danger">{summary.error.message}</Alert> : summary.data && <>
       <div className="feeding-insights-grid">
-        <div><span>{it ? "Giorni dall'ultimo pasto" : "Days since last accepted meal"}</span><strong>{summary.data.daysSinceLastFeeding == null ? "—" : summary.data.daysSinceLastFeeding}</strong></div>
+        <div><span>{it ? "Giorni dall'ultimo pasto accettato" : "Days since last accepted meal"}</span><strong>{summary.data.daysSinceLastFeeding == null ? "—" : summary.data.daysSinceLastFeeding}</strong></div>
         <div><span>{it ? "Prossimo pasto previsto" : "Next expected meal"}</span><strong>{date(summary.data.nextMealAt)}</strong></div>
         <div><span>{it ? "Rifiuti consecutivi" : "Consecutive refusals"}</span><strong>{summary.data.consecutiveRefusals}</strong></div>
         <div><span>{it ? "Accettazione" : "Acceptance rate"}</span><strong>{percent}</strong><small>{summary.data.acceptedCount} / {summary.data.offeredCount} {it ? "offerti" : "offered"}</small></div>
