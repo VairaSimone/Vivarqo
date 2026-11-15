@@ -37,6 +37,11 @@ async function assertPremium(ownerUserId: string, hasPremium: (ownerUserId: stri
     });
   }
 }
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: string }).code === "P2002";
+}
+
 async function writeAudit(userId: string, action: string, entityId: string | null, metadata: Record<string, unknown>, requestId?: string) {
   await prisma.auditEvent.create({
     data: {
@@ -98,19 +103,30 @@ export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (owne
       where: { ownerUserId: auth.userId, acceptedAt: null, revokedAt: null, expiresAt: { lte: now } },
       data: { revokedAt: now },
     });
+    const activeMember = await prisma.workspaceMembership.findFirst({
+      where: { ownerUserId: auth.userId, collaborator: { is: { email: input.email } }, revokedAt: null },
+      select: { id: true },
+    });
+    if (activeMember) throw new AppError(409, "COLLABORATOR_ALREADY_ACTIVE", "This account is already a collaborator");
     const existing = await prisma.workspaceInvitation.findFirst({
       where: { ownerUserId: auth.userId, email: input.email, acceptedAt: null, revokedAt: null },
       select: { id: true },
     });
     if (existing) throw new AppError(409, "INVITATION_ALREADY_PENDING", "An invitation for this email is already pending");
     const token = createOpaqueToken();
-    const invitation = await prisma.workspaceInvitation.create({
-      data: {
-        ownerUserId: auth.userId, email: input.email, role: input.role,
-        tokenHash: hashOpaqueToken(token), expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-      },
-      select: { id: true, email: true, role: true, expiresAt: true },
-    });
+    let invitation: { id: string; email: string; role: string; expiresAt: Date };
+    try {
+      invitation = await prisma.workspaceInvitation.create({
+        data: {
+          ownerUserId: auth.userId, email: input.email, role: input.role,
+          tokenHash: hashOpaqueToken(token), expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        },
+        select: { id: true, email: true, role: true, expiresAt: true },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new AppError(409, "INVITATION_ALREADY_PENDING", "An invitation for this email is already pending");
+      throw error;
+    }
     const url = new URL("/settings/collaborators", env.APP_ORIGIN);
     url.searchParams.set("invite", token);
     const isEnglish = auth.locale === "en";
@@ -213,6 +229,30 @@ export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (owne
       });
     });
     res.status(200).json({ ownerUserId: invitation.ownerUserId, role: invitation.role });
+  });
+
+  router.post("/collaborators/leave", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parse(workspaceSchema, req.body);
+    if (!input.ownerUserId) throw new AppError(400, "INVALID_WORKSPACE", "Choose the workspace you want to leave");
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: { ownerUserId: input.ownerUserId, collaboratorUserId: auth.userId, revokedAt: null },
+      select: { id: true },
+    });
+    if (!membership) throw new AppError(404, "WORKSPACE_NOT_FOUND", "Workspace not found");
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.workspaceMembership.update({ where: { id: membership.id }, data: { revokedAt: now } }),
+      prisma.userSession.updateMany({
+        where: { userId: auth.userId, activeWorkspaceOwnerId: input.ownerUserId },
+        data: { activeWorkspaceOwnerId: null },
+      }),
+      prisma.auditEvent.create({
+        data: { userId: auth.userId, action: "workspace.collaborator.left", entityType: "workspace_collaboration", entityId: membership.id,
+          metadata: { ownerUserId: input.ownerUserId } },
+      }),
+    ]);
+    res.status(204).send();
   });
 
   router.post("/collaborators/active-workspace", requireSession, async (req, res) => {
