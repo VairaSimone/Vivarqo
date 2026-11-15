@@ -30,6 +30,9 @@ const financeInput = z.object({
   description: z.string().trim().min(1).max(240),
   animalId: z.string().uuid().nullable().optional(),
   documentId: z.string().uuid().nullable().optional(),
+  reproductionCycleId: z.string().uuid().nullable().optional(),
+  clutchId: z.string().uuid().nullable().optional(),
+  offspringBatchId: z.string().uuid().nullable().optional(),
 }).strict();
 const financePatch = z.object({
   entryType: entryType.optional(),
@@ -40,10 +43,30 @@ const financePatch = z.object({
   description: z.string().trim().min(1).max(240).optional(),
   animalId: z.string().uuid().nullable().optional(),
   documentId: z.string().uuid().nullable().optional(),
+  reproductionCycleId: z.string().uuid().nullable().optional(),
+  clutchId: z.string().uuid().nullable().optional(),
+  offspringBatchId: z.string().uuid().nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 function serializeFinance<T extends { amountCents: bigint }>(entry: T) {
   return { ...entry, amountCents: entry.amountCents.toString() };
 }
+
+function addFinancePeriod(date: Date, frequency: "monthly" | "yearly"): Date {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const targetYear = frequency === "yearly" ? year + 1 : year + Math.floor((month + 1) / 12);
+  const targetMonth = frequency === "yearly" ? month : (month + 1) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
+}
+function financeDateString(date: Date): string { return date.toISOString().slice(0, 10); }
+function csvCell(value: unknown): string {
+  let text = value == null ? "" : String(value);
+  if (/^[=+@\-\t\r]/.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
 function parseTime(value: string | null | undefined): Date | null {
   if (!value) return null;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new AppError(400, "VALIDATION_ERROR", "Time must use HH:MM");
@@ -124,12 +147,26 @@ export function createFinanceRouter() {
       const document = await prisma.document.findFirst({ where: { id: input.documentId, userId: auth.userId, deletedAt: null }, select: { id: true } });
       if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
     }
+
+    if (input.reproductionCycleId) {
+      const cycle = await prisma.reproductionCycle.findFirst({ where: { id: input.reproductionCycleId, userId: auth.userId }, select: { id: true } });
+      if (!cycle) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
+    }
+    if (input.clutchId) {
+      const clutch = await prisma.clutch.findFirst({ where: { id: input.clutchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
+      if (!clutch || (input.reproductionCycleId && clutch.cycleId !== input.reproductionCycleId)) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account or cycle");
+    }
+    if (input.offspringBatchId) {
+      const batch = await prisma.offspringBatch.findFirst({ where: { id: input.offspringBatchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
+      if (!batch || (input.reproductionCycleId && batch.cycleId !== input.reproductionCycleId) || (input.clutchId && batch.clutchId !== input.clutchId)) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account or scope");
+    }
     const entry = await prisma.$transaction(async (tx) => {
       const created = await tx.financeEntry.create({
         data: {
           userId: auth.userId, entryType: input.entryType, occurredOn: date, amountCents: BigInt(input.amountCents),
           currency: input.currency, category: input.category, description: input.description,
           animalId: input.animalId ?? null, documentId: input.documentId ?? null,
+          reproductionCycleId: input.reproductionCycleId ?? null, clutchId: input.clutchId ?? null, offspringBatchId: input.offspringBatchId ?? null,
         },
       });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "finance_entry.created", entityType: "finance_entry", entityId: created.id } });
@@ -155,6 +192,23 @@ export function createFinanceRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.occurredOn) data.occurredOn = validDate(input.occurredOn);
     if (input.amountCents !== undefined) data.amountCents = BigInt(input.amountCents);
+    for (const key of ["reproductionCycleId", "clutchId", "offspringBatchId"] as const) {
+      if (input[key] === null) data[key] = null;
+      else if (input[key]) {
+        const idValue = input[key] as string;
+        if (key === "reproductionCycleId") {
+          const found = await prisma.reproductionCycle.findFirst({ where: { id: idValue, userId: auth.userId }, select: { id: true } });
+          if (!found) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
+        } else if (key === "clutchId") {
+          const found = await prisma.clutch.findFirst({ where: { id: idValue, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
+          if (!found || (input.reproductionCycleId && found.cycleId !== input.reproductionCycleId)) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account or cycle");
+        } else {
+          const found = await prisma.offspringBatch.findFirst({ where: { id: idValue, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
+          if (!found || (input.reproductionCycleId && found.cycleId !== input.reproductionCycleId) || (input.clutchId && found.clutchId !== input.clutchId)) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account or scope");
+        }
+        data[key] = idValue;
+      }
+    }
     const entry = await prisma.financeEntry.update({ where: { id }, data: data as never });
     res.status(200).json({ entry: serializeFinance(entry) });
   });
@@ -192,6 +246,192 @@ export function createFinanceRouter() {
       return { entryType: row.entryType, category: row.category, amountCents: amount.toString(), count: row._count._all };
     });
     res.status(200).json({ currency: query.currency, from: query.from ?? null, to: query.to ?? null, incomeCents: income.toString(), expenseCents: expense.toString(), balanceCents: (income - expense).toString(), categories });
+  });
+
+
+  router.get("/finance/budgets", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const query = parseBody(z.object({
+      period: z.enum(["month", "year"]).default("month"),
+      year: z.coerce.number().int().min(2000).max(2200).default(new Date().getUTCFullYear()),
+      month: z.coerce.number().int().min(1).max(12).default(new Date().getUTCMonth() + 1),
+      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+    }), req.query);
+    const start = new Date(Date.UTC(query.year, query.period === "month" ? query.month - 1 : 0, 1));
+    const end = new Date(Date.UTC(query.year, query.period === "month" ? query.month : 12, 0));
+    const budgets = await prisma.financeBudget.findMany({ where: { userId: auth.userId, period: query.period, periodStart: start, currency: query.currency }, orderBy: { category: "asc" } });
+    const actuals = await prisma.financeEntry.groupBy({
+      by: ["category"], where: { userId: auth.userId, entryType: "expense", currency: query.currency, occurredOn: { gte: start, lte: end } },
+      _sum: { amountCents: true },
+    });
+    const allSpent = actuals.reduce((sum, item) => sum + (item._sum.amountCents ?? 0n), 0n);
+    res.status(200).json({ period: query.period, periodStart: financeDateString(start), from: financeDateString(start), to: financeDateString(end), currency: query.currency,
+      budgets: budgets.map((budget) => ({ ...budget, amountCents: budget.amountCents.toString(), spentCents: (budget.category === "all" ? allSpent : actuals.find((item) => item.category === budget.category)?._sum.amountCents ?? 0n).toString() })) });
+  });
+
+  router.post("/finance/budgets", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      period: z.enum(["month", "year"]), periodStart: z.string().regex(/^\d{4}-\d{2}-01$/),
+      category: z.string().trim().min(1).max(80).default("all"),
+      amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+    }).strict(), req.body);
+    const date = validDate(input.periodStart);
+    if ((input.period === "year" && date.getUTCMonth() !== 0) || (input.period === "month" && date.getUTCDate() !== 1)) throw new AppError(400, "VALIDATION_ERROR", "Budget period must start on the first day of its period");
+    const budget = await prisma.financeBudget.upsert({
+      where: { userId_period_periodStart_category_currency: { userId: auth.userId, period: input.period, periodStart: date, category: input.category, currency: input.currency } },
+      create: { userId: auth.userId, ...input, periodStart: date, amountCents: BigInt(input.amountCents) },
+      update: { amountCents: BigInt(input.amountCents) },
+    });
+    res.status(200).json({ budget: { ...budget, amountCents: budget.amountCents.toString() } });
+  });
+
+  router.delete("/finance/budgets/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id, "budget id");
+    const result = await prisma.financeBudget.deleteMany({ where: { id, userId: auth.userId } });
+    if (!result.count) throw new AppError(404, "FINANCE_BUDGET_NOT_FOUND", "Budget not found");
+    res.status(204).send();
+  });
+
+  router.get("/finance/recurrences", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const recurrences = await prisma.financeRecurrence.findMany({ where: { userId: auth.userId }, orderBy: [{ isActive: "desc" }, { nextOccurrenceOn: "asc" }] });
+    res.status(200).json({ recurrences: recurrences.map((item) => ({ ...item, amountCents: item.amountCents.toString() })) });
+  });
+
+  router.post("/finance/recurrences", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      entryType, amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+      category: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(240),
+      animalId: z.string().uuid().nullable().optional(), documentId: z.string().uuid().nullable().optional(),
+      frequency: z.enum(["monthly", "yearly"]), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    }).strict(), req.body);
+    const next = validDate(input.nextOccurrenceOn);
+    const end = input.endOn ? validDate(input.endOn) : null;
+    if (end && end < next) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede the next occurrence");
+    if (input.animalId && !await prisma.animal.findFirst({ where: { id: input.animalId, userId: auth.userId }, select: { id: true } })) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+    if (input.documentId && !await prisma.document.findFirst({ where: { id: input.documentId, userId: auth.userId, deletedAt: null }, select: { id: true } })) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
+    const recurrence = await prisma.financeRecurrence.create({ data: { userId: auth.userId, ...input, nextOccurrenceOn: next, endOn: end, amountCents: BigInt(input.amountCents), animalId: input.animalId ?? null, documentId: input.documentId ?? null } });
+    res.status(201).json({ recurrence: { ...recurrence, amountCents: recurrence.amountCents.toString() } });
+  });
+
+  router.patch("/finance/recurrences/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id, "recurrence id");
+    const input = parseBody(z.object({
+      amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+      category: z.string().trim().min(1).max(80).optional(), description: z.string().trim().min(1).max(240).optional(),
+      frequency: z.enum(["monthly", "yearly"]).optional(), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), isActive: z.boolean().optional(),
+    }).strict().refine((v) => Object.keys(v).length > 0), req.body);
+    const existing = await prisma.financeRecurrence.findFirst({ where: { id, userId: auth.userId } });
+    if (!existing) throw new AppError(404, "FINANCE_RECURRENCE_NOT_FOUND", "Recurrence not found");
+    const data: Record<string, unknown> = { ...input };
+    if (input.amountCents !== undefined) data.amountCents = BigInt(input.amountCents);
+    if (input.nextOccurrenceOn) data.nextOccurrenceOn = validDate(input.nextOccurrenceOn);
+    if (input.endOn !== undefined) data.endOn = input.endOn ? validDate(input.endOn) : null;
+    const recurrence = await prisma.financeRecurrence.update({ where: { id }, data: data as never });
+    res.status(200).json({ recurrence: { ...recurrence, amountCents: recurrence.amountCents.toString() } });
+  });
+
+  router.delete("/finance/recurrences/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id, "recurrence id");
+    const result = await prisma.financeRecurrence.deleteMany({ where: { id, userId: auth.userId } });
+    if (!result.count) throw new AppError(404, "FINANCE_RECURRENCE_NOT_FOUND", "Recurrence not found");
+    res.status(204).send();
+  });
+
+  router.post("/finance/recurrences/:id/generate", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id, "recurrence id");
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM finance_recurrences WHERE id = ${id}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
+      const recurrence = await tx.financeRecurrence.findFirst({ where: { id, userId: auth.userId } });
+      if (!recurrence) throw new AppError(404, "FINANCE_RECURRENCE_NOT_FOUND", "Recurrence not found");
+      if (!recurrence.isActive) return { generated: 0, nextOccurrenceOn: financeDateString(recurrence.nextOccurrenceOn), isActive: false };
+      let next = recurrence.nextOccurrenceOn;
+      let generated = 0;
+      while (next <= today && (!recurrence.endOn || next <= recurrence.endOn) && generated < 36) {
+        await tx.financeEntry.create({ data: {
+          userId: auth.userId, entryType: recurrence.entryType, occurredOn: next, amountCents: recurrence.amountCents,
+          currency: recurrence.currency, category: recurrence.category, description: recurrence.description,
+          animalId: recurrence.animalId, documentId: recurrence.documentId, recurrenceId: recurrence.id,
+        } });
+        next = addFinancePeriod(next, recurrence.frequency as "monthly" | "yearly");
+        generated++;
+      }
+      const isActive = !recurrence.endOn || next <= recurrence.endOn;
+      await tx.financeRecurrence.update({ where: { id }, data: { nextOccurrenceOn: next, isActive } });
+      return { generated, nextOccurrenceOn: financeDateString(next), isActive };
+    });
+    res.status(200).json(result);
+  });
+
+  router.get("/finance/profitability", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const query = parseBody(z.object({
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+    }), req.query);
+    if (query.from && query.to && query.to < query.from) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede start date");
+    const where = { userId: auth.userId, currency: query.currency, ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}) };
+    const [totals, animals, cycles, clutches, batches] = await Promise.all([
+      prisma.financeEntry.groupBy({ by: ["entryType"], where, _sum: { amountCents: true } }),
+      prisma.financeEntry.groupBy({ by: ["animalId", "entryType"], where: { ...where, animalId: { not: null } }, _sum: { amountCents: true } }),
+      prisma.financeEntry.groupBy({ by: ["reproductionCycleId", "entryType"], where: { ...where, reproductionCycleId: { not: null } }, _sum: { amountCents: true } }),
+      prisma.financeEntry.groupBy({ by: ["clutchId", "entryType"], where: { ...where, clutchId: { not: null } }, _sum: { amountCents: true } }),
+      prisma.financeEntry.groupBy({ by: ["offspringBatchId", "entryType"], where: { ...where, offspringBatchId: { not: null } }, _sum: { amountCents: true } }),
+    ]);
+    const income = totals.find((row) => row.entryType === "income")?._sum.amountCents ?? 0n;
+    const expense = totals.find((row) => row.entryType === "expense")?._sum.amountCents ?? 0n;
+    function mergeGroups<T extends { entryType: string; _sum: { amountCents: bigint | null } }>(rows: T[], key: (row: T) => string | null) {
+      const map = new Map<string, { income: bigint; expense: bigint }>();
+      for (const row of rows) {
+        const id = key(row); if (!id) continue;
+        const current = map.get(id) ?? { income: 0n, expense: 0n };
+        if (row.entryType === "income") current.income += row._sum.amountCents ?? 0n; else current.expense += row._sum.amountCents ?? 0n;
+        map.set(id, current);
+      }
+      return [...map].map(([id, value]) => ({ id, incomeCents: value.income.toString(), expenseCents: value.expense.toString(), marginCents: (value.income - value.expense).toString() }));
+    }
+    res.status(200).json({
+      currency: query.currency, from: query.from ?? null, to: query.to ?? null,
+      incomeCents: income.toString(), expenseCents: expense.toString(), marginCents: (income - expense).toString(),
+      animals: mergeGroups(animals, (row) => row.animalId),
+      reproductionCycles: mergeGroups(cycles, (row) => row.reproductionCycleId),
+      clutches: mergeGroups(clutches, (row) => row.clutchId),
+      offspringBatches: mergeGroups(batches, (row) => row.offspringBatchId),
+    });
+  });
+
+  router.get("/finance/export.csv", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const query = parseBody(z.object({
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+    }), req.query);
+    if (query.from && query.to && query.to < query.from) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede start date");
+    const where = { userId: auth.userId, currency: query.currency, ...(query.from || query.to ? { occurredOn: { ...(query.from ? { gte: validDate(query.from) } : {}), ...(query.to ? { lte: validDate(query.to) } : {}) } } : {}) };
+    const entries = await prisma.financeEntry.findMany({ where, orderBy: [{ occurredOn: "asc" }, { createdAt: "asc" }], take: 50000 });
+    const header = ["date","type","amount_cents","currency","category","description","animal_id","reproduction_cycle_id","clutch_id","offspring_batch_id","document_id"];
+    const lines = [header.map(csvCell).join(";"), ...entries.map((entry) => [
+      financeDateString(entry.occurredOn), entry.entryType, entry.amountCents.toString(), entry.currency, entry.category, entry.description,
+      entry.animalId, entry.reproductionCycleId, entry.clutchId, entry.offspringBatchId, entry.documentId,
+    ].map(csvCell).join(";"))];
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="vivarqo-finanze-${query.from ?? "inizio"}-${query.to ?? "oggi"}.csv"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).send("\uFEFF" + lines.join("\r\n"));
   });
 
   return router;

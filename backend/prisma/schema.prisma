@@ -47,6 +47,8 @@ model User {
   importJobs              ImportJob[]
   exportJobs              ExportJob[]
   financeEntries          FinanceEntry[]
+  financeBudgets          FinanceBudget[]
+  financeRecurrences      FinanceRecurrence[]
   subscription            Subscription?
   auditEvents             AuditEvent[]
   @@map("users")
@@ -761,16 +763,65 @@ model FinanceEntry {
   category    String    @db.VarChar(80)
   description String    @db.VarChar(240)
   documentId  String?   @map("document_id") @db.Uuid
+  reproductionCycleId String? @map("reproduction_cycle_id") @db.Uuid
+  clutchId String? @map("clutch_id") @db.Uuid
+  offspringBatchId String? @map("offspring_batch_id") @db.Uuid
+  recurrenceId String? @map("recurrence_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal      Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
   document    Document? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  recurrence  FinanceRecurrence? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
+  @@unique([recurrenceId, occurredOn], map: "finance_entries_recurrence_date_unique")
+  @@index([reproductionCycleId], map: "finance_entries_cycle_idx")
+  @@index([clutchId], map: "finance_entries_clutch_idx")
+  @@index([offspringBatchId], map: "finance_entries_offspring_batch_idx")
+  @@index([recurrenceId], map: "finance_entries_recurrence_idx")
   @@index([userId, occurredOn(sort: Desc)], map: "finance_entries_user_date_idx")
   @@index([userId, category, occurredOn(sort: Desc)], map: "finance_entries_user_category_date_idx")
   @@index([animalId], map: "finance_entries_animal_idx")
   @@index([documentId], map: "finance_entries_document_idx")
   @@map("finance_entries")
+}
+
+
+model FinanceBudget {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  period      String   @db.VarChar(8)
+  periodStart DateTime @map("period_start") @db.Date
+  category    String   @default("all") @db.VarChar(80)
+  amountCents BigInt   @map("amount_cents")
+  currency    String   @default("EUR") @db.Char(3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, period, periodStart, category, currency], map: "finance_budgets_scope_unique")
+  @@index([userId, periodStart], map: "finance_budgets_user_period_idx")
+  @@map("finance_budgets")
+}
+
+model FinanceRecurrence {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  entryType         String   @map("entry_type") @db.VarChar(12)
+  amountCents       BigInt   @map("amount_cents")
+  currency          String   @default("EUR") @db.Char(3)
+  category          String   @db.VarChar(80)
+  description       String   @db.VarChar(240)
+  animalId          String?  @map("animal_id") @db.Uuid
+  documentId        String?  @map("document_id") @db.Uuid
+  frequency         String   @db.VarChar(12)
+  nextOccurrenceOn  DateTime @map("next_occurrence_on") @db.Date
+  endOn             DateTime? @map("end_on") @db.Date
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries           FinanceEntry[]
+  @@index([userId, isActive, nextOccurrenceOn], map: "finance_recurrences_due_idx")
+  @@map("finance_recurrences")
 }
 
 model Subscription {
