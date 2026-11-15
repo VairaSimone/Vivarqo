@@ -1041,22 +1041,22 @@ ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_humidity_min_pct NUMERIC(5,
 ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_humidity_max_pct NUMERIC(5,2);
 ALTER TABLE clutches ADD COLUMN IF NOT EXISTS check_interval_hours INTEGER;
 ALTER TABLE clutches ADD COLUMN IF NOT EXISTS incubator_id UUID;
-DO $ BEGIN
+DO $$ BEGIN
     ALTER TABLE clutches ADD CONSTRAINT clutches_incubator_id_fkey
       FOREIGN KEY (incubator_id) REFERENCES incubators(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
-DO $ BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
     ALTER TABLE clutches ADD CONSTRAINT clutches_temperature_range_check
       CHECK (target_temperature_min_c IS NULL OR target_temperature_max_c IS NULL OR target_temperature_min_c <= target_temperature_max_c);
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
-DO $ BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
     ALTER TABLE clutches ADD CONSTRAINT clutches_humidity_range_check
       CHECK (target_humidity_min_pct IS NULL OR target_humidity_max_pct IS NULL OR target_humidity_min_pct <= target_humidity_max_pct);
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
-DO $ BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
     ALTER TABLE clutches ADD CONSTRAINT clutches_check_interval_hours_check
       CHECK (check_interval_hours IS NULL OR check_interval_hours BETWEEN 1 AND 720);
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS clutches_incubator_idx ON clutches(incubator_id);
 
 ALTER TABLE eggs ADD COLUMN IF NOT EXISTS hatched_at DATE;
@@ -1066,14 +1066,14 @@ ALTER TABLE eggs ADD COLUMN IF NOT EXISTS incubator_position VARCHAR(80);
 ALTER TABLE eggs ADD COLUMN IF NOT EXISTS laid_at TIMESTAMPTZ;
 ALTER TABLE eggs ADD COLUMN IF NOT EXISTS expected_hatch_at DATE;
 ALTER TABLE eggs ADD COLUMN IF NOT EXISTS photo_key TEXT;
-DO $ BEGIN
+DO $$ BEGIN
     ALTER TABLE eggs ADD CONSTRAINT eggs_offspring_animal_id_fkey
       FOREIGN KEY (offspring_animal_id) REFERENCES animals(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
-DO $ BEGIN
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
     ALTER TABLE eggs ADD CONSTRAINT eggs_incubator_id_fkey
       FOREIGN KEY (incubator_id) REFERENCES incubators(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS eggs_offspring_animal_id_key ON eggs(offspring_animal_id) WHERE offspring_animal_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS eggs_status_idx ON eggs(status);
 CREATE INDEX IF NOT EXISTS eggs_incubator_position_idx ON eggs(incubator_id, incubator_position);
@@ -1093,10 +1093,10 @@ CREATE TABLE IF NOT EXISTS hatchling_care (
 ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS health_status VARCHAR(24) NOT NULL DEFAULT 'unknown';
 ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS health_notes TEXT;
 ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS availability_status VARCHAR(24) NOT NULL DEFAULT 'not_available';
-DO $ BEGIN
+DO $$ BEGIN
   ALTER TABLE hatchling_care ADD CONSTRAINT hatchling_care_availability_status_check
     CHECK (availability_status IN ('not_available', 'available', 'reserved', 'transferred'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS egg_measurements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
