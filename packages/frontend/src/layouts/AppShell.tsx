@@ -30,6 +30,7 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
   ] },
   { title: "navResources", items: [
     { path: "/reproduction", label: "navBreeding", icon: "leaf" },
+    { path: "/genetics", label: "navGenetics", icon: "leaf" },
     { path: "/inventory", label: "navInventory", icon: "box" },
     { path: "/documents", label: "navDocuments", icon: "file" }
   ] },
@@ -49,7 +50,7 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
 const routeTitles: Record<string, string> = {
   "/today": "navToday", "/calendar": "navCalendar", "/tasks": "navTasks",
   "/animals": "navAnimals", "/feeding": "navFeeding", "/reproduction": "navBreeding",
-  "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding",
+  "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding", "/genetics": "navGenetics",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",
   "/billing": "navBilling", "/settings": "navSettings", "/help": "navHelp"
