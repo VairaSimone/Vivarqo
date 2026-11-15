@@ -75,7 +75,7 @@ export async function assertDocumentCapacity(tx: Prisma.TransactionClient, userI
   }
 }
 const accessExempt = (path: string) =>
-  path.startsWith("/auth/") || path === "/account" || path.startsWith("/account/") ||
+  path.startsWith("/auth/") || path === "/account" || path.startsWith("/account/") || path === "/collaborators" || path.startsWith("/collaborators/") ||
   path === "/billing" || path.startsWith("/billing/") || path === "/webhooks/stripe" ||
   path === "/push/public-key" || path.startsWith("/public/");
 export const subscriptionAccessGuard: RequestHandler = async (req, res, next) => {
