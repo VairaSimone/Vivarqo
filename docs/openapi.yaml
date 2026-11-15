@@ -4344,6 +4344,15 @@ components:
               "null"
             ],
             "format": "date"
+          },
+          "initialWeightG": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 100000,
+            "description": "Optional initial weight in grams. When present, a WeightMeasurement is created atomically with the hatchling animal."
           }
         }
       }
