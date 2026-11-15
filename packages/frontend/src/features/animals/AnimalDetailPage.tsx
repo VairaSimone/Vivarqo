@@ -50,7 +50,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [feedingBusy, setFeedingBusy] = useState(false);
   const [feedingFormError, setFeedingFormError] = useState("");
   const [feedingEditForm, setFeedingEditForm] = useState({
-    performedAt: "", outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "",
+    performedAt: "", outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", preyState: "unknown", inventoryItemId: "", inventoryQuantity: "", notes: "",
   });
   const { toast, show } = useToast();
   const animal = animalResource.data?.animal;
@@ -60,6 +60,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const sheds = useResource<{ sheds: ShedDto[] }>(animal && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
   const notes = useResource<{ notes: AnimalNoteDto[] }>(animal && tab === "history" ? `/animals/${id}/notes?page=1&pageSize=100` : null);
   const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
+  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(feedingEditEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
@@ -175,6 +176,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       foodType: getString(entry, "foodType"),
       foodSize: getString(entry, "foodSize"),
       foodWeightG: getString(entry, "foodWeightG") ? String(gramsToWeight(getString(entry, "foodWeightG"))) : "",
+      preyState: getString(entry, "preyState", "unknown"),
+      inventoryItemId: getString(entry, "inventoryItemId"),
+      inventoryQuantity: getString(entry, "inventoryQuantity"),
       notes: getString(entry, "notes"),
     });
     setFeedingEditEntry(entry);
@@ -192,6 +196,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         foodType: feedingEditForm.foodType || null,
         foodSize: feedingEditForm.foodSize || null,
         foodWeightG: feedingEditForm.foodWeightG ? weightToGrams(feedingEditForm.foodWeightG) : null,
+        preyState: feedingEditForm.preyState,
+        inventoryItemId: feedingEditForm.inventoryItemId || null,
+        inventoryQuantity: feedingEditForm.inventoryItemId && feedingEditForm.inventoryQuantity ? Number(feedingEditForm.inventoryQuantity) : null,
         notes: feedingEditForm.notes || null,
       });
       setFeedingEditEntry(null);
@@ -587,6 +594,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Field label={t("foodType")}><Input maxLength={120} value={feedingEditForm.foodType} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input maxLength={120} value={feedingEditForm.foodSize} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodSize: e.target.value })} /></Field>
         <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={feedingEditForm.foodWeightG} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodWeightG: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={feedingEditForm.preyState} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+        <Field label={locale === "it" ? "Scarica dal magazzino" : "Deduct from inventory"}><Select value={feedingEditForm.inventoryItemId} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, inventoryItemId: e.target.value, inventoryQuantity: e.target.value ? (feedingEditForm.inventoryQuantity || "1") : "" })}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+        {feedingEditForm.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={feedingEditForm.inventoryQuantity} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, inventoryQuantity: e.target.value })} /></Field>}
         <Field label={t("notes")}><Textarea rows={3} value={feedingEditForm.notes} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setFeedingEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={feedingBusy}>{feedingBusy ? t("loading") : t("save")}</Button></div>
       </form>
