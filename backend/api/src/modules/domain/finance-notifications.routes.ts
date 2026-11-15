@@ -451,10 +451,10 @@ export function createFinanceRouter() {
     res.status(200).json({
       currency: query.currency, from: query.from ?? null, to: query.to ?? null,
       incomeCents: income.toString(), expenseCents: expense.toString(), marginCents: (income - expense).toString(),
-      animals: animalMargins.map((row) => ({ ...row, label: [animalById.get(row.id)?.name, animalById.get(row.id)?.identifier].filter(Boolean).join(" · ") || row.id })),
-      reproductionCycles: cycleMargins.map((row) => ({ ...row, label: cycleById.get(row.id)?.name || `Cycle ${financeDateString(cycleById.get(row.id)!.startedOn)}` })),
-      clutches: clutchMargins.map((row) => ({ ...row, label: `Clutch ${financeDateString(clutchById.get(row.id)!.laidOn)}` })),
-      offspringBatches: batchMargins.map((row) => ({ ...row, label: `Offspring ${financeDateString(batchById.get(row.id)!.bornOn)} · ${batchById.get(row.id)!.count}` })),
+      animals: animalMargins.map((row) => ({ ...row, name: animalById.get(row.id)?.name ?? row.id, identifier: animalById.get(row.id)?.identifier ?? null })),
+      reproductionCycles: cycleMargins.map((row) => ({ ...row, name: cycleById.get(row.id)?.name ?? null, startedOn: financeDateString(cycleById.get(row.id)!.startedOn) })),
+      clutches: clutchMargins.map((row) => ({ ...row, laidOn: financeDateString(clutchById.get(row.id)!.laidOn) })),
+      offspringBatches: batchMargins.map((row) => ({ ...row, bornOn: financeDateString(batchById.get(row.id)!.bornOn), count: batchById.get(row.id)!.count })),
     });
   });
 
