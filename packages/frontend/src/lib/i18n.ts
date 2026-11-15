@@ -4,7 +4,7 @@ const messages = {
   it: {
     brandTagline: "Gestione professionale dell'allevamento",
     navWorkspace: "Workspace", navToday: "Oggi", navCalendar: "Calendario", navTasks: "Attività",
-    navAnimals: "Animali", navFeeding: "Alimentazioni", navFeedingShort: "Pasti", navBreeding: "Riproduzioni",
+    navAnimals: "Animali", navFeeding: "Alimentazioni", navFeedingShort: "Pasti", navBreeding: "Riproduzioni", navGenetics: "Genetica",
     navResources: "Risorse", navInventory: "Inventario", navDocuments: "Documenti",
     navFinance: "Registro economico", navAdmin: "Amministrazione", navImports: "Importazione",
     navExports: "Esportazione", navPreferences: "Preferenze", navSettings: "Impostazioni",
