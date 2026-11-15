@@ -10,6 +10,7 @@ const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) =
 const CarePage = lazy(() => import("../features/CarePage").then((module) => ({ default: module.CarePage })));
 const OperationsPage = lazy(() => import("../features/OperationsPage").then((module) => ({ default: module.OperationsPage })));
 const ReproductionPage = lazy(() => import("../features/ReproductionPage").then((module) => ({ default: module.ReproductionPage })));
+const GeneticsPage = lazy(() => import("../features/GeneticsPage").then((module) => ({ default: module.GeneticsPage })));
 const InventoryDocumentsPage = lazy(() => import("../features/InventoryDocumentsPage").then((module) => ({ default: module.InventoryDocumentsPage })));
 const FinancePage = lazy(() => import("../features/FinancePage").then((module) => ({ default: module.FinancePage })));
 const SettingsPage = lazy(() => import("../features/SettingsPage").then((module) => ({ default: module.SettingsPage })));
@@ -246,6 +247,7 @@ export function App() {
   else if (matches("/feeding")) page = <CarePage locale={locale} path={path} timezone={timezone} />;
   else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/genetics")) page = <GeneticsPage locale={locale} />;
   else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/finance")) page = <FinancePage locale={locale} />;
   else if (matches("/help")) page = <HelpCenterPage locale={locale} navigate={navigate} />;
