@@ -101,6 +101,7 @@ model Animal {
   previousBreeder        String?               @map("previous_breeder") @db.VarChar(160)
   locationLabel          String?               @map("location_label") @db.VarChar(160)
   locationId             String?               @map("location_id") @db.Uuid
+  feedingIntervalDays    Int?                  @map("feeding_interval_days")
   qrToken                String?               @unique(map: "animals_qr_token_unique") @map("qr_token") @db.VarChar(64)
   status                 String                @default("active") @db.VarChar(20)
   notes                  String?
@@ -171,11 +172,17 @@ model FeedingEntry {
   foodType    String?        @map("food_type") @db.VarChar(120)
   foodSize    String?        @map("food_size") @db.VarChar(120)
   foodWeightG Decimal?       @map("food_weight_g") @db.Decimal(10, 2)
+  preyState   String          @default("unknown") @map("prey_state") @db.VarChar(16)
+  inventoryItemId String?    @map("inventory_item_id") @db.Uuid
+  inventoryQuantity Decimal? @map("inventory_quantity") @db.Decimal(12, 3)
+  inventoryDeducted Boolean  @default(false) @map("inventory_deducted")
   notes       String?
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   session     FeedingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   animal      Animal         @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  @@index([inventoryItemId], map: "feeding_entries_inventory_item_idx")
   @@index([animalId, sessionId], map: "feeding_entries_animal_session_idx")
   @@index([sessionId], map: "feeding_entries_session_idx")
   @@map("feeding_entries")
@@ -578,6 +585,7 @@ model InventoryItem {
   updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   movements       StockMovement[]
+  feedingEntries  FeedingEntry[]
   @@unique([id, userId], map: "inventory_items_id_user_id_unique")
   @@index([userId, isActive], map: "inventory_items_user_active_idx")
   @@map("inventory_items")
