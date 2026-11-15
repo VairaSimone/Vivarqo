@@ -263,6 +263,9 @@ export function createReproductionRouter() {
         inbreedingCoefficientEstimate: commonAncestors.length ? Math.min(1, inbreedingCoefficientEstimate) : null,
         inbreedingCoefficientAssumption: "Screening estimate from shared ancestor paths through at most 8 generations; assumes unrelated founders, ignores inbreeding in ancestors and can be incomplete when pedigree paths are missing.",
         geneticPredictions,
+        combinedGeneticOutcomes,
+        geneticOutcomeCombinationsTruncated,
+        geneticModelAssumptions: ["Diploid single-locus crosses", "Independent loci; no linkage or recombination model", "No phenotype inferred without explicit allele dominance/phenotype rules", "Probabilities are theoretical and depend on verified parental genotypes"],
       },
     });
   });
