@@ -361,10 +361,12 @@ export function createReproductionRouter() {
     const codes = input.eggs.map((egg) => egg.code?.trim().toLocaleLowerCase("it-IT")).filter((code): code is string => Boolean(code));
     if (new Set(codes).size !== codes.length) throw new AppError(400, "DUPLICATE_EGG_CODES", "Egg codes must be unique within the request");
     const eggs = await prisma.$transaction(async (tx) => {
+      const currentClutch = await tx.clutch.findUnique({ where: { id: clutchId }, select: { eggCount: true } });
+      if (!currentClutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found");
       const registeredEggs = await tx.egg.count({ where: { clutchId } });
-      if (registeredEggs + input.eggs.length > clutch.eggCount) {
+      if (registeredEggs + input.eggs.length > currentClutch.eggCount) {
         throw new AppError(409, "CLUTCH_EGG_COUNT_EXCEEDED", "Registered eggs cannot exceed the declared clutch egg count", {
-          declaredCount: clutch.eggCount, registeredCount: registeredEggs, requestedCount: input.eggs.length,
+          declaredCount: currentClutch.eggCount, registeredCount: registeredEggs, requestedCount: input.eggs.length,
         });
       }
       const results = [];
@@ -506,10 +508,12 @@ export function createReproductionRouter() {
       if (eggs.some((egg) => egg.offspringAnimalId)) throw new AppError(409, "EGG_ALREADY_LINKED", "One or more eggs are already linked to an animal");
     }
     const created = await prisma.$transaction(async (tx) => {
+      const currentBatch = await tx.offspringBatch.findUnique({ where: { id: batchId }, select: { count: true } });
+      if (!currentBatch) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found");
       const existingAnimals = await tx.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
-      if (existingAnimals + input.animals.length > batch.count) {
+      if (existingAnimals + input.animals.length > currentBatch.count) {
         throw new AppError(409, "OFFSPRING_COUNT_EXCEEDED", "Animal records cannot exceed the declared offspring count", {
-          declaredCount: batch.count, registeredCount: existingAnimals, requestedCount: input.animals.length,
+          declaredCount: currentBatch.count, registeredCount: existingAnimals, requestedCount: input.animals.length,
         });
       }
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
