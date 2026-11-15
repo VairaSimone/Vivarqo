@@ -2740,3 +2740,23 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .weight-growth-reminder { border-top:1px solid var(--border, #d8ded5); margin-top:16px; padding-top:16px; display:grid; gap:12px; }
 .weight-growth-reminder-fields { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end; }
 @media (max-width:640px) { .weight-growth-stats { grid-template-columns:1fr; } .weight-growth-reminder-fields { grid-template-columns:1fr; } .weight-growth-controls { justify-content:stretch; } .weight-growth-controls select { max-width:none; } }
+
+.health-panel-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.health-form { display:grid; gap:14px; padding:16px 0; border-bottom:1px solid var(--border); }
+.health-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.health-field { display:grid; gap:6px; min-width:0; color:var(--muted); font-size:13px; }
+.health-field input,.health-field select,.health-field textarea { width:100%; min-height:42px; border:1px solid var(--border); border-radius:9px; padding:9px 11px; background:var(--surface); color:var(--text); font:inherit; font-size:14px; }
+.health-form-actions,.health-record-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.health-record-list { display:grid; gap:12px; margin-top:14px; }
+.health-record { border:1px solid var(--border); border-radius:12px; padding:14px; min-width:0; }
+.health-record p { margin:7px 0; overflow-wrap:anywhere; }
+.health-record-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.health-record-heading h3 { margin:5px 0; font-size:16px; }
+.health-record-type { color:var(--muted); font-size:12px; font-weight:650; text-transform:uppercase; letter-spacing:.04em; }
+.health-status { flex:0 0 auto; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:650; background:var(--surface-muted,#eef1eb); }
+.health-status-ongoing { color:#8a5a16; }
+.health-status-resolved { color:#28634c; }
+.health-status-chronic { color:#8b4540; }
+.health-next-due { font-weight:650; color:var(--accent,#315f4b); }
+.health-record-actions { margin-top:12px; }
+@media(max-width:640px) { .health-form-grid { grid-template-columns:1fr; } .health-panel-actions { width:100%; } .health-panel-actions .btn { flex:1; } .health-record-heading { flex-direction:column; } }
