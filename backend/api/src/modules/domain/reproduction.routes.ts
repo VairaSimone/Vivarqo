@@ -256,7 +256,7 @@ export function createReproductionRouter() {
       prisma.weightMeasurement.findMany({ where: { animalId }, orderBy: [{ measuredAt: "asc" }] }),
       prisma.shedRecord.findMany({ where: { animalId }, orderBy: [{ occurredAt: "asc" }] }),
     ]);
-    res.status(200).json({ care, feedingCount: feedings.length, acceptedFeedings: feedings.filter((entry) => entry.outcome === "accepted").length, feedings, weights, sheds });
+    res.status(200).json({ care, feedingCount: feedings.length, acceptedFeedings: feedings.filter((entry) => entry.outcome === "ate").length, feedings, weights, sheds });
   });
 
   router.patch("/animals/:animalId/hatchling-care", requireSession, async (req, res) => {
