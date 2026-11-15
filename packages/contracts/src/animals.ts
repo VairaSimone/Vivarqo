@@ -12,6 +12,8 @@ export interface AnimalDto {
   fatherAnimalId?: string | null;
   motherDescription?: string | null;
   fatherDescription?: string | null;
+  originOffspringBatchId?: string | null;
+  originClutchId?: string | null;
   mother?: Pick<AnimalDto, "id" | "name" | "morph" | "sex"> | null;
   father?: Pick<AnimalDto, "id" | "name" | "morph" | "sex"> | null;
   geneticsNotes: string | null;
