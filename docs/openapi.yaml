@@ -3031,7 +3031,6 @@ paths:
           in: path
           required: true
           schema: { type: string, pattern: '^[A-Za-z0-9_-]{32}
-      type: apiKey
       in: cookie
       name: vivarqo_session
       description: Cookie HttpOnly in development e test.
@@ -14834,3 +14833,12 @@ components:
         }
       }
  }
+ }
+      responses:
+        '200':
+          description: Animale associato al QR interno.
+          content:
+            application/json:
+              schema: { type: object, required: [animal], properties: { animal: { type: object } } }
+        '404': { description: QR non valido o animale non trovato. }
+
