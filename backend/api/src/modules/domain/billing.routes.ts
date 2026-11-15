@@ -204,7 +204,7 @@ async function syncStripeEvent(tx: BillingTransaction, event: StripeEvent, price
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId,
-      stripePriceId: typeof price === "string" ? price : priceId ?? null,
+      stripePriceId: typeof price === "string" ? price : null,
       status: eventType === "customer.subscription.deleted" ? "canceled" : normalizedStatus(object.status),
       currentPeriodStart: timestamp(object.current_period_start),
       currentPeriodEnd: timestamp(object.current_period_end),
