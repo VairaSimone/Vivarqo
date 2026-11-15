@@ -15,6 +15,8 @@ function expectDenied(role: string, method: string, path: string) {
 describe("workspace role permissions", () => {
   it("keeps viewers read-only", () => {
     expect(() => assertRolePermission("viewer", "GET", "/animals")).not.toThrow();
+    expect(() => assertRolePermission("viewer", "POST", "/genetics/calculate")).not.toThrow();
+    expectDenied("unknown", "GET", "/animals");
     expectDenied("viewer", "POST", "/animals");
     expectDenied("viewer", "PATCH", "/tasks/123");
   });
