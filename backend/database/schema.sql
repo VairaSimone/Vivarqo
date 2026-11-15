@@ -1162,6 +1162,30 @@ ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS phenotype_rules JSONB
 ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS certainty VARCHAR(24) NOT NULL DEFAULT 'unverified';
 
 
+-- Cessioni animali e collegamento idempotente al ricavo finanziario.
+CREATE TABLE IF NOT EXISTS animal_transfers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE RESTRICT,
+    transfer_type VARCHAR(16) NOT NULL CHECK (transfer_type IN ('sale','gift','breeder_transfer')),
+    recipient_name VARCHAR(160) NOT NULL,
+    recipient_email VARCHAR(254),
+    recipient_breeder VARCHAR(160),
+    transferred_at TIMESTAMPTZ(6) NOT NULL,
+    price_cents BIGINT CHECK (price_cents IS NULL OR price_cents >= 0),
+    notes TEXT,
+    created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS animal_transfers_user_date_idx ON animal_transfers(user_id, transferred_at DESC);
+CREATE INDEX IF NOT EXISTS animal_transfers_animal_date_idx ON animal_transfers(animal_id, transferred_at DESC);
+ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS source_transfer_id UUID;
+DO $$ BEGIN
+  ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_source_transfer_fk
+    FOREIGN KEY (source_transfer_id) REFERENCES animal_transfers(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_source_transfer_unique
+  ON finance_entries(source_transfer_id) WHERE source_transfer_id IS NOT NULL;
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
