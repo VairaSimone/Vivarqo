@@ -1121,13 +1121,23 @@ export function createReproductionRouter() {
     }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required"), req.body);
     const existing = await prisma.incubationLog.findFirst({
       where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
-      select: { id: true, clutchId: true },
+      select: { id: true, clutchId: true, recordedAt: true, temperatureC: true, humidityPct: true, eventType: true, notes: true },
     });
     if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
     const data: Record<string, unknown> = { ...input };
     if (input.recordedAt) data.recordedAt = new Date(input.recordedAt);
     const log = await prisma.$transaction(async (tx) => {
       const updated = await tx.incubationLog.update({ where: { id: logId }, data: data as never });
+      await tx.clutchHistory.create({ data: {
+        clutchId: existing.clutchId,
+        action: "incubation.log.updated",
+        details: {
+          logId,
+          before: { recordedAt: existing.recordedAt, temperatureC: existing.temperatureC, humidityPct: existing.humidityPct, eventType: existing.eventType, notes: existing.notes },
+          after: { recordedAt: updated.recordedAt, temperatureC: updated.temperatureC, humidityPct: updated.humidityPct, eventType: updated.eventType, notes: updated.notes },
+        },
+        notes: "Registrazione di incubazione modificata",
+      } });
       const clutch = await tx.clutch.findUnique({ where: { id: existing.clutchId }, include: { incubationLogs: { orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: 1 } } });
       if (clutch) {
         const title = "Controllo incubazione · " + clutch.id;
@@ -1150,11 +1160,17 @@ export function createReproductionRouter() {
     const logId = routeUuid(req.params.id, "incubation log id");
     const existing = await prisma.incubationLog.findFirst({
       where: { id: logId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
-      select: { id: true, clutchId: true },
+      select: { id: true, clutchId: true, recordedAt: true, temperatureC: true, humidityPct: true, eventType: true, notes: true },
     });
     if (!existing) throw new AppError(404, "INCUBATION_LOG_NOT_FOUND", "Incubation log not found");
     await prisma.$transaction(async (tx) => {
       await tx.incubationLog.delete({ where: { id: logId } });
+      await tx.clutchHistory.create({ data: {
+        clutchId: existing.clutchId,
+        action: "incubation.log.deleted",
+        details: { logId, recordedAt: existing.recordedAt, temperatureC: existing.temperatureC, humidityPct: existing.humidityPct, eventType: existing.eventType, notes: existing.notes },
+        notes: "Registrazione di incubazione eliminata",
+      } });
       const clutch = await tx.clutch.findUnique({ where: { id: existing.clutchId } });
       if (clutch) {
         const title = "Controllo incubazione · " + clutch.id;
