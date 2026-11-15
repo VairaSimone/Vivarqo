@@ -11,6 +11,10 @@ describe("calculateGenetics", () => {
       expect.objectContaining({ genotype: "A|A", probability: 25 }),
     ]));
   });
+  it("recognizes compound heterozygous recessive genotypes", () => {
+    const result = calculateGenetics([{ locusId: "l1", name: "Compound", inheritanceMode: "autosomal_recessive", motherGenotype: "a1|A", fatherGenotype: "a2|A", referenceAllele: "A", allowedAlleles: ["A", "a1", "a2"] }]);
+    expect(result.loci[0]?.outcomes.find((item) => item.genotype === "a1|a2")?.phenotype).toBe("eterozigote composto recessivo (a1/a2)");
+  });
   it("does not guess a recessive phenotype without a reference allele", () => {
     const result = calculateGenetics([{ locusId: "l1", name: "No reference", inheritanceMode: "autosomal_recessive", motherGenotype: "a|a", fatherGenotype: "a|a" }]);
     expect(result.loci[0]?.outcomes[0]?.phenotype).toBeNull();
