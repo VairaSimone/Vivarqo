@@ -92,6 +92,7 @@ services:
       - postgres_app_password
       - csrf_secret
       - brevo_api_key
+      - resend_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
@@ -143,6 +144,7 @@ services:
       - postgres_app_password
       - csrf_secret
       - brevo_api_key
+      - resend_api_key
       - stripe_secret_key
       - stripe_webhook_secret
       - vapid_private_key
