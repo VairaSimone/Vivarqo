@@ -10,12 +10,12 @@ import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 type AnimalForm = {
-  name: string; identifier: string; species: string; sex: string; morph: string; geneticsNotes: string;
+  name: string; identifier: string; species: string; sex: string; morph: string; motherAnimalId: string; fatherAnimalId: string; motherDescription: string; fatherDescription: string; geneticsNotes: string;
   birthDate: string; birthDateEstimated: boolean; acquiredDate: string; originDescription: string;
   previousBreeder: string; locationLabel: string; status: string; notes: string;
 };
 const emptyAnimal: AnimalForm = {
-  name: "", identifier: "", species: "", sex: "unknown", morph: "", geneticsNotes: "", birthDate: "",
+  name: "", identifier: "", species: "", sex: "unknown", morph: "", motherAnimalId: "", fatherAnimalId: "", motherDescription: "", fatherDescription: "", geneticsNotes: "", birthDate: "",
   birthDateEstimated: false, acquiredDate: "", originDescription: "", previousBreeder: "", locationLabel: "", status: "active", notes: ""
 };
 
@@ -71,7 +71,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     setPhotoFile(null);
     setForm({
       name: getString(animal, "name"), identifier: getString(animal, "identifier"), species: getString(animal, "species"),
-      sex: getString(animal, "sex", "unknown"), morph: getString(animal, "morph"), geneticsNotes: getString(animal, "geneticsNotes"),
+      sex: getString(animal, "sex", "unknown"), morph: getString(animal, "morph"), motherAnimalId: getString(animal, "motherAnimalId"), fatherAnimalId: getString(animal, "fatherAnimalId"), motherDescription: getString(animal, "motherDescription"), fatherDescription: getString(animal, "fatherDescription"), geneticsNotes: getString(animal, "geneticsNotes"),
       birthDate: dateForInput(getString(animal, "birthDate") || null), birthDateEstimated: Boolean(animal.birthDateEstimated),
       acquiredDate: dateForInput(getString(animal, "acquiredDate") || null), originDescription: getString(animal, "originDescription"),
       previousBreeder: getString(animal, "previousBreeder"), locationLabel: getString(animal, "locationLabel"),
@@ -86,6 +86,8 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     setError("");
     const body = {
       ...form, identifier: form.identifier || null, morph: form.morph || null,
+      motherAnimalId: form.motherAnimalId || null, fatherAnimalId: form.fatherAnimalId || null,
+      motherDescription: form.motherDescription || null, fatherDescription: form.fatherDescription || null,
       geneticsNotes: form.geneticsNotes || null, birthDate: form.birthDate || null,
       acquiredDate: form.acquiredDate || null, originDescription: form.originDescription || null,
       previousBreeder: form.previousBreeder || null, locationLabel: form.locationLabel || null, notes: form.notes || null
@@ -260,6 +262,30 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <Field label={t("morph")} hint={locale === "it" ? "Morfologia o variante, se conosciuta." : "Morph or variant, if known."}><Input maxLength={200} placeholder={locale === "it" ? "Es. Pastel, Albino…" : "e.g. Pastel, Albino…"} value={form.morph} onChange={(e) => setForm({ ...form, morph: e.target.value })} /></Field>
             <Field label={t("location")} hint={locale === "it" ? "Rack, terrario o area di stabulazione." : "Rack, terrarium or enclosure area."}><Input maxLength={160} placeholder={locale === "it" ? "Es. Rack 03" : "e.g. Rack 03"} value={form.locationLabel} onChange={(e) => setForm({ ...form, locationLabel: e.target.value })} /></Field>
           </div>
+        </section>
+
+        <section className="animal-editor-section animal-editor-genealogy">
+          <div className="animal-editor-section-heading">
+            <span className="animal-editor-section-icon"><Icon name="git-branch" size={17} /></span>
+            <div>
+              <h3>{locale === "it" ? "Genealogia e genitori" : "Pedigree and parents"}</h3>
+              <p>{locale === "it" ? "Collega genitori già presenti oppure annota quelli esterni alla piattaforma." : "Link existing parents or record parents outside the platform."}</p>
+            </div>
+            <span className="animal-editor-optional">{locale === "it" ? "Facoltativa" : "Optional"}</span>
+          </div>
+          <div className="animal-editor-parent-grid">
+            <div className="animal-editor-parent-card">
+              <div className="animal-editor-parent-title"><span className="animal-editor-parent-symbol">♀</span><div><strong>{locale === "it" ? "Madre" : "Mother"}</strong><small>{locale === "it" ? "Femmina" : "Female"}</small></div></div>
+              <RemoteSelect label={locale === "it" ? "Seleziona dalla piattaforma" : "Select from platform"} value={form.motherAnimalId} onChange={(value) => setForm((current) => ({ ...current, motherAnimalId: value }))} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "all", sex: "female", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+              <Field label={locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph"}><Input maxLength={240} placeholder={locale === "it" ? "Es. Luna · Pastel het Clown" : "e.g. Luna · Pastel het Clown"} value={form.motherDescription} onChange={(e) => setForm((current) => ({ ...current, motherDescription: e.target.value, motherAnimalId: "" }))} /></Field>
+            </div>
+            <div className="animal-editor-parent-card">
+              <div className="animal-editor-parent-title"><span className="animal-editor-parent-symbol">♂</span><div><strong>{locale === "it" ? "Padre" : "Father"}</strong><small>{locale === "it" ? "Maschio" : "Male"}</small></div></div>
+              <RemoteSelect label={locale === "it" ? "Seleziona dalla piattaforma" : "Select from platform"} value={form.fatherAnimalId} onChange={(value) => setForm((current) => ({ ...current, fatherAnimalId: value }))} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "all", sex: "male", sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
+              <Field label={locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph"}><Input maxLength={240} placeholder={locale === "it" ? "Es. Thor · Banana Pied" : "e.g. Thor · Banana Pied"} value={form.fatherDescription} onChange={(e) => setForm((current) => ({ ...current, fatherDescription: e.target.value, fatherAnimalId: "" }))} /></Field>
+            </div>
+          </div>
+          <p className="animal-editor-genealogy-hint">{locale === "it" ? "Se selezioni un genitore registrato, il collegamento alla sua scheda viene salvato. Il testo manuale serve per genitori non presenti in Vivarqo." : "Selecting a registered parent saves a link to its profile. Manual text is for parents not registered in Vivarqo."}</p>
         </section>
 
         <section className="animal-editor-section">
