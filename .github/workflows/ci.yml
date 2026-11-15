@@ -67,7 +67,7 @@ jobs:
       - name: Verify animal management migration objects on PostgreSQL
         run: |
           psql "${DATABASE_URL%%\\?*}" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $animal_management$
           BEGIN
             IF to_regclass('public.animal_locations') IS NULL
               OR to_regclass('public.animal_location_moves') IS NULL
@@ -79,7 +79,7 @@ jobs:
               OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='qr_token') THEN
               RAISE EXCEPTION 'Animal management migration columns are missing';
             END IF;
-          END $;
+          END $animal_management$;
           SQL
       - name: Verify empty, baseline, partial and drifted database initialization
         run: bash backend/scripts/schema-initialization-drill.sh
