@@ -9,7 +9,7 @@ import { AppError } from "../../errors/app-error.js";
 const root = resolve(process.cwd(), env.PRIVATE_STORAGE_PATH);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_EXPORT_BYTES = env.EXPORT_MAX_ARCHIVE_BYTES;
-type PrivateFolder = "documents" | "exports" | "animal-photos";
+type PrivateFolder = "documents" | "exports" | "animal-photos" | "egg-photos";
 type PrivateExtension = "pdf" | "jpg" | "png" | "webp" | "zip";
 type S3Config = { endpoint: string | undefined; region: string; bucket: string; accessKeyId: string; secretAccessKey: string };
 
