@@ -348,6 +348,10 @@ export function createReproductionRouter() {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
+        include: {
+          offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } },
+          history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },
+        },
       }),
     ]);
     res.status(200).json({ eggs, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
