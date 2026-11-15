@@ -33,8 +33,11 @@ function isBreedingPath(path: string): boolean {
 }
 
 function canWriteAsOperator(path: string): boolean {
+  if (path === "/animals" || path === "/animals/bulk") return true;
+  if (/^\/animals\/[^/]+(?:\/archive|\/restore)?$/.test(path)) return true;
+  if (["/animals/locations", "/animals/move", "/animals/filters"].some((prefix) => startsWithPath(path, prefix))) return true;
+  if (/^\/animals\/[^/]+\/(?:weights|sheds|notes|health-records)$/.test(path)) return true;
   return [
-    "/animals/locations", "/animals/move", "/animals/filters", "/animals",
     "/feeding-sessions", "/feeding-entries", "/weights", "/sheds",
     "/animal-notes", "/health-records", "/tasks", "/reminder-rules",
   ].some((prefix) => startsWithPath(path, prefix));
