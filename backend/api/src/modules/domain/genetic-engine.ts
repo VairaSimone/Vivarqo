@@ -47,7 +47,8 @@ function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: st
   if (mode === "incomplete_dominant" && a !== b) return `intermedio (${a}/${b})`;
   if (mode === "autosomal_recessive") {
     if (!referenceAllele) return null;
-    return a === b && a !== referenceAllele ? `omozigote recessivo (${a})` : "non espresso";
+    if (a === referenceAllele || b === referenceAllele) return "non espresso";
+    return a === b ? `omozigote recessivo (${a})` : `eterozigote composto recessivo (${a}/${b})`;
   }
   if (mode === "dominant") {
     if (!referenceAllele) return null;
