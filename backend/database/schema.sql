@@ -1186,6 +1186,14 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_source_transfer_unique
   ON finance_entries(source_transfer_id) WHERE source_transfer_id IS NOT NULL;
 
+ALTER TABLE finance_entries ADD COLUMN IF NOT EXISTS source_stock_movement_id UUID;
+DO $$ BEGIN
+  ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_source_stock_movement_fk
+    FOREIGN KEY (source_stock_movement_id) REFERENCES stock_movements(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_source_stock_movement_unique
+  ON finance_entries(source_stock_movement_id) WHERE source_stock_movement_id IS NOT NULL;
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
