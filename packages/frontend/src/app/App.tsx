@@ -210,9 +210,9 @@ export function App() {
       const result = await api.get<{ user: User }>("/auth/me");
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
-      const inviteToken = new URLSearchParams(window.location.search).get("invite");
+      const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get("invite");
       if (inviteToken && routeOnly(window.location.pathname) === "/settings/collaborators") {
-        navigate("/settings/collaborators?invite=" + encodeURIComponent(inviteToken));
+        navigate("/settings/collaborators#invite=" + encodeURIComponent(inviteToken));
         return;
       }
       const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
