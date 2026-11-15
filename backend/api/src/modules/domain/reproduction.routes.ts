@@ -113,7 +113,7 @@ export function createReproductionRouter() {
       select: {
         id: true, name: true, species: true, sex: true, morph: true, geneticsNotes: true,
         birthDate: true, motherAnimalId: true, fatherAnimalId: true,
-        geneticTraits: { select: { id: true, traitName: true, traitValue: true, confidenceNote: true, sourceAnimalId: true, inheritanceMode: true, genotype: true, certainty: true } },
+        geneticTraits: { select: { id: true, traitName: true, traitValue: true, confidenceNote: true, sourceAnimalId: true, inheritanceMode: true, genotype: true, certainty: true, phenotypeRules: true } },
         weightMeasurements: { orderBy: [{ measuredAt: "desc" }, { id: "desc" }], take: 1, select: { measuredAt: true, weightG: true } },
       },
     });
@@ -141,7 +141,7 @@ export function createReproductionRouter() {
           where: { userId: auth.userId, id: { in: frontier } },
           select: { motherAnimalId: true, fatherAnimalId: true },
         });
-        const next = [...new Set(rows.flatMap((row) => [row.motherAnimalId, row.fatherAnimalId]).filter((id): id is string => Boolean(id) && !seen.has(id)))].slice(0, 256);
+        const next = [...new Set(rows.flatMap((row) => [row.motherAnimalId, row.fatherAnimalId]).filter((id): id is string => id !== null && !seen.has(id)))].slice(0, 256);
         if (!next.length) break;
         next.forEach((id) => seen.add(id));
         const ancestors = await prisma.animal.findMany({ where: { userId: auth.userId, id: { in: next } }, select: { id: true, name: true } });
