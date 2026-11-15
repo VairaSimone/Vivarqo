@@ -119,6 +119,7 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
     if (Boolean(parents[0]) !== Boolean(parents[1])) missing.add(`${id}:unknown-parent`);
     for (const parentId of parents) {
       if (!parentId) continue; // Two absent parent links identify a recorded founder.
+      if (generation >= maxGenerations) { missing.add(`depth-limit:${id}`); continue; }
       if (path.includes(parentId)) { missing.add(`cycle:${parentId}`); continue; }
       ancestors.add(parentId);
       const entries = paths.get(parentId) ?? [];
