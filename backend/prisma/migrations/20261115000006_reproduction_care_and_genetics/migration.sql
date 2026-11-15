@@ -21,7 +21,7 @@ CREATE TABLE "egg_measurements" (
 );
 CREATE INDEX "egg_measurements_egg_measured_idx" ON "egg_measurements"("egg_id", "measured_at" DESC);
 
-CREATE TABLE "incubators" (
+CREATE TABLE IF NOT EXISTS "incubators" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" UUID NOT NULL,
   "name" VARCHAR(120) NOT NULL,
@@ -35,8 +35,8 @@ CREATE TABLE "incubators" (
   CONSTRAINT "incubators_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "incubators_capacity_positive" CHECK ("capacity" IS NULL OR "capacity" > 0)
 );
-CREATE UNIQUE INDEX "incubators_user_name_unique" ON "incubators"("user_id", "name");
-CREATE INDEX "incubators_user_active_idx" ON "incubators"("user_id", "is_active");
+CREATE UNIQUE INDEX IF NOT EXISTS "incubators_user_name_unique" ON "incubators"("user_id", "name");
+CREATE INDEX IF NOT EXISTS "incubators_user_active_idx" ON "incubators"("user_id", "is_active");
 ALTER TABLE "clutches" ADD COLUMN "incubator_id" UUID;
 ALTER TABLE "clutches" ADD CONSTRAINT "clutches_incubator_id_fkey" FOREIGN KEY ("incubator_id") REFERENCES "incubators"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 CREATE INDEX "clutches_incubator_idx" ON "clutches"("incubator_id");
