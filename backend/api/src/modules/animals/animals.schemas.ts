@@ -29,6 +29,7 @@ export const animalFields = {
   originDescription: z.string().trim().max(5_000).nullable().optional(),
   previousBreeder: nullableText(160),
   locationLabel: nullableText(160),
+  feedingIntervalDays: z.coerce.number().int().min(1).max(365).nullable().optional(),
   status: animalStatusSchema.default("active"),
   notes: z.string().trim().max(10_000).nullable().optional(),
 };
@@ -56,6 +57,7 @@ export const patchAnimalSchema = z.object({
   originDescription: animalFields.originDescription,
   previousBreeder: animalFields.previousBreeder,
   locationLabel: animalFields.locationLabel,
+  feedingIntervalDays: animalFields.feedingIntervalDays,
   status: z.enum(["active", "sold", "transferred", "deceased"]).optional(),
   notes: animalFields.notes,
 }).strict().superRefine((value, ctx) => {
@@ -72,8 +74,14 @@ export const feedingEntrySchema = z.object({
   foodType: nullableText(120),
   foodSize: nullableText(120),
   foodWeightG: z.coerce.number().positive().max(1_000_000).nullable().optional(),
+  preyState: z.enum(["unknown", "frozen", "thawed", "live"]).default("unknown"),
+  inventoryItemId: z.string().uuid().nullable().optional(),
+  inventoryQuantity: z.coerce.number().positive().max(999_999_999.999).nullable().optional(),
   notes: z.string().trim().max(5_000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.inventoryItemId && !value.inventoryQuantity) ctx.addIssue({ code: "custom", path: ["inventoryQuantity"], message: "Inventory quantity is required when an item is selected" });
+  if (!value.inventoryItemId && value.inventoryQuantity != null) ctx.addIssue({ code: "custom", path: ["inventoryItemId"], message: "Select an inventory item for the quantity" });
+});
 
 export const feedingSessionSchema = z.object({
   performedAt: z.string().datetime({ offset: true }),
@@ -95,8 +103,14 @@ export const patchFeedingEntrySchema = z.object({
   foodType: nullableText(120),
   foodSize: nullableText(120),
   foodWeightG: z.coerce.number().positive().max(1_000_000).nullable().optional(),
+  preyState: z.enum(["unknown", "frozen", "thawed", "live"]).optional(),
+  inventoryItemId: z.string().uuid().nullable().optional(),
+  inventoryQuantity: z.coerce.number().positive().max(999_999_999.999).nullable().optional(),
   notes: z.string().trim().max(5_000).nullable().optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+}).strict().superRefine((value, ctx) => {
+  if (value.inventoryItemId === null && value.inventoryQuantity != null) ctx.addIssue({ code: "custom", path: ["inventoryQuantity"], message: "Inventory quantity requires an inventory item" });
+  if (value.inventoryItemId && value.inventoryQuantity === null) ctx.addIssue({ code: "custom", path: ["inventoryQuantity"], message: "Inventory quantity is required when an item is selected" });
+}).refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 export const weightSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
