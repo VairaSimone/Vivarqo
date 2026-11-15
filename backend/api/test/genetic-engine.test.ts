@@ -25,6 +25,18 @@ describe("calculateGenetics", () => {
     const result = calculateGenetics([{ locusId: "l1", name: "Co-dom", inheritanceMode: "codominant", motherGenotype: "A|a", fatherGenotype: "A|A" }]);
     expect(result.loci[0]?.outcomes.find((item) => item.genotype === "A|a")?.phenotype).toBe("A + a");
   });
+  it("applies complete dominance using the declared reference allele", () => {
+    const result = calculateGenetics([{ locusId: "l1", name: "Dominant", inheritanceMode: "dominant", motherGenotype: "A|a", fatherGenotype: "A|A", referenceAllele: "a" }]);
+    expect(result.loci[0]?.outcomes.find((item) => item.genotype === "A|a")?.phenotype).toBe("espresso");
+  });
+  it("represents incomplete dominance with an intermediate phenotype", () => {
+    const result = calculateGenetics([{ locusId: "l1", name: "Incomplete", inheritanceMode: "incomplete_dominant", motherGenotype: "A|a", fatherGenotype: "A|A" }]);
+    expect(result.loci[0]?.outcomes.find((item) => item.genotype === "A|a")?.phenotype).toBe("intermedio (A/a)");
+  });
+  it("applies phenotype rules independent of allele order", () => {
+    const result = calculateGenetics([{ locusId: "l1", name: "Rules", inheritanceMode: "codominant", motherGenotype: "A|a", fatherGenotype: "A|A", phenotypeRules: { "a|A": "Patterned" } }]);
+    expect(result.loci[0]?.outcomes.find((item) => item.genotype === "A|a")?.phenotype).toBe("Patterned");
+  });
   it("combines independent loci as a cartesian product", () => {
     const result = calculateGenetics(["l1", "l2"].map((locusId) => ({ locusId, name: locusId, inheritanceMode: "codominant" as const, motherGenotype: "A|a", fatherGenotype: "A|a" })));
     expect(result.combined).toHaveLength(9);
@@ -34,6 +46,11 @@ describe("calculateGenetics", () => {
 describe("calculateInbreeding", () => {
   it("does not report a precise coefficient for incomplete pedigrees", () => {
     const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m" }], "child");
+    expect(result.coefficient).toBeNull();
+    expect(result.completeness).toBe("partial");
+  });
+  it("rejects cyclic pedigree paths as incomplete", () => {
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "child", fatherId: "f" }, { id: "f" }], "child");
     expect(result.coefficient).toBeNull();
     expect(result.completeness).toBe("partial");
   });
