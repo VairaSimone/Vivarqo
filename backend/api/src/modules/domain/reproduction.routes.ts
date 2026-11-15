@@ -1133,8 +1133,8 @@ export function createReproductionRouter() {
         action: "incubation.log.updated",
         details: {
           logId,
-          before: { recordedAt: existing.recordedAt, temperatureC: existing.temperatureC, humidityPct: existing.humidityPct, eventType: existing.eventType, notes: existing.notes },
-          after: { recordedAt: updated.recordedAt, temperatureC: updated.temperatureC, humidityPct: updated.humidityPct, eventType: updated.eventType, notes: updated.notes },
+          before: { recordedAt: existing.recordedAt, temperatureC: existing.temperatureC?.toString() ?? null, humidityPct: existing.humidityPct?.toString() ?? null, eventType: existing.eventType, notes: existing.notes },
+          after: { recordedAt: updated.recordedAt, temperatureC: updated.temperatureC?.toString() ?? null, humidityPct: updated.humidityPct?.toString() ?? null, eventType: updated.eventType, notes: updated.notes },
         },
         notes: "Registrazione di incubazione modificata",
       } });
