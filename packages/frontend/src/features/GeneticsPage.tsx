@@ -82,6 +82,34 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
   async function createLocus(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/genetics/genes/${locusForm.geneId}/loci`, { symbol: locusForm.symbol, name: locusForm.name, inheritanceMode: locusForm.inheritanceMode }); setLocusForm((v) => ({ ...v, symbol: "", name: "" })); }); }
   async function createAllele(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/genetics/loci/${alleleForm.locusId}/alleles`, alleleForm); setAlleleForm((v) => ({ ...v, symbol: "", name: "", isReference: false })); }); }
   async function createTrait(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/animals/${animalId}/genetic-traits`, { traitName: traitForm.traitName, traitValue: traitForm.traitValue, locusId: traitForm.locusId || null, theoreticalGenotype: traitForm.theoreticalGenotype || null, observedPhenotype: traitForm.observedPhenotype || null, confirmedGenotype: traitForm.confirmedGenotype || null, certainty: traitForm.certainty }); setTraitForm((v) => ({ ...v, traitName: "", traitValue: "", theoreticalGenotype: "", observedPhenotype: "", confirmedGenotype: "" })); }); }
+
+  async function editGene(gene: Gene) {
+    const name = window.prompt(text("Nome gene", "Gene name"), gene.name);
+    if (!name?.trim()) return;
+    await run(() => api.patch(`/genetics/genes/${gene.id}`, { name: name.trim() }));
+  }
+  async function deleteGene(gene: Gene) {
+    if (!window.confirm(text("Eliminare il gene e il suo catalogo di loci e alleli?", "Delete this gene and its loci and alleles?"))) return;
+    await run(() => api.delete(`/genetics/genes/${gene.id}`));
+  }
+  async function editLocus(locus: Locus) {
+    const name = window.prompt(text("Nome locus", "Locus name"), locus.name);
+    if (!name?.trim()) return;
+    await run(() => api.patch(`/genetics/loci/${locus.id}`, { name: name.trim() }));
+  }
+  async function deleteLocus(locus: Locus) {
+    if (!window.confirm(text("Eliminare questo locus?", "Delete this locus?"))) return;
+    await run(() => api.delete(`/genetics/loci/${locus.id}`));
+  }
+  async function editAllele(allele: Allele) {
+    const name = window.prompt(text("Nome allele", "Allele name"), allele.name);
+    if (!name?.trim()) return;
+    await run(() => api.patch(`/genetics/alleles/${allele.id}`, { name: name.trim() }));
+  }
+  async function deleteAllele(allele: Allele) {
+    if (!window.confirm(text("Eliminare questo allele?", "Delete this allele?"))) return;
+    await run(() => api.delete(`/genetics/alleles/${allele.id}`));
+  }
   async function calculate(event: FormEvent) { event.preventDefault(); await run(async () => { const result = await api.post<{ calculation: unknown }>("/genetics/calculate-pairing", { motherAnimalId: pair.motherAnimalId, fatherAnimalId: pair.fatherAnimalId, locusIds: selectedLocusIds }); setCalculation(result.calculation); }); }
   if (loading) return <LoadingState />;
   return <div className="page-stack">
@@ -94,14 +122,14 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
         <label>{text("Nome gene", "Gene name")}<input required maxLength={160} value={geneForm.name} onChange={(e) => setGeneForm({ ...geneForm, name: e.target.value })} /></label>
         <Button type="submit" disabled={busy}>{text("Aggiungi gene", "Add gene")}</Button>
       </form>
-      <div className="genetics-catalog">{genes.map((gene) => <section key={gene.id}><h3>{gene.name} <small>({gene.symbol}) · {gene.species}</small></h3><form className="form-grid" onSubmit={(e) => void createLocus(e)}>
+      <div className="genetics-catalog">{genes.map((gene) => <section key={gene.id}><h3>{gene.name} <small>({gene.symbol}) · {gene.species}</small> <Button type="button" variant="ghost" size="sm" onClick={() => void editGene(gene)}>{text("Modifica", "Edit")}</Button> <Button type="button" variant="danger" size="sm" onClick={() => void deleteGene(gene)}>{text("Elimina", "Delete")}</Button></h3><form className="form-grid" onSubmit={(e) => void createLocus(e)}>
         <input aria-label="Gene" type="hidden" value={gene.id} />
         <label>{text("Simbolo locus", "Locus symbol")}<input required value={locusForm.geneId === gene.id ? locusForm.symbol : ""} onChange={(e) => setLocusForm({ ...locusForm, geneId: gene.id, symbol: e.target.value })} /></label>
         <label>{text("Nome locus", "Locus name")}<input required value={locusForm.geneId === gene.id ? locusForm.name : ""} onChange={(e) => setLocusForm({ ...locusForm, geneId: gene.id, name: e.target.value })} /></label>
         <label>{text("Ereditarietà", "Inheritance")}<select value={locusForm.inheritanceMode} onChange={(e) => setLocusForm({ ...locusForm, geneId: gene.id, inheritanceMode: e.target.value })}>{modes.map((mode) => <option key={mode} value={mode}>{labels[mode]}</option>)}</select></label>
         <Button type="submit" disabled={busy}>{text("Aggiungi locus", "Add locus")}</Button>
       </form>
-      {gene.loci.map((locus) => <div className="genetics-locus" key={locus.id}><strong>{locus.name} ({locus.symbol})</strong> · {labels[locus.inheritanceMode] ?? locus.inheritanceMode}<ul>{locus.alleles.map((allele) => <li key={allele.id}>{allele.symbol} — {allele.name}{allele.isReference ? " · reference" : ""}</li>)}</ul>
+      {gene.loci.map((locus) => <div className="genetics-locus" key={locus.id}><strong>{locus.name} ({locus.symbol})</strong> · {labels[locus.inheritanceMode] ?? locus.inheritanceMode} <Button type="button" variant="ghost" size="sm" onClick={() => void editLocus(locus)}>{text("Modifica", "Edit")}</Button> <Button type="button" variant="ghost" size="sm" onClick={() => void deleteLocus(locus)}>{text("Elimina", "Delete")}</Button><ul>{locus.alleles.map((allele) => <li key={allele.id}>{allele.symbol} — {allele.name}{allele.isReference ? " · reference" : ""} <Button type="button" variant="ghost" size="sm" onClick={() => void editAllele(allele)}>{text("Modifica", "Edit")}</Button> <Button type="button" variant="ghost" size="sm" onClick={() => void deleteAllele(allele)}>{text("Elimina", "Delete")}</Button></li>)}</ul>
         <form className="form-grid" onSubmit={(e) => void createAllele(e)}>
           <label>{text("Allele", "Allele")}<input required value={alleleForm.locusId === locus.id ? alleleForm.symbol : ""} onChange={(e) => setAlleleForm({ ...alleleForm, locusId: locus.id, symbol: e.target.value })} /></label>
           <label>{text("Nome allele", "Allele name")}<input required value={alleleForm.locusId === locus.id ? alleleForm.name : ""} onChange={(e) => setAlleleForm({ ...alleleForm, locusId: locus.id, name: e.target.value })} /></label>
