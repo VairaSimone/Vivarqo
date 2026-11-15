@@ -1,13 +1,15 @@
 import type { FormEvent } from "react";
 import type { Locale } from "../../lib/domain";
 import { translate } from "../../lib/i18n";
-import { Alert, Button, Field, Input, Modal, Textarea } from "../../components/ui";
+import type { IncubatorDto } from "@vivarqo/contracts/reproduction";
+import { Alert, Button, Field, Input, Modal, Select, Textarea } from "../../components/ui";
 
 export interface ClutchForm {
   laidOn: string;
   eggCount: string;
   status: string;
   incubatorLabel: string;
+  incubatorId: string;
   incubationStartedAt: string;
   targetTemperatureMinC: string;
   targetTemperatureMaxC: string;
@@ -26,9 +28,11 @@ interface Props {
   busy: boolean;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  incubators: IncubatorDto[];
+  onAddIncubator: () => void;
 }
 
-export function ClutchEditor({ locale, isEditing, form, onChange, error, busy, onClose, onSubmit }: Props) {
+export function ClutchEditor({ locale, isEditing, form, onChange, error, busy, onClose, onSubmit, incubators, onAddIncubator }: Props) {
   const t = (key: string) => translate(locale, key);
   return <Modal title={isEditing ? t("edit") : t("addClutch")} onClose={onClose}>
     <form className="form-stack" onSubmit={onSubmit}>
@@ -38,7 +42,16 @@ export function ClutchEditor({ locale, isEditing, form, onChange, error, busy, o
         <Field label={t("eggCount")}><Input required type="number" min="0" value={form.eggCount} onChange={(e) => onChange({ ...form, eggCount: e.target.value })} /></Field>
       </div>
       <Field label={t("status")}><Input value={form.status} onChange={(e) => onChange({ ...form, status: e.target.value })} /></Field>
-      <Field label={t("incubator")}><Input value={form.incubatorLabel} onChange={(e) => onChange({ ...form, incubatorLabel: e.target.value })} /></Field>
+      <div className="form-grid">
+        <Field label={locale === "it" ? "Incubatrice registrata" : "Managed incubator"}>
+          <Select value={form.incubatorId} onChange={(e) => onChange({ ...form, incubatorId: e.target.value })}>
+            <option value="">{locale === "it" ? "Nessuna selezionata" : "None selected"}</option>
+            {incubators.map((incubator) => <option key={incubator.id} value={incubator.id}>{incubator.name}{incubator.identifier ? ` · ${incubator.identifier}` : ""}</option>)}
+          </Select>
+          <Button type="button" size="sm" variant="secondary" onClick={onAddIncubator}>{locale === "it" ? "Nuova incubatrice" : "Add incubator"}</Button>
+        </Field>
+        <Field label={locale === "it" ? "Etichetta / posizione" : "Label / location"}><Input value={form.incubatorLabel} onChange={(e) => onChange({ ...form, incubatorLabel: e.target.value })} /></Field>
+      </div>
       <div className="animal-editor-section">
         <h3>{locale === "it" ? "Parametri obiettivo incubazione" : "Incubation target ranges"}</h3>
         <div className="form-grid">
