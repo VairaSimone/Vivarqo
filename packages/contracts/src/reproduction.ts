@@ -138,6 +138,15 @@ export const incubatorMaintenanceSchema = z.object({
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
 
+export const speciesBreedingProfileSchema = z.object({
+  species: z.string().trim().min(1).max(160),
+  femaleMinAgeMonths: z.coerce.number().int().min(0).max(1200).nullable().optional(),
+  maleMinAgeMonths: z.coerce.number().int().min(0).max(1200).nullable().optional(),
+  femaleMinWeightG: z.coerce.number().positive().max(10_000_000).nullable().optional(),
+  maleMinWeightG: z.coerce.number().positive().max(10_000_000).nullable().optional(),
+  notes: z.string().trim().max(10_000).nullable().optional(),
+}).strict();
+
 export const hatchlingCareSchema = z.object({
   firstFeedingAt: z.string().datetime({ offset: true }).nullable().optional(),
   firstFeedingAccepted: z.boolean().nullable().optional(),
