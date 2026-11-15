@@ -1069,3 +1069,101 @@ ALTER TABLE feeding_entries
   ADD CONSTRAINT feeding_entries_inventory_link_check CHECK ((inventory_item_id IS NULL AND inventory_quantity IS NULL AND inventory_deducted = FALSE) OR (inventory_item_id IS NOT NULL AND inventory_quantity IS NOT NULL));
 CREATE INDEX feeding_entries_inventory_item_idx ON feeding_entries(inventory_item_id);
 CREATE INDEX feeding_entries_animal_outcome_idx ON feeding_entries(animal_id, outcome);
+
+
+-- ---------------------------------------------------------------------------
+-- 10. Finance: reproductive links, budgets and recurring entries
+-- ---------------------------------------------------------------------------
+ALTER TABLE finance_entries
+  ADD COLUMN IF NOT EXISTS reproduction_cycle_id UUID,
+  ADD COLUMN IF NOT EXISTS clutch_id UUID,
+  ADD COLUMN IF NOT EXISTS offspring_batch_id UUID,
+  ADD COLUMN IF NOT EXISTS recurrence_id UUID;
+
+CREATE TABLE IF NOT EXISTS finance_budgets (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  period VARCHAR(8) NOT NULL,
+  period_start DATE NOT NULL,
+  category VARCHAR(80) NOT NULL DEFAULT 'all',
+  amount_cents BIGINT NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'EUR',
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT finance_budgets_pkey PRIMARY KEY (id),
+  CONSTRAINT finance_budgets_period_check CHECK (period IN ('month', 'year')),
+  CONSTRAINT finance_budgets_amount_check CHECK (amount_cents > 0),
+  CONSTRAINT finance_budgets_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS finance_budgets_scope_unique
+  ON finance_budgets(user_id, period, period_start, category, currency);
+CREATE INDEX IF NOT EXISTS finance_budgets_user_period_idx
+  ON finance_budgets(user_id, period_start);
+
+CREATE TABLE IF NOT EXISTS finance_recurrences (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  entry_type VARCHAR(12) NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'EUR',
+  category VARCHAR(80) NOT NULL,
+  description VARCHAR(240) NOT NULL,
+  animal_id UUID,
+  document_id UUID,
+  frequency VARCHAR(12) NOT NULL,
+  next_occurrence_on DATE NOT NULL,
+  anchor_month INTEGER NOT NULL,
+  anchor_day INTEGER NOT NULL,
+  end_on DATE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT finance_recurrences_pkey PRIMARY KEY (id),
+  CONSTRAINT finance_recurrences_entry_type_check CHECK (entry_type IN ('income', 'expense')),
+  CONSTRAINT finance_recurrences_frequency_check CHECK (frequency IN ('monthly', 'yearly')),
+  CONSTRAINT finance_recurrences_amount_check CHECK (amount_cents > 0),
+  CONSTRAINT finance_recurrences_anchor_month_check CHECK (anchor_month BETWEEN 1 AND 12),
+  CONSTRAINT finance_recurrences_anchor_day_check CHECK (anchor_day BETWEEN 1 AND 31),
+  CONSTRAINT finance_recurrences_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT finance_recurrences_animal_fk FOREIGN KEY (animal_id) REFERENCES animals(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT finance_recurrences_document_fk FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+ALTER TABLE finance_recurrences
+  ADD COLUMN IF NOT EXISTS anchor_month INTEGER NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS anchor_day INTEGER NOT NULL DEFAULT 1;
+UPDATE finance_recurrences
+SET anchor_month = EXTRACT(MONTH FROM next_occurrence_on)::INTEGER,
+    anchor_day = EXTRACT(DAY FROM next_occurrence_on)::INTEGER;
+ALTER TABLE finance_recurrences
+  ALTER COLUMN anchor_month DROP DEFAULT,
+  ALTER COLUMN anchor_day DROP DEFAULT;
+CREATE INDEX IF NOT EXISTS finance_recurrences_due_idx
+  ON finance_recurrences(user_id, is_active, next_occurrence_on);
+
+DO $finance_links$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'finance_entries_cycle_fk') THEN
+    ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_cycle_fk
+      FOREIGN KEY (reproduction_cycle_id) REFERENCES reproduction_cycles(id) ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'finance_entries_clutch_fk') THEN
+    ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_clutch_fk
+      FOREIGN KEY (clutch_id) REFERENCES clutches(id) ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'finance_entries_offspring_batch_fk') THEN
+    ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_offspring_batch_fk
+      FOREIGN KEY (offspring_batch_id) REFERENCES offspring_batches(id) ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'finance_entries_recurrence_fk') THEN
+    ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_recurrence_fk
+      FOREIGN KEY (recurrence_id) REFERENCES finance_recurrences(id) ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END
+$finance_links$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_recurrence_date_unique
+  ON finance_entries(recurrence_id, occurred_on);
+CREATE INDEX IF NOT EXISTS finance_entries_cycle_idx ON finance_entries(reproduction_cycle_id);
+CREATE INDEX IF NOT EXISTS finance_entries_clutch_idx ON finance_entries(clutch_id);
+CREATE INDEX IF NOT EXISTS finance_entries_offspring_batch_idx ON finance_entries(offspring_batch_id);
+CREATE INDEX IF NOT EXISTS finance_entries_recurrence_idx ON finance_entries(recurrence_id);
