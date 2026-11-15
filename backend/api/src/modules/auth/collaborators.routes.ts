@@ -69,7 +69,7 @@ export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (owne
         select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
       }),
       prisma.userSession.findFirst({ where: { id: auth.sessionId, userId: auth.userId }, select: { activeWorkspaceOwnerId: true } }),
-      hasPaidSubscriptionEntitlement(auth.userId),
+      hasPremium(auth.userId),
     ]);
     const workspaces = await prisma.workspaceMembership.findMany({
       where: { collaboratorUserId: auth.userId, revokedAt: null },
