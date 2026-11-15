@@ -22,7 +22,7 @@ import {
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
   reproductionCycleStatusSchema,
-  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema, speciesBreedingProfileSchema,
+  eggMeasurementSchema, incubatorSchema, patchIncubatorSchema, patchEggMeasurementSchema, incubatorMaintenanceSchema, hatchlingCareSchema, speciesBreedingProfileSchema,
 } from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
@@ -252,6 +252,25 @@ export function createReproductionRouter() {
     res.status(201).json({ incubator });
   });
 
+  router.patch("/incubators/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const incubatorId = routeUuid(req.params.id, "incubator id");
+    const input = parseBody(patchIncubatorSchema, req.body);
+    const existing = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
+    if (!existing) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    const incubator = await prisma.incubator.update({ where: { id: incubatorId }, data: input });
+    res.status(200).json({ incubator });
+  });
+
+  // Deletion is a soft archive: historical clutches keep their incubator relation.
+  router.delete("/incubators/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const incubatorId = routeUuid(req.params.id, "incubator id");
+    const result = await prisma.incubator.updateMany({ where: { id: incubatorId, userId: auth.userId, isActive: true }, data: { isActive: false } });
+    if (result.count !== 1) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    res.status(204).send();
+  });
+
   router.get("/incubators/:id/maintenance", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const incubatorId = routeUuid(req.params.id, "incubator id");
@@ -288,6 +307,37 @@ export function createReproductionRouter() {
     const input = parseBody(eggMeasurementSchema, req.body);
     const measurement = await prisma.eggMeasurement.create({ data: { eggId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null } });
     res.status(201).json({ measurement });
+  });
+
+  router.patch("/eggs/:id/measurements/:measurementId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const measurementId = routeUuid(req.params.measurementId, "measurement id");
+    const egg = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    const input = parseBody(patchEggMeasurementSchema, req.body);
+    const measurement = await prisma.eggMeasurement.updateMany({
+      where: { id: measurementId, eggId },
+      data: {
+        ...(input.measuredAt !== undefined ? { measuredAt: new Date(input.measuredAt) } : {}),
+        ...(input.weightG !== undefined ? { weightG: input.weightG } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      },
+    });
+    if (measurement.count !== 1) throw new AppError(404, "EGG_MEASUREMENT_NOT_FOUND", "Egg measurement not found");
+    const updated = await prisma.eggMeasurement.findUnique({ where: { id: measurementId } });
+    res.status(200).json({ measurement: updated });
+  });
+
+  router.delete("/eggs/:id/measurements/:measurementId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const measurementId = routeUuid(req.params.measurementId, "measurement id");
+    const egg = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    const result = await prisma.eggMeasurement.deleteMany({ where: { id: measurementId, eggId } });
+    if (result.count !== 1) throw new AppError(404, "EGG_MEASUREMENT_NOT_FOUND", "Egg measurement not found");
+    res.status(204).send();
   });
 
   router.get("/animals/:animalId/hatchling-care", requireSession, async (req, res) => {
