@@ -10,6 +10,7 @@ import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, Geneti
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { AnimalMovementHistory } from "./AnimalMovementHistory";
+import { AnimalFeedingInsights } from "./AnimalFeedingInsights";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
@@ -401,6 +402,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     <div className="tabs-line" role="tablist">{tabItems.map(([key, label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
 
     {tab === "overview" && <div className="detail-grid">
+      <AnimalFeedingInsights id={id} locale={locale} readOnly={isArchived} />
       {animal.originOffspringBatchId && <Panel>
         <PanelHeader title={locale === "it" ? "Crescita e prime cure" : "Hatchling care"} action={!isArchived ? <Button size="sm" variant="secondary" onClick={openHatchlingCare}>{locale === "it" ? "Aggiorna tappe" : "Update milestones"}</Button> : undefined} />
         <div className="detail-fields">
