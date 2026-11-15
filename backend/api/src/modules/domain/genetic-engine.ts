@@ -28,7 +28,7 @@ function alleles(genotype: string): [string, string] | null {
   return null;
 }
 function canonical(a: string, b: string): string {
-  return [a, b].sort((x, y) => x.localeCompare(y, undefined, { sensitivity: "base" })).join("|");
+  return [a, b].sort((x, y) => x < y ? -1 : x > y ? 1 : 0).join("|");
 }
 function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: string | null, rules?: Record<string, string> | null): string | null {
   if (rules && Object.prototype.hasOwnProperty.call(rules, genotype)) return rules[genotype]!;
