@@ -260,8 +260,8 @@ export function createCareRouter() {
         if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
         const restored = current + restore;
         if (restored > 999_999_999_999) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Restored inventory stock exceeds the supported precision");
-        const originalMovement = await tx.stockMovement.findFirst({ where: { itemId: owned.inventoryItemId, reference: "Feeding entry " + id }, select: { id: true } });
-        if (originalMovement) await tx.financeEntry.deleteMany({ where: { userId: auth.userId, sourceStockMovementId: originalMovement.id } });
+        const originalMovements = await tx.stockMovement.findMany({ where: { itemId: owned.inventoryItemId, reference: "Feeding entry " + id }, select: { id: true } });
+        if (originalMovements.length) await tx.financeEntry.deleteMany({ where: { userId: auth.userId, sourceStockMovementId: { in: originalMovements.map((movement) => movement.id) } } });
         await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry reversal " + id, notes: "Automatic stock restoration after feeding edit" } });
         await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: restored / 1000 } });
       }
@@ -374,8 +374,8 @@ export function createCareRouter() {
         if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
         const restored = current + restore;
         if (restored > 999_999_999_999) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Restored inventory stock exceeds the supported precision");
-        const originalMovement = await tx.stockMovement.findFirst({ where: { itemId: owned.inventoryItemId, reference: "Feeding entry " + id }, select: { id: true } });
-        if (originalMovement) await tx.financeEntry.deleteMany({ where: { userId: auth.userId, sourceStockMovementId: originalMovement.id } });
+        const originalMovements = await tx.stockMovement.findMany({ where: { itemId: owned.inventoryItemId, reference: "Feeding entry " + id }, select: { id: true } });
+        if (originalMovements.length) await tx.financeEntry.deleteMany({ where: { userId: auth.userId, sourceStockMovementId: { in: originalMovements.map((movement) => movement.id) } } });
         await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry deletion " + id, notes: "Automatic stock restoration after deleting feeding entry" } });
         await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: restored / 1000 } });
       }
