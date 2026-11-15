@@ -216,6 +216,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
           locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
           acquiredDate: animal.acquiredDate || null, originDescription: animal.originDescription || null,
           eggId: animal.eggId || null,
+          initialWeightG: animal.initialWeightG.trim() ? Number(animal.initialWeightG) : null,
         }))
       });
       recordsCreated = true;
