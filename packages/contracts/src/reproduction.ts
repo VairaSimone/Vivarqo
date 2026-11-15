@@ -238,6 +238,7 @@ export interface OffspringBatchDto {
   notes: string | null;
   cycle?: Pick<ReproductionCycleSummaryDto, "id" | "name">;
   clutch?: Pick<ClutchDto, "id" | "laidOn" | "eggCount"> | null;
+  _count?: { originAnimals: number };
 }
 
 export interface ReproductionCycleSummaryDto {
