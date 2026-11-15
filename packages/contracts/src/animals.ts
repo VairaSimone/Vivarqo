@@ -8,6 +8,12 @@ export interface AnimalDto {
   species: string;
   sex: AnimalSexDto;
   morph: string | null;
+  motherAnimalId?: string | null;
+  fatherAnimalId?: string | null;
+  motherDescription?: string | null;
+  fatherDescription?: string | null;
+  mother?: Pick<AnimalDto, "id" | "name" | "morph" | "sex"> | null;
+  father?: Pick<AnimalDto, "id" | "name" | "morph" | "sex"> | null;
   geneticsNotes: string | null;
   birthDate: string | null;
   birthDateEstimated: boolean;
