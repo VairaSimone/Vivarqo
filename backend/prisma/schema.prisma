@@ -52,6 +52,7 @@ model User {
   subscription            Subscription?
   auditEvents             AuditEvent[]
   geneticGenes            GeneticGene[]
+  geneticHistoryChanges   AnimalGeneticTraitHistory[] @relation("GeneticHistoryChangedBy")
   @@map("users")
 }
 
@@ -816,6 +817,7 @@ model AnimalGeneticTraitHistory {
   changedAt   DateTime           @default(now()) @map("changed_at") @db.Timestamptz(6)
   trait       AnimalGeneticTrait? @relation(fields: [traitId], references: [id], onDelete: SetNull)
   animal      Animal             @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  changedByUser User             @relation("GeneticHistoryChangedBy", fields: [changedBy], references: [id], onDelete: Cascade)
   @@index([animalId, changedAt(sort: Desc)], map: "animal_genetic_history_animal_changed_idx")
   @@index([traitId, changedAt(sort: Desc)], map: "animal_genetic_history_trait_changed_idx")
   @@map("animal_genetic_trait_history")
