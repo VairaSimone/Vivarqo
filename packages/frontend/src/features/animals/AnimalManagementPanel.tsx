@@ -55,11 +55,9 @@ export function AnimalManagementPanel({ locale }: { locale: Locale }) {
     finally { setBusy(false); }
   }
   async function deleteLocation(location: Location) {
-    if (!window.confirm(it ? "Eliminare questa posizione? Deve essere vuota e senza sottoposizioni." : "Delete this location? It must be empty."));
-    else {
-      try { await api.delete("/animals/locations/" + location.id); await reload(); }
-      catch (e) { setError(e instanceof ApiError ? e.message : "Delete failed"); }
-    }
+    if (!window.confirm(it ? "Eliminare questa posizione? Deve essere vuota e senza sottoposizioni." : "Delete this location? It must be empty.")) return;
+    try { await api.delete("/animals/locations/" + location.id); await reload(); }
+    catch (e) { setError(e instanceof ApiError ? e.message : "Delete failed"); }
   }
   async function moveAnimals() {
     if (!selected.length) return;
