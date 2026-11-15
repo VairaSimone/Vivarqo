@@ -279,25 +279,28 @@ export function createReproductionRouter() {
       },
     });
     if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found");
-    const logs = clutch.incubationLogs;
-    const temperatures = logs.map((log) => log.temperatureC === null ? null : Number(log.temperatureC)).filter((value): value is number => value !== null);
-    const humidities = logs.map((log) => log.humidityPct === null ? null : Number(log.humidityPct)).filter((value): value is number => value !== null);
-    const temperatureOutOfRange = logs.filter((log) => log.temperatureC !== null && (
-      (clutch.targetTemperatureMinC !== null && Number(log.temperatureC) < Number(clutch.targetTemperatureMinC)) ||
-      (clutch.targetTemperatureMaxC !== null && Number(log.temperatureC) > Number(clutch.targetTemperatureMaxC))
-    )).length;
-    const humidityOutOfRange = logs.filter((log) => log.humidityPct !== null && (
-      (clutch.targetHumidityMinPct !== null && Number(log.humidityPct) < Number(clutch.targetHumidityMinPct)) ||
-      (clutch.targetHumidityMaxPct !== null && Number(log.humidityPct) > Number(clutch.targetHumidityMaxPct))
-    )).length;
-    const lastCheckAt = logs[0]?.recordedAt?.toISOString() ?? null;
+    const temperatureRange = [
+      ...(clutch.targetTemperatureMinC !== null ? [{ temperatureC: { lt: clutch.targetTemperatureMinC } }] : []),
+      ...(clutch.targetTemperatureMaxC !== null ? [{ temperatureC: { gt: clutch.targetTemperatureMaxC } }] : []),
+    ];
+    const humidityRange = [
+      ...(clutch.targetHumidityMinPct !== null ? [{ humidityPct: { lt: clutch.targetHumidityMinPct } }] : []),
+      ...(clutch.targetHumidityMaxPct !== null ? [{ humidityPct: { gt: clutch.targetHumidityMaxPct } }] : []),
+    ];
+    const [monitoringAggregate, temperatureOutOfRange, humidityOutOfRange, lastLog] = await Promise.all([
+      prisma.incubationLog.aggregate({ where: { clutchId }, _avg: { temperatureC: true, humidityPct: true } }),
+      temperatureRange.length ? prisma.incubationLog.count({ where: { clutchId, OR: temperatureRange } }) : Promise.resolve(0),
+      humidityRange.length ? prisma.incubationLog.count({ where: { clutchId, OR: humidityRange } }) : Promise.resolve(0),
+      prisma.incubationLog.findFirst({ where: { clutchId }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }], select: { recordedAt: true } }),
+    ]);
+    const lastCheckAt = lastLog?.recordedAt.toISOString() ?? null;
     const nextCheckDueAt = lastCheckAt && clutch.checkIntervalHours
       ? new Date(new Date(lastCheckAt).getTime() + clutch.checkIntervalHours * 60 * 60 * 1000).toISOString()
       : null;
     res.status(200).json({ clutch: { ...clutch, monitoring: {
       temperatureOutOfRange, humidityOutOfRange, lastCheckAt, nextCheckDueAt,
-      averageTemperatureC: temperatures.length ? temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length : null,
-      averageHumidityPct: humidities.length ? humidities.reduce((sum, value) => sum + value, 0) / humidities.length : null,
+      averageTemperatureC: monitoringAggregate._avg.temperatureC === null ? null : Number(monitoringAggregate._avg.temperatureC),
+      averageHumidityPct: monitoringAggregate._avg.humidityPct === null ? null : Number(monitoringAggregate._avg.humidityPct),
     } } });
   });
 
