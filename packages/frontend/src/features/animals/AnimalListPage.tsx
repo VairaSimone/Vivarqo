@@ -231,29 +231,93 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       </form>
     </Modal>}
     {modal && <Modal title={editing ? t("animalEdit") : t("animalNew")} onClose={() => setModal(false)} wide>
-      <form className="form-stack" onSubmit={save}>
-        {error && <Alert tone="danger">{error}</Alert>}
-        <Field label={t("animalPhoto")} hint={t("animalPhotoHint")}>
-          <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => selectPhoto(e.target.files?.[0] ?? null)} />
-        </Field>
-        {photoFile && <p className="muted-note">{photoFile.name}</p>}
-        {editing?.photoUrl && <div className="animal-photo-editor"><img src={editing.photoUrl} alt={t("animalPhoto")} /><Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void removePhoto()}>{t("removePhoto")}</Button></div>}
-        <div className="form-grid">
-          <Field label={t("name")}><Input required maxLength={120} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label={t("identifier")}><Input maxLength={120} value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} /></Field>
-          <Field label={t("species")}><Input required maxLength={160} value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} /></Field>
-          <Field label={t("sex")}><Select value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })}><option value="unknown">{t("unknown")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option></Select></Field>
-          <Field label={t("morph")}><Input value={form.morph} maxLength={200} onChange={(e) => setForm({ ...form, morph: e.target.value })} /></Field>
-          <Field label={t("location")}><Input value={form.locationLabel} maxLength={160} onChange={(e) => setForm({ ...form, locationLabel: e.target.value })} /></Field>
-          <Field label={t("birthDate")}><Input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} /></Field>
-          <Field label={t("acquiredDate")}><Input type="date" value={form.acquiredDate} onChange={(e) => setForm({ ...form, acquiredDate: e.target.value })} /></Field>
-          <Field label={t("previousBreeder")}><Input value={form.previousBreeder} onChange={(e) => setForm({ ...form, previousBreeder: e.target.value })} /></Field>
-          {editing && <Field label={t("status")}><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t(`animalStatus_${value}`)}</option>)}</Select></Field>}
+      <form className="form-stack animal-editor" onSubmit={save}>
+        <div className="animal-editor-intro">
+          <span className="animal-editor-mark"><Icon name="snake" size={22} /></span>
+          <div>
+            <p className="animal-editor-kicker">{locale === "it" ? "SCHEDA ANIMALE" : "ANIMAL PROFILE"}</p>
+            <p>{editing
+              ? (locale === "it" ? "Aggiorna le informazioni dell'esemplare. Puoi modificare i dati in qualsiasi momento." : "Update this animal's information. You can edit these details at any time.")
+              : (locale === "it" ? "Inserisci le informazioni principali per creare una scheda completa e riconoscibile." : "Add the key details to create a complete, easy-to-recognize animal profile.")}</p>
+          </div>
         </div>
-        <Field label={t("geneticsNotes")}><Textarea rows={2} value={form.geneticsNotes} onChange={(e) => setForm({ ...form, geneticsNotes: e.target.value })} /></Field>
-        <Field label={t("origin")}><Textarea rows={2} value={form.originDescription} onChange={(e) => setForm({ ...form, originDescription: e.target.value })} /></Field>
-        <Field label={t("animalNotes")}><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
-        <label className="checkbox-field"><input type="checkbox" checked={form.birthDateEstimated} onChange={(e) => setForm({ ...form, birthDateEstimated: e.target.checked })} />{t("estimatedDate")}</label>
+        {error && <Alert tone="danger">{error}</Alert>}
+
+        <section className="animal-editor-section">
+          <div className="animal-editor-section-heading">
+            <span className="animal-editor-section-icon"><Icon name="fingerprint" size={17} /></span>
+            <div>
+              <h3>{locale === "it" ? "Identità dell'animale" : "Animal identity"}</h3>
+              <p>{locale === "it" ? "I dati essenziali per riconoscere l'esemplare." : "The essential details used to identify this animal."}</p>
+            </div>
+            <span className="animal-editor-required">{locale === "it" ? "* Obbligatorio" : "* Required"}</span>
+          </div>
+          <div className="form-grid">
+            <Field label={t("name")}><Input required maxLength={120} placeholder={locale === "it" ? "Es. Nala" : "e.g. Nala"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+            <Field label={t("identifier")} hint={locale === "it" ? "Codice interno, microchip o numero identificativo." : "Internal code, microchip or identification number."}><Input maxLength={120} placeholder={locale === "it" ? "Es. VRQ-001" : "e.g. VRQ-001"} value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} /></Field>
+            <Field label={t("species")}><Input required maxLength={160} placeholder={locale === "it" ? "Es. Python regius" : "e.g. Python regius"} value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} /></Field>
+            <Field label={t("sex")}><Select value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })}><option value="unknown">{t("unknown")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option></Select></Field>
+            <Field label={t("morph")} hint={locale === "it" ? "Morfologia o variante, se conosciuta." : "Morph or variant, if known."}><Input maxLength={200} placeholder={locale === "it" ? "Es. Pastel, Albino…" : "e.g. Pastel, Albino…"} value={form.morph} onChange={(e) => setForm({ ...form, morph: e.target.value })} /></Field>
+            <Field label={t("location")} hint={locale === "it" ? "Rack, terrario o area di stabulazione." : "Rack, terrarium or enclosure area."}><Input maxLength={160} placeholder={locale === "it" ? "Es. Rack 03" : "e.g. Rack 03"} value={form.locationLabel} onChange={(e) => setForm({ ...form, locationLabel: e.target.value })} /></Field>
+          </div>
+        </section>
+
+        <section className="animal-editor-section">
+          <div className="animal-editor-section-heading">
+            <span className="animal-editor-section-icon"><Icon name="camera" size={17} /></span>
+            <div>
+              <h3>{locale === "it" ? "Fotografia" : "Photograph"}</h3>
+              <p>{locale === "it" ? "Aggiungi un'immagine per riconoscere subito l'esemplare." : "Add an image to recognize the animal at a glance."}</p>
+            </div>
+            <span className="animal-editor-optional">{locale === "it" ? "Facoltativa" : "Optional"}</span>
+          </div>
+          <div className="animal-editor-photo">
+            {editing?.photoUrl
+              ? <img src={editing.photoUrl} alt={t("animalPhoto")} />
+              : <span className="animal-editor-photo-placeholder"><Icon name="image" size={23} /></span>}
+            <div className="animal-editor-photo-copy">
+              <strong>{photoFile ? photoFile.name : (locale === "it" ? "Nessuna nuova immagine selezionata" : "No new image selected")}</strong>
+              <span>{locale === "it" ? "JPG, PNG o WebP · massimo 5 MB" : "JPG, PNG or WebP · 5 MB maximum"}</span>
+              <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => selectPhoto(e.target.files?.[0] ?? null)} />
+            </div>
+            {editing?.photoUrl && <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void removePhoto()}>{t("removePhoto")}</Button>}
+          </div>
+          <p className="animal-editor-photo-hint">{t("animalPhotoHint")}</p>
+        </section>
+
+        <section className="animal-editor-section">
+          <div className="animal-editor-section-heading">
+            <span className="animal-editor-section-icon"><Icon name="calendar-days" size={17} /></span>
+            <div>
+              <h3>{locale === "it" ? "Date e provenienza" : "Dates and origin"}</h3>
+              <p>{locale === "it" ? "Tieni traccia della nascita, dell'ingresso in allevamento e dell'origine." : "Track birth, acquisition and the animal's origin."}</p>
+            </div>
+            <span className="animal-editor-optional">{locale === "it" ? "Facoltativo" : "Optional"}</span>
+          </div>
+          <div className="form-grid">
+            <Field label={t("birthDate")}><Input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} /></Field>
+            <Field label={t("acquiredDate")}><Input type="date" value={form.acquiredDate} onChange={(e) => setForm({ ...form, acquiredDate: e.target.value })} /></Field>
+            <Field label={t("previousBreeder")}><Input placeholder={locale === "it" ? "Nome dell'allevatore" : "Breeder name"} value={form.previousBreeder} onChange={(e) => setForm({ ...form, previousBreeder: e.target.value })} /></Field>
+            {editing && <Field label={t("status")}><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t(`animalStatus_${value}`)}</option>)}</Select></Field>}
+          </div>
+          <label className="checkbox-field animal-editor-estimated"><input type="checkbox" checked={form.birthDateEstimated} onChange={(e) => setForm({ ...form, birthDateEstimated: e.target.checked })} />{t("estimatedDate")}</label>
+          <Field label={t("origin")} hint={locale === "it" ? "Ad esempio: nato in allevamento, acquistato o ceduto." : "For example: captive-bred, purchased or transferred."}><Textarea rows={2} value={form.originDescription} onChange={(e) => setForm({ ...form, originDescription: e.target.value })} /></Field>
+        </section>
+
+        <section className="animal-editor-section">
+          <div className="animal-editor-section-heading">
+            <span className="animal-editor-section-icon"><Icon name="notebook-pen" size={17} /></span>
+            <div>
+              <h3>{locale === "it" ? "Genetica e annotazioni" : "Genetics and notes"}</h3>
+              <p>{locale === "it" ? "Conserva dettagli utili per la gestione futura." : "Keep useful details for future care and management."}</p>
+            </div>
+            <span className="animal-editor-optional">{locale === "it" ? "Facoltativo" : "Optional"}</span>
+          </div>
+          <Field label={t("geneticsNotes")}><Textarea rows={2} placeholder={locale === "it" ? "Genetica conosciuta, accoppiamenti, test…" : "Known genetics, pairings, tests…"} value={form.geneticsNotes} onChange={(e) => setForm({ ...form, geneticsNotes: e.target.value })} /></Field>
+          <Field label={t("animalNotes")}><Textarea rows={3} placeholder={locale === "it" ? "Note generali sull'esemplare…" : "General notes about this animal…"} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+        </section>
+
+        <div className="animal-editor-footer-note">{locale === "it" ? "I campi contrassegnati con * sono obbligatori. Tutti gli altri dettagli possono essere aggiunti o aggiornati in seguito." : "Fields marked with * are required. All other details can be added or updated later."}</div>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{busy ? t("loading") : t("save")}</Button></div>
       </form>
     </Modal>}
