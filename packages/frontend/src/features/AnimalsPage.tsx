@@ -6,7 +6,7 @@ import { AnimalListPage } from "./animals/AnimalListPage";
 import { AnimalDetailPage } from "./animals/AnimalDetailPage";
 
 export function AnimalsPage({ locale, navigate, path }: { locale: Locale; navigate: (path: string) => void; path: string }) {
-  const qrToken = path.match(/^\\/animals\\/qr\\/([A-Za-z0-9_-]{32})/)?.[1];
+  const qrToken = path.match(/^\/animals\/qr\/([A-Za-z0-9_-]{32})/)?.[1];
   const [qrError, setQrError] = useState("");
   useEffect(() => {
     if (!qrToken) return;
