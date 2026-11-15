@@ -99,7 +99,11 @@ export const eggSchema = z.object({
   status: eggStatusSchema.default("unknown"),
   hatchedAt: dateOnly.nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.status === "hatched" && !value.hatchedAt) {
+    ctx.addIssue({ code: "custom", path: ["hatchedAt"], message: "A hatch date is required for a hatched egg" });
+  }
+});
 
 export const patchEggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
