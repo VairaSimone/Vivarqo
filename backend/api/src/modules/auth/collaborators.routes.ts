@@ -52,7 +52,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
 
   router.get("/collaborators", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const [memberships, invitations, session] = await Promise.all([
+    const [memberships, invitations, session, premiumEnabled] = await Promise.all([
       prisma.workspaceMembership.findMany({
         where: { ownerUserId: auth.userId, revokedAt: null },
         orderBy: { createdAt: "asc" },
@@ -63,7 +63,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
         orderBy: { createdAt: "desc" },
         select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
       }),
-      prisma.userSession.findFirst({ where: { id: auth.sessionId, userId: auth.userId }, select: { activeWorkspaceOwnerId: true } }),
+      prisma.userSession.findFirst({ where: { id: auth.sessionId, userId: auth.userId }, select: { activeWorkspaceOwnerId: true } }),\n      hasPaidSubscriptionEntitlement(auth.userId),
     ]);
     const workspaces = await prisma.workspaceMembership.findMany({
       where: { collaboratorUserId: auth.userId, revokedAt: null },
@@ -81,7 +81,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
         ownerUserId: item.ownerUserId, role: item.role,
         owner: item.owner, active: session?.activeWorkspaceOwnerId === item.ownerUserId,
       })),
-      activeWorkspaceOwnerId: session?.activeWorkspaceOwnerId ?? null,
+      activeWorkspaceOwnerId: session?.activeWorkspaceOwnerId ?? null,\n      premiumEnabled,
     });
   });
 
