@@ -98,7 +98,7 @@ export function createGeneticTraitsRouter() {
         },
         include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
       });
-      await tx.auditEvent.create({ data: { userId: auth.userId, action: "animal_genetic_trait.created", entityType: "animal_genetic_trait", entityId: created.id } });
+      await tx.animalGeneticTraitHistory.create({ data: { traitId: created.id, animalId, changedBy: auth.userId, snapshot: created as never } });\n      await tx.auditEvent.create({ data: { userId: auth.userId, action: "animal_genetic_trait.created", entityType: "animal_genetic_trait", entityId: created.id } });
       return created;
     });
     res.status(201).json({ trait });
