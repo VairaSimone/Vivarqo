@@ -338,9 +338,16 @@ export function createGeneticTraitsRouter() {
     const inputs: GeneticLocusInput[] = catalog.map((locus) => {
       const motherTraits = traits.filter((trait) => trait.animalId === input.motherAnimalId && trait.locusId === locus.id);
       const fatherTraits = traits.filter((trait) => trait.animalId === input.fatherAnimalId && trait.locusId === locus.id);
-      const genotypeFor = (records: typeof motherTraits) => records.find((trait) => trait.confirmedGenotype)?.confirmedGenotype
-        ?? records.find((trait) => ["confirmed", "carrier"].includes(trait.certainty) && trait.genotype)?.genotype
-        ?? records.find((trait) => trait.theoreticalGenotype)?.theoreticalGenotype ?? "?|?";
+      const genotypeFor = (records: typeof motherTraits) => {
+        const confirmed = [...new Set(records.flatMap((trait) => trait.confirmedGenotype ? [trait.confirmedGenotype] : []))];
+        if (confirmed.length > 1) return "?|?";
+        if (confirmed.length === 1) return confirmed[0]!;
+        const verified = [...new Set(records.flatMap((trait) => ["confirmed", "carrier"].includes(trait.certainty) && trait.genotype ? [trait.genotype] : []))];
+        if (verified.length > 1) return "?|?";
+        if (verified.length === 1) return verified[0]!;
+        const theoretical = [...new Set(records.flatMap((trait) => trait.theoreticalGenotype ? [trait.theoreticalGenotype] : []))];
+        return theoretical.length === 1 ? theoretical[0]! : "?|?";
+      };
       const rules: Record<string, string> = {};
       let conflict = false;
       for (const ruleSet of [...motherTraits.map((trait) => trait.phenotypeRules), ...fatherTraits.map((trait) => trait.phenotypeRules)]) {
