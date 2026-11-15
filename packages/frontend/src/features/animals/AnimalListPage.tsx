@@ -4,6 +4,7 @@ import { downloadQrSvg, qrMatrix } from "../../lib/qr";
 import { dateForInput, formatDate, formatDateTime, formatWeight, getArray, getString, gramsToWeight, queryString, todayDate, weightToGrams, weightUnitLabel } from "../../lib/domain";
 import type { Locale } from "../../lib/domain";
 import type { AnimalDto } from "@vivarqo/contracts/animals";
+import { AnimalManagementPanel } from "./AnimalManagementPanel";
 
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
@@ -202,6 +203,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value="" onChange={(e) => applySavedFilter(e.target.value)}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
+    <AnimalManagementPanel locale={locale} />
     <Panel>
       <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
         filters={<><Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="active">{t("active")}</option><option value="all">{t("allStatuses")}</option><option value="sold">{t("animalStatus_sold")}</option><option value="transferred">{t("animalStatus_transferred")}</option><option value="deceased">{t("animalStatus_deceased")}</option><option value="archived">{t("archived")}</option></Select>
