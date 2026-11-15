@@ -760,6 +760,7 @@ export function createReproductionRouter() {
         await tx.eggHistory.create({ data: { eggId: created.id, status: created.status, notes: created.notes } });
         results.push(created);
       }
+      await tx.clutchHistory.create({ data: { clutchId, action: "eggs.created", details: { count: results.length }, notes: "Uova registrate nella covata" } });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.created", entityType: "egg", metadata: { count: results.length } } });
       return results;
     }, { isolationLevel: "Serializable" });
@@ -824,6 +825,14 @@ export function createReproductionRouter() {
       if (resultingStatus !== existing.status || historyNotes.length > 0) {
         await tx.eggHistory.create({ data: { eggId, status: resultingStatus, notes: historyNotes.join("; ") || input.notes || existing.notes } });
       }
+      if (resultingStatus !== existing.status) {
+        await tx.clutchHistory.create({ data: {
+          clutchId: existing.clutchId,
+          action: "egg.status.changed",
+          details: { eggId, from: existing.status, to: resultingStatus },
+          notes: "Stato di un uovo aggiornato",
+        } });
+      }
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.updated", entityType: "egg", entityId: eggId } });
       return updated;
     });
@@ -874,6 +883,12 @@ export function createReproductionRouter() {
           humidityPct: input.humidityPct ?? null, eventType: input.eventType, notes: input.notes ?? null,
         },
       });
+      await tx.clutchHistory.create({ data: {
+        clutchId,
+        action: "incubation.log.created",
+        details: { logId: created.id, temperatureC: input.temperatureC ?? null, humidityPct: input.humidityPct ?? null, eventType: input.eventType },
+        notes: input.notes ?? null,
+      } });
       const clutch = await tx.clutch.findUnique({ where: { id: clutchId }, include: { cycle: { select: { userId: true } } } });
       if (clutch?.checkIntervalHours) {
         const title = "Controllo incubazione · " + clutchId;
