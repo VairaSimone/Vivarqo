@@ -13,6 +13,7 @@ import { useResource } from "../../hooks/useResource";
 import { AnimalMovementHistory } from "./AnimalMovementHistory";
 import { AnimalFeedingInsights } from "./AnimalFeedingInsights";
 import { WeightGrowthPanel } from "./WeightGrowthPanel";
+import { AnimalHealthPanel } from "./AnimalHealthPanel";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
@@ -347,7 +348,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const latestFeedingSession = summaryFeedings.data?.sessions?.[0];
   const latestFeedingEntry = latestFeedingSession?.entries.find((entry) => getString(entry, "animalId") === id);
   const tabItems = [
-    ["overview", t("overview")], ["history", t("careHistory")], ["documents", t("documentsTab")],
+    ["overview", t("overview")], ["history", t("careHistory")], ["health", locale === "it" ? "Salute" : "Health"], ["documents", t("documentsTab")],
     ["traits", t("traits")], ["share", t("publicShare")]
   ];
 
@@ -496,6 +497,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       </div>
       <AnimalMovementHistory id={id} locale={locale} readOnly={isArchived} onTransferRecorded={animalResource.reload} />
     </div>}
+
+    {tab === "health" && <AnimalHealthPanel animalId={id} locale={locale} archived={isArchived} onDocuments={() => setTab("documents")} />}
 
     {tab === "documents" && <Panel><PanelHeader title={t("documentsTab")} action={!isArchived ? <Button onClick={() => navigate(`/documents?animalId=${id}`)}><Icon name="upload" size={15} />{t("uploadDocument")}</Button> : undefined} />
       {documents.data?.documents?.length ? <DataTable headers={[t("name"), t("documentCategory"), t("date"), t("actions")]} rows={documents.data.documents.map((doc) => [
