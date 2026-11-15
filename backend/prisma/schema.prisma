@@ -87,7 +87,7 @@ model WorkspaceInvitation {
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   owner User @relation("WorkspaceInvitationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  @@unique([ownerUserId, email], where: raw("\"accepted_at\" IS NULL AND \"revoked_at\" IS NULL"), map: "workspace_invitations_pending_owner_email_key")
+  @@unique([ownerUserId, email], where: raw("(\"accepted_at\" IS NULL) AND (\"revoked_at\" IS NULL)"), map: "workspace_invitations_pending_owner_email_key")
   @@index([ownerUserId, expiresAt], map: "workspace_invitations_owner_expires_idx")
   @@index([email, expiresAt], map: "workspace_invitations_email_expires_idx")
   @@map("workspace_invitations")
