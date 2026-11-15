@@ -1090,6 +1090,14 @@ CREATE TABLE IF NOT EXISTS hatchling_care (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS health_status VARCHAR(24) NOT NULL DEFAULT 'unknown';
+ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS health_notes TEXT;
+ALTER TABLE hatchling_care ADD COLUMN IF NOT EXISTS availability_status VARCHAR(24) NOT NULL DEFAULT 'not_available';
+DO $ BEGIN
+  ALTER TABLE hatchling_care ADD CONSTRAINT hatchling_care_availability_status_check
+    CHECK (availability_status IN ('not_available', 'available', 'reserved', 'transferred'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+
 CREATE TABLE IF NOT EXISTS egg_measurements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     egg_id UUID NOT NULL REFERENCES eggs(id) ON DELETE CASCADE,
