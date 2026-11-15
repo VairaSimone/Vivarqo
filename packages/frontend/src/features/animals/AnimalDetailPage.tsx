@@ -39,7 +39,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [hatchlingCareBusy, setHatchlingCareBusy] = useState(false);
   const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", healthStatus: "unknown", healthNotes: "", notes: "" });
   const [traitForm, setTraitForm] = useState({
-    traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", certainty: "unverified",
+    traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", phenotypeRules: "", certainty: "unverified",
   });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
   const [feedingPage, setFeedingPage] = useState(1);
@@ -222,6 +222,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       confidenceNote: existing?.confidenceNote ?? "",
       inheritanceMode: existing?.inheritanceMode ?? "",
       genotype: existing?.genotype ?? "",
+      phenotypeRules: existing?.phenotypeRules ? JSON.stringify(existing.phenotypeRules, null, 2) : "",
       certainty: existing?.certainty ?? "unverified",
     });
     setTraitModal(true);
@@ -237,9 +238,23 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       setTraitError(t("geneticSelfSourceError"));
       return;
     }
-    if ((traitForm.inheritanceMode && !/^[A-Za-z]{2}$/.test(traitForm.genotype)) || (traitForm.genotype && !traitForm.inheritanceMode)) {
+    if ((traitForm.inheritanceMode && !/^(?:[A-Za-z]{2}|[A-Za-z][A-Za-z0-9_-]{0,11}\|[A-Za-z][A-Za-z0-9_-]{0,11})$/.test(traitForm.genotype)) || (traitForm.genotype && !traitForm.inheritanceMode)) {
       setTraitError(locale === "it" ? "Per calcolare le probabilità servono sia la modalità di ereditarietà sia un genotipo di due alleli (es. Aa)." : "To calculate probabilities, provide both an inheritance mode and a two-allele genotype (e.g. Aa).");
       return;
+    }
+    let phenotypeRules: Record<string, string> | null = null;
+    if (traitForm.phenotypeRules.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(traitForm.phenotypeRules);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+            Object.entries(parsed).some(([key, value]) => !key.trim() || typeof value !== "string" || !value.trim())) {
+          throw new Error("invalid phenotype rules");
+        }
+        phenotypeRules = parsed as Record<string, string>;
+      } catch {
+        setTraitError(locale === "it" ? "Le regole fenotipo devono essere un oggetto JSON con genotipo come chiave e fenotipo come valore testuale." : "Phenotype rules must be a JSON object mapping genotype keys to phenotype labels.");
+        return;
+      }
     }
     setTraitBusy(true);
     setTraitError("");
@@ -250,6 +265,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       confidenceNote: traitForm.confidenceNote.trim() || null,
       inheritanceMode: traitForm.inheritanceMode || null,
       genotype: traitForm.genotype || null,
+      phenotypeRules,
       certainty: traitForm.certainty,
     };
     try {
@@ -520,8 +536,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
               <option value="dominant">{locale === "it" ? "Dominante" : "Dominant"}</option>
             </Select>
           </Field>
-          <Field label={locale === "it" ? "Genotipo (es. Aa)" : "Genotype (e.g. Aa)"} hint={locale === "it" ? "Due alleli; non dedurre il genotipo dal solo morph." : "Two alleles; never infer genotype from morph alone."}>
-            <Input maxLength={2} pattern="[A-Za-z]{2}" value={traitForm.genotype} onChange={(e) => setTraitForm({ ...traitForm, genotype: e.target.value })} />
+          <Field label={locale === "it" ? "Genotipo (es. Aa o allele1|allele2)" : "Genotype (e.g. Aa or allele1|allele2)"} hint={locale === "it" ? "Due alleli; usa | per nomi composti. Non dedurre il genotipo dal solo morph." : "Two alleles; use | for multi-character names. Never infer genotype from morph alone."}>
+            <Input maxLength={25} value={traitForm.genotype} onChange={(e) => setTraitForm({ ...traitForm, genotype: e.target.value })} />
+          </Field>
+          <Field label={locale === "it" ? "Regole genotipo → fenotipo (JSON)" : "Genotype → phenotype rules (JSON)"} hint={locale === "it" ? 'Esempio: {"A|A":"Wild type","A|a":"Portatore","a|a":"Morph"}. Inserisci le stesse regole sui genitori dello stesso tratto.' : 'Example: {"A|A":"Wild type","A|a":"Carrier","a|a":"Morph"}. Use the same rules for both parents for this trait.'}>
+            <Textarea rows={4} value={traitForm.phenotypeRules} onChange={(e) => setTraitForm({ ...traitForm, phenotypeRules: e.target.value })} placeholder='{"A|A":"Wild type","A|a":"Carrier","a|a":"Morph"}' />
           </Field>
           <Field label={locale === "it" ? "Attendibilità" : "Certainty"}>
             <Select value={traitForm.certainty} onChange={(e) => setTraitForm({ ...traitForm, certainty: e.target.value })}>
