@@ -16,7 +16,7 @@ const roleNames: Record<Role, { it: string; en: string }> = {
   viewer: { it: "Sola lettura", en: "Read only" },
 };
 const roleDescriptions: Record<Role, { it: string; en: string }> = {
-  admin: { it: "Gestisce tutte le aree operative e i collaboratori. Non accede a finanze, esportazioni complete o abbonamento.", en: "Manages operational areas and collaborators. No access to finances, full exports or billing." },
+  admin: { it: "Gestisce tutte le aree operative. Non gestisce l’abbonamento del workspace e non accede a finanze o esportazioni complete.", en: "Manages operational areas. Cannot manage workspace billing or access finances and full exports." },
   operator: { it: "Gestisce anagrafiche, alimentazioni, pesi, mute, salute e attività.", en: "Manages animals, feeding, weights, sheds, health and tasks." },
   breeding: { it: "Consulta gli animali e modifica riproduzioni, covate, incubazione e genetica.", en: "Views animals and edits reproduction, clutches, incubation and genetics." },
   viewer: { it: "Può consultare i dati, senza modificarli.", en: "Can view data but cannot make changes." },
