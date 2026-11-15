@@ -19,7 +19,9 @@ import {
   patchOffspringSchema,
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
-  reproductionCycleStatusSchema,\n  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema,\n} from "@vivarqo/contracts/reproduction";
+  reproductionCycleStatusSchema,
+  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema,
+} from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
@@ -187,7 +189,9 @@ export function createReproductionRouter() {
           cycles: pairCycles.map((cycle) => ({ id: cycle.id, name: cycle.name, startedOn: cycle.startedOn, status: cycle.status, clutchCount: cycle._count.clutches, offspringBatchCount: cycle._count.offspringBatches })),
         },
         geneticDataIsIncomplete: !mother.geneticTraits.length || !father.geneticTraits.length,
-        inbreedingCoefficientEstimate: commonAncestors.length ? Math.min(1, inbreedingCoefficientEstimate) : 0,\n        inbreedingCoefficientAssumption: "Common-ancestor path estimate through at most 8 generations; assumes unrelated founders and no additional inbreeding in ancestors.",\n        geneticPredictions,
+        inbreedingCoefficientEstimate: commonAncestors.length ? Math.min(1, inbreedingCoefficientEstimate) : 0,
+        inbreedingCoefficientAssumption: "Common-ancestor path estimate through at most 8 generations; assumes unrelated founders and no additional inbreeding in ancestors.",
+        geneticPredictions,
       },
     });
   });
