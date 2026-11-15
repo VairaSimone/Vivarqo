@@ -22,6 +22,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [eggPhotoBusy, setEggPhotoBusy] = useState(false);
   const [editingLog, setEditingLog] = useState<IncubationLogDto | null>(null);
   const [measuringEgg, setMeasuringEgg] = useState<EggDto | null>(null);
+  const [editingMeasurement, setEditingMeasurement] = useState<{ id: string; measuredAt: string; weightG: number; notes: string | null } | null>(null);
   const [eggMeasurements, setEggMeasurements] = useState<Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }>>([]);
   const [measurementForm, setMeasurementForm] = useState({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
   const [eggsPage, setEggsPage] = useState(1);
@@ -56,6 +57,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   }
   async function openEggMeasurements(egg: EggDto) {
     setMeasuringEgg(egg);
+    setEditingMeasurement(null);
     setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
     try {
       const response = await api.get<{ measurements: Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }> }>(`/eggs/${encodeURIComponent(egg.id)}/measurements`);
@@ -70,18 +72,47 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     if (!measuringEgg) return;
     setBusy(true);
     try {
-      await api.post(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`, {
+      const body = {
         measuredAt: new Date(measurementForm.measuredAt).toISOString(),
         weightG: Number(measurementForm.weightG),
         notes: measurementForm.notes || null,
-      });
+      };
+      if (editingMeasurement) {
+        await api.patch(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements/${encodeURIComponent(editingMeasurement.id)}`, body);
+      } else {
+        await api.post(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`, body);
+      }
       const response = await api.get<{ measurements: Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }> }>(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`);
       setEggMeasurements(response.measurements);
       eggsResource.reload();
       show(t("saveSuccess"));
+      setEditingMeasurement(null);
       setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
     } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
+  }
+
+  function editEggMeasurement(measurement: { id: string; measuredAt: string; weightG: number; notes: string | null }) {
+    setEditingMeasurement(measurement);
+    setMeasurementForm({
+      measuredAt: localDateTimeValue(new Date(measurement.measuredAt)),
+      weightG: String(measurement.weightG),
+      notes: measurement.notes ?? "",
+    });
+  }
+
+  async function deleteEggMeasurement(measurement: { id: string }) {
+    if (!measuringEgg || !window.confirm(t("confirmDelete"))) return;
+    try {
+      await api.delete(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements/${encodeURIComponent(measurement.id)}`);
+      const response = await api.get<{ measurements: Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }> }>(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`);
+      setEggMeasurements(response.measurements);
+      if (editingMeasurement?.id === measurement.id) {
+        setEditingMeasurement(null);
+        setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
+      }
+      show(t("delete"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
   async function addIncubatorMaintenance() {
@@ -177,12 +208,12 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     </Panel>}
     {measuringEgg && <Modal title={(locale === "it" ? "Misurazioni uovo · " : "Egg measurements · ") + (measuringEgg.code || "—")} onClose={() => setMeasuringEgg(null)}>
       <div className="form-stack">
-        {eggMeasurements.length > 0 && <div className="record-list">{eggMeasurements.map((measurement) => <div className="record-row" key={measurement.id}><div><strong>{measurement.weightG} g</strong><small>{formatDateTime(measurement.measuredAt, locale)}</small>{measurement.notes && <p>{measurement.notes}</p>}</div></div>)}</div>}
+        {eggMeasurements.length > 0 && <div className="record-list">{eggMeasurements.map((measurement) => <div className="record-row" key={measurement.id}><div><strong>{measurement.weightG} g</strong><small>{formatDateTime(measurement.measuredAt, locale)}</small>{measurement.notes && <p>{measurement.notes}</p>}</div><div className="row-actions"><IconButton label={t("edit")} onClick={() => editEggMeasurement(measurement)}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEggMeasurement(measurement)}><Icon name="trash" size={15} /></IconButton></div></div>)}</div>}
         <form className="form-stack" onSubmit={saveEggMeasurement}>
           <Field label={locale === "it" ? "Data e ora" : "Date and time"}><Input required type="datetime-local" value={measurementForm.measuredAt} onChange={(e) => setMeasurementForm({ ...measurementForm, measuredAt: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Peso (g)" : "Weight (g)"}><Input required type="number" min="0.01" step="0.01" value={measurementForm.weightG} onChange={(e) => setMeasurementForm({ ...measurementForm, weightG: e.target.value })} /></Field>
           <Field label={t("notes")}><Textarea rows={2} value={measurementForm.notes} onChange={(e) => setMeasurementForm({ ...measurementForm, notes: e.target.value })} /></Field>
-          <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMeasuringEgg(null)}>{t("close")}</Button><Button type="submit" disabled={busy || !measurementForm.weightG}>{t("save")}</Button></div>
+          <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => { setEditingMeasurement(null); setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" }); }}>{locale === "it" ? "Nuova misurazione" : "New measurement"}</Button><Button type="submit" disabled={busy || !measurementForm.weightG}>{editingMeasurement ? t("edit") : t("save")}</Button><Button variant="secondary" type="button" onClick={() => setMeasuringEgg(null)}>{t("close")}</Button></div>
         </form>
       </div>
     </Modal>}
