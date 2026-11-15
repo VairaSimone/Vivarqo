@@ -409,7 +409,26 @@ function scheduleRestart(name) {
   service.restarts++;
   service.state = "restarting";
   void log("WARN", name, "Tentativo di riavvio " + attempt + "/8 tra " + Math.ceil(wait / 1000) + "s. Riavvii totali: " + service.restarts + ".");
-  setTimeout(() => { if (!STOP.requested && service.state === "restarting") start(name); }, wait).unref();
+  setTimeout(() => {
+    if (STOP.requested || service.state !== "restarting") return;
+    const restarted = start(name);
+    // A replacement child starts in "starting". Unlike the initial boot path,
+    // a scheduled restart must also run the immediate HTTP readiness probe;
+    // otherwise the service stays "starting" until the periodic monitor wakes
+    // up (30s by default), longer than the resilience test and the UI contract.
+    if (restarted && (name === "api" || name === "frontend")) {
+      const url = name === "api" ? API_URL : WEB_URL;
+      void waitHttp(name, url).catch(async error => {
+        if (restarted.child === service.child && !STOP.requested) {
+          restarted.state = "crashed";
+          restarted.lastCheck = error.message;
+          registerRestartFailure(restarted);
+          await log("ERROR", name, "Health check dopo il riavvio fallito: " + error.message);
+          scheduleRestart(name);
+        }
+      });
+    }
+  }, wait).unref();
 }
 function broadcast(payload) {
   const data = "data: " + JSON.stringify(payload) + "\n\n";
