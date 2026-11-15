@@ -4,6 +4,8 @@ import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { assertAnimalCapacity } from "./billing-entitlements.js";
+import { deletePrivateObject } from "./private-storage.js";
+import { logger } from "../../logger.js";
 
 import {
   createCycleSchema,
@@ -970,13 +972,17 @@ export function createReproductionRouter() {
     const eggId = routeUuid(req.params.id, "egg id");
     const existing = await prisma.egg.findFirst({
       where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } },
-      select: { id: true },
+      select: { id: true, photoKey: true },
     });
     if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
     await prisma.$transaction(async (tx) => {
       await tx.egg.delete({ where: { id: eggId } });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.deleted", entityType: "egg", entityId: eggId } });
     });
+    if (existing.photoKey) {
+      try { await deletePrivateObject(existing.photoKey); }
+      catch (error) { logger.error({ eggId, storageKey: existing.photoKey, error }, "Failed to delete egg photo after egg removal"); }
+    }
     res.status(204).send();
   });
 
