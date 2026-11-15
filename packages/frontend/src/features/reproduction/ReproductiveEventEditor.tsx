@@ -31,7 +31,15 @@ export function ReproductiveEventEditor({ locale, isEditing, form, onChange, err
   return <Modal title={isEditing ? t("edit") : t("addEvent")} onClose={onClose}>
     <form className="form-stack" onSubmit={onSubmit}>
       {error && <Alert tone="danger">{error}</Alert>}
-      <Field label={t("eventType")}><Select value={form.eventType} onChange={(e) => onChange({ ...form, eventType: e.target.value })}>{eventTypes.map((value) => <option key={value} value={value}>{t(`event_${value}`)}</option>)}</Select></Field>
+      <Field label={t("eventType")}><Select value={form.eventType} onChange={(e) => onChange({ ...form, eventType: e.target.value })}>{eventTypes.map((value) => <option key={value} value={value}>{({
+        pairing: locale === "it" ? "Accoppiamento" : "Pairing",
+        pairing_failed: locale === "it" ? "Accoppiamento non riuscito" : "Unsuccessful pairing",
+        no_deposition: locale === "it" ? "Nessuna deposizione" : "No egg laying",
+        infertile_clutch: locale === "it" ? "Covata non fertile" : "Infertile clutch",
+        embryonic_loss: locale === "it" ? "Perdita embrionale" : "Embryonic loss",
+        stillbirth: locale === "it" ? "Nascita senza piccoli vivi" : "Stillbirth",
+        post_hatch_loss: locale === "it" ? "Perdita dopo la schiusa" : "Post-hatch loss"
+      } as Record<string, string>)[value] ?? t(`event_${value}`)}</option>)}</Select></Field>
       <Field label={t("occurredAt")}><Input required type="datetime-local" value={form.occurredAt} onChange={(e) => onChange({ ...form, occurredAt: e.target.value })} /></Field>
       <RemoteSelect label={t("animalDetail")} value={form.animalId} onChange={(animalId) => onChange({ ...form, animalId })} endpoint="/animals" responseKey="animals" filters={{ status: "active", sort: "name" }} detailEndpoint={(animalId) => `/animals/${encodeURIComponent(animalId)}`} detailKey="animal" locale={locale} />
       <div className="form-grid">
