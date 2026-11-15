@@ -94,6 +94,7 @@ export function createGeneticTraitsRouter() {
     await ownedAnimal(auth.userId, animalId);
     const input = parseBody(traitCreate, req.body);
     await ownedSource(auth.userId, input.sourceAnimalId, animalId);
+    await ownedLocus(auth.userId, input.locusId);
     const trait = await prisma.$transaction(async (tx) => {
       const created = await tx.animalGeneticTrait.create({
         data: {
@@ -119,6 +120,7 @@ export function createGeneticTraitsRouter() {
     if (!existing) throw new AppError(404, "GENETIC_TRAIT_NOT_FOUND", "Genetic trait not found");
     const source = input.sourceAnimalId !== undefined ? input.sourceAnimalId : existing.sourceAnimalId;
     await ownedSource(auth.userId, source, existing.animalId);
+    await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
     const trait = await prisma.$transaction(async (tx) => {
       await tx.animalGeneticTraitHistory.create({ data: { traitId: id, animalId: existing.animalId, changedBy: auth.userId, snapshot: existing as never } });
       const updated = await tx.animalGeneticTrait.update({ where: { id }, data: input as never, include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } } });
@@ -139,6 +141,169 @@ export function createGeneticTraitsRouter() {
       await tx.animalGeneticTrait.delete({ where: { id } });
     });
     res.status(204).send();
+  });
+
+
+  router.get("/genetics/catalog", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const species = typeof req.query.species === "string" ? req.query.species.trim().slice(0, 160) : "";
+    const genes = await prisma.geneticGene.findMany({
+      where: { userId: auth.userId, ...(species ? { species: { equals: species, mode: "insensitive" as const } } : {}) },
+      include: { loci: { include: { alleles: { orderBy: { symbol: "asc" } } }, orderBy: { symbol: "asc" } } },
+      orderBy: [{ species: "asc" }, { symbol: "asc" }],
+    });
+    res.status(200).json({ genes });
+  });
+
+  router.post("/genetics/genes", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      species: z.string().trim().min(1).max(160), symbol: z.string().trim().min(1).max(40),
+      name: z.string().trim().min(1).max(160), description: z.string().max(10000).nullable().optional(),
+    }).strict(), req.body);
+    const gene = await prisma.geneticGene.create({ data: { ...input, userId: auth.userId } });
+    res.status(201).json({ gene });
+  });
+
+  router.post("/genetics/genes/:geneId/loci", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const geneId = uuid(req.params.geneId, "gene id");
+    const input = parseBody(z.object({
+      symbol: z.string().trim().min(1).max(40), name: z.string().trim().min(1).max(160),
+      inheritanceMode: z.enum(["autosomal_recessive", "dominant", "incomplete_dominant", "codominant"]),
+      description: z.string().max(10000).nullable().optional(),
+    }).strict(), req.body);
+    const gene = await prisma.geneticGene.findFirst({ where: { id: geneId, userId: auth.userId }, select: { id: true } });
+    if (!gene) throw new AppError(404, "GENETIC_GENE_NOT_FOUND", "Genetic gene not found");
+    const locus = await prisma.geneticLocus.create({ data: { geneId, ...input } });
+    res.status(201).json({ locus });
+  });
+
+  router.post("/genetics/loci/:locusId/alleles", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const locusId = uuid(req.params.locusId, "locus id");
+    const input = parseBody(z.object({
+      symbol: z.string().trim().min(1).max(24), name: z.string().trim().min(1).max(120),
+      description: z.string().max(10000).nullable().optional(), isReference: z.boolean().optional(),
+    }).strict(), req.body);
+    await ownedLocus(auth.userId, locusId);
+    const allele = await prisma.geneticAllele.create({ data: { locusId, ...input } });
+    res.status(201).json({ allele });
+  });
+
+  router.get("/animals/:animalId/genetic-history", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = uuid(req.params.animalId, "animal id");
+    await ownedAnimal(auth.userId, animalId);
+    const history = await prisma.animalGeneticTraitHistory.findMany({
+      where: { animalId }, orderBy: [{ changedAt: "desc" }, { id: "desc" }], take: 200,
+    });
+    res.status(200).json({ history });
+  });
+
+  router.post("/genetics/calculate", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      loci: z.array(z.object({ locusId: z.string().uuid(), motherGenotype: z.string().max(64), fatherGenotype: z.string().max(64) }).strict()).min(1).max(12),
+    }).strict(), req.body);
+    const ids = input.loci.map((item) => item.locusId);
+    const catalog = await prisma.geneticLocus.findMany({
+      where: { id: { in: ids }, gene: { is: { userId: auth.userId } } }, include: { alleles: true },
+    });
+    if (catalog.length !== ids.length || new Set(ids).size !== ids.length) throw new AppError(400, "GENETIC_LOCUS_INVALID", "One or more loci are unavailable");
+    const byId = new Map(catalog.map((locus) => [locus.id, locus]));
+    const calculation = calculateGenetics(input.loci.map((item) => {
+      const locus = byId.get(item.locusId)!;
+      return {
+        locusId: locus.id, name: locus.name,
+        inheritanceMode: locus.inheritanceMode as GeneticLocusInput["inheritanceMode"],
+        motherGenotype: item.motherGenotype, fatherGenotype: item.fatherGenotype,
+        referenceAllele: locus.alleles.find((allele) => allele.isReference)?.symbol ?? null,
+        allowedAlleles: locus.alleles.map((allele) => allele.symbol),
+      };
+    }));
+    res.status(200).json({ calculation });
+  });
+
+  router.post("/genetics/calculate-pairing", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      motherAnimalId: z.string().uuid(), fatherAnimalId: z.string().uuid(),
+      locusIds: z.array(z.string().uuid()).min(1).max(12),
+    }).strict(), req.body);
+    if (input.motherAnimalId === input.fatherAnimalId) throw new AppError(400, "INVALID_PAIRING", "Parents must be different animals");
+    await ownedAnimal(auth.userId, input.motherAnimalId);
+    await ownedAnimal(auth.userId, input.fatherAnimalId);
+    const [catalog, traits] = await Promise.all([
+      prisma.geneticLocus.findMany({ where: { id: { in: input.locusIds }, gene: { is: { userId: auth.userId } } }, include: { alleles: true } }),
+      prisma.animalGeneticTrait.findMany({ where: { animalId: { in: [input.motherAnimalId, input.fatherAnimalId] }, locusId: { in: input.locusIds } } }),
+    ]);
+    if (catalog.length !== input.locusIds.length || new Set(input.locusIds).size !== input.locusIds.length) throw new AppError(400, "GENETIC_LOCUS_INVALID", "One or more loci are unavailable");
+    const inputs: GeneticLocusInput[] = catalog.map((locus) => {
+      const mother = traits.find((trait) => trait.animalId === input.motherAnimalId && trait.locusId === locus.id);
+      const father = traits.find((trait) => trait.animalId === input.fatherAnimalId && trait.locusId === locus.id);
+      const genotypeFor = (trait: typeof mother) => trait?.confirmedGenotype
+        ?? (trait && ["confirmed", "carrier"].includes(trait.certainty) ? trait.genotype : null)
+        ?? trait?.theoreticalGenotype ?? "?|?";
+      const rules: Record<string, string> = {};
+      let conflict = false;
+      for (const ruleSet of [mother?.phenotypeRules, father?.phenotypeRules]) {
+        if (!ruleSet || typeof ruleSet !== "object" || Array.isArray(ruleSet)) continue;
+        for (const [genotype, value] of Object.entries(ruleSet as Record<string, unknown>)) {
+          if (typeof value !== "string") continue;
+          if (rules[genotype] && rules[genotype] !== value) conflict = true;
+          else rules[genotype] = value;
+        }
+      }
+      return {
+        locusId: locus.id, name: locus.name,
+        inheritanceMode: locus.inheritanceMode as GeneticLocusInput["inheritanceMode"],
+        motherGenotype: genotypeFor(mother), fatherGenotype: genotypeFor(father),
+        referenceAllele: locus.alleles.find((allele) => allele.isReference)?.symbol ?? null,
+        allowedAlleles: locus.alleles.map((allele) => allele.symbol),
+        phenotypeRules: conflict ? null : rules,
+      };
+    });
+    res.status(200).json({ calculation: calculateGenetics(inputs) });
+  });
+
+  router.get("/animals/:animalId/inbreeding", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = uuid(req.params.animalId, "animal id");
+    await ownedAnimal(auth.userId, animalId);
+    const animals = await prisma.animal.findMany({ where: { userId: auth.userId }, select: { id: true, motherAnimalId: true, fatherAnimalId: true } });
+    const inbreeding = calculateInbreeding(animals.map((animal) => ({ id: animal.id, motherId: animal.motherAnimalId, fatherId: animal.fatherAnimalId })), animalId, 8);
+    res.status(200).json({ inbreeding });
+  });
+
+  router.get("/animals/:animalId/pedigree", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = uuid(req.params.animalId, "animal id");
+    await ownedAnimal(auth.userId, animalId);
+    const animals = await prisma.animal.findMany({
+      where: { userId: auth.userId },
+      select: { id: true, name: true, species: true, motherAnimalId: true, fatherAnimalId: true, motherDescription: true, fatherDescription: true },
+    });
+    const byId = new Map(animals.map((animal) => [animal.id, animal]));
+    const nodes = new Map<string, { id: string; name: string; species: string; generation: number }>();
+    const edges: Array<{ childId: string; parentId: string; role: "mother" | "father" }> = [];
+    const missingParents: Array<{ childId: string; role: "mother" | "father"; description: string | null }> = [];
+    const walk = (id: string, generation: number, path: string[]) => {
+      const animal = byId.get(id);
+      if (!animal || generation > 8 || path.includes(id)) return;
+      nodes.set(id, { id, name: animal.name, species: animal.species, generation });
+      for (const [role, parentId, description] of [
+        ["mother", animal.motherAnimalId, animal.motherDescription],
+        ["father", animal.fatherAnimalId, animal.fatherDescription],
+      ] as const) {
+        if (!parentId) { missingParents.push({ childId: id, role, description }); continue; }
+        if (path.includes(parentId)) continue;
+        edges.push({ childId: id, parentId, role });
+        walk(parentId, generation + 1, [...path, id]);
+      }
+    };
+    walk(animalId, 0, []);
+    res.status(200).json({ nodes: [...nodes.values()], edges, missingParents, generations: 8 });
   });
 
   return router;
