@@ -8,7 +8,7 @@ import {
   patchClutchSchema,
   eggSchema,
   patchEggSchema,
-  newAnimalSchema, eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema, reproductiveEventTypeSchema,
+  newAnimalSchema, eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema, reproductiveEventTypeSchema, speciesBreedingProfileSchema,
 } from "@vivarqo/contracts/reproduction";
 
 describe("shared reproduction contracts", () => {
@@ -104,5 +104,22 @@ describe("advanced reproduction contracts", () => {
     expect(hatchlingCareSchema.safeParse({ firstFeedingAt: "2026-11-15T10:00:00.000Z", firstFeedingAccepted: true }).success).toBe(true);
     expect(reproductiveEventTypeSchema.safeParse("embryonic_loss").success).toBe(true);
     expect(reproductiveEventTypeSchema.safeParse("made-up").success).toBe(false);
+    expect(eggSchema.safeParse({ status: "collapsed" }).success).toBe(true);
+  });
+});
+
+describe("species breeding profile contract", () => {
+  it("accepts optional species-specific maturity and weight thresholds", () => {
+    expect(speciesBreedingProfileSchema.safeParse({
+      species: "Python regius",
+      femaleMinAgeMonths: 36,
+      maleMinAgeMonths: 18,
+      femaleMinWeightG: 1500,
+      maleMinWeightG: 700,
+    }).success).toBe(true);
+    expect(speciesBreedingProfileSchema.safeParse({
+      species: "Python regius",
+      femaleMinAgeMonths: -1,
+    }).success).toBe(false);
   });
 });
