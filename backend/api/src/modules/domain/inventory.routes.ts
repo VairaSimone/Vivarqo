@@ -222,6 +222,17 @@ export function createInventoryRouter() {
         },
       });
       const item = await tx.inventoryItem.update({ where: { id }, data: { quantityOnHand: newAmount / scale } });
+      if (input.movementType === "out" && input.unitCostCents != null) {
+        const amountCents = Math.round(input.unitCostCents * input.quantity);
+        if (Number.isSafeInteger(amountCents) && amountCents > 0) {
+          await tx.financeEntry.create({ data: {
+            userId: auth.userId, entryType: "expense", occurredOn: new Date(input.occurredAt.slice(0, 10) + "T00:00:00.000Z"),
+            amountCents: BigInt(amountCents), currency: "EUR", category: "Inventario",
+            description: "Consumo inventario: " + current.name + (input.reference ? " · " + input.reference : ""),
+            sourceStockMovementId: movement.id,
+          } });
+        }
+      }
       await tx.auditEvent.create({
         data: {
           userId: auth.userId, action: "inventory.movement.created", entityType: "stock_movement", entityId: movement.id,
