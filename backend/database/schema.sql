@@ -1014,6 +1014,154 @@ ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_category_check;
 ALTER TABLE tasks ADD CONSTRAINT tasks_category_check
     CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'incubation', 'document', 'inventory', 'custom'));
 
+
+-- ---------------------------------------------------------------------------
+-- 14. Strutture riproduttive, incubazione e cura sanitaria (baseline consolidata)
+-- Queste definizioni riflettono le migrazioni successive alla baseline iniziale.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS incubators (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(120) NOT NULL,
+    identifier VARCHAR(80),
+    capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+    notes TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    maintenance_interval_days INTEGER,
+    next_maintenance_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS incubators_user_name_unique ON incubators(user_id, name);
+CREATE INDEX IF NOT EXISTS incubators_user_active_idx ON incubators(user_id, is_active);
+
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_temperature_min_c NUMERIC(5,2);
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_temperature_max_c NUMERIC(5,2);
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_humidity_min_pct NUMERIC(5,2);
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS target_humidity_max_pct NUMERIC(5,2);
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS check_interval_hours INTEGER;
+ALTER TABLE clutches ADD COLUMN IF NOT EXISTS incubator_id UUID;
+DO $ BEGIN
+    ALTER TABLE clutches ADD CONSTRAINT clutches_incubator_id_fkey
+      FOREIGN KEY (incubator_id) REFERENCES incubators(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+DO $ BEGIN
+    ALTER TABLE clutches ADD CONSTRAINT clutches_temperature_range_check
+      CHECK (target_temperature_min_c IS NULL OR target_temperature_max_c IS NULL OR target_temperature_min_c <= target_temperature_max_c);
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+DO $ BEGIN
+    ALTER TABLE clutches ADD CONSTRAINT clutches_humidity_range_check
+      CHECK (target_humidity_min_pct IS NULL OR target_humidity_max_pct IS NULL OR target_humidity_min_pct <= target_humidity_max_pct);
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+DO $ BEGIN
+    ALTER TABLE clutches ADD CONSTRAINT clutches_check_interval_hours_check
+      CHECK (check_interval_hours IS NULL OR check_interval_hours BETWEEN 1 AND 720);
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+CREATE INDEX IF NOT EXISTS clutches_incubator_idx ON clutches(incubator_id);
+
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS hatched_at DATE;
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS offspring_animal_id UUID;
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS incubator_id UUID;
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS incubator_position VARCHAR(80);
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS laid_at TIMESTAMPTZ;
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS expected_hatch_at DATE;
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS photo_key TEXT;
+DO $ BEGIN
+    ALTER TABLE eggs ADD CONSTRAINT eggs_offspring_animal_id_fkey
+      FOREIGN KEY (offspring_animal_id) REFERENCES animals(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+DO $ BEGIN
+    ALTER TABLE eggs ADD CONSTRAINT eggs_incubator_id_fkey
+      FOREIGN KEY (incubator_id) REFERENCES incubators(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $;
+CREATE UNIQUE INDEX IF NOT EXISTS eggs_offspring_animal_id_key ON eggs(offspring_animal_id) WHERE offspring_animal_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS eggs_status_idx ON eggs(status);
+CREATE INDEX IF NOT EXISTS eggs_incubator_position_idx ON eggs(incubator_id, incubator_position);
+
+CREATE TABLE IF NOT EXISTS hatchling_care (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    animal_id UUID NOT NULL UNIQUE REFERENCES animals(id) ON DELETE CASCADE,
+    first_feeding_at TIMESTAMPTZ,
+    first_feeding_accepted BOOLEAN,
+    first_shed_at TIMESTAMPTZ,
+    ready_for_rehoming_at TIMESTAMPTZ,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS egg_measurements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    egg_id UUID NOT NULL REFERENCES eggs(id) ON DELETE CASCADE,
+    measured_at TIMESTAMPTZ(6) NOT NULL,
+    weight_g NUMERIC(10,2) NOT NULL CHECK (weight_g > 0),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS egg_measurements_egg_measured_idx ON egg_measurements(egg_id, measured_at DESC);
+
+CREATE TABLE IF NOT EXISTS egg_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    egg_id UUID NOT NULL REFERENCES eggs(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL,
+    occurred_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS egg_history_egg_occurred_idx ON egg_history(egg_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS egg_incubator_transfers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    egg_id UUID NOT NULL REFERENCES eggs(id) ON DELETE CASCADE,
+    from_incubator_id UUID REFERENCES incubators(id) ON DELETE SET NULL,
+    to_incubator_id UUID REFERENCES incubators(id) ON DELETE SET NULL,
+    from_position VARCHAR(80),
+    to_position VARCHAR(80),
+    transferred_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS egg_incubator_transfers_egg_date_idx ON egg_incubator_transfers(egg_id, transferred_at DESC);
+
+CREATE TABLE IF NOT EXISTS clutch_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    clutch_id UUID NOT NULL REFERENCES clutches(id) ON DELETE CASCADE,
+    action VARCHAR(40) NOT NULL,
+    occurred_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    details JSONB,
+    notes TEXT
+);
+CREATE INDEX IF NOT EXISTS clutch_history_clutch_occurred_idx ON clutch_history(clutch_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS incubator_maintenance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    incubator_id UUID NOT NULL REFERENCES incubators(id) ON DELETE CASCADE,
+    occurred_at TIMESTAMPTZ(6) NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS incubator_maintenance_incubator_date_idx ON incubator_maintenance(incubator_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS species_breeding_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    species VARCHAR(160) NOT NULL,
+    female_min_age_months INTEGER CHECK (female_min_age_months IS NULL OR female_min_age_months >= 0),
+    male_min_age_months INTEGER CHECK (male_min_age_months IS NULL OR male_min_age_months >= 0),
+    female_min_weight_g NUMERIC(10,2) CHECK (female_min_weight_g IS NULL OR female_min_weight_g > 0),
+    male_min_weight_g NUMERIC(10,2) CHECK (male_min_weight_g IS NULL OR male_min_weight_g > 0),
+    notes TEXT,
+    created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS species_breeding_profiles_user_species_unique ON species_breeding_profiles(user_id, species);
+CREATE INDEX IF NOT EXISTS species_breeding_profiles_user_idx ON species_breeding_profiles(user_id);
+
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS inheritance_mode VARCHAR(32);
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS genotype VARCHAR(32);
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS phenotype_rules JSONB;
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS certainty VARCHAR(24) NOT NULL DEFAULT 'unverified';
+
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
