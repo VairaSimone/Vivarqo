@@ -676,7 +676,7 @@ export function createReproductionRouter() {
   router.patch("/clutches/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const clutchId = routeUuid(req.params.id, "clutch id");
-    await ownedClutch(auth.userId, clutchId);
+    const existingClutch = await ownedClutch(auth.userId, clutchId);
     const input = parseBody(patchClutchSchema, req.body);
     if (input.incubatorId) {
       const incubator = await prisma.incubator.findFirst({ where: { id: input.incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
@@ -695,6 +695,26 @@ export function createReproductionRouter() {
         }
       }
       const updated = await tx.clutch.update({ where: { id: clutchId }, data: data as never });
+      if (input.incubatorId !== undefined && input.incubatorId !== existingClutch.incubatorId) {
+        const clutchEggs = await tx.egg.findMany({
+          where: { clutchId, OR: [{ incubatorId: existingClutch.incubatorId }, { incubatorId: null }] },
+          select: { id: true, incubatorId: true, incubatorPosition: true },
+        });
+        for (const egg of clutchEggs) {
+          await tx.egg.update({ where: { id: egg.id }, data: {
+            incubatorId: input.incubatorId,
+            incubatorPosition: input.incubatorId ? egg.incubatorPosition : null,
+          } });
+          await tx.eggIncubatorTransfer.create({ data: {
+            eggId: egg.id,
+            fromIncubatorId: egg.incubatorId,
+            toIncubatorId: input.incubatorId,
+            fromPosition: egg.incubatorPosition,
+            toPosition: input.incubatorId ? egg.incubatorPosition : null,
+            notes: "Trasferimento dovuto alla modifica dell'incubatrice della covata",
+          } });
+        }
+      }
       await tx.clutchHistory.create({ data: {
         clutchId,
         action: "clutch.updated",
@@ -756,8 +776,9 @@ export function createReproductionRouter() {
       }
       const results = [];
       for (const egg of input.eggs) {
-        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, laidAt: egg.laidAt ? new Date(egg.laidAt) : null, expectedHatchAt: egg.expectedHatchAt ? validDate(egg.expectedHatchAt) : null, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, notes: egg.notes ?? null } });
+        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, laidAt: egg.laidAt ? new Date(egg.laidAt) : null, expectedHatchAt: egg.expectedHatchAt ? validDate(egg.expectedHatchAt) : null, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, incubatorId: clutch.incubatorId, notes: egg.notes ?? null } });
         await tx.eggHistory.create({ data: { eggId: created.id, status: created.status, notes: created.notes } });
+        if (clutch.incubatorId) await tx.eggIncubatorTransfer.create({ data: { eggId: created.id, toIncubatorId: clutch.incubatorId, notes: "Assegnazione iniziale dall'incubatrice della covata" } });
         results.push(created);
       }
       await tx.clutchHistory.create({ data: { clutchId, action: "eggs.created", details: { count: results.length }, notes: "Uova registrate nella covata" } });
