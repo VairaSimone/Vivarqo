@@ -455,6 +455,7 @@ export function createReproductionRouter() {
       ...(input.firstFeedingAccepted !== undefined ? { firstFeedingAccepted: input.firstFeedingAccepted } : {}),
       ...(input.firstShedAt !== undefined ? { firstShedAt: input.firstShedAt ? new Date(input.firstShedAt) : null } : {}),
       ...(input.readyForRehomingAt !== undefined ? { readyForRehomingAt: input.readyForRehomingAt ? new Date(input.readyForRehomingAt) : null } : {}),
+      ...(input.availabilityStatus !== undefined ? { availabilityStatus: input.availabilityStatus } : {}),
       ...(input.healthStatus !== undefined ? { healthStatus: input.healthStatus } : {}),
       ...(input.healthNotes !== undefined ? { healthNotes: input.healthNotes } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
