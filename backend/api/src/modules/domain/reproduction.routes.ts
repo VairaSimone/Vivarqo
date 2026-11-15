@@ -632,6 +632,7 @@ export function createReproductionRouter() {
           checkIntervalHours: input.checkIntervalHours ?? null, notes: input.notes ?? null,
         },
       });
+      await tx.clutchHistory.create({ data: { clutchId: created.id, action: "clutch.created", details: { laidOn: input.laidOn, eggCount: input.eggCount, incubatorId: input.incubatorId ?? null }, notes: "Covata creata" } });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "clutch.created", entityType: "clutch", entityId: created.id } });
       return created;
     });
