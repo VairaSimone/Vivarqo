@@ -716,6 +716,44 @@ paths:
                   offeredCount: { type: integer, minimum: 0 }
                   acceptanceRate: { type: [number, 'null'], minimum: 0, maximum: 1 }
 
+
+  /api/v1/animals/{animalId}/weight-growth:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      operationId: getAnimalsByAnimalIdWeightGrowth
+      tags: [Care]
+      summary: Analizza crescita e variazioni del peso
+      parameters:
+        - name: periodDays
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['30', '90', '180', '365', all]
+      responses:
+        '200':
+          description: Analisi dello storico del peso
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/animals/{animalId}/weights/export.csv:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      operationId: exportAnimalsByAnimalIdWeightsCsv
+      tags: [Care]
+      summary: Esporta lo storico delle pesature in CSV
+      responses:
+        '200':
+          description: File CSV dello storico pesature
+          content:
+            text/csv:
+              schema:
+                type: string
+
   /api/v1/animals/{animalId}/health-records:
     parameters:
       - $ref: '#/components/parameters/AnimalId'
