@@ -47,6 +47,28 @@ const financePatch = z.object({
   clutchId: z.string().uuid().nullable().optional(),
   offspringBatchId: z.string().uuid().nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+
+const financeBudgetInput = z.object({
+  period: z.enum(["month", "year"]), periodStart: z.string().regex(/^\d{4}-\d{2}-01$/),
+  category: z.string().trim().min(1).max(80).default("all"),
+  amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+}).strict();
+const financeRecurrenceInput = z.object({
+  entryType, amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
+  category: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(240),
+  animalId: z.string().uuid().nullable().optional(), documentId: z.string().uuid().nullable().optional(),
+  frequency: z.enum(["monthly", "yearly"]), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+}).strict();
+const financeRecurrencePatch = z.object({
+  amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  category: z.string().trim().min(1).max(80).optional(), description: z.string().trim().min(1).max(240).optional(),
+  frequency: z.enum(["monthly", "yearly"]).optional(), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), isActive: z.boolean().optional(),
+}).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
+
 function serializeFinance<T extends { amountCents: bigint }>(entry: T) {
   return { ...entry, amountCents: entry.amountCents.toString() };
 }
@@ -271,12 +293,7 @@ export function createFinanceRouter() {
 
   router.post("/finance/budgets", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const input = parseBody(z.object({
-      period: z.enum(["month", "year"]), periodStart: z.string().regex(/^\d{4}-\d{2}-01$/),
-      category: z.string().trim().min(1).max(80).default("all"),
-      amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
-    }).strict(), req.body);
+    const input = parseBody(financeBudgetInput, req.body);
     const date = validDate(input.periodStart);
     if ((input.period === "year" && date.getUTCMonth() !== 0) || (input.period === "month" && date.getUTCDate() !== 1)) throw new AppError(400, "VALIDATION_ERROR", "Budget period must start on the first day of its period");
     const budget = await prisma.financeBudget.upsert({
@@ -303,14 +320,7 @@ export function createFinanceRouter() {
 
   router.post("/finance/recurrences", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const input = parseBody(z.object({
-      entryType, amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-      currency: z.string().trim().length(3).default("EUR").transform((v) => v.toUpperCase()),
-      category: z.string().trim().min(1).max(80), description: z.string().trim().min(1).max(240),
-      animalId: z.string().uuid().nullable().optional(), documentId: z.string().uuid().nullable().optional(),
-      frequency: z.enum(["monthly", "yearly"]), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-    }).strict(), req.body);
+    const input = parseBody(financeRecurrenceInput, req.body);
     const next = validDate(input.nextOccurrenceOn);
     const end = input.endOn ? validDate(input.endOn) : null;
     if (end && end < next) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede the next occurrence");
@@ -323,12 +333,7 @@ export function createFinanceRouter() {
   router.patch("/finance/recurrences/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeUuid(req.params.id, "recurrence id");
-    const input = parseBody(z.object({
-      amountCents: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
-      category: z.string().trim().min(1).max(80).optional(), description: z.string().trim().min(1).max(240).optional(),
-      frequency: z.enum(["monthly", "yearly"]).optional(), nextOccurrenceOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      endOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), isActive: z.boolean().optional(),
-    }).strict().refine((v) => Object.keys(v).length > 0), req.body);
+    const input = parseBody(financeRecurrencePatch, req.body);
     const existing = await prisma.financeRecurrence.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "FINANCE_RECURRENCE_NOT_FOUND", "Recurrence not found");
     const data: Record<string, unknown> = { ...input };
