@@ -232,6 +232,8 @@ export function createGeneticTraitsRouter() {
     const geneId = uuid(req.params.geneId, "gene id");
     const existing = await prisma.geneticGene.findFirst({ where: { id: geneId, userId: auth.userId }, select: { id: true } });
     if (!existing) throw new AppError(404, "GENETIC_GENE_NOT_FOUND", "Genetic gene not found");
+    const usedTraits = await prisma.animalGeneticTrait.count({ where: { locus: { is: { geneId } } } });
+    if (usedTraits) throw new AppError(409, "GENETIC_CATALOG_IN_USE", "This gene is linked to animal genetic records");
     await prisma.geneticGene.delete({ where: { id: geneId } });
     res.status(204).send();
   });
@@ -252,6 +254,8 @@ export function createGeneticTraitsRouter() {
     const auth = res.locals.auth as AuthContext;
     const locusId = uuid(req.params.locusId, "locus id");
     await ownedLocus(auth.userId, locusId);
+    const usedTraits = await prisma.animalGeneticTrait.count({ where: { locusId } });
+    if (usedTraits) throw new AppError(409, "GENETIC_CATALOG_IN_USE", "This locus is linked to animal genetic records");
     await prisma.geneticLocus.delete({ where: { id: locusId } });
     res.status(204).send();
   });
@@ -275,8 +279,10 @@ export function createGeneticTraitsRouter() {
   router.delete("/genetics/alleles/:alleleId", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const alleleId = uuid(req.params.alleleId, "allele id");
-    const existing = await prisma.geneticAllele.findFirst({ where: { id: alleleId, locus: { is: { gene: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    const existing = await prisma.geneticAllele.findFirst({ where: { id: alleleId, locus: { is: { gene: { is: { userId: auth.userId } } } } }, select: { id: true, locusId: true } });
     if (!existing) throw new AppError(404, "GENETIC_ALLELE_NOT_FOUND", "Genetic allele not found");
+    const usedTraits = await prisma.animalGeneticTrait.count({ where: { locusId: existing.locusId } });
+    if (usedTraits) throw new AppError(409, "GENETIC_CATALOG_IN_USE", "This allele may be referenced by saved animal genotypes");
     await prisma.geneticAllele.delete({ where: { id: alleleId } });
     res.status(204).send();
   });
@@ -387,6 +393,7 @@ export function createGeneticTraitsRouter() {
         ["father", animal.fatherAnimalId, animal.fatherDescription],
       ] as const) {
         if (!parentId) { missingParents.push({ childId: id, role, description }); continue; }
+        if (!byId.has(parentId)) { missingParents.push({ childId: id, role, description: description ?? "Genitore non presente nel catalogo dell'allevatore" }); continue; }
         if (path.includes(parentId)) continue;
         edges.push({ childId: id, parentId, role });
         walk(parentId, generation + 1, [...path, id]);
