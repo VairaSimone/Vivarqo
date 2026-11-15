@@ -466,7 +466,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
                     <span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>
                     {foodWeight ? <small>{formatWeight(foodWeight, locale)}</small> : null}
                     <small>{({ unknown: locale === "it" ? "Stato preda non specificato" : "Prey condition unspecified", frozen: locale === "it" ? "Congelata" : "Frozen", thawed: locale === "it" ? "Scongelata" : "Thawed", live: locale === "it" ? "Viva" : "Live" } as Record<string, string>)[getString(entry, "preyState", "unknown")]}</small>
-                    {getString(entry, "inventoryItemId") && <small>{getString(entry, "inventoryDeducted") === "true" ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino · non scaricata" : "Linked to inventory · not deducted")}</small>}
+                    {getString(entry, "inventoryItemId") && <small>{Boolean(entry.inventoryDeducted) ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino · non scaricata" : "Linked to inventory · not deducted")}</small>}
                   </div>
                   {!isArchived && <div className="row-actions">
                     <IconButton label={t("edit")} onClick={() => openFeedingEdit(session, entry)}><Icon name="edit" size={15} /></IconButton>
