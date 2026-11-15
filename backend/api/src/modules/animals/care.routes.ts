@@ -184,16 +184,14 @@ export function createCareRouter() {
             data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, unitCostCents, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after prey was offered" },
           });
           if (unitCostCents !== null) {
-            const amountCents = Math.round(unitCostCents * Number(entry.inventoryQuantity));
-            if (Number.isSafeInteger(amountCents) && amountCents > 0) {
-              await tx.financeEntry.create({ data: {
-                userId: auth.userId, animalId: entry.animalId, entryType: "expense",
-                occurredOn: new Date(input.performedAt.slice(0, 10) + "T00:00:00.000Z"),
-                amountCents: BigInt(amountCents), currency: "EUR", category: "Alimentazione",
-                description: "Consumo alimento da inventario",
-                sourceStockMovementId: movement.id,
-              } });
-            }
+            const amountCents = (BigInt(unitCostCents) * BigInt(requested) + 500n) / 1000n;
+            if (amountCents > 0n) await tx.financeEntry.create({ data: {
+              userId: auth.userId, animalId: entry.animalId, entryType: "expense",
+              occurredOn: new Date(input.performedAt.slice(0, 10) + "T00:00:00.000Z"),
+              amountCents, currency: "EUR", category: "Alimentazione",
+              description: "Consumo alimento da inventario",
+              sourceStockMovementId: movement.id,
+            } });
           }
           await tx.inventoryItem.update({ where: { id: entry.inventoryItemId }, data: { quantityOnHand: balance } });
           await tx.feedingEntry.update({ where: { id: createdEntry.id }, data: { inventoryDeducted: true } });
@@ -325,11 +323,11 @@ export function createCareRouter() {
             reference: "Feeding entry " + id, notes: "Automatic deduction after prey offer was edited"
           } });
           if (unitCostCents !== null) {
-            const amountCents = Math.round(unitCostCents * Number(nextQuantity));
-            if (Number.isSafeInteger(amountCents) && amountCents > 0) await tx.financeEntry.create({ data: {
+            const amountCents = (BigInt(unitCostCents) * BigInt(requested) + 500n) / 1000n;
+            if (amountCents > 0n) await tx.financeEntry.create({ data: {
               userId: auth.userId, animalId: owned.animalId, entryType: "expense",
               occurredOn: new Date((performedAt ?? owned.session.performedAt.toISOString()).slice(0, 10) + "T00:00:00.000Z"),
-              amountCents: BigInt(amountCents), currency: "EUR", category: "Alimentazione",
+              amountCents, currency: "EUR", category: "Alimentazione",
               description: "Consumo alimento da inventario", sourceStockMovementId: movement.id,
             } });
           }
