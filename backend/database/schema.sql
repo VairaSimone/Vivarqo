@@ -891,6 +891,100 @@ CREATE TRIGGER document_deletion_jobs_tenant_guard
     BEFORE INSERT OR UPDATE ON document_deletion_jobs
     FOR EACH ROW EXECUTE FUNCTION vivarqo_check_document_deletion_tenant_consistency();
 
+
+-- Accettazione dei termini e genealogia degli animali.
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ(6),
+    ADD COLUMN IF NOT EXISTS terms_version VARCHAR(32);
+
+ALTER TABLE animals
+    ADD COLUMN IF NOT EXISTS mother_animal_id UUID,
+    ADD COLUMN IF NOT EXISTS father_animal_id UUID,
+    ADD COLUMN IF NOT EXISTS mother_description VARCHAR(240),
+    ADD COLUMN IF NOT EXISTS father_description VARCHAR(240);
+
+DO $vivarqo$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'animals_mother_animal_fk') THEN
+        ALTER TABLE animals ADD CONSTRAINT animals_mother_animal_fk
+            FOREIGN KEY (mother_animal_id) REFERENCES animals(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'animals_father_animal_fk') THEN
+        ALTER TABLE animals ADD CONSTRAINT animals_father_animal_fk
+            FOREIGN KEY (father_animal_id) REFERENCES animals(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'animals_mother_not_self') THEN
+        ALTER TABLE animals ADD CONSTRAINT animals_mother_not_self
+            CHECK (mother_animal_id IS NULL OR mother_animal_id <> id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'animals_father_not_self') THEN
+        ALTER TABLE animals ADD CONSTRAINT animals_father_not_self
+            CHECK (father_animal_id IS NULL OR father_animal_id <> id);
+    END IF;
+END
+$vivarqo$;
+
+CREATE INDEX IF NOT EXISTS animals_mother_idx ON animals(mother_animal_id) WHERE mother_animal_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS animals_father_idx ON animals(father_animal_id) WHERE father_animal_id IS NOT NULL;
+
+-- Parametri obiettivo e intervallo di controllo delle covate.
+ALTER TABLE clutches
+    ADD COLUMN IF NOT EXISTS target_temperature_min_c NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS target_temperature_max_c NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS target_humidity_min_pct NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS target_humidity_max_pct NUMERIC(5,2),
+    ADD COLUMN IF NOT EXISTS check_interval_hours INTEGER;
+
+DO $vivarqo$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clutches_temperature_range_check') THEN
+        ALTER TABLE clutches ADD CONSTRAINT clutches_temperature_range_check
+            CHECK (target_temperature_min_c IS NULL OR target_temperature_max_c IS NULL OR target_temperature_min_c <= target_temperature_max_c);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clutches_humidity_range_check') THEN
+        ALTER TABLE clutches ADD CONSTRAINT clutches_humidity_range_check
+            CHECK (target_humidity_min_pct IS NULL OR target_humidity_max_pct IS NULL OR target_humidity_min_pct <= target_humidity_max_pct);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clutches_check_interval_hours_check') THEN
+        ALTER TABLE clutches ADD CONSTRAINT clutches_check_interval_hours_check
+            CHECK (check_interval_hours IS NULL OR check_interval_hours BETWEEN 1 AND 720);
+    END IF;
+END
+$vivarqo$;
+
+-- Ciclo di vita e collegamento individuale tra uova e piccoli.
+ALTER TABLE eggs
+    ADD COLUMN IF NOT EXISTS hatched_at DATE,
+    ADD COLUMN IF NOT EXISTS offspring_animal_id UUID;
+
+DO $vivarqo$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'eggs_offspring_animal_id_fkey') THEN
+        ALTER TABLE eggs ADD CONSTRAINT eggs_offspring_animal_id_fkey
+            FOREIGN KEY (offspring_animal_id) REFERENCES animals(id) ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+END
+$vivarqo$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS eggs_offspring_animal_id_key ON eggs(offspring_animal_id);
+CREATE INDEX IF NOT EXISTS eggs_status_idx ON eggs(status);
+
+CREATE TABLE IF NOT EXISTS egg_history (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    egg_id UUID NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    occurred_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    CONSTRAINT egg_history_pkey PRIMARY KEY (id),
+    CONSTRAINT egg_history_egg_id_fkey FOREIGN KEY (egg_id) REFERENCES eggs(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS egg_history_egg_occurred_idx ON egg_history(egg_id, occurred_at DESC);
+
+-- La categoria incubation viene usata dai task automatici dei controlli.
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_category_check;
+ALTER TABLE tasks ADD CONSTRAINT tasks_category_check
+    CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'incubation', 'document', 'inventory', 'custom'));
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
