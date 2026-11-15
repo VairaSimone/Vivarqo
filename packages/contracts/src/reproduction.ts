@@ -110,6 +110,8 @@ export const eggSchema = z.object({
 });
 
 export const patchEggSchema = z.object({
+  incubatorId: nullableUuid,
+  incubatorPosition: z.string().trim().max(80).nullable().optional(),
   code: z.string().trim().max(80).nullable().optional(),
   status: eggStatusSchema.optional(),
   laidAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -117,6 +119,8 @@ export const patchEggSchema = z.object({
   hatchedAt: dateOnly.nullable().optional(),
   offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
+  incubatorId: nullableUuid,
+  incubatorPosition: z.string().trim().max(80).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 export const eggMeasurementSchema = z.object({
@@ -129,6 +133,8 @@ export const incubatorSchema = z.object({
   name: z.string().trim().min(1).max(120),
   identifier: z.string().trim().max(80).nullable().optional(),
   capacity: z.coerce.number().int().positive().max(100_000).nullable().optional(),
+  maintenanceIntervalDays: z.coerce.number().int().min(1).max(3650).nullable().optional(),
+  nextMaintenanceAt: z.string().datetime({ offset: true }).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
 
@@ -136,6 +142,8 @@ export const patchIncubatorSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   identifier: z.string().trim().max(80).nullable().optional(),
   capacity: z.coerce.number().int().positive().max(100_000).nullable().optional(),
+  maintenanceIntervalDays: z.coerce.number().int().min(1).max(3650).nullable().optional(),
+  nextMaintenanceAt: z.string().datetime({ offset: true }).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
@@ -149,6 +157,8 @@ export const incubatorMaintenanceSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }),
   eventType: z.enum(["cleaning", "calibration", "repair", "inspection", "other"]),
   notes: z.string().trim().max(10_000).nullable().optional(),
+  maintenanceIntervalDays: z.coerce.number().int().min(1).max(3650).nullable().optional(),
+  nextMaintenanceAt: z.string().datetime({ offset: true }).nullable().optional(),
 }).strict();
 
 export const speciesBreedingProfileSchema = z.object({
