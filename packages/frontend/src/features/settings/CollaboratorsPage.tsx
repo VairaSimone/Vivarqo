@@ -41,7 +41,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
 
   useEffect(() => {
     let active = true;
-    const token = new URLSearchParams(window.location.search).get("invite");
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("invite");
     if (token) {
       window.history.replaceState({}, "", window.location.pathname);
       setBusy(true);
