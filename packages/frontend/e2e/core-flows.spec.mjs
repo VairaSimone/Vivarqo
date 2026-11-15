@@ -1266,6 +1266,9 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await page.evaluate(() => { window.print = () => { window.__vivarqoPrintCalled = true; }; });
   await page.getByRole("button", { name: "Stampa / PDF" }).click();
   expect(await page.evaluate(() => Boolean(window.__vivarqoPrintCalled))).toBe(true);
+  const pdf = await page.pdf({ format: "A4", printBackground: true });
+  expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+  expect(pdf.length).toBeGreaterThan(1000);
 
   await page.getByRole("tab", { name: "Storico cure" }).click();
   await page.getByLabel("Tipo").selectOption("sale");
