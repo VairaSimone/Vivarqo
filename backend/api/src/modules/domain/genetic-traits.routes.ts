@@ -52,17 +52,18 @@ const traitListQuery = z.object({
 });
 
 async function ownedAnimal(userId: string, animalId: string) {
-  const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true } });
+  const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true, species: true } });
   if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+  return animal;
 }
 async function ownedLocus(userId: string, locusId: string | null | undefined) {
   if (!locusId) return [];
   const locus = await prisma.geneticLocus.findFirst({
     where: { id: locusId, gene: { is: { userId } } },
-    include: { alleles: { select: { symbol: true } } },
+    include: { alleles: { select: { symbol: true } }, gene: { select: { species: true } } },
   });
   if (!locus) throw new AppError(404, "GENETIC_LOCUS_NOT_FOUND", "Genetic locus not found");
-  return locus.alleles.map((allele) => allele.symbol);
+  return { alleles: locus.alleles.map((allele) => allele.symbol), species: locus.gene.species };
 }
 function validateGenotypes(genotypes: Array<string | null | undefined>, allowedAlleles: string[]) {
   if (!allowedAlleles.length) return; // Existing records remain usable until the breeder completes the catalog.
@@ -106,11 +107,12 @@ export function createGeneticTraitsRouter() {
   router.post("/animals/:animalId/genetic-traits", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = uuid(req.params.animalId, "animal id");
-    await ownedAnimal(auth.userId, animalId);
+    const animal = await ownedAnimal(auth.userId, animalId);
     const input = parseBody(traitCreate, req.body);
     await ownedSource(auth.userId, input.sourceAnimalId, animalId);
-    const allowedAlleles = await ownedLocus(auth.userId, input.locusId);
-    validateGenotypes([input.genotype, input.theoreticalGenotype, input.confirmedGenotype], allowedAlleles);
+    const locus = await ownedLocus(auth.userId, input.locusId);
+    if (locus && locus.species.toLocaleLowerCase() !== animal.species.toLocaleLowerCase()) throw new AppError(400, "GENETIC_SPECIES_MISMATCH", "Genetic locus species does not match the animal species");
+    validateGenotypes([input.genotype, input.theoreticalGenotype, input.confirmedGenotype], locus?.alleles ?? []);
     if (input.confirmedGenotype && input.certainty !== "confirmed") throw new AppError(400, "CONFIRMED_GENOTYPE_REQUIRES_CONFIRMATION", "A confirmed genotype requires certainty=confirmed");
     const trait = await prisma.$transaction(async (tx) => {
       const created = await tx.animalGeneticTrait.create({
@@ -137,12 +139,14 @@ export function createGeneticTraitsRouter() {
     if (!existing) throw new AppError(404, "GENETIC_TRAIT_NOT_FOUND", "Genetic trait not found");
     const source = input.sourceAnimalId !== undefined ? input.sourceAnimalId : existing.sourceAnimalId;
     await ownedSource(auth.userId, source, existing.animalId);
-    const allowedAlleles = await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
+    const animal = await ownedAnimal(auth.userId, existing.animalId);
+    const locus = await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
+    if (locus && locus.species.toLocaleLowerCase() !== animal.species.toLocaleLowerCase()) throw new AppError(400, "GENETIC_SPECIES_MISMATCH", "Genetic locus species does not match the animal species");
     validateGenotypes([
       input.genotype !== undefined ? input.genotype : existing.genotype,
       input.theoreticalGenotype !== undefined ? input.theoreticalGenotype : existing.theoreticalGenotype,
       input.confirmedGenotype !== undefined ? input.confirmedGenotype : existing.confirmedGenotype,
-    ], allowedAlleles);
+    ], locus?.alleles ?? []);
     const nextCertainty = input.certainty ?? existing.certainty;
     const nextConfirmedGenotype = input.confirmedGenotype !== undefined ? input.confirmedGenotype : existing.confirmedGenotype;
     if (nextConfirmedGenotype && nextCertainty !== "confirmed") throw new AppError(400, "CONFIRMED_GENOTYPE_REQUIRES_CONFIRMATION", "A confirmed genotype requires certainty=confirmed");
@@ -335,13 +339,15 @@ export function createGeneticTraitsRouter() {
       locusIds: z.array(z.string().uuid()).min(1).max(12),
     }).strict(), req.body);
     if (input.motherAnimalId === input.fatherAnimalId) throw new AppError(400, "INVALID_PAIRING", "Parents must be different animals");
-    await ownedAnimal(auth.userId, input.motherAnimalId);
-    await ownedAnimal(auth.userId, input.fatherAnimalId);
+    const motherAnimal = await ownedAnimal(auth.userId, input.motherAnimalId);
+    const fatherAnimal = await ownedAnimal(auth.userId, input.fatherAnimalId);
+    if (motherAnimal.species.toLocaleLowerCase() !== fatherAnimal.species.toLocaleLowerCase()) throw new AppError(400, "GENETIC_SPECIES_MISMATCH", "Pairing parents must belong to the same species");
     const [catalog, traits] = await Promise.all([
-      prisma.geneticLocus.findMany({ where: { id: { in: input.locusIds }, gene: { is: { userId: auth.userId } } }, include: { alleles: true } }),
+      prisma.geneticLocus.findMany({ where: { id: { in: input.locusIds }, gene: { is: { userId: auth.userId } } }, include: { alleles: true, gene: { select: { species: true } } } }),
       prisma.animalGeneticTrait.findMany({ where: { animalId: { in: [input.motherAnimalId, input.fatherAnimalId] }, locusId: { in: input.locusIds } } }),
     ]);
     if (catalog.length !== input.locusIds.length || new Set(input.locusIds).size !== input.locusIds.length) throw new AppError(400, "GENETIC_LOCUS_INVALID", "One or more loci are unavailable");
+    if (catalog.some((locus) => locus.gene.species.toLocaleLowerCase() !== motherAnimal.species.toLocaleLowerCase())) throw new AppError(400, "GENETIC_SPECIES_MISMATCH", "Selected loci do not belong to the parents species");
     const inputs: GeneticLocusInput[] = catalog.map((locus) => {
       const motherTraits = traits.filter((trait) => trait.animalId === input.motherAnimalId && trait.locusId === locus.id);
       const fatherTraits = traits.filter((trait) => trait.animalId === input.fatherAnimalId && trait.locusId === locus.id);
