@@ -27,6 +27,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [logsPage, setLogsPage] = useState(1);
   const clutch = resource.data?.clutch;
   const eggsResource = useResource<{ eggs: EggDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/eggs?page=${eggsPage}&pageSize=25` : null);
+  const maintenanceResource = useResource<{ maintenance: Array<{ id: string; occurredAt: string; eventType: string; notes: string | null }> }>(clutch?.incubatorId ? `/incubators/${encodeURIComponent(clutch.incubatorId)}/maintenance` : null);
   const logsResource = useResource<{ logs: IncubationLogDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/incubation-logs?page=${logsPage}&pageSize=25` : null);
   const eggs = eggsResource.data?.eggs ?? clutch?.eggs ?? [];
   const logs = logsResource.data?.logs ?? clutch?.incubationLogs ?? [];
@@ -82,6 +83,18 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     finally { setBusy(false); }
   }
 
+  async function addIncubatorMaintenance() {
+    if (!clutch?.incubatorId) return;
+    const eventType = window.prompt(locale === "it" ? "Tipo: cleaning, calibration, repair, inspection, other" : "Type: cleaning, calibration, repair, inspection, other", "inspection");
+    if (!eventType) return;
+    const notes = window.prompt(locale === "it" ? "Note manutenzione (facoltative)" : "Maintenance notes (optional)") ?? "";
+    try {
+      await api.post(`/incubators/${encodeURIComponent(clutch.incubatorId)}/maintenance`, { occurredAt: new Date().toISOString(), eventType, notes: notes || null });
+      maintenanceResource.reload();
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+
   async function addLog(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -117,6 +130,10 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
       <div><EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} onMeasure={(egg) => void openEggMeasurements(egg)} />{eggsResource.data?.pagination && <Pagination page={eggsResource.data.pagination.page} totalPages={eggsResource.data.pagination.totalPages} onChange={setEggsPage} label={t("page")} />}</div>
       <div><IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />{logsResource.data?.pagination && <Pagination page={logsResource.data.pagination.page} totalPages={logsResource.data.pagination.totalPages} onChange={setLogsPage} label={t("page")} />}</div>
     </div>
+    {clutch.incubatorId && <Panel>
+      <PanelHeader title={locale === "it" ? "Manutenzione incubatrice" : "Incubator maintenance"} action={<Button size="sm" onClick={() => void addIncubatorMaintenance()}><Icon name="plus" />{locale === "it" ? "Registra intervento" : "Log maintenance"}</Button>} />
+      {maintenanceResource.data?.maintenance.length ? <div className="record-list">{maintenanceResource.data.maintenance.map((item) => <div className="record-row" key={item.id}><div><strong>{({ cleaning: locale === "it" ? "Pulizia" : "Cleaning", calibration: locale === "it" ? "Calibrazione" : "Calibration", repair: locale === "it" ? "Riparazione" : "Repair", inspection: locale === "it" ? "Ispezione" : "Inspection", other: locale === "it" ? "Altro" : "Other" } as Record<string,string>)[item.eventType] ?? item.eventType}</strong><small>{formatDateTime(item.occurredAt, locale)}</small>{item.notes && <p>{item.notes}</p>}</div></div>)}</div> : <EmptyState title={locale === "it" ? "Nessuna manutenzione registrata" : "No maintenance recorded"} />}
+    </Panel>}
     {clutch.monitoring && <Panel>
       <PanelHeader title={locale === "it" ? "Monitoraggio incubazione" : "Incubation monitoring"} />
       <div className="detail-grid">
