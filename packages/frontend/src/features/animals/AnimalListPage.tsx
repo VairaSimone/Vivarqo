@@ -64,6 +64,34 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const resource = useResource<{ animals: AnimalDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(url);
   const animals = resource.data?.animals ?? [];
   const pager = resource.data?.pagination;
+  const savedFiltersResource = useResource<{ filters: Array<{ id: string; name: string; filters: Record<string, unknown> }> }>("/animals/filters");
+
+  async function saveCurrentFilter() {
+    const name = window.prompt(locale === "it" ? "Nome del filtro da salvare" : "Name this saved filter");
+    if (!name?.trim()) return;
+    try {
+      await api.post("/animals/filters", { name: name.trim(), filters: { q, species, morph, location, sex, status, sort } });
+      savedFiltersResource.reload();
+      show(locale === "it" ? "Filtro salvato." : "Filter saved.");
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+
+  function applySavedFilter(filterId: string) {
+    const saved = savedFiltersResource.data?.filters.find((item) => item.id === filterId);
+    if (!saved) return;
+    const value = saved.filters;
+    setSearch(String(value.q ?? ""));
+    setQ(String(value.q ?? ""));
+    setSpecies(String(value.species ?? ""));
+    setMorph(String(value.morph ?? ""));
+    setLocation(String(value.location ?? ""));
+    setSex(String(value.sex ?? ""));
+    setStatus(String(value.status ?? "active"));
+    setSort(String(value.sort ?? "updatedAt"));
+    setPage(1);
+  }
 
   function openCreate() { setEditing(null); setForm(emptyAnimal); setPhotoFile(null); setError(""); setModal(true); }
   function openEdit(animal: AnimalDto) {
@@ -173,7 +201,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   });
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
+    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value="" onChange={(e) => applySavedFilter(e.target.value)}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
     <Panel>
       <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
         filters={<><Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="active">{t("active")}</option><option value="all">{t("allStatuses")}</option><option value="sold">{t("animalStatus_sold")}</option><option value="transferred">{t("animalStatus_transferred")}</option><option value="deceased">{t("animalStatus_deceased")}</option><option value="archived">{t("archived")}</option></Select>
