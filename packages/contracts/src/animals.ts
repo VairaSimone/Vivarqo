@@ -23,6 +23,7 @@ export interface AnimalDto {
   originDescription: string | null;
   previousBreeder: string | null;
   locationLabel: string | null;
+  locationId?: string | null;
   status: AnimalStatusDto;
   notes: string | null;
   photoUrl?: string | null;
