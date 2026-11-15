@@ -380,7 +380,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <Detail label={locale === "it" ? "Prima alimentazione accettata" : "First feeding accepted"} value={hatchlingCare.data?.care?.firstFeedingAccepted == null ? "—" : hatchlingCare.data.care.firstFeedingAccepted ? (locale === "it" ? "Sì" : "Yes") : (locale === "it" ? "No" : "No")} />
           <Detail label={locale === "it" ? "Prima muta" : "First shed"} value={formatDate(hatchlingCare.data?.care?.firstShedAt ?? "", locale)} />
           <Detail label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming"} value={formatDate(hatchlingCare.data?.care?.readyForRehomingAt ?? "", locale)} />
+          <Detail label={locale === "it" ? "Stato di salute" : "Health status"} value={({ unknown: locale === "it" ? "Non valutato" : "Unknown", healthy: locale === "it" ? "Regolare" : "Healthy", monitoring: locale === "it" ? "Da monitorare" : "Monitoring", treatment: locale === "it" ? "In trattamento" : "Under treatment" } as Record<string,string>)[hatchlingCare.data?.care?.healthStatus ?? "unknown"]} />
         </div>
+        {hatchlingCare.data?.care?.healthNotes && <p className="detail-copy">{locale === "it" ? "Note sanitarie: " : "Health notes: "}{hatchlingCare.data.care.healthNotes}</p>}
         {hatchlingCare.data?.care?.notes && <p className="detail-copy">{hatchlingCare.data.care.notes}</p>}
         <p className="muted-note">{locale === "it" ? "Le alimentazioni, i pesi e le mute provengono dai normali registri di cura dell'animale." : "Feedings, weights and sheds are sourced from the animal's standard care records."}</p>
       </Panel>}
