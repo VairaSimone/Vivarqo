@@ -2640,3 +2640,34 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .animal-editor-parent-title small { color: var(--muted); font-size: 11px; }
 .animal-editor-genealogy-hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 @media (max-width: 680px) { .animal-editor-parent-grid { grid-template-columns: 1fr; } }
+
+
+/* Reproduction: compact historical readings and individual egg lifecycle. */
+.incubation-chart {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  min-height: 112px;
+  padding: 10px 8px 4px;
+  border-bottom: 1px solid var(--border, #d9dfd7);
+  border-radius: 8px;
+  background: var(--surface-muted, #f5f7f3);
+  overflow-x: auto;
+}
+.incubation-chart span {
+  display: block;
+  flex: 1 0 7px;
+  min-width: 7px;
+  max-width: 18px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent, #557b61);
+  opacity: .82;
+}
+.egg-history {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid var(--border, #d9dfd7);
+}
+.egg-history small { color: var(--muted, #68736b); font-size: 12px; }
