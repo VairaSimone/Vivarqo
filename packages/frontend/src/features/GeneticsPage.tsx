@@ -21,7 +21,8 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
   const [locusForm, setLocusForm] = useState({ geneId: "", symbol: "", name: "", inheritanceMode: "autosomal_recessive" });
   const [alleleForm, setAlleleForm] = useState({ locusId: "", symbol: "", name: "", isReference: false });
   const [traitForm, setTraitForm] = useState({ locusId: "", traitName: "", traitValue: "", theoreticalGenotype: "", observedPhenotype: "", confirmedGenotype: "", certainty: "unverified" });
-  const [pair, setPair] = useState({ motherAnimalId: "", fatherAnimalId: "", locusId: "" });
+  const [pair, setPair] = useState({ motherAnimalId: "", fatherAnimalId: "" });
+  const [selectedLocusIds, setSelectedLocusIds] = useState<string[]>([]);
   const [calculation, setCalculation] = useState<unknown>(null);
   const [inbreeding, setInbreeding] = useState<Record<string, unknown> | null>(null);
   const [history, setHistory] = useState<Array<{ id: string; changedAt: string; snapshot: Record<string, unknown> }>>([]);
@@ -37,7 +38,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
     if (!locusForm.geneId && result.genes[0]) setLocusForm((value) => ({ ...value, geneId: result.genes[0]!.id }));
     const firstLocus = result.genes.flatMap((gene) => gene.loci)[0];
     if (firstLocus) {
-      setPair((value) => ({ ...value, locusId: value.locusId || firstLocus.id }));
+      setSelectedLocusIds((value) => value.length ? value : [firstLocus.id]);
       setTraitForm((value) => ({ ...value, locusId: value.locusId || firstLocus.id }));
       setAlleleForm((value) => ({ ...value, locusId: value.locusId || firstLocus.id }));
     }
@@ -64,7 +65,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       if (catalogResult.genes[0]) setLocusForm((v) => ({ ...v, geneId: catalogResult.genes[0]!.id }));
       const locus = catalogResult.genes.flatMap((gene) => gene.loci)[0];
       if (locus) {
-        setPair((v) => ({ ...v, locusId: locus.id })); setTraitForm((v) => ({ ...v, locusId: locus.id })); setAlleleForm((v) => ({ ...v, locusId: locus.id }));
+        setSelectedLocusIds((v) => v.length ? v : [locus.id]); setTraitForm((v) => ({ ...v, locusId: locus.id })); setAlleleForm((v) => ({ ...v, locusId: locus.id }));
       }
     }).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : text("Impossibile caricare i dati genetici.", "Could not load genetics data."))).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -81,7 +82,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
   async function createLocus(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/genetics/genes/${locusForm.geneId}/loci`, { symbol: locusForm.symbol, name: locusForm.name, inheritanceMode: locusForm.inheritanceMode }); setLocusForm((v) => ({ ...v, symbol: "", name: "" })); }); }
   async function createAllele(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/genetics/loci/${alleleForm.locusId}/alleles`, alleleForm); setAlleleForm((v) => ({ ...v, symbol: "", name: "", isReference: false })); }); }
   async function createTrait(event: FormEvent) { event.preventDefault(); await run(async () => { await api.post(`/animals/${animalId}/genetic-traits`, { traitName: traitForm.traitName, traitValue: traitForm.traitValue, locusId: traitForm.locusId || null, theoreticalGenotype: traitForm.theoreticalGenotype || null, observedPhenotype: traitForm.observedPhenotype || null, confirmedGenotype: traitForm.confirmedGenotype || null, certainty: traitForm.certainty }); setTraitForm((v) => ({ ...v, traitName: "", traitValue: "", theoreticalGenotype: "", observedPhenotype: "", confirmedGenotype: "" })); }); }
-  async function calculate(event: FormEvent) { event.preventDefault(); await run(async () => { const result = await api.post<{ calculation: unknown }>("/genetics/calculate-pairing", { motherAnimalId: pair.motherAnimalId, fatherAnimalId: pair.fatherAnimalId, locusIds: [pair.locusId] }); setCalculation(result.calculation); }); }
+  async function calculate(event: FormEvent) { event.preventDefault(); await run(async () => { const result = await api.post<{ calculation: unknown }>("/genetics/calculate-pairing", { motherAnimalId: pair.motherAnimalId, fatherAnimalId: pair.fatherAnimalId, locusIds: selectedLocusIds }); setCalculation(result.calculation); }); }
   if (loading) return <LoadingState />;
   return <div className="page-stack">
     <PageHeader title={text("Genetica", "Genetics")} description={text("Catalogo di geni, loci e alleli; schede genetiche, incroci e genealogia.", "Gene, locus and allele catalog; animal records, pairings and pedigree.")} />
@@ -130,8 +131,8 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
     <Panel><h2>{text("Calcolo incrocio", "Pairing calculator")}</h2><form className="form-grid" onSubmit={(e) => void calculate(e)}>
       <label>{text("Genitore A", "Parent A")}<select required value={pair.motherAnimalId} onChange={(e) => setPair({ ...pair, motherAnimalId: e.target.value })}><option value="">—</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
       <label>{text("Genitore B", "Parent B")}<select required value={pair.fatherAnimalId} onChange={(e) => setPair({ ...pair, fatherAnimalId: e.target.value })}><option value="">—</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
-      <label>{text("Locus", "Locus")}<select required value={pair.locusId} onChange={(e) => setPair({ ...pair, locusId: e.target.value })}>{loci.map((locus) => <option key={locus.id} value={locus.id}>{locus.geneName} / {locus.name}</option>)}</select></label>
-      <Button type="submit" disabled={busy || !pair.locusId || !pair.motherAnimalId || !pair.fatherAnimalId || pair.motherAnimalId === pair.fatherAnimalId}>{text("Calcola probabilità", "Calculate probabilities")}</Button>
+      <fieldset className="form-fieldset"><legend>{text("Loci da calcolare", "Loci to calculate")}</legend>{loci.map((locus) => <label className="checkbox-field" key={locus.id}><input type="checkbox" checked={selectedLocusIds.includes(locus.id)} onChange={(e) => setSelectedLocusIds((current) => e.target.checked ? [...current, locus.id] : current.filter((id) => id !== locus.id))} />{locus.geneName} / {locus.name}</label>)}</fieldset>
+      <Button type="submit" disabled={busy || !selectedLocusIds.length || !pair.motherAnimalId || !pair.fatherAnimalId || pair.motherAnimalId === pair.fatherAnimalId}>{text("Calcola probabilità", "Calculate probabilities")}</Button>
     </form><p>{text("Il calcolo usa i genotipi confermati o teorici salvati nelle schede dei genitori. Se mancano, il risultato segnala il locus come incompleto.", "The calculation uses confirmed or theoretical genotypes stored on the parents. Missing values are reported as incomplete.")}</p>{calculation && <pre className="genetics-result">{JSON.stringify(calculation, null, 2)}</pre>}</Panel>
   </div>;
 }
