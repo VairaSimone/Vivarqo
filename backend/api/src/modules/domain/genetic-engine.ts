@@ -43,7 +43,10 @@ function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: st
   const [a, b] = pair;
   if (mode === "codominant" && a !== b) return `${a} + ${b}`;
   if (mode === "incomplete_dominant" && a !== b) return `intermedio (${a}/${b})`;
-  if (mode === "autosomal_recessive") return a === b && (!referenceAllele || a !== referenceAllele) ? `omozigote recessivo (${a})` : "non espresso";
+  if (mode === "autosomal_recessive") {
+    if (!referenceAllele) return null;
+    return a === b && a !== referenceAllele ? `omozigote recessivo (${a})` : "non espresso";
+  }
   if (mode === "dominant") {
     if (!referenceAllele) return null;
     return a !== referenceAllele || b !== referenceAllele ? "espresso" : "non espresso";
