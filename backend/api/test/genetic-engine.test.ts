@@ -11,6 +11,10 @@ describe("calculateGenetics", () => {
       expect.objectContaining({ genotype: "A|A", probability: 25 }),
     ]));
   });
+  it("does not guess a recessive phenotype without a reference allele", () => {
+    const result = calculateGenetics([{ locusId: "l1", name: "No reference", inheritanceMode: "autosomal_recessive", motherGenotype: "a|a", fatherGenotype: "a|a" }]);
+    expect(result.loci[0]?.outcomes[0]?.phenotype).toBeNull();
+  });
   it("rejects alleles not defined in the selected locus", () => {
     const result = calculateGenetics([{ locusId: "l1", name: "Catalogued", inheritanceMode: "codominant", motherGenotype: "A|x", fatherGenotype: "A|A", allowedAlleles: ["A", "a"] }]);
     expect(result.status).toBe("incomplete");
