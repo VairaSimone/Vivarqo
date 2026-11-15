@@ -37,14 +37,15 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
     setGenes(result.genes);
     if (!locusForm.geneId && result.genes[0]) setLocusForm((value) => ({ ...value, geneId: result.genes[0]!.id }));
     const firstLocus = result.genes.flatMap((gene) => gene.loci)[0];
+    const availableLocusIds = result.genes.flatMap((gene) => gene.loci.map((locus) => locus.id));
     if (firstLocus) {
-      setSelectedLocusIds((value) => value.length ? value : [firstLocus.id]);
+      setSelectedLocusIds((value) => { const retained = value.filter((id) => availableLocusIds.includes(id)); return retained.length ? retained : [firstLocus.id]; });
       setTraitForm((value) => ({ ...value, locusId: value.locusId || firstLocus.id }));
       setAlleleForm((value) => ({ ...value, locusId: value.locusId || firstLocus.id }));
     }
   }
   async function loadAnimalData(id: string) {
-    if (!id) { setTraits([]); setHistory([]); setInbreeding(null); return; }
+    if (!id) { setTraits([]); setHistory([]); setInbreeding(null); setPedigree(null); return; }
     const [traitResult, historyResult, inbreedingResult, pedigreeResult] = await Promise.all([
       api.get<{ traits: Trait[] }>(`/animals/${id}/genetic-traits`),
       api.get<{ history: Array<{ id: string; changedAt: string; snapshot: Record<string, unknown> }> }>(`/animals/${id}/genetic-history`),
