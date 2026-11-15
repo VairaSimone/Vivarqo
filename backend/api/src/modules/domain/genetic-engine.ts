@@ -90,37 +90,42 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
   if (!byId.has(subjectId)) return { coefficient: null, completeness: "unknown", knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale non presente nella genealogia fornita." };
   const missing = new Set<string>();
   const ancestors = new Set<string>();
-  const paths = new Map<string, number[]>();
-  const walk = (id: string, path: number[], generation: number) => {
+  const paths = new Map<string, Array<{ side: "maternal" | "paternal"; generation: number }>>();
+  const walk = (id: string, path: string[], generation: number, side: "maternal" | "paternal") => {
     if (generation > maxGenerations) return;
     const animal = byId.get(id);
     if (!animal) { missing.add(id); return; }
-    for (const [index, parentId] of [animal.motherId, animal.fatherId].entries()) {
-      if (!parentId) {\n        if (Boolean(animal.motherId) !== Boolean(animal.fatherId)) missing.add(`${id}:${index}`);\n        continue;\n      }
+    const parents = [animal.motherId, animal.fatherId];
+    if (Boolean(parents[0]) !== Boolean(parents[1])) missing.add(`${id}:unknown-parent`);
+    for (const parentId of parents) {
+      if (!parentId) continue; // Two absent parent links identify a recorded founder.
       if (path.includes(parentId)) { missing.add(`cycle:${parentId}`); continue; }
       ancestors.add(parentId);
-      const next = [...path, parentId];
-      const existing = paths.get(parentId) ?? [];
-      paths.set(parentId, [...existing, generation + 1]);
-      walk(parentId, next, generation + 1);
+      const entries = paths.get(parentId) ?? [];
+      entries.push({ side, generation: generation + 1 });
+      paths.set(parentId, entries);
+      walk(parentId, [...path, parentId], generation + 1, side);
     }
   };
   const root = byId.get(subjectId)!;
   if (!root.motherId || !root.fatherId) missing.add("root-parent");
-  if (root.motherId) walk(root.motherId, [subjectId], 1);
-  if (root.fatherId) walk(root.fatherId, [subjectId], 1);
-  // The path-overlap estimate is intentionally conservative: exact Wright F requires
-  // complete parent paths and inbreeding coefficients for common ancestors.
-  const common = [...paths.entries()].filter(([, generations]) => generations.length > 1);
-  const estimate = common.reduce((sum, [, generations]) => {
-    const sorted = [...generations].sort((a, b) => a - b);
-    return sum + Math.pow(0.5, sorted[0]! + sorted[1]! + 1);
-  }, 0);
+  if (root.motherId) walk(root.motherId, [subjectId], 1, "maternal");
+  if (root.fatherId) walk(root.fatherId, [subjectId], 1, "paternal");
+  // Wright's path contribution is calculated only for an ancestor reached through
+  // both parental sides. Founders are assumed unrelated and non-inbred.
+  let estimate = 0;
+  for (const entries of paths.values()) {
+    const maternal = entries.filter((entry) => entry.side === "maternal");
+    const paternal = entries.filter((entry) => entry.side === "paternal");
+    for (const left of maternal) for (const right of paternal) {
+      estimate += Math.pow(0.5, left.generation + right.generation + 1);
+    }
+  }
   const complete = missing.size === 0;
   return {
     coefficient: complete ? Number(estimate.toFixed(6)) : null,
     completeness: complete ? "complete" : ancestors.size ? "partial" : "unknown",
     knownAncestors: ancestors.size, missingParentLinks: missing.size, generations: maxGenerations,
-    note: complete ? "Stima da percorsi genealogici registrati; gli antenati fondatori sono assunti non imparentati." : "Genealogia incompleta: coefficiente non pubblicato per evitare una falsa precisione. Integra i genitori mancanti.",
+    note: complete ? "Coefficiente stimato dai percorsi genealogici registrati; gli antenati fondatori sono assunti non imparentati e non inbred." : "Genealogia incompleta o ciclica: coefficiente non pubblicato per evitare falsa precisione. Integra i genitori mancanti.",
   };
 }
