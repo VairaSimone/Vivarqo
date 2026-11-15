@@ -63,7 +63,7 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
     const message = sentEmails.at(-1);
     const href = message?.html.match(/href="([^"]+)"/)?.[1];
     if (!href) throw new Error("Invitation email did not contain an acceptance URL");
-    const token = new URL(href).searchParams.get("invite");
+    const token = new URLSearchParams(new URL(href).hash.slice(1)).get("invite");
     if (!token) throw new Error("Invitation URL did not contain a token");
     return token;
   }
