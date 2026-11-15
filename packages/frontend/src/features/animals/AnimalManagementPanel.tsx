@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { Alert, Button, Field, Input, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 import type { Locale } from "../../lib/domain";
@@ -6,10 +6,10 @@ import { getLocationDescendantIds, getLocationPath } from "./location-tree";
 
 type Location = { id: string; name: string; kind: "room" | "rack" | "shelf" | "container"; parentId: string | null; sortOrder: number; _count?: { animals: number; children: number } };
 type Animal = { id: string; name: string; species: string; identifier?: string | null; locationId?: string | null; status: string };
-const labels = { room: "Stanza", rack: "Rack", shelf: "Ripiano", container: "Contenitore" } as const;
 
 export function AnimalManagementPanel({ locale }: { locale: Locale }) {
   const it = locale === "it";
+  const labels = it ? { room: "Stanza", rack: "Rack", shelf: "Ripiano", container: "Contenitore" } : { room: "Room", rack: "Rack", shelf: "Shelf", container: "Container" };
   const [locations, setLocations] = useState<Location[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -40,7 +40,8 @@ export function AnimalManagementPanel({ locale }: { locale: Locale }) {
   useEffect(() => { void reload().catch((e) => setError(e instanceof ApiError ? e.message : "Unable to load animal locations")); }, []);
   const pathOf = (id: string | null | undefined): string => getLocationPath(locations, id, it ? "Non assegnato" : "Unassigned");
   const descendants = (id: string): string[] => getLocationDescendantIds(locations, id);
-  const visibleAnimals = animals.filter((a) => !filter || descendants(filter).includes(a.locationId ?? ""));
+  const visibleLocationIds = useMemo(() => new Set(filter ? descendants(filter) : []), [filter, locations]);
+  const visibleAnimals = animals.filter((a) => !filter || visibleLocationIds.has(a.locationId ?? ""));
   const parents = locations.filter((l) => l.kind === ({ room: "room", rack: "room", shelf: "rack", container: "shelf" } as const)[kind]);
   const eligibleParents = kind === "room" ? [] : parents;
 
