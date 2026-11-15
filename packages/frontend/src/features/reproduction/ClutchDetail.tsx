@@ -32,7 +32,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const incubatorsResource = useResource<{ incubators: Array<{ id: string; name: string; identifier: string | null }> }>("/incubators");
   const transfersResource = useResource<{ transfers: Array<{ id: string; transferredAt: string; fromPosition: string | null; toPosition: string | null; fromIncubator: { name: string } | null; toIncubator: { name: string } | null; notes: string | null }> }>(editingEgg ? `/eggs/${encodeURIComponent(editingEgg.id)}/incubator-transfers` : null);
   const maintenanceResource = useResource<{ maintenance: Array<{ id: string; occurredAt: string; eventType: string; notes: string | null }> }>(clutch?.incubatorId ? `/incubators/${encodeURIComponent(clutch.incubatorId)}/maintenance` : null);
-  const logsResource = useResource<{ logs: IncubationLogDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/incubation-logs?page=${logsPage}&pageSize=25` : null);
+  const logsResource = useResource<{ logs: IncubationLogDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/incubation-logs?page=${logsPage}&pageSize=100` : null);
   const eggs = eggsResource.data?.eggs ?? clutch?.eggs ?? [];
   const logs = logsResource.data?.logs ?? clutch?.incubationLogs ?? [];
   const cycle = clutch?.cycle;
@@ -206,6 +206,10 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
       <PanelHeader title={locale === "it" ? "Manutenzione incubatrice" : "Incubator maintenance"} action={<Button size="sm" onClick={() => void addIncubatorMaintenance()}><Icon name="plus" />{locale === "it" ? "Registra intervento" : "Log maintenance"}</Button>} />
       {maintenanceResource.data?.maintenance.length ? <div className="record-list">{maintenanceResource.data.maintenance.map((item) => <div className="record-row" key={item.id}><div><strong>{({ cleaning: locale === "it" ? "Pulizia" : "Cleaning", calibration: locale === "it" ? "Calibrazione" : "Calibration", repair: locale === "it" ? "Riparazione" : "Repair", inspection: locale === "it" ? "Ispezione" : "Inspection", other: locale === "it" ? "Altro" : "Other" } as Record<string,string>)[item.eventType] ?? item.eventType}</strong><small>{formatDateTime(item.occurredAt, locale)}</small>{item.notes && <p>{item.notes}</p>}</div></div>)}</div> : <EmptyState title={locale === "it" ? "Nessuna manutenzione registrata" : "No maintenance recorded"} />}
     </Panel>}
+    {clutch.history?.length ? <Panel>
+      <PanelHeader title={locale === "it" ? "Storico operazioni covata" : "Clutch activity history"} />
+      <div className="timeline">{clutch.history.slice(0, 30).map((item) => <div className="timeline-item" key={item.id}><span className="timeline-dot" /><div className="timeline-copy"><span>{formatDateTime(item.occurredAt, locale)}</span><strong>{item.action}</strong>{item.notes && <p>{item.notes}</p>}</div></div>)}</div>
+    </Panel> : null}
     {clutch.monitoring && <Panel>
       <PanelHeader title={locale === "it" ? "Monitoraggio incubazione" : "Incubation monitoring"} />
       <div className="detail-grid">
