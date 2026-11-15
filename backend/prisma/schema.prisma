@@ -809,12 +809,12 @@ model GeneticAllele {
 
 model AnimalGeneticTraitHistory {
   id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  traitId     String             @map("trait_id") @db.Uuid
+  traitId     String?            @map("trait_id") @db.Uuid
   animalId    String             @map("animal_id") @db.Uuid
   changedBy   String             @map("changed_by") @db.Uuid
   snapshot    Json               @db.JsonB
   changedAt   DateTime           @default(now()) @map("changed_at") @db.Timestamptz(6)
-  trait       AnimalGeneticTrait @relation(fields: [traitId], references: [id], onDelete: Cascade)
+  trait       AnimalGeneticTrait? @relation(fields: [traitId], references: [id], onDelete: SetNull)
   animal      Animal             @relation(fields: [animalId], references: [id], onDelete: Cascade)
   @@index([animalId, changedAt(sort: Desc)], map: "animal_genetic_history_animal_changed_idx")
   @@index([traitId, changedAt(sort: Desc)], map: "animal_genetic_history_trait_changed_idx")
