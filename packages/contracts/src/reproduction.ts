@@ -254,7 +254,7 @@ export interface EggHistoryDto {
   notes: string | null;
 }
 export interface EggMeasurementDto { id: string; eggId: string; measuredAt: string; weightG: number; notes: string | null; }
-export interface IncubatorDto { id: string; name: string; identifier: string | null; capacity: number | null; notes: string | null; isActive: boolean; }
+export interface IncubatorDto { id: string; name: string; identifier: string | null; capacity: number | null; maintenanceIntervalDays?: number | null; nextMaintenanceAt?: string | null; notes: string | null; isActive: boolean; }
 export interface IncubatorMaintenanceDto { id: string; incubatorId: string; occurredAt: string; eventType: string; notes: string | null; }
 export interface HatchlingCareDto { id: string; animalId: string; firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; notes: string | null; }
 
@@ -272,6 +272,9 @@ export interface EggDto {
   offspringAnimal?: AnimalSummaryDto | null;
   history?: EggHistoryDto[];
   notes: string | null;
+  incubatorId?: string | null;
+  incubatorPosition?: string | null;
+  currentIncubator?: { id: string; name: string; identifier: string | null } | null;
 }
 
 export interface IncubationLogDto {
@@ -339,6 +342,8 @@ export interface ClutchDetailDto extends ClutchDto {
   eggs: EggDto[];
   incubationLogs: IncubationLogDto[];
   monitoring?: { temperatureOutOfRange: number; humidityOutOfRange: number; lastCheckAt: string | null; nextCheckDueAt: string | null; averageTemperatureC: number | null; averageHumidityPct: number | null };
+  eggSummary?: { registered: number; declared: number; unregisteredDeclared: number; byStatus: Record<string, number>; hatchRatePct: number | null; averageIncubationDays: number | null };
+  history?: Array<{ id: string; action: string; occurredAt: string; details: unknown; notes: string | null }>;
 }
 
 export interface ReproductionRecordDto {
