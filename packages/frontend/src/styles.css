@@ -2681,3 +2681,45 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .animal-detail-page .panel, .animal-detail-page .animal-summary-card { break-inside: avoid; box-shadow: none !important; border: 1px solid #bbb !important; }
   .animal-detail-page img { max-width: 32mm; }
 }
+
+.feeding-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 14px;
+}
+.feeding-insights-grid > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border, #e4e7e1);
+  border-radius: 12px;
+  background: var(--surface-muted, #f8f9f6);
+}
+.feeding-insights-grid span,
+.feeding-insights-grid small {
+  display: block;
+  color: var(--text-muted, #667064);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.feeding-insights-grid strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.feeding-interval-form {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border, #e4e7e1);
+  padding-top: 12px;
+}
+.feeding-interval-form > .field {
+  flex: 1 1 220px;
+}
+@media (max-width: 700px) {
+  .feeding-insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feeding-interval-form { align-items: stretch; flex-direction: column; }
+}
