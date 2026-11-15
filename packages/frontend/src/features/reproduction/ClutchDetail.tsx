@@ -15,8 +15,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [mode, setMode] = useState<"eggs" | "log" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [eggLines, setEggLines] = useState("1
-2");
+  const [eggLines, setEggLines] = useState("1\n2");
   const [logForm, setLogForm] = useState({ recordedAt: localDateTimeValue(), temperatureC: "", humidityPct: "", eventType: "measurement", notes: "" });
   const [editingEgg, setEditingEgg] = useState<EggDto | null>(null);
   const [eggPhotoBusy, setEggPhotoBusy] = useState(false);
@@ -40,8 +39,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
 
   async function addEggs(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
-    const codes = eggLines.split("
-").map((line) => line.trim()).filter(Boolean);
+    const codes = eggLines.split("\n").map((line) => line.trim()).filter(Boolean);
     try { await api.post(`/clutches/${id}/eggs`, { eggs: codes.map((code) => ({ code, status: "incubating" })) }); setMode(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
