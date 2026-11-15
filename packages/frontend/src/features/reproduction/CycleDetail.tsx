@@ -33,9 +33,9 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   const cycle = resource.data?.cycle;
   const incubatorsResource = useResource<{ incubators: IncubatorDto[] }>("/incubators");
   const pairInsights = useResource<{ pair: {
-    mother: { name: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
-    father: { name: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
-    compatibleSpecies: boolean; warnings: string[]; commonAncestors: Array<{ id: string; name: string }>; geneticDataIsIncomplete: boolean; inbreedingCoefficientEstimate: number | null; inbreedingCoefficientAssumption: string; geneticPredictions: Array<{ traitName: string; inheritanceMode: string; probabilities: Array<{ genotype: string; probabilityPct: number }>; certainty: string }>;
+    mother: { name: string; species: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
+    father: { name: string; species: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
+    compatibleSpecies: boolean; breedingProfile: { femaleMinAgeMonths: number | null; maleMinAgeMonths: number | null; femaleMinWeightG: string | number | null; maleMinWeightG: string | number | null; notes: string | null } | null; warnings: string[]; commonAncestors: Array<{ id: string; name: string }>; geneticDataIsIncomplete: boolean; inbreedingCoefficientEstimate: number | null; inbreedingCoefficientAssumption: string; geneticPredictions: Array<{ traitName: string; inheritanceMode: string; probabilities: Array<{ genotype: string; probabilityPct: number }>; certainty: string }>;
     history: { cycleCount: number; pairingCount: number; firstPairingAt: string | null; lastPairingAt: string | null; clutchCount: number; offspringBatchCount: number; outcomes: Array<{ type: string; occurredAt: string; details: string | null }> };
   } }>(cycle?.parentAAnimalId && cycle?.parentBAnimalId
     ? `/reproduction-pairs/insights?motherId=${encodeURIComponent(cycle.parentAAnimalId)}&fatherId=${encodeURIComponent(cycle.parentBAnimalId)}`
@@ -57,6 +57,39 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     });
     setError(""); setModal("event");
   }
+  async function configureSpeciesThresholds() {
+    const pair = pairInsights.data?.pair;
+    if (!pair) return;
+    const profile = pair.breedingProfile;
+    const ask = (label: string, current: number | string | null) => window.prompt(label, current == null ? "" : String(current));
+    const femaleAge = ask(locale === "it" ? "Età minima femmina (mesi, vuoto = non impostata)" : "Minimum female age (months, blank = unset)", profile?.femaleMinAgeMonths ?? null);
+    if (femaleAge === null) return;
+    const maleAge = ask(locale === "it" ? "Età minima maschio (mesi)" : "Minimum male age (months)", profile?.maleMinAgeMonths ?? null);
+    if (maleAge === null) return;
+    const femaleWeight = ask(locale === "it" ? "Peso minimo femmina (g)" : "Minimum female weight (g)", profile?.femaleMinWeightG ?? null);
+    if (femaleWeight === null) return;
+    const maleWeight = ask(locale === "it" ? "Peso minimo maschio (g)" : "Minimum male weight (g)", profile?.maleMinWeightG ?? null);
+    if (maleWeight === null) return;
+    const parseOptional = (value: string, integer: boolean) => {
+      if (!value.trim()) return null;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0 || (integer && !Number.isInteger(parsed))) throw new Error(locale === "it" ? "Valore soglia non valido." : "Invalid threshold value.");
+      return parsed;
+    };
+    try {
+      await api.patch("/species-breeding-profiles", {
+        species: pair.mother.species,
+        femaleMinAgeMonths: parseOptional(femaleAge, true),
+        maleMinAgeMonths: parseOptional(maleAge, true),
+        femaleMinWeightG: parseOptional(femaleWeight, false),
+        maleMinWeightG: parseOptional(maleWeight, false),
+        notes: profile?.notes ?? null,
+      });
+      pairInsights.reload();
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof Error ? reason.message : t("operationFailed")); }
+  }
+
   async function saveEvent(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     const body = { eventType: eventForm.eventType, occurredAt: new Date(eventForm.occurredAt).toISOString(), animalId: eventForm.animalId || null, details: eventForm.details || null, temperatureC: eventForm.temperatureC === "" ? null : temperatureToCelsius(eventForm.temperatureC), humidityPct: eventForm.humidityPct === "" ? null : Number(eventForm.humidityPct) };
@@ -190,7 +223,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     <PageHeader eyebrow={t("cycles")} title={getString(cycle, "name") || t("cycles")} description={`${formatDate(getString(cycle, "startedOn"), locale)} · ${t(`cycleStatus_${getString(cycle, "status")}`)}`} action={<Button onClick={() => { setModal("event"); openEvent(); }}><Icon name="plus" />{t("addEvent")}</Button>} />
     <Panel className="cycle-summary"><div className="cycle-parent"><span>{locale === "it" ? "Madre" : "Mother"}</span><strong>{getString(parentA, "name") || "—"}</strong><small>{getString(parentA, "species")}</small></div><div className="cycle-vs">×</div><div className="cycle-parent"><span>{locale === "it" ? "Padre" : "Father"}</span><strong>{getString(parentB, "name") || "—"}</strong><small>{getString(parentB, "species")}</small></div><div className="cycle-stats"><span>{cycle._count?.events ?? events.length} {t("events")}</span><span>{cycle._count?.clutches ?? clutches.length} {t("clutches")}</span><span>{cycle._count?.offspringBatches ?? offspring.length} {t("offspring")}</span></div></Panel>
     {pairInsights.data?.pair && <Panel>
-      <PanelHeader title={locale === "it" ? "Compatibilità e storico della coppia" : "Pair compatibility and history"} />
+      <PanelHeader title={locale === "it" ? "Compatibilità e storico della coppia" : "Pair compatibility and history"} action={<Button size="sm" variant="secondary" onClick={() => void configureSpeciesThresholds()}>{locale === "it" ? "Soglie specie" : "Species thresholds"}</Button>} />
       {pairInsights.data.pair.warnings.length > 0 && <Alert tone="warning">{pairInsights.data.pair.warnings.map((warning) => ({
         MOTHER_SEX_NOT_CONFIRMED_FEMALE: locale === "it" ? "Sesso della madre non confermato come femmina." : "Mother is not confirmed female.",
         FATHER_SEX_NOT_CONFIRMED_MALE: locale === "it" ? "Sesso del padre non confermato come maschio." : "Father is not confirmed male.",
@@ -199,6 +232,10 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
         MOTHER_AGE_UNKNOWN: locale === "it" ? "Età della madre non disponibile." : "Mother's age is unavailable.",
         FATHER_AGE_UNKNOWN: locale === "it" ? "Età del padre non disponibile." : "Father's age is unavailable.",
         MOTHER_WEIGHT_UNKNOWN: locale === "it" ? "Peso della madre non disponibile." : "Mother's weight is unavailable.",
+        MOTHER_BELOW_MIN_AGE: locale === "it" ? "La madre è sotto l'età minima configurata per la specie." : "The mother is below the configured minimum age for this species.",
+        FATHER_BELOW_MIN_AGE: locale === "it" ? "Il padre è sotto l'età minima configurata per la specie." : "The father is below the configured minimum age for this species.",
+        MOTHER_BELOW_MIN_WEIGHT: locale === "it" ? "La madre è sotto il peso minimo configurato per la specie." : "The mother is below the configured minimum weight for this species.",
+        FATHER_BELOW_MIN_WEIGHT: locale === "it" ? "Il padre è sotto il peso minimo configurato per la specie." : "The father is below the configured minimum weight for this species.",
         FATHER_WEIGHT_UNKNOWN: locale === "it" ? "Peso del padre non disponibile." : "Father's weight is unavailable."
       } as Record<string, string>)[warning] ?? warning).join(" ")}</Alert>}
       <div className="detail-grid">
