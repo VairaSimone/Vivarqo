@@ -17,6 +17,7 @@ import { loadOptionalSession } from "./modules/auth/session.js";
 import { createAccountRouter } from "./modules/account/account.routes.js";
 import type { EmailSender } from "./modules/auth/email-sender.js";
 import { createAnimalRouter } from "./modules/animals/animals.routes.js";
+import { createAnimalManagementRouter } from "./modules/animals/animal-management.routes.js";
 import { createCareRouter } from "./modules/animals/care.routes.js";
 import { createImportRouter } from "./modules/animals/import.routes.js";
 import { createTasksRouter } from "./modules/operations/tasks.routes.js";
@@ -96,6 +97,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
   app.use("/api/v1/onboarding", createOnboardingRouter());
+  app.use("/api/v1", createAnimalManagementRouter());
   app.use("/api/v1/animals", createAnimalRouter());
   app.use("/api/v1", createAnimalPhotoRouter());
   app.use("/api/v1", createEggPhotoRouter());
