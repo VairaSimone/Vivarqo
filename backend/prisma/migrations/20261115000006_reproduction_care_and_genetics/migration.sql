@@ -1,7 +1,6 @@
 ALTER TABLE "eggs"
   ADD COLUMN "laid_at" TIMESTAMPTZ(6),
-  ADD COLUMN "expected_hatch_at" DATE;
-  -- Private storage key; never exposed by the API.
+  ADD COLUMN "expected_hatch_at" DATE,
   ADD COLUMN "photo_key" TEXT;
 
 ALTER TABLE "animal_genetic_traits"
