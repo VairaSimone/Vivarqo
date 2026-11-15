@@ -170,17 +170,26 @@ export function createFinanceRouter() {
       if (!document) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
     }
 
-    if (input.reproductionCycleId) {
-      const cycle = await prisma.reproductionCycle.findFirst({ where: { id: input.reproductionCycleId, userId: auth.userId }, select: { id: true } });
+    let linkedCycleId = input.reproductionCycleId ?? null;
+    let linkedClutchId = input.clutchId ?? null;
+    let linkedBatchId = input.offspringBatchId ?? null;
+    if (linkedCycleId) {
+      const cycle = await prisma.reproductionCycle.findFirst({ where: { id: linkedCycleId, userId: auth.userId }, select: { id: true } });
       if (!cycle) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
     }
-    if (input.clutchId) {
-      const clutch = await prisma.clutch.findFirst({ where: { id: input.clutchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
-      if (!clutch || (input.reproductionCycleId && clutch.cycleId !== input.reproductionCycleId)) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account or cycle");
+    if (linkedClutchId) {
+      const clutch = await prisma.clutch.findFirst({ where: { id: linkedClutchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
+      if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account");
+      if (linkedCycleId && clutch.cycleId !== linkedCycleId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Clutch and finance entry must belong to the same cycle");
+      linkedCycleId ??= clutch.cycleId;
     }
-    if (input.offspringBatchId) {
-      const batch = await prisma.offspringBatch.findFirst({ where: { id: input.offspringBatchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
-      if (!batch || (input.reproductionCycleId && batch.cycleId !== input.reproductionCycleId) || (input.clutchId && batch.clutchId !== input.clutchId)) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account or scope");
+    if (linkedBatchId) {
+      const batch = await prisma.offspringBatch.findFirst({ where: { id: linkedBatchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
+      if (!batch) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account");
+      if (linkedCycleId && batch.cycleId !== linkedCycleId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Offspring batch and finance entry must belong to the same cycle");
+      if (linkedClutchId && batch.clutchId !== linkedClutchId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Offspring batch and selected clutch do not match");
+      linkedCycleId ??= batch.cycleId;
+      linkedClutchId ??= batch.clutchId;
     }
     const entry = await prisma.$transaction(async (tx) => {
       const created = await tx.financeEntry.create({
@@ -188,7 +197,7 @@ export function createFinanceRouter() {
           userId: auth.userId, entryType: input.entryType, occurredOn: date, amountCents: BigInt(input.amountCents),
           currency: input.currency, category: input.category, description: input.description,
           animalId: input.animalId ?? null, documentId: input.documentId ?? null,
-          reproductionCycleId: input.reproductionCycleId ?? null, clutchId: input.clutchId ?? null, offspringBatchId: input.offspringBatchId ?? null,
+          reproductionCycleId: linkedCycleId, clutchId: linkedClutchId, offspringBatchId: linkedBatchId,
         },
       });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "finance_entry.created", entityType: "finance_entry", entityId: created.id } });
