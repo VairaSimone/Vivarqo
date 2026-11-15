@@ -15,10 +15,14 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [mode, setMode] = useState<"eggs" | "log" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [eggLines, setEggLines] = useState("1\n2");
+  const [eggLines, setEggLines] = useState("1
+2");
   const [logForm, setLogForm] = useState({ recordedAt: localDateTimeValue(), temperatureC: "", humidityPct: "", eventType: "measurement", notes: "" });
   const [editingEgg, setEditingEgg] = useState<EggDto | null>(null);
   const [editingLog, setEditingLog] = useState<IncubationLogDto | null>(null);
+  const [measuringEgg, setMeasuringEgg] = useState<EggDto | null>(null);
+  const [eggMeasurements, setEggMeasurements] = useState<Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }>>([]);
+  const [measurementForm, setMeasurementForm] = useState({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
   const [eggsPage, setEggsPage] = useState(1);
   const [logsPage, setLogsPage] = useState(1);
   const clutch = resource.data?.clutch;
@@ -31,7 +35,8 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
 
   async function addEggs(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
-    const codes = eggLines.split("\n").map((line) => line.trim()).filter(Boolean);
+    const codes = eggLines.split("
+").map((line) => line.trim()).filter(Boolean);
     try { await api.post(`/clutches/${id}/eggs`, { eggs: codes.map((code) => ({ code, status: "incubating" })) }); setMode(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
@@ -47,6 +52,36 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     });
     setError(""); setMode("log");
   }
+  async function openEggMeasurements(egg: EggDto) {
+    setMeasuringEgg(egg);
+    setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
+    try {
+      const response = await api.get<{ measurements: Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }> }>(`/eggs/${encodeURIComponent(egg.id)}/measurements`);
+      setEggMeasurements(response.measurements);
+    } catch (reason) {
+      setEggMeasurements([]);
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+  async function saveEggMeasurement(event: FormEvent) {
+    event.preventDefault();
+    if (!measuringEgg) return;
+    setBusy(true);
+    try {
+      await api.post(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`, {
+        measuredAt: new Date(measurementForm.measuredAt).toISOString(),
+        weightG: Number(measurementForm.weightG),
+        notes: measurementForm.notes || null,
+      });
+      const response = await api.get<{ measurements: Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }> }>(`/eggs/${encodeURIComponent(measuringEgg.id)}/measurements`);
+      setEggMeasurements(response.measurements);
+      eggsResource.reload();
+      show(t("saveSuccess"));
+      setMeasurementForm({ measuredAt: localDateTimeValue(), weightG: "", notes: "" });
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setBusy(false); }
+  }
+
   async function addLog(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -79,7 +114,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     <div className="back-row"><button className="text-link" onClick={() => navigate(`/reproduction-cycles/${getString(cycle, "id")}`)}>← {getString(cycle, "name") || t("cycles")}</button></div>
     <PageHeader eyebrow={t("clutches")} title={formatDate(getString(clutch, "laidOn"), locale)} description={`${locale === "it" ? "Uova registrate" : "Eggs registered"}: ${eggsResource.data?.pagination.total ?? clutch._count?.eggs ?? eggs.length} / ${getString(clutch, "eggCount")} · ${getString(clutch, "incubatorLabel") || "—"}`} action={<Button onClick={() => openLog()}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
     <div className="detail-grid">
-      <div><EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} />{eggsResource.data?.pagination && <Pagination page={eggsResource.data.pagination.page} totalPages={eggsResource.data.pagination.totalPages} onChange={setEggsPage} label={t("page")} />}</div>
+      <div><EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} onMeasure={(egg) => void openEggMeasurements(egg)} />{eggsResource.data?.pagination && <Pagination page={eggsResource.data.pagination.page} totalPages={eggsResource.data.pagination.totalPages} onChange={setEggsPage} label={t("page")} />}</div>
       <div><IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />{logsResource.data?.pagination && <Pagination page={logsResource.data.pagination.page} totalPages={logsResource.data.pagination.totalPages} onChange={setLogsPage} label={t("page")} />}</div>
     </div>
     {clutch.monitoring && <Panel>
@@ -99,6 +134,17 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
       </div>
       <p className="muted-note">{locale === "it" ? "Le colonne mostrano i controlli registrati in ordine cronologico; i valori fuori intervallo sono conteggiati rispetto ai target configurati." : "Bars show recorded checks chronologically; out-of-range values are counted against the configured targets."}</p>
     </Panel>}
+    {measuringEgg && <Modal title={(locale === "it" ? "Misurazioni uovo · " : "Egg measurements · ") + (measuringEgg.code || "—")} onClose={() => setMeasuringEgg(null)}>
+      <div className="form-stack">
+        {eggMeasurements.length > 0 && <div className="record-list">{eggMeasurements.map((measurement) => <div className="record-row" key={measurement.id}><div><strong>{measurement.weightG} g</strong><small>{formatDateTime(measurement.measuredAt, locale)}</small>{measurement.notes && <p>{measurement.notes}</p>}</div></div>)}</div>}
+        <form className="form-stack" onSubmit={saveEggMeasurement}>
+          <Field label={locale === "it" ? "Data e ora" : "Date and time"}><Input required type="datetime-local" value={measurementForm.measuredAt} onChange={(e) => setMeasurementForm({ ...measurementForm, measuredAt: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Peso (g)" : "Weight (g)"}><Input required type="number" min="0.01" step="0.01" value={measurementForm.weightG} onChange={(e) => setMeasurementForm({ ...measurementForm, weightG: e.target.value })} /></Field>
+          <Field label={t("notes")}><Textarea rows={2} value={measurementForm.notes} onChange={(e) => setMeasurementForm({ ...measurementForm, notes: e.target.value })} /></Field>
+          <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMeasuringEgg(null)}>{t("close")}</Button><Button type="submit" disabled={busy || !measurementForm.weightG}>{t("save")}</Button></div>
+        </form>
+      </div>
+    </Modal>}
     {mode === "eggs" && <Modal title={t("addEggs")} onClose={() => setMode(null)}><form className="form-stack" onSubmit={addEggs}>{error && <Alert tone="danger">{error}</Alert>}<Field label={t("eggCode")} hint={locale === "it" ? "Un codice per riga; ogni riga crea un uovo." : "One code per line; each line creates one egg."}><Textarea rows={5} value={eggLines} onChange={(e) => setEggLines(e.target.value)} /></Field><div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div></form></Modal>}
     {mode === "log" && <Modal title={editingLog ? t("edit") : t("addIncubationLog")} onClose={() => { setEditingLog(null); setMode(null); }}><form className="form-stack" onSubmit={addLog}>{error && <Alert tone="danger">{error}</Alert>}
       <Field label={t("recordedAt")}><Input type="datetime-local" required value={logForm.recordedAt} onChange={(e) => setLogForm({ ...logForm, recordedAt: e.target.value })} /></Field>
@@ -106,9 +152,11 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
       <Field label={t("eventType")}><Input value={logForm.eventType} onChange={(e) => setLogForm({ ...logForm, eventType: e.target.value })} /></Field><Field label={t("notes")}><Textarea rows={3} value={logForm.notes} onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })} /></Field>
       <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
     </form></Modal>}
-    {editingEgg && <Modal title={t("edit")} onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null, offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null, notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}><Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field><Field label={t("eggStatus")}><Select value={getString(editingEgg, "status", "unknown")} onChange={(e) => { const status = e.target.value as EggDto["status"]; setEditingEgg({ ...editingEgg, status, hatchedAt: status === "hatched" ? (getString(editingEgg, "hatchedAt").slice(0,10) || todayDate()) : null, offspringAnimalId: status === "hatched" ? getString(editingEgg, "offspringAnimalId") || null : null }); }}>
+    {editingEgg && <Modal title={t("edit")} onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), laidAt: getString(editingEgg, "laidAt") || null, expectedHatchAt: getString(editingEgg, "expectedHatchAt").slice(0,10) || null, hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null, offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null, notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}><Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field><Field label={t("eggStatus")}><Select value={getString(editingEgg, "status", "unknown")} onChange={(e) => { const status = e.target.value as EggDto["status"]; setEditingEgg({ ...editingEgg, status, hatchedAt: status === "hatched" ? (getString(editingEgg, "hatchedAt").slice(0,10) || todayDate()) : null, offspringAnimalId: status === "hatched" ? getString(editingEgg, "offspringAnimalId") || null : null }); }}>
       <option value="unknown">{locale === "it" ? "Da valutare" : "Unassessed"}</option><option value="fertile">Fertile</option><option value="infertile">{locale === "it" ? "Non fertile" : "Infertile"}</option><option value="damaged">{locale === "it" ? "Danneggiato" : "Damaged"}</option><option value="lost">{locale === "it" ? "Perso" : "Lost"}</option><option value="incubating">{locale === "it" ? "In incubazione" : "Incubating"}</option><option value="hatched">{locale === "it" ? "Schiuso" : "Hatched"}</option>
     </Select></Field>
+    <Field label={locale === "it" ? "Data deposizione" : "Deposition date"}><Input type="datetime-local" value={getString(editingEgg, "laidAt") ? localDateTimeValue(new Date(getString(editingEgg, "laidAt"))) : ""} onChange={(e) => setEditingEgg({ ...editingEgg, laidAt: e.target.value ? new Date(e.target.value).toISOString() : null })} /></Field>
+    <Field label={locale === "it" ? "Schiusa prevista" : "Expected hatch"}><Input type="date" value={getString(editingEgg, "expectedHatchAt").slice(0,10)} onChange={(e) => setEditingEgg({ ...editingEgg, expectedHatchAt: e.target.value || null })} /></Field>
     <Field label={locale === "it" ? "Data di schiusa" : "Hatch date"}><Input type="date" value={getString(editingEgg, "hatchedAt").slice(0,10)} onChange={(e) => setEditingEgg({ ...editingEgg, hatchedAt: e.target.value || null })} /></Field>
     <RemoteSelect label={locale === "it" ? "Piccolo collegato" : "Linked hatchling"} value={getString(editingEgg, "offspringAnimalId")} onChange={(value) => setEditingEgg({ ...editingEgg, offspringAnimalId: value || null, status: value ? "hatched" : editingEgg.status })} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "all", sort: "name" }} detailEndpoint={(animalId) => `/animals/${encodeURIComponent(animalId)}`} detailKey="animal" locale={locale} />
     <Field label={t("notes")}><Textarea value={getString(editingEgg, "notes")} onChange={(e) => setEditingEgg({ ...editingEgg, notes: e.target.value })} /></Field><div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setEditingEgg(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div></form></Modal>}
