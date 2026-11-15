@@ -68,6 +68,95 @@ async function ownedClutch(userId: string, clutchId: string) {
 export function createReproductionRouter() {
   const router = Router();
 
+  // Pair insights are derived from owned animals and existing reproduction records.
+  // They deliberately avoid inventing species-specific maturity or weight thresholds.
+  router.get("/reproduction-pairs/insights", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const motherId = routeUuid(typeof req.query.motherId === "string" ? req.query.motherId : undefined, "mother id");
+    const fatherId = routeUuid(typeof req.query.fatherId === "string" ? req.query.fatherId : undefined, "father id");
+    if (motherId === fatherId) throw new AppError(400, "INVALID_PAIR", "The two parents must be different animals");
+    const parents = await prisma.animal.findMany({
+      where: { userId: auth.userId, id: { in: [motherId, fatherId] } },
+      select: {
+        id: true, name: true, species: true, sex: true, morph: true, geneticsNotes: true,
+        birthDate: true, motherAnimalId: true, fatherAnimalId: true,
+        geneticTraits: { select: { id: true, traitName: true, traitValue: true, confidenceNote: true, sourceAnimalId: true } },
+        weightMeasurements: { orderBy: [{ measuredAt: "desc" }, { id: "desc" }], take: 1, select: { measuredAt: true, weightG: true } },
+      },
+    });
+    if (parents.length !== 2) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or both breeding animals were not found");
+    const mother = parents.find((animal) => animal.id === motherId)!;
+    const father = parents.find((animal) => animal.id === fatherId)!;
+    const pairCycles = await prisma.reproductionCycle.findMany({
+      where: { userId: auth.userId, parentAAnimalId: motherId, parentBAnimalId: fatherId },
+      select: {
+        id: true, name: true, startedOn: true, status: true,
+        events: { where: { eventType: { in: ["pairing", "loss", "hatch", "live_birth"] } }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }], select: { eventType: true, occurredAt: true, details: true } },
+        _count: { select: { clutches: true, offspringBatches: true } },
+      },
+      orderBy: [{ startedOn: "desc" }],
+    });
+    const ancestorLevels = async (animalId: string) => {
+      const levels: Array<Array<{ id: string; name: string }>> = [];
+      let frontier = [animalId];
+      const seen = new Set(frontier);
+      for (let depth = 1; depth <= 8 && frontier.length; depth += 1) {
+        const rows = await prisma.animal.findMany({
+          where: { userId: auth.userId, id: { in: frontier } },
+          select: { motherAnimalId: true, fatherAnimalId: true },
+        });
+        const next = [...new Set(rows.flatMap((row) => [row.motherAnimalId, row.fatherAnimalId]).filter((id): id is string => Boolean(id) && !seen.has(id)))].slice(0, 256);
+        if (!next.length) break;
+        next.forEach((id) => seen.add(id));
+        const ancestors = await prisma.animal.findMany({ where: { userId: auth.userId, id: { in: next } }, select: { id: true, name: true } });
+        levels.push(ancestors);
+        frontier = ancestors.map((item) => item.id);
+      }
+      return levels;
+    };
+    const [motherAncestors, fatherAncestors] = await Promise.all([ancestorLevels(motherId), ancestorLevels(fatherId)]);
+    const motherAncestorIds = new Set(motherAncestors.flat().map((item) => item.id));
+    const commonAncestorIds = new Set(fatherAncestors.flat().map((item) => item.id).filter((id) => motherAncestorIds.has(id)));
+    const commonAncestors = [...motherAncestors.flat(), ...fatherAncestors.flat()]
+      .filter((item, index, all) => commonAncestorIds.has(item.id) && all.findIndex((candidate) => candidate.id === item.id) === index);
+    const pairingEvents = pairCycles.flatMap((cycle) => cycle.events.filter((event) => event.eventType === "pairing"));
+    const sortedPairings = pairingEvents.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+    const allEvents = pairCycles.flatMap((cycle) => cycle.events);
+    const ageYears = (birthDate: Date | null) => birthDate ? Math.floor((Date.now() - birthDate.getTime()) / 31_557_600_000) : null;
+    const sameSpecies = mother.species.trim().toLocaleLowerCase() === father.species.trim().toLocaleLowerCase();
+    const warnings = [
+      ...(mother.sex !== "female" ? ["MOTHER_SEX_NOT_CONFIRMED_FEMALE"] : []),
+      ...(father.sex !== "male" ? ["FATHER_SEX_NOT_CONFIRMED_MALE"] : []),
+      ...(!sameSpecies ? ["SPECIES_MISMATCH"] : []),
+      ...(commonAncestors.length ? ["COMMON_ANCESTORS_FOUND"] : []),
+      ...(!mother.birthDate ? ["MOTHER_AGE_UNKNOWN"] : []),
+      ...(!father.birthDate ? ["FATHER_AGE_UNKNOWN"] : []),
+      ...(!mother.weightMeasurements[0] ? ["MOTHER_WEIGHT_UNKNOWN"] : []),
+      ...(!father.weightMeasurements[0] ? ["FATHER_WEIGHT_UNKNOWN"] : []),
+    ];
+    res.status(200).json({
+      pair: {
+        mother: { id: mother.id, name: mother.name, species: mother.species, sex: mother.sex, morph: mother.morph, geneticsNotes: mother.geneticsNotes, ageYears: ageYears(mother.birthDate), lastWeight: mother.weightMeasurements[0] ?? null, geneticTraits: mother.geneticTraits },
+        father: { id: father.id, name: father.name, species: father.species, sex: father.sex, morph: father.morph, geneticsNotes: father.geneticsNotes, ageYears: ageYears(father.birthDate), lastWeight: father.weightMeasurements[0] ?? null, geneticTraits: father.geneticTraits },
+        compatibleSpecies: sameSpecies,
+        warnings,
+        commonAncestors,
+        history: {
+          cycleCount: pairCycles.length,
+          pairingCount: sortedPairings.length,
+          firstPairingAt: sortedPairings[0]?.occurredAt ?? null,
+          lastPairingAt: sortedPairings.at(-1)?.occurredAt ?? null,
+          clutchCount: pairCycles.reduce((sum, cycle) => sum + cycle._count.clutches, 0),
+          offspringBatchCount: pairCycles.reduce((sum, cycle) => sum + cycle._count.offspringBatches, 0),
+          outcomes: allEvents.map((event) => ({ type: event.eventType, occurredAt: event.occurredAt, details: event.details })),
+          cycles: pairCycles.map((cycle) => ({ id: cycle.id, name: cycle.name, startedOn: cycle.startedOn, status: cycle.status, clutchCount: cycle._count.clutches, offspringBatchCount: cycle._count.offspringBatches })),
+        },
+        geneticDataIsIncomplete: !mother.geneticTraits.length || !father.geneticTraits.length,
+        inbreedingCoefficient: null,
+      },
+    });
+  });
+
   router.get("/reproduction-cycles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: reproductionCycleStatusSchema.or(z.literal("all")).default("all") }), req.query);
