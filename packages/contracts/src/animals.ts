@@ -82,6 +82,9 @@ export interface GeneticTraitDto {
   sourceAnimalId: string | null;
   sourceAnimal?: GeneticTraitSourceAnimalDto | null;
   confidenceNote: string | null;
+  inheritanceMode?: "autosomal_recessive" | "incomplete_dominant" | "dominant" | null;
+  genotype?: string | null;
+  certainty?: "confirmed" | "visual" | "possible" | "carrier" | "unverified";
 }
 
 export interface PublicShareDto {
