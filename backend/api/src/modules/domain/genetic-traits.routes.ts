@@ -208,7 +208,10 @@ export function createGeneticTraitsRouter() {
       description: z.string().max(10000).nullable().optional(), isReference: z.boolean().optional(),
     }).strict(), req.body);
     await ownedLocus(auth.userId, locusId);
-    const allele = await prisma.geneticAllele.create({ data: { locusId, ...input } });
+    const allele = await prisma.$transaction(async (tx) => {
+      if (input.isReference) await tx.geneticAllele.updateMany({ where: { locusId, isReference: true }, data: { isReference: false } });
+      return tx.geneticAllele.create({ data: { locusId, ...input } });
+    });
     res.status(201).json({ allele });
   });
 
