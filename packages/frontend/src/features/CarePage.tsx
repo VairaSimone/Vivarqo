@@ -6,6 +6,7 @@ import { api, ApiError } from "../lib/api";
 import { dateTimeInputToUtc, formatDateTime, formatWeight, getString, gramsToWeight, localDateTimeValue, queryString, weightToGrams, weightUnitLabel } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
+import { suggestedInventoryQuantity } from "../lib/prey-inventory";
 import { useResource } from "../hooks/useResource";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../components/ui";
 
@@ -206,7 +207,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
                 <Field label={t("foodSize")}><Input value={entry.foodSize} onChange={(e) => updateEntry(id, "foodSize", e.target.value)} /></Field>
                 <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={entry.foodWeightG} onChange={(e) => updateEntry(id, "foodWeightG", e.target.value)} /></Field>
                 <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={entry.preyState} onChange={(e) => updateEntry(id, "preyState", e.target.value)}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
-                <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={entry.inventoryItemId} onChange={(e) => { updateEntry(id, "inventoryItemId", e.target.value); if (e.target.value && !entry.inventoryQuantity) updateEntry(id, "inventoryQuantity", "1"); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+                <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={entry.inventoryItemId} onChange={(e) => { const selectedItem = preyInventory.data?.items.find((item) => item.id === e.target.value); updateEntry(id, "inventoryItemId", e.target.value); updateEntry(id, "inventoryQuantity", selectedItem ? suggestedInventoryQuantity(selectedItem.unit, entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null) : ""); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
                 {entry.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={entry.inventoryQuantity} onChange={(e) => updateEntry(id, "inventoryQuantity", e.target.value)} /></Field>}
               </div>
             </div>;
