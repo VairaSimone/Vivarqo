@@ -5,7 +5,7 @@ import { env } from "../../config/env.js";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
-import { getUserEntitlements } from "../domain/billing-entitlements.js";
+import { hasPaidSubscriptionEntitlement } from "../domain/billing-entitlements.js";
 import { requireSession, type AuthContext } from "./session.js";
 import { createConfiguredEmailSender, type EmailSender } from "./email-sender.js";
 
@@ -31,8 +31,7 @@ function escapeHtml(value: string): string {
   })[character] ?? character);
 }
 async function assertPremium(ownerUserId: string): Promise<void> {
-  const entitlements = await getUserEntitlements(ownerUserId);
-  if (!entitlements.features.includes("paidSubscription")) {
+  if (!await hasPaidSubscriptionEntitlement(ownerUserId)) {
     throw new AppError(403, "PREMIUM_REQUIRED", "An active Premium subscription is required to invite or join a shared workspace", {
       upgradeRequired: true, billingPath: "/billing",
     });
