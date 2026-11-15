@@ -3039,6 +3039,132 @@ paths:
               schema: { type: object, required: [animal], properties: { animal: { type: object } } }
         '404': { description: QR non valido o animale non trovato. }
 
+  /api/v1/animals/filters:
+    get:
+      operationId: getSavedAnimalFilters
+      tags: [Animals]
+      summary: Elenca i filtri salvati dell'account
+      responses:
+        '200':
+          description: Filtri salvati.
+          content:
+            application/json:
+              schema: { type: object, required: [filters], properties: { filters: { type: array, items: { type: object } } } }
+    post:
+      operationId: saveAnimalFilter
+      tags: [Animals]
+      summary: Salva o aggiorna un filtro nominato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/animal-management.routes.ts
+          symbol: savedFilterSchema
+        content:
+          application/json:
+            schema: { type: object, required: [name, filters], properties: { name: { type: string, maxLength: 80 }, filters: { type: object, additionalProperties: true } } }
+      responses:
+        '201':
+          description: Filtro salvato.
+          content:
+            application/json:
+              schema: { type: object, required: [filter], properties: { filter: { type: object } } }
+  /api/v1/animals/filters/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      operationId: deleteSavedAnimalFilter
+      tags: [Animals]
+      summary: Elimina un filtro salvato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Filtro eliminato. }
+  /api/v1/animals/{id}/transfers:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getAnimalTransfers
+      tags: [Animals]
+      summary: Consulta lo storico delle cessioni dell'animale
+      responses:
+        '200':
+          description: Trasferimenti ordinati per data.
+          content:
+            application/json:
+              schema: { type: object, required: [transfers], properties: { transfers: { type: array, items: { type: object } } } }
+    post:
+      operationId: createAnimalTransfer
+      tags: [Animals]
+      summary: Registra vendita, donazione o trasferimento ad altro allevatore
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/animal-management.routes.ts
+          symbol: transferSchema
+        content:
+          application/json:
+            schema: { type: object, required: [type, recipientName, transferredAt], properties: { type: { type: string, enum: [sale, gift, breeder_transfer] }, recipientName: { type: string }, recipientEmail: { type: [string, 'null'], format: email }, recipientBreeder: { type: [string, 'null'] }, transferredAt: { type: string, format: date-time }, priceCents: { type: [integer, 'null'] }, notes: { type: [string, 'null'] } } }
+      responses:
+        '201':
+          description: Trasferimento registrato e stato animale aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [transfer], properties: { transfer: { type: object } } }
+
+
+  /api/v1/eggs/{id}/photo:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Recupera la foto privata di un uovo
+      responses:
+        '200':
+          description: Immagine dell'uovo.
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '404': { description: Uovo o foto non trovato. }
+    post:
+      operationId: postEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Carica o sostituisce la foto privata di un uovo
+      requestBody:
+        required: true
+        content:
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          image/webp: { schema: { type: string, format: binary } }
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        '200':
+          description: Foto caricata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photoUrl]
+                properties:
+                  photoUrl: { type: string }
+        '400': { description: File non valido. }
+        '404': { description: Uovo non trovato. }
+    delete:
+      operationId: deleteEggsByIdPhoto
+      tags: [Reproduction]
+      summary: Elimina la foto privata di un uovo
+      responses:
+        '204': { description: Foto eliminata. }
+        '404': { description: Uovo non trovato. }
+
 components:
   securitySchemes:
     sessionCookieDev:
