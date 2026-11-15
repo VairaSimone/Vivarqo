@@ -19,6 +19,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
 2");
   const [logForm, setLogForm] = useState({ recordedAt: localDateTimeValue(), temperatureC: "", humidityPct: "", eventType: "measurement", notes: "" });
   const [editingEgg, setEditingEgg] = useState<EggDto | null>(null);
+  const [eggPhotoBusy, setEggPhotoBusy] = useState(false);
   const [editingLog, setEditingLog] = useState<IncubationLogDto | null>(null);
   const [measuringEgg, setMeasuringEgg] = useState<EggDto | null>(null);
   const [eggMeasurements, setEggMeasurements] = useState<Array<{ id: string; measuredAt: string; weightG: number; notes: string | null }>>([]);
@@ -116,6 +117,28 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     try { await api.delete(`/eggs/${getString(egg, "id")}`); resource.reload(); eggsResource.reload(); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
+  async function uploadEggPhoto(file: File) {
+    if (!editingEgg) return;
+    setEggPhotoBusy(true);
+    try {
+      const result = await api.upload<{ photoUrl: string }>(`/eggs/${encodeURIComponent(editingEgg.id)}/photo`, file);
+      setEditingEgg({ ...editingEgg, photoUrl: result.photoUrl });
+      eggsResource.reload(); resource.reload();
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setEggPhotoBusy(false); }
+  }
+  async function deleteEggPhoto() {
+    if (!editingEgg?.photoUrl) return;
+    setEggPhotoBusy(true);
+    try {
+      await api.delete(`/eggs/${encodeURIComponent(editingEgg.id)}/photo`);
+      setEditingEgg({ ...editingEgg, photoUrl: null });
+      eggsResource.reload(); resource.reload();
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setEggPhotoBusy(false); }
+  }
+
   async function deleteLog(log: IncubationLogDto) {
     if (!window.confirm(t("confirmDelete"))) return;
     try { await api.delete(`/incubation-logs/${getString(log, "id")}`); resource.reload(); logsResource.reload(); }
@@ -170,7 +193,13 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
       <Field label={t("eventType")}><Input value={logForm.eventType} onChange={(e) => setLogForm({ ...logForm, eventType: e.target.value })} /></Field><Field label={t("notes")}><Textarea rows={3} value={logForm.notes} onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })} /></Field>
       <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setMode(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
     </form></Modal>}
-    {editingEgg && <Modal title={t("edit")} onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), laidAt: getString(editingEgg, "laidAt") || null, expectedHatchAt: getString(editingEgg, "expectedHatchAt").slice(0,10) || null, hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null, offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null, notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}><Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field><Field label={t("eggStatus")}><Select value={getString(editingEgg, "status", "unknown")} onChange={(e) => { const status = e.target.value as EggDto["status"]; setEditingEgg({ ...editingEgg, status, hatchedAt: status === "hatched" ? (getString(editingEgg, "hatchedAt").slice(0,10) || todayDate()) : null, offspringAnimalId: status === "hatched" ? getString(editingEgg, "offspringAnimalId") || null : null }); }}>
+    {editingEgg && <Modal title={t("edit")} onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), laidAt: getString(editingEgg, "laidAt") || null, expectedHatchAt: getString(editingEgg, "expectedHatchAt").slice(0,10) || null, hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null, offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null, notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}>
+    <Field label={locale === "it" ? "Fotografia dell'uovo" : "Egg photo"}>
+      {editingEgg.photoUrl && <img src={editingEgg.photoUrl} alt={locale === "it" ? "Fotografia dell'uovo" : "Egg photo"} style={{ width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 10 }} />}
+      <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={eggPhotoBusy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadEggPhoto(file); e.currentTarget.value = ""; }} />
+      {editingEgg.photoUrl && <Button type="button" variant="secondary" size="sm" disabled={eggPhotoBusy} onClick={() => void deleteEggPhoto()}>{locale === "it" ? "Rimuovi foto" : "Remove photo"}</Button>}
+      <small>{locale === "it" ? "JPEG, PNG o WebP; massimo 5 MB." : "JPEG, PNG or WebP; maximum 5 MB."}</small>
+    </Field> onClose={() => setEditingEgg(null)}><form className="form-stack" onSubmit={async (event) => { event.preventDefault(); setBusy(true); try { await api.patch(`/eggs/${getString(editingEgg, "id")}`, { code: getString(editingEgg, "code") || null, status: getString(editingEgg, "status"), laidAt: getString(editingEgg, "laidAt") || null, expectedHatchAt: getString(editingEgg, "expectedHatchAt").slice(0,10) || null, hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null, offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null, notes: getString(editingEgg, "notes") || null }); setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess")); } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); } finally { setBusy(false); } }}><Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field><Field label={t("eggStatus")}><Select value={getString(editingEgg, "status", "unknown")} onChange={(e) => { const status = e.target.value as EggDto["status"]; setEditingEgg({ ...editingEgg, status, hatchedAt: status === "hatched" ? (getString(editingEgg, "hatchedAt").slice(0,10) || todayDate()) : null, offspringAnimalId: status === "hatched" ? getString(editingEgg, "offspringAnimalId") || null : null }); }}>
       <option value="unknown">{locale === "it" ? "Da valutare" : "Unassessed"}</option><option value="fertile">Fertile</option><option value="infertile">{locale === "it" ? "Non fertile" : "Infertile"}</option><option value="damaged">{locale === "it" ? "Danneggiato" : "Damaged"}</option><option value="collapsed">{locale === "it" ? "Collassato" : "Collapsed"}</option><option value="lost">{locale === "it" ? "Perso" : "Lost"}</option><option value="incubating">{locale === "it" ? "In incubazione" : "Incubating"}</option><option value="hatched">{locale === "it" ? "Schiuso" : "Hatched"}</option>
     </Select></Field>
     <Field label={locale === "it" ? "Data deposizione" : "Deposition date"}><Input type="datetime-local" value={getString(editingEgg, "laidAt") ? localDateTimeValue(new Date(getString(editingEgg, "laidAt"))) : ""} onChange={(e) => setEditingEgg({ ...editingEgg, laidAt: e.target.value ? new Date(e.target.value).toISOString() : null })} /></Field>
