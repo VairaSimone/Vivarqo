@@ -1259,10 +1259,19 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
   const qrDownload = page.waitForEvent("download");
+  const qrResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === "GET" &&
+    new URL(response.url()).pathname.endsWith("/internal-qr")
+  );
   await page.getByRole("button", { name: "QR interno" }).click();
   const qrFile = await qrDownload;
   expect(qrFile.suggestedFilename()).toContain(".svg");
-
+  const qrResponse = await qrResponsePromise;
+  expect(qrResponse.status()).toBe(200);
+  const qr = await qrResponse.json();
+  expect(qr.path).toMatch(/^\\/animals\\/qr\\/[A-Za-z0-9_-]{32}$/);
+  await page.goto(qr.path);
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   await page.evaluate(() => { window.print = () => { window.__vivarqoPrintCalled = true; }; });
   await page.getByRole("button", { name: "Stampa / PDF" }).click();
   expect(await page.evaluate(() => Boolean(window.__vivarqoPrintCalled))).toBe(true);
