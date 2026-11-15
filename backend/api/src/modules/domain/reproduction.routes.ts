@@ -294,7 +294,18 @@ export function createReproductionRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.laidOn) data.laidOn = validDate(input.laidOn);
     if (input.incubationStartedAt !== undefined) data.incubationStartedAt = input.incubationStartedAt ? new Date(input.incubationStartedAt) : null;
-    const clutch = await prisma.clutch.update({ where: { id: clutchId }, data: data as never });
+    const clutch = await prisma.$transaction(async (tx) => {
+      const updated = await tx.clutch.update({ where: { id: clutchId }, data: data as never });
+      const lastLog = await tx.incubationLog.findFirst({ where: { clutchId }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }] });
+      const title = "Controllo incubazione · " + clutchId;
+      const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubation", title, status: "open" }, select: { id: true } });
+      if (updated.checkIntervalHours && lastLog) {
+        const dueAt = new Date(lastLog.recordedAt.getTime() + updated.checkIntervalHours * 60 * 60 * 1000);
+        if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt } });
+        else await tx.task.create({ data: { userId: auth.userId, title, category: "incubation", dueAt, description: "Controllo programmato per la covata " + (updated.incubatorLabel || clutchId) } });
+      } else if (reminder) await tx.task.delete({ where: { id: reminder.id } });
+      return updated;
+    });
     res.status(200).json({ clutch });
   });
 
