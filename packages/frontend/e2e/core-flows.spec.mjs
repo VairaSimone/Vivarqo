@@ -734,6 +734,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const stockAfterDelete = (await stockAfterDeleteResponse.json()).items.find((item) => item.id === stockItem.id);
   expect(Number(stockAfterDelete.quantityOnHand)).toBe(2);
 
+  await page.goto("/inventory");
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
   const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
