@@ -177,6 +177,16 @@ export function createReproductionRouter() {
     if (input.startedOn) data.startedOn = validDate(input.startedOn);
     if (input.endedOn !== undefined) data.endedOn = input.endedOn ? validDate(input.endedOn) : null;
     const parentsChanged = parentA !== existing.parentAAnimalId || parentB !== existing.parentBAnimalId;
+    if (parentsChanged) {
+      const batchRows = await prisma.offspringBatch.findMany({ where: { cycleId }, select: { id: true } });
+      if (batchRows.length) {
+        const offspringParent = await prisma.animal.findFirst({
+          where: { userId: auth.userId, id: { in: [parentA, parentB].filter((id): id is string => Boolean(id)) }, originOffspringBatchId: { in: batchRows.map((batch) => batch.id) } },
+          select: { id: true },
+        });
+        if (offspringParent) throw new AppError(400, "CYCLE_PARENT_IS_OFFSPRING", "A cycle parent cannot be an offspring of the same cycle");
+      }
+    }
     const cycle = await prisma.$transaction(async (tx) => {
       const updated = await tx.reproductionCycle.update({ where: { id: cycleId }, data: data as never });
       if (parentsChanged) {
