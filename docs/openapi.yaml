@@ -3024,6 +3024,139 @@ paths:
               schema: { type: string, format: binary }
         '410':
           $ref: '#/components/responses/Error'
+  /api/v1/collaborators:
+    get:
+      operationId: getWorkspaceCollaborators
+      tags: [Collaboration]
+      summary: Elenca collaboratori, inviti e workspace condivisi dell'account corrente
+      responses:
+        '200':
+          description: Stato della collaborazione e indicatore Premium.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [collaborators, invitations, workspaces, activeWorkspaceOwnerId, premiumEnabled]
+                properties:
+                  collaborators: { type: array, items: { type: object } }
+                  invitations: { type: array, items: { type: object } }
+                  workspaces: { type: array, items: { type: object } }
+                  activeWorkspaceOwnerId: { type: [string, 'null'], format: uuid }
+                  premiumEnabled: { type: boolean }
+  /api/v1/collaborators/invitations:
+    post:
+      operationId: inviteWorkspaceCollaborator
+      tags: [Collaboration]
+      summary: Invita via email un collaboratore (solo Premium)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/auth/collaborators.routes.ts
+          symbol: inviteSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+                role: { type: string, enum: [admin, operator, breeding, viewer] }
+      responses:
+        '201': { description: Invito creato e email inviata; il link scade dopo 7 giorni. }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/invitations/{id}:
+    delete:
+      operationId: revokeWorkspaceInvitation
+      tags: [Collaboration]
+      summary: Revoca un invito non ancora accettato
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Invito revocato. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/{id}:
+    patch:
+      operationId: updateWorkspaceCollaboratorRole
+      tags: [Collaboration]
+      summary: Modifica il ruolo di un collaboratore
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/auth/collaborators.routes.ts
+          symbol: roleSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [admin, operator, breeding, viewer] }
+      responses:
+        '200': { description: Ruolo aggiornato. }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: revokeWorkspaceCollaborator
+      tags: [Collaboration]
+      summary: Revoca l'accesso e disattiva il workspace nelle sessioni del collaboratore
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Accesso revocato. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/accept:
+    post:
+      operationId: acceptWorkspaceInvitation
+      tags: [Collaboration]
+      summary: Accetta un invito con token monouso legato all'indirizzo email autenticato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/auth/collaborators.routes.ts
+          symbol: acceptSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 128 }
+      responses:
+        '200': { description: Invito accettato. }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/active-workspace:
+    post:
+      operationId: setActiveWorkspace
+      tags: [Collaboration]
+      summary: Seleziona il workspace condiviso oppure torna a quello personale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/auth/collaborators.routes.ts
+          symbol: workspaceSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ownerUserId]
+              properties:
+                ownerUserId: { type: [string, 'null'], format: uuid }
+      responses:
+        '200': { description: Workspace selezionato nella sessione corrente. }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/billing/checkout:
     post:
       operationId: createBillingCheckout
