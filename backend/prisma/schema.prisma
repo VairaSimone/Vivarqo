@@ -392,10 +392,27 @@ model Egg {
   offspringAnimal Animal? @relation("EggOffspring", fields: [offspringAnimalId], references: [id], onDelete: SetNull)
   history   EggHistory[]
   measurements EggMeasurement[]
+  incubatorId String? @map("incubator_id") @db.Uuid
+  incubatorPosition String? @map("incubator_position") @db.VarChar(80)
+  currentIncubator Incubator? @relation("EggCurrentIncubator", fields: [incubatorId], references: [id], onDelete: SetNull)
+  incubatorTransfers EggIncubatorTransfer[]
   @@unique([clutchId, code], where: raw("\"code\" IS NOT NULL"), map: "eggs_clutch_code_unique")
   @@index([clutchId], map: "eggs_clutch_idx")
   @@index([status], map: "eggs_status_idx")
+  @@index([incubatorId, incubatorPosition], map: "eggs_incubator_position_idx")
   @@map("eggs")
+}
+
+model ClutchHistory {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clutchId String @map("clutch_id") @db.Uuid
+  action String @db.VarChar(40)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  details Json? @db.JsonB
+  notes String?
+  clutch Clutch @relation(fields: [clutchId], references: [id], onDelete: Cascade)
+  @@index([clutchId, occurredAt(sort: Desc)], map: "clutch_history_clutch_occurred_idx")
+  @@map("clutch_history")
 }
 
 model EggHistory {
@@ -476,16 +493,37 @@ model Incubator {
   name        String   @db.VarChar(120)
   identifier  String?  @db.VarChar(80)
   capacity    Int?
+  maintenanceIntervalDays Int? @map("maintenance_interval_days")
+  nextMaintenanceAt DateTime? @map("next_maintenance_at") @db.Timestamptz(6)
   notes       String?
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   clutches    Clutch[]
+  eggs        Egg[] @relation("EggCurrentIncubator")
+  transfersFrom EggIncubatorTransfer[] @relation("EggTransferFrom")
+  transfersTo EggIncubatorTransfer[] @relation("EggTransferTo")
   maintenance IncubatorMaintenance[]
   @@unique([userId, name], map: "incubators_user_name_unique")
   @@index([userId, isActive], map: "incubators_user_active_idx")
   @@map("incubators")
+}
+
+model EggIncubatorTransfer {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eggId String @map("egg_id") @db.Uuid
+  fromIncubatorId String? @map("from_incubator_id") @db.Uuid
+  toIncubatorId String? @map("to_incubator_id") @db.Uuid
+  fromPosition String? @map("from_position") @db.VarChar(80)
+  toPosition String? @map("to_position") @db.VarChar(80)
+  transferredAt DateTime @default(now()) @map("transferred_at") @db.Timestamptz(6)
+  notes String?
+  egg Egg @relation(fields: [eggId], references: [id], onDelete: Cascade)
+  fromIncubator Incubator? @relation("EggTransferFrom", fields: [fromIncubatorId], references: [id], onDelete: SetNull)
+  toIncubator Incubator? @relation("EggTransferTo", fields: [toIncubatorId], references: [id], onDelete: SetNull)
+  @@index([eggId, transferredAt(sort: Desc)], map: "egg_incubator_transfers_egg_date_idx")
+  @@map("egg_incubator_transfers")
 }
 
 model IncubatorMaintenance {
