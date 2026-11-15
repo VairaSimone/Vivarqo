@@ -77,7 +77,7 @@ export function createReproductionRouter() {
     res.status(200).json({ profile });
   });
 
-  router.put("/species-breeding-profiles", requireSession, async (req, res) => {
+  router.patch("/species-breeding-profiles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(speciesBreedingProfileSchema, req.body);
     const existing = await prisma.speciesBreedingProfile.findFirst({ where: { userId: auth.userId, species: { equals: input.species, mode: "insensitive" } }, select: { id: true } });
