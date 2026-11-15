@@ -246,6 +246,7 @@ export interface EggDto {
   laidAt?: string | null;
   expectedHatchAt?: string | null;
   measurements?: EggMeasurementDto[];
+  photoUrl?: string | null;
   offspringAnimalId?: string | null;
   offspringAnimal?: AnimalSummaryDto | null;
   history?: EggHistoryDto[];
