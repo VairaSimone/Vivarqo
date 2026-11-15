@@ -2802,3 +2802,25 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .genetics-locus { overflow-wrap:anywhere; }
   .form-fieldset { display:grid; grid-template-columns:1fr; }
 }
+
+
+/* Shared workspace and collaborator management */
+.workspace-switch-row,.collaborator-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 0; border-bottom:1px solid var(--border); }
+.workspace-switch-row:last-child,.collaborator-row:last-child { border-bottom:0; }
+.workspace-switch-row > div,.collaborator-identity { min-width:0; }
+.workspace-switch-row strong,.collaborator-identity strong { display:block; overflow-wrap:anywhere; }
+.workspace-switch-row .muted-note { margin:4px 0 0; }
+.collaborator-list { display:grid; gap:0; }
+.collaborator-identity span { display:block; margin-top:4px; color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+.collaborator-row .control { width:min(220px,38%); flex:0 0 auto; }
+.collaborator-row .btn { flex:0 0 auto; }
+.role-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.role-summary > div { min-width:0; padding:12px; border:1px solid var(--border); border-radius:10px; }
+.role-summary p { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+.text-link { border:0; padding:0; color:var(--accent); background:transparent; text-decoration:underline; font:inherit; cursor:pointer; }
+@media(max-width:640px) {
+  .workspace-switch-row,.collaborator-row { align-items:flex-start; flex-wrap:wrap; }
+  .collaborator-row .control { width:100%; flex:1 1 100%; }
+  .collaborator-row .btn { margin-left:auto; }
+  .role-summary { grid-template-columns:1fr; }
+}
