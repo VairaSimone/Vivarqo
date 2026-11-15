@@ -61,6 +61,7 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
   async function convertBatchAnimals(drafts: OffspringAnimalDraft[]) {
     if (!conversionBatch) return;
     setConversionBusy(true);
+    let recordsCreated = false;
     try {
       const created = await api.post<{ animals: Array<{ id: string }> }>(`/offspring-batches/${getString(conversionBatch, "id")}/animals`, {
         animals: drafts.map(({ photo: _photo, ...animal }) => ({
@@ -69,13 +70,18 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
           locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
         }))
       });
+      recordsCreated = true;
+      setConversionBatch(null);
       for (let index = 0; index < drafts.length; index += 1) {
         const photo = drafts[index]?.photo;
         const animalId = created.animals[index]?.id;
         if (photo && animalId) await api.upload(`/animals/${animalId}/photo`, photo);
       }
       setConversionBatch(null); batches.reload(); show(t("saveSuccess"));
-    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); batches.reload(); }
+    } catch (reason) {
+      if (recordsCreated) { setConversionBatch(null); batches.reload(); }
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
     finally { setConversionBusy(false); }
   }
 
