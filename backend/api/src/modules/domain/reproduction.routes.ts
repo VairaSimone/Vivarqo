@@ -42,6 +42,10 @@ function validDate(value: string): Date {
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new AppError(400, "VALIDATION_ERROR", "Invalid calendar date");
   return date;
 }
+function serializeEgg<T extends { id: string; photoKey: string | null; updatedAt: Date }>(egg: T) {
+  const { photoKey, updatedAt, ...safe } = egg;
+  return { ...safe, photoUrl: photoKey ? `/api/v1/eggs/${egg.id}/photo?v=${updatedAt.getTime()}` : null };
+}
 async function assertOwnedAnimals(userId: string, ids: Array<string | null | undefined>) {
   const expected = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   if (!expected.length) return;
@@ -548,7 +552,7 @@ export function createReproductionRouter() {
     const nextCheckDueAt = lastCheckAt && clutch.checkIntervalHours
       ? new Date(new Date(lastCheckAt).getTime() + clutch.checkIntervalHours * 60 * 60 * 1000).toISOString()
       : null;
-    res.status(200).json({ clutch: { ...clutch, monitoring: {
+    res.status(200).json({ clutch: { ...clutch, eggs: clutch.eggs.map(serializeEgg), monitoring: {
       temperatureOutOfRange, humidityOutOfRange, lastCheckAt, nextCheckDueAt,
       averageTemperatureC: monitoringAggregate._avg.temperatureC === null ? null : Number(monitoringAggregate._avg.temperatureC),
       averageHumidityPct: monitoringAggregate._avg.humidityPct === null ? null : Number(monitoringAggregate._avg.humidityPct),
@@ -610,7 +614,7 @@ export function createReproductionRouter() {
         },
       }),
     ]);
-    res.status(200).json({ eggs, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
+    res.status(200).json({ eggs: eggs.map(serializeEgg), pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/clutches/:id/eggs", requireSession, async (req, res) => {
@@ -638,7 +642,7 @@ export function createReproductionRouter() {
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.created", entityType: "egg", metadata: { count: results.length } } });
       return results;
     }, { isolationLevel: "Serializable" });
-    res.status(201).json({ eggs, createdCount: eggs.length });
+    res.status(201).json({ eggs: eggs.map(serializeEgg), createdCount: eggs.length });
   });
 
   router.patch("/eggs/:id", requireSession, async (req, res) => {
@@ -672,7 +676,7 @@ export function createReproductionRouter() {
       }
       return updated;
     });
-    res.status(200).json({ egg });
+    res.status(200).json({ egg: serializeEgg(egg) });
   });
 
   router.get("/clutches/:id/incubation-logs", requireSession, async (req, res) => {
