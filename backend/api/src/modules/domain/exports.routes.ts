@@ -108,7 +108,9 @@ const EMPTY_HEADERS: Record<string, string[]> = {
         "offspring_batches.csv": ["id", "cycleId", "clutchId", "bornOn", "count", "notes", "createdAt", "updatedAt"],
         "inventory_items.csv": ["id", "userId", "name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive", "createdAt", "updatedAt"],
         "stock_movements.csv": ["id", "itemId", "movementType", "quantity", "unitCostCents", "occurredAt", "reference", "notes", "createdAt"],
-        "finance_entries.csv": ["id", "userId", "animalId", "documentId", "entryType", "occurredOn", "amountCents", "currency", "category", "description", "createdAt", "updatedAt"],
+        "finance_entries.csv": ["id", "userId", "animalId", "documentId", "reproductionCycleId", "clutchId", "offspringBatchId", "recurrenceId", "entryType", "occurredOn", "amountCents", "currency", "category", "description", "createdAt", "updatedAt"],
+        "finance_budgets.csv": ["id", "userId", "period", "periodStart", "category", "amountCents", "currency", "createdAt", "updatedAt"],
+        "finance_recurrences.csv": ["id", "userId", "entryType", "amountCents", "currency", "category", "description", "animalId", "documentId", "frequency", "nextOccurrenceOn", "anchorMonth", "anchorDay", "endOn", "isActive", "createdAt", "updatedAt"],
         "tasks.csv": ["id", "userId", "animalId", "title", "description", "category", "dueAt", "status", "completedAt", "reminderRuleId", "createdAt", "updatedAt"],
         "reminder_rules.csv": ["id", "userId", "animalId", "title", "category", "intervalDays", "nextDueAt", "isEnabled", "createdAt", "updatedAt"],
         "notifications.csv": ["id", "userId", "category", "title", "body", "targetPath", "readAt", "createdAt"],
@@ -203,6 +205,14 @@ function exportTables(userId: string, includeDocuments: boolean): ExportTable[] 
     {
       name: "finance_entries.csv", emptyHeaders: EMPTY_HEADERS["finance_entries.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.financeEntry.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "finance_budgets.csv", emptyHeaders: EMPTY_HEADERS["finance_budgets.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.financeBudget.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "finance_recurrences.csv", emptyHeaders: EMPTY_HEADERS["finance_recurrences.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.financeRecurrence.findMany({ where: { userId }, ...page(cursor, take) })),
     },
     {
       name: "tasks.csv", emptyHeaders: EMPTY_HEADERS["tasks.csv"]!,
