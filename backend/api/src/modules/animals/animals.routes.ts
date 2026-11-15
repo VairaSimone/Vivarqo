@@ -43,8 +43,8 @@ function toAnimalData(input: z.output<typeof createAnimalSchema>) {
 }
 
 
-function animalResponse<T extends { id: string; photoKey: string | null; updatedAt: Date }>(animal: T) {
-  const { photoKey, ...safeAnimal } = animal;
+function animalResponse<T extends { id: string; photoKey: string | null; qrToken?: string | null; updatedAt: Date }>(animal: T) {
+  const { photoKey, qrToken: _qrToken, ...safeAnimal } = animal;
   return {
     ...safeAnimal,
     photoUrl: photoKey ? "/api/v1/animals/" + animal.id + "/photo?v=" + animal.updatedAt.getTime() : null,
