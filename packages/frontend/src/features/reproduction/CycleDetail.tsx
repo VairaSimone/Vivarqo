@@ -119,13 +119,19 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
         }))
       });
       recordsCreated = true;
-      setConversionBatch(null);
+      const failedPhotos: string[] = [];
       for (let index = 0; index < drafts.length; index += 1) {
         const photo = drafts[index]?.photo;
         const animalId = created.animals[index]?.id;
-        if (photo && animalId) await api.upload(`/animals/${animalId}/photo`, photo);
+        if (photo && animalId) {
+          try { await api.upload(`/animals/${animalId}/photo`, photo); }
+          catch { failedPhotos.push(drafts[index]?.name || String(index + 1)); }
+        }
       }
-      setConversionBatch(null); resource.reload(); show(t("saveSuccess"));
+      setConversionBatch(null); resource.reload();
+      show(failedPhotos.length
+        ? (locale === "it" ? `Animali creati, ma non è stato possibile caricare le foto di: ${failedPhotos.join(", ")}` : `Animals created, but photos failed to upload for: ${failedPhotos.join(", ")}`)
+        : t("saveSuccess"));
     } catch (reason) {
       if (recordsCreated) { setConversionBatch(null); resource.reload(); }
       show(reason instanceof ApiError ? reason.message : t("operationFailed"));
