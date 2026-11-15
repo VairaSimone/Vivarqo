@@ -22,6 +22,8 @@ export function FinancePage({ locale }: { locale: Locale }) {
   const [form, setForm] = useState({ entryType: "expense", occurredOn: todayDate(), amount: "", currency: "EUR", category: "", description: "", animalId: "", documentId: "", reproductionCycleId: "", clutchId: "", offspringBatchId: "" });
   const currentDate = new Date();
   const [budgetPeriod, setBudgetPeriod] = useState<"month" | "year">("month");
+  const [budgetYear, setBudgetYear] = useState(currentDate.getFullYear());
+  const [budgetMonth, setBudgetMonth] = useState(currentDate.getMonth() + 1);
   const [budgetCategory, setBudgetCategory] = useState("all");
   const [budgetAmount, setBudgetAmount] = useState("");
   const [recurrenceForm, setRecurrenceForm] = useState({ entryType: "expense", amount: "", currency: "EUR", category: "", description: "", frequency: "monthly", nextOccurrenceOn: todayDate(), endOn: "", animalId: "" });
@@ -36,7 +38,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
   const summary = useResource<FinanceSummaryDto>(
     "/finance/summary" + queryString({ from, to, currency: "EUR" }), parseFinanceSummaryResponse
   );
-  const budgetUrl = "/finance/budgets" + queryString({ period: budgetPeriod, year: currentDate.getFullYear(), month: currentDate.getMonth() + 1, currency: "EUR" });
+  const budgetUrl = "/finance/budgets" + queryString({ period: budgetPeriod, year: budgetYear, month: budgetMonth, currency: "EUR" });
   const budgets = useResource<{ budgets: Array<Record<string, unknown>> }>(budgetUrl);
   const recurrences = useResource<{ recurrences: Array<Record<string, unknown>> }>("/finance/recurrences");
   const profitability = useResource<Record<string, unknown>>("/finance/profitability" + queryString({ from, to, currency: "EUR" }));
@@ -87,8 +89,8 @@ export function FinancePage({ locale }: { locale: Locale }) {
   }
 
   const periodStart = budgetPeriod === "month"
-    ? `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-01`
-    : `${currentDate.getFullYear()}-01-01`;
+    ? `${budgetYear}-${String(budgetMonth).padStart(2, "0")}-01`
+    : `${budgetYear}-01-01`;
   async function saveBudget() {
     try {
       await api.post("/finance/budgets", { period: budgetPeriod, periodStart, category: budgetCategory, amountCents: amountToCents(budgetAmount), currency: "EUR" });
@@ -121,6 +123,11 @@ export function FinancePage({ locale }: { locale: Locale }) {
   }
   async function updateRecurrence(id: string, isActive: boolean) {
     try { await api.patch(`/finance/recurrences/${id}`, { isActive }); recurrences.reload(); }
+    catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function deleteRecurrence(id: string) {
+    if (!window.confirm(locale === "it" ? "Eliminare questa regola ricorrente? Le registrazioni già create resteranno nel registro." : "Delete this recurring rule? Entries already generated will remain in the ledger.")) return;
+    try { await api.delete(`/finance/recurrences/${id}`); recurrences.reload(); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
@@ -169,6 +176,8 @@ export function FinancePage({ locale }: { locale: Locale }) {
             <option value="month">{locale === "it" ? "Mensile corrente" : "Current month"}</option>
             <option value="year">{locale === "it" ? "Annuale corrente" : "Current year"}</option>
           </Select>
+          <Input aria-label={locale === "it" ? "Anno budget" : "Budget year"} type="number" min="2000" max="2200" value={budgetYear} onChange={(e) => setBudgetYear(Number(e.target.value) || currentDate.getFullYear())} />
+          {budgetPeriod === "month" && <Select aria-label={locale === "it" ? "Mese budget" : "Budget month"} value={String(budgetMonth)} onChange={(e) => setBudgetMonth(Number(e.target.value))}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(2026, index, 1))}</option>)}</Select>}
           <Input aria-label={locale === "it" ? "Categoria budget" : "Budget category"} value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)} placeholder={locale === "it" ? "Categoria (o all)" : "Category (or all)"} />
           <Input aria-label={locale === "it" ? "Importo budget" : "Budget amount"} inputMode="decimal" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} placeholder="0,00 €" />
           <Button disabled={!budgetAmount || !Number.isFinite(Number(budgetAmount.replace(",", "."))) || Number(budgetAmount.replace(",", ".")) <= 0} onClick={() => void saveBudget()}>{locale === "it" ? "Salva budget" : "Save budget"}</Button>
@@ -208,7 +217,7 @@ export function FinancePage({ locale }: { locale: Locale }) {
             <div><strong>{getString(item, "description")}</strong><small>{getString(item, "frequency") === "monthly" ? (locale === "it" ? "Mensile" : "Monthly") : (locale === "it" ? "Annuale" : "Yearly")} · {formatMoneyCents(getString(item, "amountCents"), locale)} · {formatDate(getString(item, "nextOccurrenceOn"), locale)}</small></div>
             <Badge tone={item.isActive ? "success" : "neutral"}>{item.isActive ? (locale === "it" ? "Attiva" : "Active") : (locale === "it" ? "Sospesa" : "Paused")}</Badge>
             <Button size="sm" variant="secondary" onClick={() => void generateRecurrence(getString(item, "id"))}>{locale === "it" ? "Registra scadenze" : "Generate due"}</Button>
-            <Button size="sm" variant="ghost" onClick={() => void updateRecurrence(getString(item, "id"), !Boolean(item.isActive))}>{item.isActive ? (locale === "it" ? "Sospendi" : "Pause") : (locale === "it" ? "Riattiva" : "Resume")}</Button>
+            <Button size="sm" variant="ghost" onClick={() => void updateRecurrence(getString(item, "id"), !Boolean(item.isActive))}>{item.isActive ? (locale === "it" ? "Sospendi" : "Pause") : (locale === "it" ? "Riattiva" : "Resume")}</Button><IconButton label={t("delete")} onClick={() => void deleteRecurrence(getString(item, "id"))}><Icon name="trash" /></IconButton>
           </div>)}
         </div>
       </Panel>
