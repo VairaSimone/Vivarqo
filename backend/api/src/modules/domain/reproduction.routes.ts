@@ -713,6 +713,15 @@ export function createReproductionRouter() {
     }
     if (input.status === "hatched" && !input.hatchedAt && !existing.hatchedAt) throw new AppError(400, "HATCH_DATE_REQUIRED", "A hatch date is required when marking an egg as hatched");
     const data: Record<string, unknown> = { ...input };
+    const nextIncubatorId = input.incubatorId !== undefined ? input.incubatorId : existing.incubatorId;
+    const nextIncubatorPosition = input.incubatorPosition !== undefined ? input.incubatorPosition : existing.incubatorPosition;
+    if (input.incubatorId) {
+      const incubator = await prisma.incubator.findFirst({ where: { id: input.incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
+      if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    }
+    if (!nextIncubatorId && nextIncubatorPosition) throw new AppError(400, "EGG_POSITION_REQUIRES_INCUBATOR", "An egg position requires an incubator");
+    if (input.incubatorId !== undefined) data.incubatorId = input.incubatorId;
+    if (input.incubatorPosition !== undefined || (input.incubatorId === null && existing.incubatorId)) data.incubatorPosition = nextIncubatorId ? nextIncubatorPosition : null;
     if (input.hatchedAt !== undefined) data.hatchedAt = input.hatchedAt ? validDate(input.hatchedAt) : null;
     if (input.laidAt !== undefined) data.laidAt = input.laidAt ? new Date(input.laidAt) : null;
     if (input.expectedHatchAt !== undefined) data.expectedHatchAt = input.expectedHatchAt ? validDate(input.expectedHatchAt) : null;
@@ -731,6 +740,17 @@ export function createReproductionRouter() {
     ].filter((value): value is string => Boolean(value));
     const egg = await prisma.$transaction(async (tx) => {
       const updated = await tx.egg.update({ where: { id: eggId }, data: data as never });
+      if (existing.incubatorId !== updated.incubatorId || existing.incubatorPosition !== updated.incubatorPosition) {
+        await tx.eggIncubatorTransfer.create({ data: {
+          eggId,
+          fromIncubatorId: existing.incubatorId,
+          toIncubatorId: updated.incubatorId,
+          fromPosition: existing.incubatorPosition,
+          toPosition: updated.incubatorPosition,
+          transferredAt: new Date(),
+          notes: "Posizione di incubazione aggiornata",
+        } });
+      }
       const resultingStatus = input.status ?? (input.offspringAnimalId ? "hatched" : existing.status);
       if (resultingStatus !== existing.status || historyNotes.length > 0) {
         await tx.eggHistory.create({ data: { eggId, status: resultingStatus, notes: historyNotes.join("; ") || input.notes || existing.notes } });
@@ -739,6 +759,20 @@ export function createReproductionRouter() {
       return updated;
     });
     res.status(200).json({ egg: serializeEgg(egg) });
+  });
+
+  router.get("/eggs/:id/incubator-transfers", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const egg = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    const transfers = await prisma.eggIncubatorTransfer.findMany({
+      where: { eggId },
+      orderBy: [{ transferredAt: "desc" }, { id: "desc" }],
+      include: { fromIncubator: { select: { id: true, name: true, identifier: true } }, toIncubator: { select: { id: true, name: true, identifier: true } } },
+      take: 100,
+    });
+    res.status(200).json({ transfers });
   });
 
   router.get("/clutches/:id/incubation-logs", requireSession, async (req, res) => {
