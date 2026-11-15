@@ -328,6 +328,14 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Detail label={t("birthDate")} value={formatDate(getString(animal, "birthDate"), locale)} /><Detail label={t("acquiredDate")} value={formatDate(getString(animal, "acquiredDate"), locale)} />
         <Detail label={t("location")} value={getString(animal, "locationLabel")} /><Detail label={t("previousBreeder")} value={getString(animal, "previousBreeder")} />
       </div></Panel>
+      <Panel>
+        <PanelHeader title={locale === "it" ? "Genealogia" : "Genealogy"} description={locale === "it" ? "Apri i genitori per consultare anche le generazioni precedenti." : "Open either parent to inspect earlier generations."} />
+        <div className="detail-fields">
+          <div className="detail-field"><span>{locale === "it" ? "Madre" : "Mother"}</span>{animal.mother ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.mother!.id)}`)}>{animal.mother.name}{animal.mother.morph ? ` · ${animal.mother.morph}` : ""}</button> : <strong>{getString(animal, "motherDescription") || "—"}</strong>}</div>
+          <div className="detail-field"><span>{locale === "it" ? "Padre" : "Father"}</span>{animal.father ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.father!.id)}`)}>{animal.father.name}{animal.father.morph ? ` · ${animal.father.morph}` : ""}</button> : <strong>{getString(animal, "fatherDescription") || "—"}</strong>}</div>
+        </div>
+        <p className="muted-note">{locale === "it" ? "La genealogia completa si esplora seguendo i collegamenti dei genitori, generazione dopo generazione." : "Explore the full pedigree by following parent links, generation by generation."}</p>
+      </Panel>
       <Panel><PanelHeader title={t("genetics")} /><p className="detail-copy">{getString(animal, "geneticsNotes") || t("noRecords")}</p><PanelHeader title={t("origin")} /><p className="detail-copy">{getString(animal, "originDescription") || t("noRecords")}</p><PanelHeader title={t("animalNotes")} /><p className="detail-copy">{getString(animal, "notes") || t("noRecords")}</p></Panel>
 
     </div>}
