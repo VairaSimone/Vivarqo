@@ -449,13 +449,21 @@ export function createReproductionRouter() {
     const input = parseBody(z.object({ animals: z.array(newAnimalSchema).min(1).max(500) }).strict(), req.body);
     const identifiers = input.animals.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")).filter((v): v is string => Boolean(v));
     if (new Set(identifiers).size !== identifiers.length) throw new AppError(400, "DUPLICATE_IDENTIFIERS", "Identifiers must be unique in this request");
+    const eggIds = input.animals.map((animal) => animal.eggId).filter((value): value is string => Boolean(value));
+    if (new Set(eggIds).size !== eggIds.length) throw new AppError(400, "DUPLICATE_EGG_LINKS", "Each egg can be linked to only one hatchling in this conversion");
+    if (eggIds.length && !batch.clutchId) throw new AppError(400, "EGG_CLUTCH_REQUIRED", "This offspring batch is not linked to a clutch");
+    if (eggIds.length) {
+      const eggs = await prisma.egg.findMany({ where: { id: { in: eggIds }, clutchId: batch.clutchId! }, select: { id: true, offspringAnimalId: true } });
+      if (eggs.length !== eggIds.length) throw new AppError(400, "EGG_CLUTCH_MISMATCH", "Selected eggs must belong to the offspring batch clutch");
+      if (eggs.some((egg) => egg.offspringAnimalId)) throw new AppError(409, "EGG_ALREADY_LINKED", "One or more eggs are already linked to an animal");
+    }
     const created = await prisma.$transaction(async (tx) => {
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
       for (const animal of input.animals) {
         await assertOwnedAnimals(auth.userId, [animal.motherAnimalId, animal.fatherAnimalId]);
         await assertCycleParentSexes(auth.userId, animal.motherAnimalId ?? batch.cycle.parentAAnimalId, animal.fatherAnimalId ?? batch.cycle.parentBAnimalId);
-        animals.push(await tx.animal.create({
+        const createdAnimal = await tx.animal.create({
           data: {
             userId: auth.userId, originOffspringBatchId: batchId, name: animal.name,
             identifier: animal.identifier ?? null, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
@@ -468,7 +476,14 @@ export function createReproductionRouter() {
             fatherAnimalId: animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
             originClutchId: batch.clutchId,
           },
-        }));
+        });
+        animals.push(createdAnimal);
+        if (animal.eggId) {
+          const egg = await tx.egg.findFirst({ where: { id: animal.eggId, clutchId: batch.clutchId, offspringAnimalId: null } });
+          if (!egg) throw new AppError(409, "EGG_ALREADY_LINKED", "The selected egg is no longer available");
+          await tx.egg.update({ where: { id: egg.id }, data: { status: "hatched", hatchedAt: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn, offspringAnimalId: createdAnimal.id } });
+          await tx.eggHistory.create({ data: { eggId: egg.id, status: "hatched", notes: "Hatchling linked during offspring conversion" } });
+        }
       }
       return animals;
     });
