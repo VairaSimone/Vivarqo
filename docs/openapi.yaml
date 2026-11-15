@@ -9079,6 +9079,7 @@ components:
         originDescription: { type: [string, 'null'], maxLength: 5000 }
         previousBreeder: { type: [string, 'null'], maxLength: 160 }
         locationLabel: { type: [string, 'null'], maxLength: 160 }
+        feedingIntervalDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
         status: { type: string, enum: [active, sold, transferred, deceased], default: active }
         notes: { type: [string, 'null'], maxLength: 10000 }
     AnimalPatch:
@@ -9120,6 +9121,9 @@ components:
               foodType: { type: [string, 'null'], maxLength: 120 }
               foodSize: { type: [string, 'null'], maxLength: 120 }
               foodWeightG: { type: [number, 'null'], exclusiveMinimum: 0 }
+              preyState: { type: string, enum: [unknown, frozen, thawed, live], default: unknown }
+              inventoryItemId: { type: [string, 'null'], format: uuid }
+              inventoryQuantity: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 999999999.999 }
               notes: { type: [string, 'null'], maxLength: 5000 }
     FeedingEntryPatch:
       type: object
@@ -9131,6 +9135,9 @@ components:
         foodType: { type: [string, 'null'], maxLength: 120 }
         foodSize: { type: [string, 'null'], maxLength: 120 }
         foodWeightG: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 1000000 }
+        preyState: { type: string, enum: [unknown, frozen, thawed, live] }
+        inventoryItemId: { type: [string, 'null'], format: uuid }
+        inventoryQuantity: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 999999999.999 }
         notes: { type: [string, 'null'], maxLength: 5000 }
     WeightWrite:
       type: object
@@ -10766,6 +10773,11 @@ components:
               "null"
             ]
           },
+          "feedingIntervalDays": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 365
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -11054,6 +11066,21 @@ components:
               "number",
               "null"
             ]
+          },
+          "preyState": {
+            "type": "string",
+            "enum": ["unknown", "frozen", "thawed", "live"]
+          },
+          "inventoryItemId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "inventoryQuantity": {
+            "type": ["number", "null"],
+            "exclusiveMinimum": 0
+          },
+          "inventoryDeducted": {
+            "type": "boolean"
           },
           "notes": {
             "type": [
