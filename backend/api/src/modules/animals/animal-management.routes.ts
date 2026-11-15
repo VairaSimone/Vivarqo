@@ -8,7 +8,7 @@ const uuid=z.string().uuid();
 const kinds=["room","rack","shelf","container"] as const;
 const parse=<T extends z.ZodType>(s:T,v:unknown):z.output<T>=>{const p=s.safeParse(v);if(!p.success)throw new AppError(400,"VALIDATION_ERROR","Request validation failed",{issues:p.error.issues});return p.data;};
 const getId=(v:string|string[]|undefined)=>{const x=Array.isArray(v)?v[0]:v;if(!x||!uuid.safeParse(x).success)throw new AppError(400,"INVALID_ID","Invalid identifier");return x;};
-const ctx=(r:{locals:Record<string,unknown>})=>router.locals.auth as AuthContext;
+const ctx=(r:{locals:Record<string,unknown>})=>r.locals.auth as AuthContext;
 const locSchema=z.object({kind:z.enum(kinds),name:z.string().trim().min(1).max(120),parentId:uuid.nullable().optional(),sortOrder:z.number().int().min(-10000).max(10000).default(0)}).strict();
 const locationPatchSchema=z.object({name:z.string().trim().min(1).max(120).optional(),sortOrder:z.number().int().min(-10000).max(10000).optional()}).strict();
 const moveSchema=z.object({animalIds:z.array(uuid).min(1).max(500),toLocationId:uuid.nullable(),movedAt:z.string().datetime({offset:true}).optional(),reason:z.string().trim().max(500).nullable().optional()}).strict();
