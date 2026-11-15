@@ -117,6 +117,7 @@ export function createAnimalRouter() {
         orderBy: sort === "name" ? [{ name: "asc" }, { id: "asc" }] : sort === "createdAt" ? { createdAt: "desc" } : { updatedAt: "desc" },
         skip: (pageInput.page - 1) * pageInput.pageSize,
         take: pageInput.pageSize,
+        include: { mother: { select: { id: true, name: true, morph: true, sex: true } }, father: { select: { id: true, name: true, morph: true, sex: true } } },
       }),
     ]);
     res.status(200).json({
@@ -137,7 +138,7 @@ export function createAnimalRouter() {
     try {
       const animal = await prisma.$transaction(async (tx) => {
         await assertAnimalCapacity(tx, auth.userId, 1);
-        const created = await tx.animal.create({ data: { ...toAnimalData(input), userId: auth.userId } });
+        const created = await tx.animal.create({ data: { ...toAnimalData(input), userId: auth.userId }, include: { mother: { select: { id: true, name: true, morph: true, sex: true } }, father: { select: { id: true, name: true, morph: true, sex: true } } } });
         await tx.auditEvent.create({
           data: {
             userId: auth.userId,
@@ -190,7 +191,7 @@ export function createAnimalRouter() {
   router.get("/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
-    const animal = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
+    const animal = await prisma.animal.findFirst({ where: { id, userId: auth.userId }, include: { mother: { select: { id: true, name: true, morph: true, sex: true } }, father: { select: { id: true, name: true, morph: true, sex: true } } } });
     if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     res.status(200).json({ animal: animalResponse(animal) });
   });
@@ -211,7 +212,7 @@ export function createAnimalRouter() {
     if ("acquiredDate" in input) data.acquiredDate = input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null;
     try {
       const animal = await prisma.$transaction(async (tx) => {
-        const updated = await tx.animal.update({ where: { id }, data: data as never });
+        const updated = await tx.animal.update({ where: { id }, data: data as never, include: { mother: { select: { id: true, name: true, morph: true, sex: true } }, father: { select: { id: true, name: true, morph: true, sex: true } } } });
         await tx.auditEvent.create({
           data: {
             userId: auth.userId,
