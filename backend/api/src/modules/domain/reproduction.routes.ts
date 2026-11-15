@@ -208,9 +208,19 @@ export function createReproductionRouter() {
       };
       const maternalRules = normalizeRules(maternalTrait.phenotypeRules);
       const paternalRules = normalizeRules(paternalTrait.phenotypeRules);
-      const rulesSignature = (rules: Record<string, string> | null) => JSON.stringify(Object.entries(rules ?? {}).sort(([left], [right]) => left.localeCompare(right)));
-      const phenotypeRulesConflict = Boolean(maternalRules && paternalRules && rulesSignature(maternalRules) !== rulesSignature(paternalRules));
-      const phenotypeRules = phenotypeRulesConflict ? null : maternalRules ?? paternalRules;
+      // Parent records may contain complementary subsets of the same mapping.
+      // Merge them by genotype and report a conflict only when the same genotype
+      // is explicitly assigned two different phenotypes.
+      const mergedRules: Record<string, string> = {};
+      let phenotypeRulesConflict = false;
+      for (const rules of [maternalRules, paternalRules]) {
+        for (const [genotype, phenotype] of Object.entries(rules ?? {})) {
+          const existingPhenotype = mergedRules[genotype];
+          if (existingPhenotype && existingPhenotype !== phenotype) phenotypeRulesConflict = true;
+          else mergedRules[genotype] = phenotype;
+        }
+      }
+      const phenotypeRules = phenotypeRulesConflict || !Object.keys(mergedRules).length ? null : mergedRules;
       const probabilities = [...outcomes.entries()].map(([genotype, probabilityPct]) => ({
         genotype,
         probabilityPct,
