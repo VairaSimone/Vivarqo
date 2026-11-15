@@ -73,7 +73,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     const parseOptional = (value: string, integer: boolean) => {
       if (!value.trim()) return null;
       const parsed = Number(value);
-      if (!Number.isFinite(parsed) || parsed < 0 || (integer && !Number.isInteger(parsed))) throw new Error(locale === "it" ? "Valore soglia non valido." : "Invalid threshold value.");
+      if (!Number.isFinite(parsed) || (integer ? parsed < 0 : parsed <= 0) || (integer && !Number.isInteger(parsed))) throw new Error(locale === "it" ? "Valore soglia non valido." : "Invalid threshold value.");
       return parsed;
     };
     try {
