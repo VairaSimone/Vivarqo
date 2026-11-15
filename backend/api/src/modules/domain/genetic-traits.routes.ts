@@ -25,6 +25,10 @@ const traitCreate = z.object({
   genotype: z.string().max(32).regex(/^(?:[A-Za-z]{2}|(?:[A-Za-z][A-Za-z0-9_-]{0,11}|\?)\|(?:[A-Za-z][A-Za-z0-9_-]{0,11}|\?))$/).nullable().optional(),
   phenotypeRules: z.record(z.string(), z.string().trim().min(1).max(240)).nullable().optional(),
   certainty: z.enum(["confirmed", "visual", "possible", "carrier", "unverified"]).optional(),
+  locusId: z.string().uuid().nullable().optional(),
+  theoreticalGenotype: z.string().max(64).nullable().optional(),
+  observedPhenotype: z.string().trim().max(240).nullable().optional(),
+  confirmedGenotype: z.string().max(64).nullable().optional(),
 }).strict();
 const traitPatch = z.object({
   traitName: z.string().trim().min(1).max(160).optional(),
@@ -35,6 +39,10 @@ const traitPatch = z.object({
   genotype: z.string().max(32).regex(/^(?:[A-Za-z]{2}|(?:[A-Za-z][A-Za-z0-9_-]{0,11}|\?)\|(?:[A-Za-z][A-Za-z0-9_-]{0,11}|\?))$/).nullable().optional(),
   phenotypeRules: z.record(z.string(), z.string().trim().min(1).max(240)).nullable().optional(),
   certainty: z.enum(["confirmed", "visual", "possible", "carrier", "unverified"]).optional(),
+  locusId: z.string().uuid().nullable().optional(),
+  theoreticalGenotype: z.string().max(64).nullable().optional(),
+  observedPhenotype: z.string().trim().max(240).nullable().optional(),
+  confirmedGenotype: z.string().max(64).nullable().optional(),
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 
 const traitListQuery = z.object({
@@ -46,7 +54,7 @@ async function ownedAnimal(userId: string, animalId: string) {
   const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true } });
   if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
 }
-async function ownedSource(userId: string, sourceAnimalId: string | null | undefined, animalId: string) {
+async function ownedLocus(userId: string, locusId: string | null | undefined) {\n  if (!locusId) return;\n  const locus = await prisma.geneticLocus.findFirst({ where: { id: locusId, gene: { is: { userId } } }, select: { id: true } });\n  if (!locus) throw new AppError(404, "GENETIC_LOCUS_NOT_FOUND", "Genetic locus not found");\n}\nasync function ownedSource(userId: string, sourceAnimalId: string | null | undefined, animalId: string) {
   if (!sourceAnimalId) return;
   if (sourceAnimalId === animalId) throw new AppError(400, "GENETIC_SOURCE_SELF_REFERENCE", "An animal cannot be its own genetic source");
   await ownedAnimal(userId, sourceAnimalId);
@@ -85,7 +93,7 @@ export function createGeneticTraitsRouter() {
         data: {
           animalId, traitName: input.traitName, traitValue: input.traitValue,
           sourceAnimalId: input.sourceAnimalId ?? null, confidenceNote: input.confidenceNote ?? null,
-          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, phenotypeRules: input.phenotypeRules as never, certainty: input.certainty ?? "unverified",
+          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, phenotypeRules: input.phenotypeRules as never, certainty: input.certainty ?? "unverified",\n          locusId: input.locusId ?? null, theoreticalGenotype: input.theoreticalGenotype ?? null, observedPhenotype: input.observedPhenotype ?? null, confirmedGenotype: input.confirmedGenotype ?? null,
         },
         include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
       });
@@ -104,7 +112,7 @@ export function createGeneticTraitsRouter() {
     const source = input.sourceAnimalId !== undefined ? input.sourceAnimalId : existing.sourceAnimalId;
     await ownedSource(auth.userId, source, existing.animalId);
     const trait = await prisma.$transaction(async (tx) => {
-      const updated = await tx.animalGeneticTrait.update({ where: { id }, data: input as never, include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } } });
+      await tx.animalGeneticTraitHistory.create({ data: { traitId: id, animalId: existing.animalId, changedBy: auth.userId, snapshot: existing as never } });\n      const updated = await tx.animalGeneticTrait.update({ where: { id }, data: input as never, include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } } });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "animal_genetic_trait.updated", entityType: "animal_genetic_trait", entityId: id } });
       return updated;
     });
@@ -116,7 +124,7 @@ export function createGeneticTraitsRouter() {
     const id = uuid(req.params.id, "genetic trait id");
     const existing = await prisma.animalGeneticTrait.findFirst({ where: { id, animal: { is: { userId: auth.userId } } }, select: { id: true } });
     if (!existing) throw new AppError(404, "GENETIC_TRAIT_NOT_FOUND", "Genetic trait not found");
-    await prisma.animalGeneticTrait.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {\n      const snapshot = await tx.animalGeneticTrait.findUniqueOrThrow({ where: { id } });\n      await tx.animalGeneticTraitHistory.create({ data: { traitId: id, animalId: snapshot.animalId, changedBy: auth.userId, snapshot: snapshot as never } });\n      await tx.animalGeneticTrait.delete({ where: { id } });\n    });
     res.status(204).send();
   });
 
