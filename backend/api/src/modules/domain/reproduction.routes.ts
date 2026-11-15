@@ -186,9 +186,9 @@ export function createReproductionRouter() {
           outcomes: allEvents.map((event) => ({ type: event.eventType, occurredAt: event.occurredAt, details: event.details })),
           cycles: pairCycles.map((cycle) => ({ id: cycle.id, name: cycle.name, startedOn: cycle.startedOn, status: cycle.status, clutchCount: cycle._count.clutches, offspringBatchCount: cycle._count.offspringBatches })),
         },
-        geneticDataIsIncomplete: geneticPredictions.length === 0,
+        geneticDataIsIncomplete: geneticPredictions.length < Math.max(mother.geneticTraits.length, father.geneticTraits.length),
         inbreedingCoefficientEstimate: commonAncestors.length ? Math.min(1, inbreedingCoefficientEstimate) : null,
-        inbreedingCoefficientAssumption: "Common-ancestor path estimate through at most 8 generations; assumes unrelated founders and no additional inbreeding in ancestors.",
+        inbreedingCoefficientAssumption: "Screening estimate from shared ancestor paths through at most 8 generations; assumes unrelated founders, ignores inbreeding in ancestors and can be incomplete when pedigree paths are missing.",
         geneticPredictions,
       },
     });
