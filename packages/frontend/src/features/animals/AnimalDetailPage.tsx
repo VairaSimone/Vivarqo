@@ -43,7 +43,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [traitError, setTraitError] = useState("");
   const [hatchlingCareModal, setHatchlingCareModal] = useState(false);
   const [hatchlingCareBusy, setHatchlingCareBusy] = useState(false);
-  const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", healthStatus: "unknown", healthNotes: "", notes: "" });
+  const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", availabilityStatus: "not_available", healthStatus: "unknown", healthNotes: "", notes: "" });
   const [traitForm, setTraitForm] = useState({
     traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", phenotypeRules: "", certainty: "unverified",
   });
@@ -302,6 +302,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       firstFeedingAccepted: care?.firstFeedingAccepted == null ? "" : care.firstFeedingAccepted ? "yes" : "no",
       firstShedAt: care?.firstShedAt?.slice(0, 10) ?? "",
       readyForRehomingAt: care?.readyForRehomingAt?.slice(0, 10) ?? "",
+      availabilityStatus: care?.availabilityStatus ?? "not_available",
       healthStatus: care?.healthStatus ?? "unknown",
       healthNotes: care?.healthNotes ?? "",
       notes: care?.notes ?? "",
@@ -318,6 +319,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         firstFeedingAccepted: hatchlingCareForm.firstFeedingAccepted === "" ? null : hatchlingCareForm.firstFeedingAccepted === "yes",
         firstShedAt: toIso(hatchlingCareForm.firstShedAt),
         readyForRehomingAt: toIso(hatchlingCareForm.readyForRehomingAt),
+        availabilityStatus: hatchlingCareForm.availabilityStatus,
         healthStatus: hatchlingCareForm.healthStatus,
         healthNotes: hatchlingCareForm.healthNotes || null,
         notes: hatchlingCareForm.notes || null,
@@ -534,6 +536,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Field label={locale === "it" ? "Prima alimentazione accettata?" : "First feeding accepted?"}><Select value={hatchlingCareForm.firstFeedingAccepted} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAccepted: e.target.value })}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="yes">{locale === "it" ? "Sì" : "Yes"}</option><option value="no">{locale === "it" ? "No" : "No"}</option></Select></Field>
         <Field label={locale === "it" ? "Data prima muta" : "First shed date"}><Input type="date" value={hatchlingCareForm.firstShedAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstShedAt: e.target.value })} /></Field>
         <Field label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming from"}><Input type="date" value={hatchlingCareForm.readyForRehomingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, readyForRehomingAt: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Disponibilità alla cessione" : "Rehoming availability"}><Select value={hatchlingCareForm.availabilityStatus} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, availabilityStatus: e.target.value })}><option value="not_available">{locale === "it" ? "Non disponibile" : "Not available"}</option><option value="available">{locale === "it" ? "Disponibile" : "Available"}</option><option value="reserved">{locale === "it" ? "Riservato" : "Reserved"}</option><option value="transferred">{locale === "it" ? "Ceduto" : "Transferred"}</option></Select></Field>
         <Field label={locale === "it" ? "Stato di salute" : "Health status"}><Select value={hatchlingCareForm.healthStatus} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, healthStatus: e.target.value })}><option value="unknown">{locale === "it" ? "Non valutato" : "Unknown"}</option><option value="healthy">{locale === "it" ? "Regolare" : "Healthy"}</option><option value="monitoring">{locale === "it" ? "Da monitorare" : "Monitoring"}</option><option value="treatment">{locale === "it" ? "In trattamento" : "Under treatment"}</option></Select></Field>
         <Field label={locale === "it" ? "Note sanitarie" : "Health notes"}><Textarea rows={2} value={hatchlingCareForm.healthNotes} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, healthNotes: e.target.value })} /></Field>
 

@@ -173,6 +173,7 @@ export const hatchlingCareSchema = z.object({
   firstFeedingAccepted: z.boolean().nullable().optional(),
   firstShedAt: z.string().datetime({ offset: true }).nullable().optional(),
   readyForRehomingAt: z.string().datetime({ offset: true }).nullable().optional(),
+  availabilityStatus: z.enum(["not_available", "available", "reserved", "transferred"]).optional(),
   healthStatus: z.enum(["unknown", "healthy", "monitoring", "treatment"]).optional(),
   healthNotes: z.string().trim().max(10_000).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
@@ -259,7 +260,7 @@ export interface EggHistoryDto {
 export interface EggMeasurementDto { id: string; eggId: string; measuredAt: string; weightG: number; notes: string | null; }
 export interface IncubatorDto { id: string; name: string; identifier: string | null; capacity: number | null; maintenanceIntervalDays?: number | null; nextMaintenanceAt?: string | null; notes: string | null; isActive: boolean; }
 export interface IncubatorMaintenanceDto { id: string; incubatorId: string; occurredAt: string; eventType: string; notes: string | null; }
-export interface HatchlingCareDto { id: string; animalId: string; firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null; }
+export interface HatchlingCareDto { id: string; animalId: string; firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; availabilityStatus: "not_available" | "available" | "reserved" | "transferred"; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null; }
 
 export interface EggDto {
   id: string;
