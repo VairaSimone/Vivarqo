@@ -269,14 +269,67 @@ export async function dispatchDocumentDeletionJob(jobId?: string): Promise<boole
   return true;
 }
 
-export async function dispatchDataJobsBatch(): Promise<{ imports: number; exports: number; documentDeletions: number }> {
+
+function addRecurringDate(date: Date, frequency: string): Date {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const targetYear = frequency === "yearly" ? year + 1 : year + Math.floor((month + 1) / 12);
+  const targetMonth = frequency === "yearly" ? month : (month + 1) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
+}
+
+/** Claims one due finance recurrence with SKIP LOCKED and creates at most 36 missed entries. */
+export async function dispatchFinanceRecurrence(recurrenceId?: string): Promise<boolean> {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id::text AS id
+      FROM finance_recurrences
+      WHERE is_active = TRUE
+        AND next_occurrence_on <= ${today}::date
+        AND (end_on IS NULL OR next_occurrence_on <= end_on)
+        AND (${recurrenceId ?? null}::uuid IS NULL OR id = ${recurrenceId ?? null}::uuid)
+      ORDER BY next_occurrence_on ASC, created_at ASC
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    `;
+    const id = rows[0]?.id;
+    if (!id) return false;
+    const recurrence = await tx.financeRecurrence.findUnique({ where: { id } });
+    if (!recurrence || !recurrence.isActive) return false;
+    let next = recurrence.nextOccurrenceOn;
+    let generated = 0;
+    while (next <= today && (!recurrence.endOn || next <= recurrence.endOn) && generated < 36) {
+      await tx.financeEntry.create({ data: {
+        userId: recurrence.userId, entryType: recurrence.entryType, occurredOn: next,
+        amountCents: recurrence.amountCents, currency: recurrence.currency,
+        category: recurrence.category, description: recurrence.description,
+        animalId: recurrence.animalId, documentId: recurrence.documentId, recurrenceId: recurrence.id,
+      } });
+      next = addRecurringDate(next, recurrence.frequency);
+      generated++;
+    }
+    await tx.financeRecurrence.update({
+      where: { id },
+      data: { nextOccurrenceOn: next, isActive: !recurrence.endOn || next <= recurrence.endOn },
+    });
+    return generated > 0;
+  });
+}
+
+export async function dispatchDataJobsBatch(): Promise<{ imports: number; exports: number; documentDeletions: number; financeRecurrences: number }> {
   let imports = 0;
   let exports = 0;
   let documentDeletions = 0;
+  let financeRecurrences = 0;
   if (await dispatchImportJob()) imports = 1;
   if (await dispatchExportJob()) exports = 1;
   if (await dispatchDocumentDeletionJob()) documentDeletions = 1;
-  return { imports, exports, documentDeletions };
+  if (await dispatchFinanceRecurrence()) financeRecurrences = 1;
+  return { imports, exports, documentDeletions, financeRecurrences };
 }
 
 let timer: NodeJS.Timeout | null = null;
@@ -289,7 +342,7 @@ export function startDataJobsWorker(): () => void {
     inFlight = true;
     try {
       const result = await dispatchDataJobsBatch();
-      if (result.imports > 0 || result.exports > 0 || result.documentDeletions > 0) logger.info(result, "Asynchronous import/export/document-deletion jobs processed");
+      if (result.imports > 0 || result.exports > 0 || result.documentDeletions > 0 || result.financeRecurrences > 0) logger.info(result, "Asynchronous import/export/document-deletion/finance-recurrence jobs processed");
     } catch (error) {
       logger.warn({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Data jobs worker failed");
       captureException(error, { worker: "data-jobs" });
