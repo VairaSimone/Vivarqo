@@ -68,6 +68,7 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
           ...animal, identifier: animal.identifier || null, morph: animal.morph || null,
           geneticsNotes: animal.geneticsNotes || null, notes: animal.notes || null,
           locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
+          eggId: animal.eggId || null,
         }))
       });
       recordsCreated = true;
