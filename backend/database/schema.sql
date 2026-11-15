@@ -1158,7 +1158,7 @@ BEGIN
     ALTER TABLE finance_entries ADD CONSTRAINT finance_entries_recurrence_fk
       FOREIGN KEY (recurrence_id) REFERENCES finance_recurrences(id) ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
-END
+END;
 $finance_links$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_recurrence_date_unique
