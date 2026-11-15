@@ -20,7 +20,7 @@ import {
   newAnimalSchema,
   reproductionPageSchema as pageSchema,
   reproductionCycleStatusSchema,
-  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema,
+  eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema, speciesBreedingProfileSchema,
 } from "@vivarqo/contracts/reproduction";
 
 function parseBody<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
@@ -69,6 +69,32 @@ async function ownedClutch(userId: string, clutchId: string) {
 export function createReproductionRouter() {
   const router = Router();
 
+  router.get("/species-breeding-profiles", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const species = typeof req.query.species === "string" ? req.query.species.trim().slice(0, 160) : "";
+    if (!species) throw new AppError(400, "SPECIES_REQUIRED", "Species is required");
+    const profile = await prisma.speciesBreedingProfile.findFirst({ where: { userId: auth.userId, species: { equals: species, mode: "insensitive" } } });
+    res.status(200).json({ profile });
+  });
+
+  router.put("/species-breeding-profiles", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(speciesBreedingProfileSchema, req.body);
+    const existing = await prisma.speciesBreedingProfile.findFirst({ where: { userId: auth.userId, species: { equals: input.species, mode: "insensitive" } }, select: { id: true } });
+    const profile = existing
+      ? await prisma.speciesBreedingProfile.update({ where: { id: existing.id }, data: {
+          species: input.species, femaleMinAgeMonths: input.femaleMinAgeMonths ?? null,
+          maleMinAgeMonths: input.maleMinAgeMonths ?? null, femaleMinWeightG: input.femaleMinWeightG ?? null,
+          maleMinWeightG: input.maleMinWeightG ?? null, notes: input.notes ?? null,
+        } })
+      : await prisma.speciesBreedingProfile.create({ data: {
+          userId: auth.userId, species: input.species, femaleMinAgeMonths: input.femaleMinAgeMonths ?? null,
+          maleMinAgeMonths: input.maleMinAgeMonths ?? null, femaleMinWeightG: input.femaleMinWeightG ?? null,
+          maleMinWeightG: input.maleMinWeightG ?? null, notes: input.notes ?? null,
+        } });
+    res.status(200).json({ profile });
+  });
+
   // Pair insights are derived from owned animals and existing reproduction records.
   // They deliberately avoid inventing species-specific maturity or weight thresholds.
   router.get("/reproduction-pairs/insights", requireSession, async (req, res) => {
@@ -88,6 +114,9 @@ export function createReproductionRouter() {
     if (parents.length !== 2) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or both breeding animals were not found");
     const mother = parents.find((animal) => animal.id === motherId)!;
     const father = parents.find((animal) => animal.id === fatherId)!;
+    const breedingProfile = await prisma.speciesBreedingProfile.findFirst({
+      where: { userId: auth.userId, species: { equals: mother.species, mode: "insensitive" } },
+    });
     const pairCycles = await prisma.reproductionCycle.findMany({
       where: { userId: auth.userId, parentAAnimalId: motherId, parentBAnimalId: fatherId },
       select: {
@@ -158,6 +187,11 @@ export function createReproductionRouter() {
     const sortedPairings = pairingEvents.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
     const allEvents = pairCycles.flatMap((cycle) => cycle.events);
     const ageYears = (birthDate: Date | null) => birthDate ? Math.floor((Date.now() - birthDate.getTime()) / 31_557_600_000) : null;
+    const ageMonths = (birthDate: Date | null) => birthDate ? Math.floor((Date.now() - birthDate.getTime()) / 2_629_746_000) : null;
+    const motherAgeMonths = ageMonths(mother.birthDate);
+    const fatherAgeMonths = ageMonths(father.birthDate);
+    const motherWeightG = mother.weightMeasurements[0] ? Number(mother.weightMeasurements[0].weightG) : null;
+    const fatherWeightG = father.weightMeasurements[0] ? Number(father.weightMeasurements[0].weightG) : null;
     const sameSpecies = mother.species.trim().toLocaleLowerCase() === father.species.trim().toLocaleLowerCase();
     const warnings = [
       ...(mother.sex !== "female" ? ["MOTHER_SEX_NOT_CONFIRMED_FEMALE"] : []),
@@ -168,12 +202,17 @@ export function createReproductionRouter() {
       ...(!father.birthDate ? ["FATHER_AGE_UNKNOWN"] : []),
       ...(!mother.weightMeasurements[0] ? ["MOTHER_WEIGHT_UNKNOWN"] : []),
       ...(!father.weightMeasurements[0] ? ["FATHER_WEIGHT_UNKNOWN"] : []),
+      ...(breedingProfile?.femaleMinAgeMonths != null && motherAgeMonths != null && motherAgeMonths < breedingProfile.femaleMinAgeMonths ? ["MOTHER_BELOW_MIN_AGE"] : []),
+      ...(breedingProfile?.maleMinAgeMonths != null && fatherAgeMonths != null && fatherAgeMonths < breedingProfile.maleMinAgeMonths ? ["FATHER_BELOW_MIN_AGE"] : []),
+      ...(breedingProfile?.femaleMinWeightG != null && motherWeightG != null && motherWeightG < Number(breedingProfile.femaleMinWeightG) ? ["MOTHER_BELOW_MIN_WEIGHT"] : []),
+      ...(breedingProfile?.maleMinWeightG != null && fatherWeightG != null && fatherWeightG < Number(breedingProfile.maleMinWeightG) ? ["FATHER_BELOW_MIN_WEIGHT"] : []),
     ];
     res.status(200).json({
       pair: {
         mother: { id: mother.id, name: mother.name, species: mother.species, sex: mother.sex, morph: mother.morph, geneticsNotes: mother.geneticsNotes, ageYears: ageYears(mother.birthDate), lastWeight: mother.weightMeasurements[0] ?? null, geneticTraits: mother.geneticTraits },
         father: { id: father.id, name: father.name, species: father.species, sex: father.sex, morph: father.morph, geneticsNotes: father.geneticsNotes, ageYears: ageYears(father.birthDate), lastWeight: father.weightMeasurements[0] ?? null, geneticTraits: father.geneticTraits },
         compatibleSpecies: sameSpecies,
+        breedingProfile,
         warnings,
         commonAncestors,
         history: {
