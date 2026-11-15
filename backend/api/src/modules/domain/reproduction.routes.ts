@@ -192,11 +192,21 @@ export function createReproductionRouter() {
           outcomes.set(genotype, (outcomes.get(genotype) ?? 0) + 25);
         }
       }
-      const asRules = (value: unknown): Record<string, string> | null =>
-        value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, string> : null;
-      const maternalRules = asRules(maternalTrait.phenotypeRules);
-      const paternalRules = asRules(paternalTrait.phenotypeRules);
-      const phenotypeRulesConflict = Boolean(maternalRules && paternalRules && JSON.stringify(maternalRules) !== JSON.stringify(paternalRules));
+      const normalizeRules = (value: unknown): Record<string, string> | null => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+        const normalized: Record<string, string> = {};
+        for (const [key, phenotype] of Object.entries(value)) {
+          const alleles = parseDiploidGenotype(key);
+          if (alleles && typeof phenotype === "string" && phenotype.trim()) {
+            normalized[canonicalGenotype(alleles[0], alleles[1])] = phenotype.trim();
+          }
+        }
+        return Object.keys(normalized).length ? normalized : null;
+      };
+      const maternalRules = normalizeRules(maternalTrait.phenotypeRules);
+      const paternalRules = normalizeRules(paternalTrait.phenotypeRules);
+      const rulesSignature = (rules: Record<string, string> | null) => JSON.stringify(Object.entries(rules ?? {}).sort(([left], [right]) => left.localeCompare(right)));
+      const phenotypeRulesConflict = Boolean(maternalRules && paternalRules && rulesSignature(maternalRules) !== rulesSignature(paternalRules));
       const phenotypeRules = phenotypeRulesConflict ? null : maternalRules ?? paternalRules;
       const probabilities = [...outcomes.entries()].map(([genotype, probabilityPct]) => ({
         genotype,
@@ -222,7 +232,7 @@ export function createReproductionRouter() {
       (combinations, prediction) => {
         if (!combinations.length) return prediction.probabilities.map((outcome) => ({
           loci: [{ traitName: prediction.traitName, genotype: outcome.genotype, phenotype: outcome.phenotype }],
-          phenotype: outcome.phenotype,
+          phenotype: outcome.phenotype ? `${prediction.traitName}: ${outcome.phenotype}` : null,
           probabilityPct: outcome.probabilityPct,
         }));
         return combinations.flatMap((combination) => prediction.probabilities.map((outcome) => ({
