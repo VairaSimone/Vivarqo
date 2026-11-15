@@ -91,7 +91,7 @@ function invalidateAfterMutation(path: string): void {
     clutches: ["/clutches", "/reproduction-cycles", "/calendar", "/home/today", "/animals", "/onboarding"],
     eggs: ["/clutches", "/reproduction-cycles", "/calendar", "/home/today", "/onboarding"],
     "reproductive-events": ["/reproduction-cycles", "/calendar", "/home/today"],
-    "offspring-batches": ["/reproduction-cycles", "/animals"],
+    "offspring-batches": ["/reproduction-cycles", "/animals", "/clutches"],
     notifications: ["/notifications"],
     "notification-preferences": ["/notification-preferences", "/notifications"],
     "push-subscriptions": ["/push-subscriptions", "/notifications"],
