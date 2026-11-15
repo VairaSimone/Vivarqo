@@ -8,7 +8,7 @@ import {
   patchClutchSchema,
   eggSchema,
   patchEggSchema,
-  newAnimalSchema,
+  newAnimalSchema, eggMeasurementSchema, incubatorSchema, incubatorMaintenanceSchema, hatchlingCareSchema, reproductiveEventTypeSchema,
 } from "@vivarqo/contracts/reproduction";
 
 describe("shared reproduction contracts", () => {
@@ -84,5 +84,25 @@ describe("reproduction lifecycle contracts", () => {
       notes: "First shed complete", motherAnimalId: parentId,
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe("advanced reproduction contracts", () => {
+  it("validates per-egg weight measurements", () => {
+    expect(eggMeasurementSchema.safeParse({ measuredAt: "2026-11-15T10:00:00.000Z", weightG: 82.5 }).success).toBe(true);
+    expect(eggMeasurementSchema.safeParse({ measuredAt: "2026-11-15T10:00:00.000Z", weightG: 0 }).success).toBe(false);
+  });
+
+  it("validates incubator and maintenance data", () => {
+    expect(incubatorSchema.safeParse({ name: "Incubatrice 1", capacity: 24 }).success).toBe(true);
+    expect(incubatorSchema.safeParse({ name: "", capacity: -1 }).success).toBe(false);
+    expect(incubatorMaintenanceSchema.safeParse({ occurredAt: "2026-11-15T10:00:00.000Z", eventType: "calibration" }).success).toBe(true);
+    expect(incubatorMaintenanceSchema.safeParse({ occurredAt: "2026-11-15T10:00:00.000Z", eventType: "made-up" }).success).toBe(false);
+  });
+
+  it("validates hatchling care milestones and negative reproductive outcomes", () => {
+    expect(hatchlingCareSchema.safeParse({ firstFeedingAt: "2026-11-15T10:00:00.000Z", firstFeedingAccepted: true }).success).toBe(true);
+    expect(reproductiveEventTypeSchema.safeParse("embryonic_loss").success).toBe(true);
+    expect(reproductiveEventTypeSchema.safeParse("made-up").success).toBe(false);
   });
 });
