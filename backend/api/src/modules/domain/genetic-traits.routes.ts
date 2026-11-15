@@ -138,7 +138,11 @@ export function createGeneticTraitsRouter() {
     const source = input.sourceAnimalId !== undefined ? input.sourceAnimalId : existing.sourceAnimalId;
     await ownedSource(auth.userId, source, existing.animalId);
     const allowedAlleles = await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
-    validateGenotypes([input.genotype, input.theoreticalGenotype, input.confirmedGenotype], allowedAlleles);
+    validateGenotypes([
+      input.genotype !== undefined ? input.genotype : existing.genotype,
+      input.theoreticalGenotype !== undefined ? input.theoreticalGenotype : existing.theoreticalGenotype,
+      input.confirmedGenotype !== undefined ? input.confirmedGenotype : existing.confirmedGenotype,
+    ], allowedAlleles);
     const nextCertainty = input.certainty ?? existing.certainty;
     const nextConfirmedGenotype = input.confirmedGenotype !== undefined ? input.confirmedGenotype : existing.confirmedGenotype;
     if (nextConfirmedGenotype && nextCertainty !== "confirmed") throw new AppError(400, "CONFIRMED_GENOTYPE_REQUIRES_CONFIRMATION", "A confirmed genotype requires certainty=confirmed");
