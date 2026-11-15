@@ -2671,3 +2671,13 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   border-top: 1px solid var(--border, #d9dfd7);
 }
 .egg-history small { color: var(--muted, #68736b); font-size: 12px; }
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body * { visibility: hidden !important; }
+  .animal-detail-page, .animal-detail-page * { visibility: visible !important; }
+  .animal-detail-page { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; background: #fff !important; color: #111 !important; }
+  .animal-detail-page .back-row, .animal-detail-page .animal-hero-actions, .animal-detail-page .detail-tabs, .animal-detail-page button, .animal-detail-page .row-actions { display: none !important; }
+  .animal-detail-page .panel, .animal-detail-page .animal-summary-card { break-inside: avoid; box-shadow: none !important; border: 1px solid #bbb !important; }
+  .animal-detail-page img { max-width: 32mm; }
+}
