@@ -82,7 +82,8 @@ export function createGeneticTraitsRouter() {
       const created = await tx.animalGeneticTrait.create({
         data: {
           animalId, traitName: input.traitName, traitValue: input.traitValue,
-          sourceAnimalId: input.sourceAnimalId ?? null, confidenceNote: input.confidenceNote ?? null,\n          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, certainty: input.certainty ?? "unverified",
+          sourceAnimalId: input.sourceAnimalId ?? null, confidenceNote: input.confidenceNote ?? null,
+          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, certainty: input.certainty ?? "unverified",
         },
         include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
       });
