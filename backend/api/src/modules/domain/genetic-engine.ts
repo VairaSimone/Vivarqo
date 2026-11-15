@@ -8,6 +8,7 @@ export interface GeneticLocusInput {
   referenceAllele?: string | null;
   phenotypeRules?: Record<string, string> | null;
   allowedAlleles?: string[];
+  phenotypeRulesConflict?: boolean;
 }
 export interface GenotypeOutcome { genotype: string; probability: number; phenotype: string | null }
 export interface LocusOutcome { locusId: string; name: string; outcomes: GenotypeOutcome[] }
@@ -30,7 +31,8 @@ function alleles(genotype: string): [string, string] | null {
 function canonical(a: string, b: string): string {
   return [a, b].sort((x, y) => x < y ? -1 : x > y ? 1 : 0).join("|");
 }
-function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: string | null, rules?: Record<string, string> | null): string | null {
+function phenotype(genotype: string, mode: InheritanceMode, referenceAllele?: string | null, rules?: Record<string, string> | null, rulesConflict = false): string | null {
+  if (rulesConflict) return null;
   if (rules && Object.prototype.hasOwnProperty.call(rules, genotype)) return rules[genotype]!;
   if (rules) {
     for (const [ruleGenotype, rulePhenotype] of Object.entries(rules)) {
@@ -61,6 +63,7 @@ export function calculateGenetics(inputs: GeneticLocusInput[]): GeneticCalculati
   let incomplete = false;
   const loci: LocusOutcome[] = [];
   for (const input of inputs) {
+    if (input.phenotypeRulesConflict) assumptions.push(`${input.name}: regole fenotipo parentali in conflitto; le probabilità genotipiche restano valide ma il fenotipo non viene inferito.`);
     const mother = alleles(input.motherGenotype);
     const father = alleles(input.fatherGenotype);
     if (!mother || !father) {
@@ -84,7 +87,7 @@ export function calculateGenetics(inputs: GeneticLocusInput[]): GeneticCalculati
     }
     const outcomes = [...counts.entries()].map(([genotype, probability]) => ({
       genotype, probability: Number((probability * 100).toFixed(4)),
-      phenotype: phenotype(genotype, input.inheritanceMode, input.referenceAllele, input.phenotypeRules),
+      phenotype: phenotype(genotype, input.inheritanceMode, input.referenceAllele, input.phenotypeRules, input.phenotypeRulesConflict),
     })).sort((a, b) => a.genotype.localeCompare(b.genotype));
     loci.push({ locusId: input.locusId, name: input.name, outcomes });
   }
