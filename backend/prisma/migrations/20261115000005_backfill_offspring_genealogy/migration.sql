@@ -3,7 +3,8 @@
 UPDATE "animals" AS offspring
 SET
   "mother_animal_id" = COALESCE(offspring."mother_animal_id", cycle."parent_a_animal_id"),
-  "father_animal_id" = COALESCE(offspring."father_animal_id", cycle."parent_b_animal_id")
+  "father_animal_id" = COALESCE(offspring."father_animal_id", cycle."parent_b_animal_id"),
+  "origin_clutch_id" = COALESCE(offspring."origin_clutch_id", batch."clutch_id")
 FROM "offspring_batches" AS batch
 JOIN "reproduction_cycles" AS cycle ON cycle."id" = batch."cycle_id"
 WHERE offspring."origin_offspring_batch_id" = batch."id"
