@@ -2109,6 +2109,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
         content:
           application/json:
             schema:
@@ -2121,6 +2124,42 @@ paths:
                 description: { type: [string, 'null'] }
       responses:
         '201': { description: Gene creato. }
+  /api/v1/genetics/genes/{geneId}:
+    parameters:
+      - name: geneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateGeneticGene
+      tags: [Genetics]
+      summary: Modifica un gene del catalogo personale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                species: { type: string, maxLength: 160 }
+                symbol: { type: string, maxLength: 40 }
+                name: { type: string, maxLength: 160 }
+                description: { type: [string, 'null'] }
+      responses:
+        '200': { description: Gene aggiornato. }
+    delete:
+      operationId: deleteGeneticGene
+      tags: [Genetics]
+      summary: Elimina un gene non utilizzato da tratti animali
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Gene eliminato. }
   /api/v1/genetics/genes/{geneId}/loci:
     post:
       operationId: createGeneticLocus
@@ -2134,6 +2173,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
         content:
           application/json:
             schema:
@@ -2145,6 +2187,42 @@ paths:
                 inheritanceMode: { type: string, enum: [autosomal_recessive, dominant, incomplete_dominant, codominant] }
       responses:
         '201': { description: Locus creato. }
+  /api/v1/genetics/loci/{locusId}:
+    parameters:
+      - name: locusId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateGeneticLocus
+      tags: [Genetics]
+      summary: Modifica un locus del catalogo personale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbol: { type: string, maxLength: 40 }
+                name: { type: string, maxLength: 160 }
+                inheritanceMode: { type: string, enum: [autosomal_recessive, dominant, incomplete_dominant, codominant] }
+                description: { type: [string, 'null'] }
+      responses:
+        '200': { description: Locus aggiornato. }
+    delete:
+      operationId: deleteGeneticLocus
+      tags: [Genetics]
+      summary: Elimina un locus non utilizzato da tratti animali
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Locus eliminato. }
   /api/v1/genetics/loci/{locusId}/alleles:
     post:
       operationId: createGeneticAllele
@@ -2158,6 +2236,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
         content:
           application/json:
             schema:
@@ -2169,6 +2250,42 @@ paths:
                 isReference: { type: boolean }
       responses:
         '201': { description: Allele creato. }
+  /api/v1/genetics/alleles/{alleleId}:
+    parameters:
+      - name: alleleId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateGeneticAllele
+      tags: [Genetics]
+      summary: Modifica un allele del catalogo personale
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                symbol: { type: string, maxLength: 24 }
+                name: { type: string, maxLength: 120 }
+                description: { type: [string, 'null'] }
+                isReference: { type: boolean }
+      responses:
+        '200': { description: Allele aggiornato. }
+    delete:
+      operationId: deleteGeneticAllele
+      tags: [Genetics]
+      summary: Elimina un allele non utilizzato da tratti animali
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Allele eliminato. }
   /api/v1/genetics/calculate:
     post:
       operationId: calculateGeneticCross
@@ -2178,6 +2295,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
         content:
           application/json:
             schema:
@@ -2205,6 +2325,9 @@ paths:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
         required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/genetic-traits.routes.ts
+          symbol: parseBody
         content:
           application/json:
             schema:
