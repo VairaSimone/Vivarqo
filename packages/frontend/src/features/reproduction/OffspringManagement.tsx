@@ -35,7 +35,7 @@ export function OffspringManagement({ locale, batches, clutches, editorOpen, isE
     <Panel>
       <PanelHeader title={t("offspring")} action={<Button size="sm" onClick={onAdd}><Icon name="plus" />{t("addOffspring")}</Button>} />
       {batches.length ? <div className="record-list">{batches.map((batch) => <div className="record-row" key={batch.id}>
-        <div><strong>{batch.count} {t("offspring")}</strong><small>{formatDate(batch.bornOn, locale)}</small><p>{batch.notes}</p></div>
+        <div><strong>{batch.count} {t("offspring")}</strong><small>{formatDate(batch.bornOn, locale)}</small><small>{locale === "it" ? "Schede animali registrate" : "Animal profiles registered"}: {batch._count?.originAnimals ?? 0} / {batch.count}</small><p>{batch.notes}</p></div>
         <div className="row-actions"><IconButton label={t("convertToAnimals")} onClick={() => onConvert(batch)}><Icon name="plus" /></IconButton><IconButton label={t("edit")} onClick={() => onEdit(batch)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => onDelete(batch)}><Icon name="trash" /></IconButton></div>
       </div>)}</div> : <EmptyState title={t("noRecords")} />}
     </Panel>
