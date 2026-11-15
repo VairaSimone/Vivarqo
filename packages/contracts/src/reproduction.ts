@@ -98,7 +98,6 @@ export const eggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
   status: eggStatusSchema.default("unknown"),
   hatchedAt: dateOnly.nullable().optional(),
-  offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
 
