@@ -237,6 +237,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       setTraitError(t("geneticSelfSourceError"));
       return;
     }
+    if ((traitForm.inheritanceMode && !/^[A-Za-z]{2}$/.test(traitForm.genotype)) || (traitForm.genotype && !traitForm.inheritanceMode)) {
+      setTraitError(locale === "it" ? "Per calcolare le probabilità servono sia la modalità di ereditarietà sia un genotipo di due alleli (es. Aa)." : "To calculate probabilities, provide both an inheritance mode and a two-allele genotype (e.g. Aa).");
+      return;
+    }
     setTraitBusy(true);
     setTraitError("");
     const payload = {
