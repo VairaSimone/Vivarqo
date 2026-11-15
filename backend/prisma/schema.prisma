@@ -814,6 +814,8 @@ model FinanceRecurrence {
   documentId        String?  @map("document_id") @db.Uuid
   frequency         String   @db.VarChar(12)
   nextOccurrenceOn  DateTime @map("next_occurrence_on") @db.Date
+  anchorMonth       Int      @map("anchor_month")
+  anchorDay         Int      @map("anchor_day")
   endOn             DateTime? @map("end_on") @db.Date
   isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

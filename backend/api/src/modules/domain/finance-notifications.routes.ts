@@ -73,14 +73,11 @@ function serializeFinance<T extends { amountCents: bigint }>(entry: T) {
   return { ...entry, amountCents: entry.amountCents.toString() };
 }
 
-function addFinancePeriod(date: Date, frequency: "monthly" | "yearly"): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
-  const targetYear = frequency === "yearly" ? year + 1 : year + Math.floor((month + 1) / 12);
-  const targetMonth = frequency === "yearly" ? month : (month + 1) % 12;
+function addFinancePeriod(date: Date, frequency: "monthly" | "yearly", anchorDay: number, anchorMonth: number): Date {
+  const targetYear = frequency === "yearly" ? date.getUTCFullYear() + 1 : date.getUTCFullYear() + (date.getUTCMonth() === 11 ? 1 : 0);
+  const targetMonth = frequency === "yearly" ? anchorMonth - 1 : (date.getUTCMonth() + 1) % 12;
   const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(anchorDay, lastDay)));
 }
 function financeDateString(date: Date): string { return date.toISOString().slice(0, 10); }
 function csvCell(value: unknown): string {
@@ -348,7 +345,7 @@ export function createFinanceRouter() {
     if (end && end < next) throw new AppError(400, "VALIDATION_ERROR", "End date cannot precede the next occurrence");
     if (input.animalId && !await prisma.animal.findFirst({ where: { id: input.animalId, userId: auth.userId }, select: { id: true } })) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     if (input.documentId && !await prisma.document.findFirst({ where: { id: input.documentId, userId: auth.userId, deletedAt: null }, select: { id: true } })) throw new AppError(404, "DOCUMENT_NOT_FOUND", "Document not found");
-    const recurrence = await prisma.financeRecurrence.create({ data: { userId: auth.userId, ...input, nextOccurrenceOn: next, endOn: end, amountCents: BigInt(input.amountCents), animalId: input.animalId ?? null, documentId: input.documentId ?? null } });
+    const recurrence = await prisma.financeRecurrence.create({ data: { userId: auth.userId, ...input, nextOccurrenceOn: next, anchorMonth: next.getUTCMonth() + 1, anchorDay: next.getUTCDate(), endOn: end, amountCents: BigInt(input.amountCents), animalId: input.animalId ?? null, documentId: input.documentId ?? null } });
     res.status(201).json({ recurrence: { ...recurrence, amountCents: recurrence.amountCents.toString() } });
   });
 
@@ -392,7 +389,7 @@ export function createFinanceRouter() {
           currency: recurrence.currency, category: recurrence.category, description: recurrence.description,
           animalId: recurrence.animalId, documentId: recurrence.documentId, recurrenceId: recurrence.id,
         } });
-        next = addFinancePeriod(next, recurrence.frequency as "monthly" | "yearly");
+        next = addFinancePeriod(next, recurrence.frequency as "monthly" | "yearly", recurrence.anchorDay, recurrence.anchorMonth);
         generated++;
       }
       const isActive = !recurrence.endOn || next <= recurrence.endOn;

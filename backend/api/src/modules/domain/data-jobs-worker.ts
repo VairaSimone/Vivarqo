@@ -270,14 +270,11 @@ export async function dispatchDocumentDeletionJob(jobId?: string): Promise<boole
 }
 
 
-function addRecurringDate(date: Date, frequency: string): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
-  const targetYear = frequency === "yearly" ? year + 1 : year + Math.floor((month + 1) / 12);
-  const targetMonth = frequency === "yearly" ? month : (month + 1) % 12;
+function addRecurringDate(date: Date, frequency: string, anchorDay: number, anchorMonth: number): Date {
+  const targetYear = frequency === "yearly" ? date.getUTCFullYear() + 1 : date.getUTCFullYear() + (date.getUTCMonth() === 11 ? 1 : 0);
+  const targetMonth = frequency === "yearly" ? anchorMonth - 1 : (date.getUTCMonth() + 1) % 12;
   const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(anchorDay, lastDay)));
 }
 
 /** Claims one due finance recurrence with SKIP LOCKED and creates at most 36 missed entries. */
@@ -309,7 +306,7 @@ export async function dispatchFinanceRecurrence(recurrenceId?: string): Promise<
         category: recurrence.category, description: recurrence.description,
         animalId: recurrence.animalId, documentId: recurrence.documentId, recurrenceId: recurrence.id,
       } });
-      next = addRecurringDate(next, recurrence.frequency);
+      next = addRecurringDate(next, recurrence.frequency, recurrence.anchorDay, recurrence.anchorMonth);
       generated++;
     }
     await tx.financeRecurrence.update({
