@@ -12,6 +12,7 @@ import { suggestedInventoryQuantity } from "../../lib/prey-inventory";
 import { useResource } from "../../hooks/useResource";
 import { AnimalMovementHistory } from "./AnimalMovementHistory";
 import { AnimalFeedingInsights } from "./AnimalFeedingInsights";
+import { WeightGrowthPanel } from "./WeightGrowthPanel";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
@@ -483,6 +484,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         </Panel>
         <Panel><PanelHeader title={t("weightHistory")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("weight")}><Icon name="plus" size={14} />{t("addWeight")}</Button> : undefined} />
           <WeightChart weights={weights.data?.weights ?? []} locale={locale} />
+          <WeightGrowthPanel animalId={id} locale={locale} readOnly={isArchived} />
           <RecordList readOnly={isArchived} records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
         </Panel>
         <Panel><PanelHeader title={t("addShed")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />

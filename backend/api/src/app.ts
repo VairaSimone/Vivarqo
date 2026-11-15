@@ -19,6 +19,7 @@ import type { EmailSender } from "./modules/auth/email-sender.js";
 import { createAnimalRouter } from "./modules/animals/animals.routes.js";
 import { createAnimalManagementRouter } from "./modules/animals/animal-management.routes.js";
 import { createCareRouter } from "./modules/animals/care.routes.js";
+import { createWeightGrowthRouter } from "./modules/animals/weight-growth.routes.js";
 import { createImportRouter } from "./modules/animals/import.routes.js";
 import { createTasksRouter } from "./modules/operations/tasks.routes.js";
 import { createHomeCalendarRouter } from "./modules/operations/home-calendar.routes.js";
@@ -102,6 +103,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createAnimalPhotoRouter());
   app.use("/api/v1", createEggPhotoRouter());
   app.use("/api/v1", createCareRouter());
+  app.use("/api/v1", createWeightGrowthRouter());
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/imports", createDomainImportRouter());
   app.use("/api/v1/imports", createCareImportRouter());
