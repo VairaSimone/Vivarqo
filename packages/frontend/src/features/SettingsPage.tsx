@@ -5,6 +5,7 @@ import { NotificationsPage } from "./settings/NotificationsPage";
 import { NotificationSettingsPage } from "./settings/NotificationSettingsPage";
 import { BillingPage } from "./settings/BillingPage";
 import { PrivacyCenterPage } from "./settings/PrivacyCenterPage";
+import { CollaboratorsPage } from "./settings/CollaboratorsPage";
 
 export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated, onThemeChange, onDisplayPreferencesChange, navigate }: {
   locale: Locale; path: string; user: SettingsUserDto; onLocaleChange: (locale: Locale) => void; onUserUpdated: (user: SettingsUserDto) => void;
@@ -16,6 +17,7 @@ export function SettingsPage({ locale, path, user, onLocaleChange, onUserUpdated
   if (path.startsWith("/settings/notifications")) return <NotificationSettingsPage locale={locale} />;
   if (path.startsWith("/billing")) return <BillingPage locale={locale} />;
   if (path.startsWith("/settings/privacy")) return <PrivacyCenterPage locale={locale} navigate={navigate} />;
+  if (path.startsWith("/settings/collaborators")) return <CollaboratorsPage locale={locale} navigate={navigate} />;
   return <AccountSettingsPage locale={locale} user={user} onLocaleChange={onLocaleChange} onUserUpdated={onUserUpdated}
     onThemeChange={onThemeChange} onDisplayPreferencesChange={onDisplayPreferencesChange} navigate={navigate} />;
 }
