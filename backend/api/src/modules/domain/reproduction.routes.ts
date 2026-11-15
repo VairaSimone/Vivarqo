@@ -167,18 +167,28 @@ export function createReproductionRouter() {
       const f = fatherDepths.get(ancestor.id);
       return m && f ? sum + Math.pow(0.5, m + f + 1) : sum;
     }, 0);
+    const parseDiploidGenotype = (value: string): [string, string] | null => {
+      const alleles = value.includes("|")
+        ? value.split("|").map((allele) => allele.trim()).filter(Boolean)
+        : [...value.trim()];
+      return alleles.length === 2 && alleles.every((allele) => allele.length <= 12) ? [alleles[0]!, alleles[1]!] : null;
+    };
+    const canonicalGenotype = (a: string, b: string) =>
+      [a, b].sort((left, right) => left.toLocaleLowerCase().localeCompare(right.toLocaleLowerCase()) || left.localeCompare(right)).join("|");
     const geneticPredictions = mother.geneticTraits.flatMap((maternalTrait) => {
       const paternalTrait = father.geneticTraits.find((trait) => trait.traitName.trim().toLocaleLowerCase() === maternalTrait.traitName.trim().toLocaleLowerCase());
       if (!paternalTrait || !maternalTrait.genotype || !paternalTrait.genotype ||
-          maternalTrait.genotype.length !== 2 || paternalTrait.genotype.length !== 2 ||
           maternalTrait.inheritanceMode !== paternalTrait.inheritanceMode ||
           !maternalTrait.inheritanceMode ||
           !["confirmed", "carrier"].includes(maternalTrait.certainty) ||
           !["confirmed", "carrier"].includes(paternalTrait.certainty)) return [];
+      const maternalAlleles = parseDiploidGenotype(maternalTrait.genotype);
+      const paternalAlleles = parseDiploidGenotype(paternalTrait.genotype);
+      if (!maternalAlleles || !paternalAlleles) return [];
       const outcomes = new Map<string, number>();
-      for (const maternalAllele of maternalTrait.genotype) {
-        for (const paternalAllele of paternalTrait.genotype) {
-          const genotype = [maternalAllele, paternalAllele].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()) || a.localeCompare(b)).join("");
+      for (const maternalAllele of maternalAlleles) {
+        for (const paternalAllele of paternalAlleles) {
+          const genotype = canonicalGenotype(maternalAllele, paternalAllele);
           outcomes.set(genotype, (outcomes.get(genotype) ?? 0) + 25);
         }
       }
@@ -187,8 +197,26 @@ export function createReproductionRouter() {
         inheritanceMode: maternalTrait.inheritanceMode,
         probabilities: [...outcomes.entries()].map(([genotype, probabilityPct]) => ({ genotype, probabilityPct })),
         certainty: "theoretical_single_locus",
+        phenotypePrediction: null,
+        phenotypeLimitation: "Phenotype is not inferred without an explicit, validated allele-to-phenotype rule.",
       }];
     });
+    // Independent-locus combinations are calculated as a Cartesian product.
+    // Linkage, recombination and epistasis are intentionally not assumed.
+    const combinedGeneticOutcomes = geneticPredictions.reduce<Array<{ loci: Array<{ traitName: string; genotype: string }>; probabilityPct: number }>>(
+      (combinations, prediction) => {
+        if (!combinations.length) return prediction.probabilities.map((outcome) => ({
+          loci: [{ traitName: prediction.traitName, genotype: outcome.genotype }],
+          probabilityPct: outcome.probabilityPct,
+        }));
+        return combinations.flatMap((combination) => prediction.probabilities.map((outcome) => ({
+          loci: [...combination.loci, { traitName: prediction.traitName, genotype: outcome.genotype }],
+          probabilityPct: Number((combination.probabilityPct * outcome.probabilityPct / 100).toFixed(6)),
+        }))).slice(0, 256);
+      },
+      [],
+    );
+    const geneticOutcomeCombinationsTruncated = combinedGeneticOutcomes.length >= 256;
     const pairingEvents = pairCycles.flatMap((cycle) => cycle.events.filter((event) => event.eventType === "pairing"));
     const sortedPairings = pairingEvents.sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
     const allEvents = pairCycles.flatMap((cycle) => cycle.events);
