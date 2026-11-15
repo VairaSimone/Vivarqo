@@ -20,7 +20,9 @@ const workspacePrefixes = [
   "/imports", "/exports", "/finance",
 ];
 const startsWithPath = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + "/");
-const isWrite = (method: string) => !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+const isWrite = (method: string, path = "") =>
+  !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase()) &&
+  !(method.toUpperCase() === "POST" && ["/genetics/calculate", "/genetics/calculate-pairing"].includes(path));
 
 function isBreedingPath(path: string): boolean {
   return [
@@ -48,7 +50,7 @@ export function assertRolePermission(role: string, method: string, path: string)
   if (startsWithPath(path, "/finance") || startsWithPath(path, "/exports")) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Only the workspace owner can access financial data and full exports");
   }
-  if (!isWrite(method)) return;
+  if (!isWrite(method, path)) return;
   if (role === "viewer") {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "This collaborator has read-only access");
   }
@@ -113,7 +115,7 @@ export function createWorkspaceAccessGuard(hasPremium: (ownerUserId: string) => 
       workspaceRole: membership.role,
     } satisfies AuthContext;
 
-    if (isWrite(req.method)) {
+    if (isWrite(req.method, path)) {
       await prisma.auditEvent.create({
         data: {
           userId: actorUserId,
