@@ -123,6 +123,7 @@ model Animal {
   financeEntries         FinanceEntry[]
   geneticTraits          AnimalGeneticTrait[]  @relation("GeneticTraitAnimal")
   traitsAsSource         AnimalGeneticTrait[]  @relation("GeneticTraitSourceAnimal")
+  hatchedEgg             Egg?                  @relation("EggOffspring")
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
   @@index([userId, status], map: "animals_user_status_idx")
@@ -350,6 +351,11 @@ model Clutch {
   status              String             @default("active") @db.VarChar(20)
   incubatorLabel      String?            @map("incubator_label") @db.VarChar(120)
   incubationStartedAt DateTime?          @map("incubation_started_at") @db.Timestamptz(6)
+  targetTemperatureMinC Decimal?          @map("target_temperature_min_c") @db.Decimal(5, 2)
+  targetTemperatureMaxC Decimal?          @map("target_temperature_max_c") @db.Decimal(5, 2)
+  targetHumidityMinPct Decimal?            @map("target_humidity_min_pct") @db.Decimal(5, 2)
+  targetHumidityMaxPct Decimal?            @map("target_humidity_max_pct") @db.Decimal(5, 2)
+  checkIntervalHours Int?                  @map("check_interval_hours")
   notes               String?
   createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -368,13 +374,29 @@ model Egg {
   clutchId  String    @map("clutch_id") @db.Uuid
   code      String?   @db.VarChar(80)
   status    String    @default("unknown") @db.VarChar(20)
+  hatchedAt DateTime? @map("hatched_at") @db.Date
+  offspringAnimalId String? @unique @map("offspring_animal_id") @db.Uuid
   notes     String?
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   clutch    Clutch    @relation(fields: [clutchId], references: [id], onDelete: Restrict)
+  offspringAnimal Animal? @relation("EggOffspring", fields: [offspringAnimalId], references: [id], onDelete: SetNull)
+  history   EggHistory[]
   @@unique([clutchId, code], where: raw("\"code\" IS NOT NULL"), map: "eggs_clutch_code_unique")
   @@index([clutchId], map: "eggs_clutch_idx")
+  @@index([status], map: "eggs_status_idx")
   @@map("eggs")
+}
+
+model EggHistory {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eggId     String   @map("egg_id") @db.Uuid
+  status    String   @db.VarChar(20)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  notes     String?
+  egg       Egg      @relation(fields: [eggId], references: [id], onDelete: Cascade)
+  @@index([eggId, occurredAt(sort: Desc)], map: "egg_history_egg_occurred_idx")
+  @@map("egg_history")
 }
 
 model IncubationLog {
