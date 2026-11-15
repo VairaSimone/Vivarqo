@@ -2615,6 +2615,276 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
 
+  /api/v1/species-breeding-profiles:
+    get:
+      operationId: getSpeciesBreedingProfile
+      tags: [Reproduction]
+      summary: Legge le soglie riproduttive configurate per una specie
+      parameters:
+        - in: query
+          name: species
+          required: true
+          schema: { type: string, maxLength: 160 }
+      responses:
+        '200':
+          description: Profilo della specie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { type: [object, "null"], additionalProperties: true }
+    patch:
+      operationId: updateSpeciesBreedingProfile
+      tags: [Reproduction]
+      summary: Crea o aggiorna le soglie riproduttive per una specie
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: speciesBreedingProfileSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Profilo aggiornato
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/reproduction-pairs/insights:
+    get:
+      operationId: getReproductionPairInsights
+      tags: [Reproduction]
+      summary: Analizza compatibilità, pedigree e risultati genetici teorici della coppia
+      parameters:
+        - in: query
+          name: motherId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: fatherId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Analisi della coppia
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/incubators:
+    get:
+      operationId: listIncubators
+      tags: [Reproduction]
+      summary: Elenca le incubatrici attive dell'utente
+      responses:
+        '200':
+          description: Incubatrici
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: createIncubator
+      tags: [Reproduction]
+      summary: Registra una incubatrice
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: incubatorSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Incubatrice creata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/incubators/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateIncubator
+      tags: [Reproduction]
+      summary: Modifica un'incubatrice e la sua pianificazione di manutenzione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: patchIncubatorSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Incubatrice aggiornata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    delete:
+      operationId: archiveIncubator
+      tags: [Reproduction]
+      summary: Archivia un'incubatrice senza perdere i riferimenti storici
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Incubatrice archiviata
+  /api/v1/incubators/{id}/maintenance:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: listIncubatorMaintenance
+      tags: [Reproduction]
+      summary: Legge lo storico delle manutenzioni
+      responses:
+        '200':
+          description: Manutenzioni registrate
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: createIncubatorMaintenance
+      tags: [Reproduction]
+      summary: Registra una manutenzione e aggiorna il promemoria successivo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: incubatorMaintenanceSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Manutenzione registrata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/eggs/{id}/measurements:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: listEggMeasurements
+      tags: [Reproduction]
+      summary: Legge le misurazioni di un uovo
+      responses:
+        '200':
+          description: Misurazioni
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: createEggMeasurement
+      tags: [Reproduction]
+      summary: Registra una misurazione di un uovo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: eggMeasurementSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Misurazione creata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/eggs/{id}/measurements/{measurementId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateEggMeasurement
+      tags: [Reproduction]
+      summary: Modifica una misurazione di un uovo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: patchEggMeasurementSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Misurazione aggiornata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    delete:
+      operationId: deleteEggMeasurement
+      tags: [Reproduction]
+      summary: Elimina una misurazione di un uovo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Misurazione eliminata
+  /api/v1/eggs/{id}/incubator-transfers:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: listEggIncubatorTransfers
+      tags: [Reproduction]
+      summary: Legge lo storico dei trasferimenti di un uovo tra incubatrici e posizioni
+      responses:
+        '200':
+          description: Trasferimenti registrati
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /api/v1/animals/{animalId}/hatchling-care:
+    parameters:
+      - name: animalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getHatchlingCare
+      tags: [Reproduction]
+      summary: Legge le tappe di cura e crescita di un piccolo
+      responses:
+        '200':
+          description: Cura del piccolo
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    patch:
+      operationId: updateHatchlingCare
+      tags: [Reproduction]
+      summary: Aggiorna le tappe di cura e lo stato sanitario del piccolo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: packages/contracts/src/reproduction.ts
+          symbol: hatchlingCareSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Cura aggiornata
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
 components:
   securitySchemes:
     sessionCookieDev:
