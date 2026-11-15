@@ -108,38 +108,55 @@ export interface InbreedingResult { coefficient: number | null; completeness: "c
 export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string, maxGenerations = 8): InbreedingResult {
   const byId = new Map(animals.map((animal) => [animal.id, animal]));
   if (!byId.has(subjectId)) return { coefficient: null, completeness: "unknown", knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale non presente nella genealogia fornita." };
+  const root = byId.get(subjectId)!;
+  if (!root.motherId && !root.fatherId) {
+    return { coefficient: 0, completeness: "complete", knownAncestors: 0, missingParentLinks: 0, generations: maxGenerations, note: "Animale trattato come fondatore: i genitori non registrati sono assunti non imparentati." };
+  }
   const missing = new Set<string>();
   const ancestors = new Set<string>();
-  const paths = new Map<string, Array<{ side: "maternal" | "paternal"; generation: number }>>();
+  const paths = new Map<string, Array<{ side: "maternal" | "paternal"; generation: number; path: string[] }>>();
   const walk = (id: string, path: string[], generation: number, side: "maternal" | "paternal") => {
-    if (generation > maxGenerations) return;
     const animal = byId.get(id);
     if (!animal) { missing.add(id); return; }
+    if (generation > maxGenerations) {
+      if (animal.motherId || animal.fatherId) missing.add(`depth-limit:${id}`);
+      return;
+    }
+    ancestors.add(id);
     const parents = [animal.motherId, animal.fatherId];
     if (Boolean(parents[0]) !== Boolean(parents[1])) missing.add(`${id}:unknown-parent`);
     for (const parentId of parents) {
       if (!parentId) continue; // Two absent parent links identify a recorded founder.
-      if (generation >= maxGenerations) { missing.add(`depth-limit:${id}`); continue; }
       if (path.includes(parentId)) { missing.add(`cycle:${parentId}`); continue; }
-      ancestors.add(parentId);
+      const nextPath = [...path, parentId];
       const entries = paths.get(parentId) ?? [];
-      entries.push({ side, generation });
+      // generation is the number of meioses from this parent to the common ancestor.
+      entries.push({ side, generation, path: nextPath });
       paths.set(parentId, entries);
-      walk(parentId, [...path, parentId], generation + 1, side);
+      walk(parentId, nextPath, generation + 1, side);
     }
   };
-  const root = byId.get(subjectId)!;
   if (!root.motherId || !root.fatherId) missing.add("root-parent");
   if (root.motherId) walk(root.motherId, [subjectId], 1, "maternal");
   if (root.fatherId) walk(root.fatherId, [subjectId], 1, "paternal");
-  // Wright's path contribution is calculated only for an ancestor reached through
-  // both parental sides. Founders are assumed unrelated and non-inbred.
   let estimate = 0;
-  for (const entries of paths.values()) {
+  for (const [ancestorId, entries] of paths) {
     const maternal = entries.filter((entry) => entry.side === "maternal");
     const paternal = entries.filter((entry) => entry.side === "paternal");
     for (const left of maternal) for (const right of paternal) {
-      estimate += Math.pow(0.5, left.generation + right.generation + 1);
+      // Do not count an ancestor again when a closer common ancestor already lies
+      // on both paths; its own inbreeding coefficient accounts for that loop.
+      const hasCloserCommonAncestor = [...paths.keys()].some((otherId) =>
+        otherId !== ancestorId && left.path.includes(otherId) && right.path.includes(otherId),
+      );
+      if (hasCloserCommonAncestor) continue;
+      const remainingGenerations = Math.max(0, maxGenerations - Math.max(left.generation, right.generation));
+      const ancestorInbreeding = calculateInbreeding(animals, ancestorId, remainingGenerations);
+      if (ancestorInbreeding.coefficient === null) {
+        missing.add(`ancestor-incomplete:${ancestorId}`);
+        continue;
+      }
+      estimate += Math.pow(0.5, left.generation + right.generation + 1) * (1 + ancestorInbreeding.coefficient);
     }
   }
   const complete = missing.size === 0;
@@ -147,6 +164,6 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
     coefficient: complete ? Number(estimate.toFixed(6)) : null,
     completeness: complete ? "complete" : ancestors.size ? "partial" : "unknown",
     knownAncestors: ancestors.size, missingParentLinks: missing.size, generations: maxGenerations,
-    note: complete ? "Coefficiente stimato dai percorsi genealogici registrati; gli antenati fondatori sono assunti non imparentati e non inbred." : "Genealogia incompleta o ciclica: coefficiente non pubblicato per evitare falsa precisione. Integra i genitori mancanti.",
+    note: complete ? "Coefficiente di Wright stimato sui percorsi registrati; gli animali senza genitori registrati sono assunti fondatori non imparentati." : "Genealogia incompleta, ciclica o oltre il limite di generazioni: coefficiente non pubblicato per evitare falsa precisione.",
   };
 }
