@@ -133,6 +133,26 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       show(t("saveSuccess"));
     } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
+  async function editIncubator(incubator: IncubatorDto) {
+    const name = window.prompt(locale === "it" ? "Nome incubatrice" : "Incubator name", incubator.name);
+    if (name === null || !name.trim() || name.trim() === incubator.name) return;
+    try {
+      await api.patch(`/incubators/${encodeURIComponent(incubator.id)}`, { name: name.trim() });
+      await incubatorsResource.reload();
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function deleteIncubator(incubator: IncubatorDto) {
+    if (!window.confirm(locale === "it"
+      ? `Archiviare l'incubatrice "${incubator.name}"? Le covate storiche manterranno il collegamento.`
+      : `Archive incubator "${incubator.name}"? Existing clutches will keep their historical link.`)) return;
+    try {
+      await api.delete(`/incubators/${encodeURIComponent(incubator.id)}`);
+      await incubatorsResource.reload();
+      show(t("delete"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+
   async function saveClutch(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
@@ -263,6 +283,15 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       <p className="muted-note">{locale === "it" ? "Nessuna soglia automatica di età/peso o coefficiente di consanguineità viene inventata: servono parametri validati per specie e pedigree completo." : "No age/weight threshold or inbreeding coefficient is fabricated; validated species parameters and a complete pedigree are required."}</p>
     </Panel>}
     {pairInsights.error && <Alert tone="warning">{locale === "it" ? "Impossibile caricare l'analisi della coppia." : "Could not load pair insights."}</Alert>}
+    <Panel>
+      <PanelHeader title={locale === "it" ? "Incubatrici" : "Incubators"} action={<Button size="sm" variant="secondary" onClick={() => void addIncubator()}><Icon name="plus" />{locale === "it" ? "Aggiungi" : "Add"}</Button>} />
+      {incubatorsResource.loading && !incubatorsResource.data ? <LoadingState /> : (incubatorsResource.data?.incubators ?? []).length
+        ? <div className="record-list">{(incubatorsResource.data?.incubators ?? []).map((incubator) => <div className="record-row" key={incubator.id}>
+            <div><strong>{incubator.name}</strong><small>{[incubator.identifier, incubator.capacity != null ? `${incubator.capacity} ${locale === "it" ? "uova" : "eggs"}` : null].filter(Boolean).join(" · ") || (locale === "it" ? "Nessun dettaglio aggiuntivo" : "No additional details")}</small>{incubator.notes && <p>{incubator.notes}</p>}</div>
+            <div className="row-actions"><IconButton label={t("edit")} onClick={() => void editIncubator(incubator)}><Icon name="edit" size={15} /></IconButton><IconButton label={t("delete")} onClick={() => void deleteIncubator(incubator)}><Icon name="trash" size={15} /></IconButton></div>
+          </div>)}</div>
+        : <EmptyState title={locale === "it" ? "Nessuna incubatrice registrata" : "No incubators registered"} />}
+    </Panel>
     <div className="tabs-line"><button className={tab === "events" ? "selected" : ""} onClick={() => setTab("events")}>{t("events")}</button><button className={tab === "clutches" ? "selected" : ""} onClick={() => setTab("clutches")}>{t("clutches")}</button><button className={tab === "offspring" ? "selected" : ""} onClick={() => setTab("offspring")}>{t("offspring")}</button></div>
     {tab === "events" && <Panel><PanelHeader title={t("events")} action={<Button size="sm" onClick={() => openEvent()}><Icon name="plus" />{t("addEvent")}</Button>} />
       {eventsPageResource.loading && !eventsPageResource.data ? <LoadingState /> : events.length ? <div className="timeline">{events.map((event) => <div className="timeline-item" key={getString(event, "id")}><span className="timeline-dot" /><div className="timeline-copy"><span>{formatDateTime(getString(event, "occurredAt"), locale)}</span><strong>{t(`event_${getString(event, "eventType")}`)}</strong><p>{getString(event, "details")}</p><small>{getString(event, "animal") ? getString(event.animal, "name") : ""}</small></div><div className="row-actions"><IconButton label={t("edit")} onClick={() => openEvent(event)}><Icon name="edit" /></IconButton><IconButton label={t("delete")} onClick={() => void deleteEvent(event)}><Icon name="trash" /></IconButton></div></div>)}</div> : <EmptyState title={t("noRecords")} />}
