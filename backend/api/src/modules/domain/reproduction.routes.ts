@@ -580,8 +580,9 @@ export function createReproductionRouter() {
       where: { id: clutchId, cycle: { is: { userId: auth.userId } } },
       include: {
         cycle: { select: { id: true, name: true, status: true } },
-        eggs: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100, include: { offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } }, history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] } } },
+        eggs: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100, include: { currentIncubator: { select: { id: true, name: true, identifier: true } }, offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } }, history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] } } },
         incubationLogs: { orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: 100 },
+        history: { orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 100 },
         _count: { select: { eggs: true, incubationLogs: true } },
       },
     });
@@ -594,17 +595,35 @@ export function createReproductionRouter() {
       ...(clutch.targetHumidityMinPct !== null ? [{ humidityPct: { lt: clutch.targetHumidityMinPct } }] : []),
       ...(clutch.targetHumidityMaxPct !== null ? [{ humidityPct: { gt: clutch.targetHumidityMaxPct } }] : []),
     ];
-    const [monitoringAggregate, temperatureOutOfRange, humidityOutOfRange, lastLog] = await Promise.all([
+    const [monitoringAggregate, temperatureOutOfRange, humidityOutOfRange, lastLog, eggStatusGroups, hatchedEggDates] = await Promise.all([
       prisma.incubationLog.aggregate({ where: { clutchId }, _avg: { temperatureC: true, humidityPct: true } }),
       temperatureRange.length ? prisma.incubationLog.count({ where: { clutchId, OR: temperatureRange } }) : Promise.resolve(0),
       humidityRange.length ? prisma.incubationLog.count({ where: { clutchId, OR: humidityRange } }) : Promise.resolve(0),
       prisma.incubationLog.findFirst({ where: { clutchId }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }], select: { recordedAt: true } }),
+      prisma.egg.groupBy({ by: ["status"], where: { clutchId }, _count: { _all: true } }),
+      prisma.egg.findMany({ where: { clutchId, hatchedAt: { not: null } }, select: { laidAt: true, hatchedAt: true } }),
     ]);
     const lastCheckAt = lastLog?.recordedAt.toISOString() ?? null;
     const nextCheckDueAt = lastCheckAt && clutch.checkIntervalHours
       ? new Date(new Date(lastCheckAt).getTime() + clutch.checkIntervalHours * 60 * 60 * 1000).toISOString()
       : null;
-    res.status(200).json({ clutch: { ...clutch, eggs: clutch.eggs.map(serializeEgg), monitoring: {
+    const eggCounts = Object.fromEntries(eggStatusGroups.map((item) => [item.status, item._count._all]));
+    const registeredEggCount = eggStatusGroups.reduce((sum, item) => sum + item._count._all, 0);
+    const hatchedCount = eggCounts.hatched ?? 0;
+    const incubationDurationsDays = hatchedEggDates.flatMap((egg) => egg.laidAt && egg.hatchedAt
+      ? [Math.max(0, Math.floor((egg.hatchedAt.getTime() - egg.laidAt.getTime()) / 86_400_000))]
+      : []);
+    const averageIncubationDays = incubationDurationsDays.length
+      ? incubationDurationsDays.reduce((sum, days) => sum + days, 0) / incubationDurationsDays.length
+      : null;
+    res.status(200).json({ clutch: { ...clutch, eggs: clutch.eggs.map(serializeEgg), eggSummary: {
+      registered: registeredEggCount,
+      declared: clutch.eggCount,
+      unregisteredDeclared: Math.max(0, clutch.eggCount - registeredEggCount),
+      byStatus: eggCounts,
+      hatchRatePct: registeredEggCount ? Number(((hatchedCount / registeredEggCount) * 100).toFixed(2)) : null,
+      averageIncubationDays: averageIncubationDays === null ? null : Number(averageIncubationDays.toFixed(1)),
+    }, monitoring: {
       temperatureOutOfRange, humidityOutOfRange, lastCheckAt, nextCheckDueAt,
       averageTemperatureC: monitoringAggregate._avg.temperatureC === null ? null : Number(monitoringAggregate._avg.temperatureC),
       averageHumidityPct: monitoringAggregate._avg.humidityPct === null ? null : Number(monitoringAggregate._avg.humidityPct),
@@ -633,6 +652,12 @@ export function createReproductionRouter() {
         }
       }
       const updated = await tx.clutch.update({ where: { id: clutchId }, data: data as never });
+      await tx.clutchHistory.create({ data: {
+        clutchId,
+        action: "clutch.updated",
+        details: input as never,
+        notes: "Dati della covata aggiornati",
+      } });
       const lastLog = await tx.incubationLog.findFirst({ where: { clutchId }, orderBy: [{ recordedAt: "desc" }, { id: "desc" }] });
       const title = "Controllo incubazione · " + clutchId;
       const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubation", title, status: "open" }, select: { id: true } });
