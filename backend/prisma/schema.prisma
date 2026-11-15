@@ -35,6 +35,7 @@ model User {
   notifications           Notification[]
   reproductionCycles      ReproductionCycle[]
   incubators              Incubator[]
+  breedingProfiles        SpeciesBreedingProfile[]
   inventoryItems          InventoryItem[]
   documents               Document[]
   documentDeletionJobs    DocumentDeletionJob[]
@@ -449,6 +450,23 @@ model EggMeasurement {
   egg        Egg      @relation(fields: [eggId], references: [id], onDelete: Cascade)
   @@index([eggId, measuredAt(sort: Desc)], map: "egg_measurements_egg_measured_idx")
   @@map("egg_measurements")
+}
+
+model SpeciesBreedingProfile {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String   @map("user_id") @db.Uuid
+  species               String   @db.VarChar(160)
+  femaleMinAgeMonths    Int?     @map("female_min_age_months")
+  maleMinAgeMonths      Int?     @map("male_min_age_months")
+  femaleMinWeightG      Decimal? @map("female_min_weight_g") @db.Decimal(10, 2)
+  maleMinWeightG        Decimal? @map("male_min_weight_g") @db.Decimal(10, 2)
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, species], map: "species_breeding_profiles_user_species_unique")
+  @@index([userId], map: "species_breeding_profiles_user_idx")
+  @@map("species_breeding_profiles")
 }
 
 model Incubator {
