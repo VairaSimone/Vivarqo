@@ -171,7 +171,10 @@ export function createReproductionRouter() {
       const alleles = value.includes("|")
         ? value.split("|").map((allele) => allele.trim()).filter(Boolean)
         : [...value.trim()];
-      return alleles.length === 2 && alleles.every((allele) => allele.length <= 12) ? [alleles[0]!, alleles[1]!] : null;
+      // A partially known genotype (for example "A|?") must never be treated
+      // as a real allele in a Punnett square. Keep it visible in the animal record,
+      // but exclude it from probability calculations until both alleles are known.
+      return alleles.length === 2 && alleles.every((allele) => allele.length <= 12 && allele !== "?") ? [alleles[0]!, alleles[1]!] : null;
     };
     const canonicalGenotype = (a: string, b: string) =>
       [a, b].sort((left, right) => left.toLocaleLowerCase().localeCompare(right.toLocaleLowerCase()) || left.localeCompare(right)).join("|");
