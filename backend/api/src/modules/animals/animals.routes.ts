@@ -57,8 +57,20 @@ async function validateAnimalParents(userId: string, motherAnimalId?: string | n
   if (childId && ids.includes(childId)) throw new AppError(400, "INVALID_ANIMAL_PARENT", "An animal cannot be its own parent");
   const parents = await prisma.animal.findMany({ where: { id: { in: ids }, userId }, select: { id: true, sex: true } });
   if (parents.length !== ids.length) throw new AppError(400, "INVALID_ANIMAL_PARENT", "Selected parent not found in this account");
-  if (motherAnimalId && parents.find((parent) => parent.id === motherAnimalId)?.sex === "male") throw new AppError(400, "INVALID_MOTHER", "The selected mother must be female");
-  if (fatherAnimalId && parents.find((parent) => parent.id === fatherAnimalId)?.sex === "female") throw new AppError(400, "INVALID_FATHER", "The selected father must be male");
+  if (motherAnimalId && parents.find((parent) => parent.id === motherAnimalId)?.sex !== "female") throw new AppError(400, "INVALID_MOTHER", "The selected mother must be female");
+  if (fatherAnimalId && parents.find((parent) => parent.id === fatherAnimalId)?.sex !== "male") throw new AppError(400, "INVALID_FATHER", "The selected father must be male");
+  if (childId) {
+    const descendants = await prisma.$queryRaw<Array<{ id: string }>>`
+      WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM animals WHERE mother_animal_id = ${childId}::uuid OR father_animal_id = ${childId}::uuid
+        UNION
+        SELECT child.id FROM animals child
+        INNER JOIN descendants parent ON child.mother_animal_id = parent.id OR child.father_animal_id = parent.id
+      )
+      SELECT id FROM descendants WHERE id = ANY(${ids}::uuid[])
+    `;
+    if (descendants.length > 0) throw new AppError(400, "CYCLIC_ANIMAL_PARENTAGE", "A descendant cannot be selected as a parent");
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
