@@ -2589,3 +2589,41 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .cookie-banner button:focus-visible,.cookie-dialog button:focus-visible,.cookie-preference-row input:focus-visible{outline:3px solid var(--accent-blue);outline-offset:3px}
 
 @media(max-width:760px){.cookie-banner{left:10px;right:10px;bottom:10px;align-items:stretch;flex-direction:column;gap:14px;padding:16px}.cookie-banner-actions{justify-content:stretch}.cookie-banner-actions .btn{flex:1 1 auto}.cookie-dialog{padding:22px 18px}.cookie-dialog-actions{justify-content:stretch}.cookie-dialog-actions .btn{flex:1 1 auto}}
+
+
+/* Animal create/edit modal: grouped sections, readable hierarchy and robust responsive layout. */
+.animal-editor { gap: 18px; }
+.animal-editor-intro { display: flex; align-items: center; gap: 14px; padding: 15px 17px; border: 1px solid color-mix(in srgb, var(--forest-2) 22%, var(--border)); border-radius: 13px; background: linear-gradient(115deg, color-mix(in srgb, var(--accent-teal-bg) 72%, var(--surface)), var(--surface)); }
+.animal-editor-mark { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; border-radius: 12px; background: var(--forest); color: #fff; }
+.animal-editor-intro p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.animal-editor-intro .animal-editor-kicker { margin-bottom: 4px; color: var(--forest-2); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.animal-editor-section { display: grid; gap: 15px; min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
+.animal-editor-section-heading { display: flex; align-items: center; gap: 11px; min-width: 0; padding-bottom: 13px; border-bottom: 1px solid var(--border); }
+.animal-editor-section-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 9px; background: var(--accent-teal-bg); color: var(--forest-2); }
+.animal-editor-section-heading > div { min-width: 0; flex: 1; }
+.animal-editor-section-heading h3 { margin: 0 0 3px; color: var(--text); font-size: 14px; font-weight: 750; letter-spacing: -.015em; }
+.animal-editor-section-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.animal-editor-required, .animal-editor-optional { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.animal-editor-required { color: var(--accent-clay); }
+.animal-editor-photo { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 13px; border: 1px dashed var(--border-strong); border-radius: 11px; background: var(--surface-soft); }
+.animal-editor-photo > img, .animal-editor-photo-placeholder { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 64px; border-radius: 10px; object-fit: cover; background: var(--accent-teal-bg); color: var(--forest-2); }
+.animal-editor-photo-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.animal-editor-photo-copy strong { overflow-wrap: anywhere; color: var(--text); font-size: 13px; }
+.animal-editor-photo-copy > span, .animal-editor-photo-hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.animal-editor-photo-copy .field { margin-top: 5px; }
+.animal-editor-photo-copy input[type="file"] { min-height: 40px; height: auto; padding: 5px; font-size: 12px !important; }
+.animal-editor-photo-hint { margin: -7px 0 0; }
+.animal-editor-estimated { min-height: 36px; padding: 8px 10px; border-radius: 8px; background: var(--surface-soft); color: var(--text); font-size: 12px; }
+.animal-editor-estimated input { width: 17px; height: 17px; }
+.animal-editor-footer-note { padding: 10px 12px; border-left: 3px solid var(--accent-teal); border-radius: 0 8px 8px 0; background: var(--surface-soft); color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 680px) {
+  .animal-editor { gap: 13px; }
+  .animal-editor-intro { padding: 12px; }
+  .animal-editor-section { gap: 13px; padding: 14px 12px; }
+  .animal-editor-section-heading { align-items: flex-start; flex-wrap: wrap; }
+  .animal-editor-section-heading > div { flex-basis: calc(100% - 48px); }
+  .animal-editor-required, .animal-editor-optional { margin-left: 45px; }
+  .animal-editor-photo { align-items: flex-start; flex-wrap: wrap; }
+  .animal-editor-photo-copy { flex-basis: calc(100% - 80px); }
+  .animal-editor-photo > .btn { margin-left: 78px; }
+}
