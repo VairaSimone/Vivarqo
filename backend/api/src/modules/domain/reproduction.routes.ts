@@ -662,6 +662,12 @@ export function createReproductionRouter() {
       const clutch = await ownedClutch(auth.userId, input.clutchId);
       if (clutch.cycleId !== existing.cycleId) throw new AppError(400, "CLUTCH_CYCLE_MISMATCH", "Clutch and offspring batch must belong to the same cycle");
     }
+    if (input.clutchId !== undefined && input.clutchId !== existing.clutchId) {
+      const linkedAnimals = await prisma.animal.count({ where: { userId: auth.userId, originOffspringBatchId: batchId } });
+      if (linkedAnimals > 0) {
+        throw new AppError(409, "OFFSPRING_BATCH_HAS_ANIMALS", "The source clutch cannot be changed after animal records have been created");
+      }
+    }
     const data: Record<string, unknown> = { ...input };
     if (input.bornOn) data.bornOn = validDate(input.bornOn);
     const batch = await prisma.$transaction(async (tx) => {
