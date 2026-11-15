@@ -114,6 +114,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
           ...animal, identifier: animal.identifier || null, morph: animal.morph || null,
           geneticsNotes: animal.geneticsNotes || null, notes: animal.notes || null,
           locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
+          eggId: animal.eggId || null,
         }))
       });
       recordsCreated = true;
