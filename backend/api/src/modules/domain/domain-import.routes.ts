@@ -356,6 +356,7 @@ export function createDomainImportRouter() {
     const documentIds = new Set<string>();
     for (const row of sourceRows) {
       if (typeof row.record.cycleId === "string" && z.string().uuid().safeParse(row.record.cycleId).success) cycleIds.add(row.record.cycleId);
+      if (typeof row.record.reproductionCycleId === "string" && z.string().uuid().safeParse(row.record.reproductionCycleId).success) cycleIds.add(row.record.reproductionCycleId);
       if (typeof row.record.clutchId === "string" && z.string().uuid().safeParse(row.record.clutchId).success) clutchIds.add(row.record.clutchId);
       if (typeof row.record.offspringBatchId === "string" && z.string().uuid().safeParse(row.record.offspringBatchId).success) offspringBatchIds.add(row.record.offspringBatchId);
       if (typeof row.record.recurrenceId === "string" && z.string().uuid().safeParse(row.record.recurrenceId).success) recurrenceIds.add(row.record.recurrenceId);
