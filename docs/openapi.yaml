@@ -5059,7 +5059,11 @@ components:
           "certainty": {
             "type": "string",
             "enum": ["confirmed", "visual", "possible", "carrier", "unverified"]
-          }
+          },
+          "locusId": { "type": ["string", "null"], "format": "uuid" },
+          "theoreticalGenotype": { "type": ["string", "null"], "maxLength": 64 },
+          "observedPhenotype": { "type": ["string", "null"], "maxLength": 240 },
+          "confirmedGenotype": { "type": ["string", "null"], "maxLength": 64 },
         }
       }
     GeneticTraitPatch:
@@ -5104,7 +5108,11 @@ components:
           "certainty": {
             "type": "string",
             "enum": ["confirmed", "visual", "possible", "carrier", "unverified"]
-          }
+          },
+          "locusId": { "type": ["string", "null"], "format": "uuid" },
+          "theoreticalGenotype": { "type": ["string", "null"], "maxLength": 64 },
+          "observedPhenotype": { "type": ["string", "null"], "maxLength": 240 },
+          "confirmedGenotype": { "type": ["string", "null"], "maxLength": 64 },
         }
       }
     FinanceEntryWrite:
@@ -6939,6 +6947,10 @@ components:
           "inheritanceMode": { "type": ["string", "null"], "enum": ["autosomal_recessive", "incomplete_dominant", "dominant", "codominant", null] },
           "genotype": { "type": ["string", "null"] },
           "phenotypeRules": { "type": ["object", "null"], "additionalProperties": { "type": "string" } },
+          "locusId": { "type": ["string", "null"], "format": "uuid" },
+          "theoreticalGenotype": { "type": ["string", "null"] },
+          "observedPhenotype": { "type": ["string", "null"] },
+          "confirmedGenotype": { "type": ["string", "null"] },
           "certainty": { "type": "string", "enum": ["confirmed", "visual", "possible", "carrier", "unverified"] },
           "createdAt": {
             "type": "string",
