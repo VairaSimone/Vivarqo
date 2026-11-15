@@ -128,7 +128,7 @@ export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (owne
       throw error;
     }
     const url = new URL("/settings/collaborators", env.APP_ORIGIN);
-    url.searchParams.set("invite", token);
+    url.hash = "invite=" + encodeURIComponent(token);
     const isEnglish = auth.locale === "en";
     try {
       await emailSender.send({
