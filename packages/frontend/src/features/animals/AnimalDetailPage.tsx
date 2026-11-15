@@ -9,6 +9,7 @@ import type { AnimalDto, AnimalNoteDto, AnimalDocumentDto, CareRecordDto, Geneti
 
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
+import { AnimalMovementHistory } from "./AnimalMovementHistory";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 
@@ -479,6 +480,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <RecordList readOnly={isArchived} records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
         </Panel>
       </div>
+      <AnimalMovementHistory id={id} locale={locale} readOnly={isArchived} />
     </div>}
 
     {tab === "documents" && <Panel><PanelHeader title={t("documentsTab")} action={!isArchived ? <Button onClick={() => navigate(`/documents?animalId=${id}`)}><Icon name="upload" size={15} />{t("uploadDocument")}</Button> : undefined} />
