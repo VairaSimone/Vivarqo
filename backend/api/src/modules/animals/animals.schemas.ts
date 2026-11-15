@@ -109,6 +109,7 @@ export const patchFeedingEntrySchema = z.object({
   notes: z.string().trim().max(5_000).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
   if (value.inventoryItemId === null && value.inventoryQuantity != null) ctx.addIssue({ code: "custom", path: ["inventoryQuantity"], message: "Inventory quantity requires an inventory item" });
+  if (value.inventoryQuantity === null && value.inventoryItemId === undefined) ctx.addIssue({ code: "custom", path: ["inventoryItemId"], message: "Clear the inventory item and quantity together" });
   if (value.inventoryItemId && value.inventoryQuantity == null) ctx.addIssue({ code: "custom", path: ["inventoryQuantity"], message: "Inventory quantity is required when an item is selected" });
 }).refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
