@@ -1037,6 +1037,6 @@ ALTER TABLE feeding_entries
   ADD COLUMN inventory_item_id UUID REFERENCES inventory_items(id) ON DELETE RESTRICT,
   ADD COLUMN inventory_quantity NUMERIC(12,3) CHECK (inventory_quantity IS NULL OR inventory_quantity > 0),
   ADD COLUMN inventory_deducted BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD CONSTRAINT feeding_entries_inventory_link_check CHECK ((inventory_item_id IS NULL OR inventory_quantity IS NOT NULL) AND (inventory_deducted = FALSE OR inventory_item_id IS NOT NULL));
+  ADD CONSTRAINT feeding_entries_inventory_link_check CHECK ((inventory_item_id IS NULL AND inventory_quantity IS NULL AND inventory_deducted = FALSE) OR (inventory_item_id IS NOT NULL AND inventory_quantity IS NOT NULL));
 CREATE INDEX feeding_entries_inventory_item_idx ON feeding_entries(inventory_item_id);
 CREATE INDEX feeding_entries_animal_outcome_idx ON feeding_entries(animal_id, outcome);
