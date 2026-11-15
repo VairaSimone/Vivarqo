@@ -767,12 +767,14 @@ model FinanceEntry {
   clutchId String? @map("clutch_id") @db.Uuid
   offspringBatchId String? @map("offspring_batch_id") @db.Uuid
   recurrenceId String? @map("recurrence_id") @db.Uuid
+  sourceTransferId String? @unique(map: "finance_entries_source_transfer_unique") @map("source_transfer_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal      Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
   document    Document? @relation(fields: [documentId], references: [id], onDelete: Restrict)
   recurrence  FinanceRecurrence? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
+  sourceTransfer AnimalTransfer? @relation(fields: [sourceTransferId], references: [id], onDelete: SetNull)
   @@unique([recurrenceId, occurredOn], map: "finance_entries_recurrence_date_unique")
   @@index([reproductionCycleId], map: "finance_entries_cycle_idx")
   @@index([clutchId], map: "finance_entries_clutch_idx")
@@ -981,6 +983,7 @@ model AnimalTransfer {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  financeEntry FinanceEntry?
   @@index([userId,transferredAt(sort: Desc)], map: "animal_transfers_user_date_idx")
   @@index([animalId,transferredAt(sort: Desc)], map: "animal_transfers_animal_date_idx")
   @@map("animal_transfers")
