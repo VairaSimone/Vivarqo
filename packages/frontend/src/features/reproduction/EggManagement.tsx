@@ -30,6 +30,7 @@ export function EggManagement({ locale, eggs, onAdd, onEdit, onDelete, onMeasure
       {egg.photoUrl ? <img src={egg.photoUrl} alt={locale === "it" ? `Foto uovo ${egg.code || ""}` : `Egg ${egg.code || ""} photo`} style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8 }} /> : <span><Icon name="egg" size={18} /></span>}<strong>{egg.code || "—"}</strong>
       <Badge tone={egg.status === "hatched" ? "success" : egg.status === "lost" || egg.status === "damaged" || egg.status === "collapsed" ? "danger" : "neutral"}>{labels[egg.status]?.[locale] ?? egg.status}</Badge>
       {egg.measurements?.length ? <small>{locale === "it" ? "Ultimo peso: " : "Latest weight: "}{egg.measurements[egg.measurements.length - 1]?.weightG} g</small> : null}
+      {(egg.currentIncubator || egg.incubatorPosition) && <small>{locale === "it" ? "Incubatrice: " : "Incubator: "}{egg.currentIncubator?.name || "—"}{egg.incubatorPosition ? ` · ${egg.incubatorPosition}` : ""}</small>}
       {egg.expectedHatchAt && <small>{locale === "it" ? "Schiusa prevista: " : "Expected hatch: "}{formatDate(egg.expectedHatchAt, locale)}</small>}
       {egg.hatchedAt && <small>{locale === "it" ? "Schiusa: " : "Hatched: "}{formatDate(egg.hatchedAt, locale)}</small>}
       {egg.offspringAnimal && <small>{locale === "it" ? "Piccolo: " : "Hatchling: "}{egg.offspringAnimal.name}</small>}
