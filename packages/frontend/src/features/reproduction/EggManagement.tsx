@@ -17,6 +17,7 @@ const labels: Record<string, { it: string; en: string }> = {
   fertile: { it: "Fertile", en: "Fertile" },
   infertile: { it: "Non fertile", en: "Infertile" },
   damaged: { it: "Danneggiato", en: "Damaged" },
+  collapsed: { it: "Collassato", en: "Collapsed" },
   lost: { it: "Perso", en: "Lost" },
   incubating: { it: "In incubazione", en: "Incubating" },
   hatched: { it: "Schiuso", en: "Hatched" },
