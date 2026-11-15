@@ -717,6 +717,7 @@ model AnimalGeneticTrait {
   confidenceNote String?  @map("confidence_note")
   inheritanceMode String? @map("inheritance_mode") @db.VarChar(32)
   genotype       String?  @db.VarChar(32)
+  phenotypeRules Json? @map("phenotype_rules") @db.JsonB
   certainty      String   @default("unverified") @db.VarChar(24)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
