@@ -4,6 +4,8 @@ export const statuses = ["planned", "active", "completed", "cancelled"] as const
 const eventTypes = ["pairing", "observation", "ovulation", "gravid", "laying", "live_birth", "incubation_start", "hatch", "loss", "other"] as const;
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const nullableUuid = z.string().uuid().nullable().optional();
+export const eggStatuses = ["unknown", "fertile", "infertile", "damaged", "lost", "incubating", "hatched"] as const;
+export const eggStatusSchema = z.enum(eggStatuses);
 
 export const reproductionCycleStatusSchema = z.enum(statuses);
 export const reproductiveEventTypeSchema = z.enum(eventTypes);
@@ -64,8 +66,16 @@ export const createClutchSchema = z.object({
   status: z.string().trim().min(1).max(20).default("active"),
   incubatorLabel: z.string().trim().max(120).nullable().optional(),
   incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  targetTemperatureMinC: z.coerce.number().min(-20).max(60).nullable().optional(),
+  targetTemperatureMaxC: z.coerce.number().min(-20).max(60).nullable().optional(),
+  targetHumidityMinPct: z.coerce.number().min(0).max(100).nullable().optional(),
+  targetHumidityMaxPct: z.coerce.number().min(0).max(100).nullable().optional(),
+  checkIntervalHours: z.coerce.number().int().min(1).max(720).nullable().optional(),
   notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.targetTemperatureMinC != null && value.targetTemperatureMaxC != null && value.targetTemperatureMinC > value.targetTemperatureMaxC) ctx.addIssue({ code: "custom", path: ["targetTemperatureMaxC"], message: "Maximum temperature must be at least the minimum" });
+  if (value.targetHumidityMinPct != null && value.targetHumidityMaxPct != null && value.targetHumidityMinPct > value.targetHumidityMaxPct) ctx.addIssue({ code: "custom", path: ["targetHumidityMaxPct"], message: "Maximum humidity must be at least the minimum" });
+});
 
 export const patchClutchSchema = z.object({
   laidOn: dateOnly.optional(),
@@ -73,18 +83,30 @@ export const patchClutchSchema = z.object({
   status: z.string().trim().min(1).max(20).optional(),
   incubatorLabel: z.string().trim().max(120).nullable().optional(),
   incubationStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  targetTemperatureMinC: z.coerce.number().min(-20).max(60).nullable().optional(),
+  targetTemperatureMaxC: z.coerce.number().min(-20).max(60).nullable().optional(),
+  targetHumidityMinPct: z.coerce.number().min(0).max(100).nullable().optional(),
+  targetHumidityMaxPct: z.coerce.number().min(0).max(100).nullable().optional(),
+  checkIntervalHours: z.coerce.number().int().min(1).max(720).nullable().optional(),
   notes: z.string().trim().max(20_000).nullable().optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+}).strict().superRefine((value, ctx) => {
+  if (value.targetTemperatureMinC != null && value.targetTemperatureMaxC != null && value.targetTemperatureMinC > value.targetTemperatureMaxC) ctx.addIssue({ code: "custom", path: ["targetTemperatureMaxC"], message: "Maximum temperature must be at least the minimum" });
+  if (value.targetHumidityMinPct != null && value.targetHumidityMaxPct != null && value.targetHumidityMinPct > value.targetHumidityMaxPct) ctx.addIssue({ code: "custom", path: ["targetHumidityMaxPct"], message: "Maximum humidity must be at least the minimum" });
+}).refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 export const eggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
-  status: z.string().trim().min(1).max(20).default("unknown"),
+  status: eggStatusSchema.default("unknown"),
+  hatchedAt: dateOnly.nullable().optional(),
+  offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
 
 export const patchEggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
-  status: z.string().trim().min(1).max(20).optional(),
+  status: eggStatusSchema.optional(),
+  hatchedAt: dateOnly.nullable().optional(),
+  offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
@@ -118,6 +140,14 @@ export const newAnimalSchema = z.object({
   sex: z.enum(["male", "female", "unknown"]).default("unknown"),
   morph: z.string().trim().max(200).nullable().optional(),
   birthDate: dateOnly.nullable().optional(),
+  geneticsNotes: z.string().trim().max(20_000).nullable().optional(),
+  notes: z.string().trim().max(20_000).nullable().optional(),
+  locationLabel: z.string().trim().max(160).nullable().optional(),
+  originDescription: z.string().trim().max(20_000).nullable().optional(),
+  acquiredDate: dateOnly.nullable().optional(),
+  birthDateEstimated: z.boolean().optional(),
+  motherAnimalId: nullableUuid,
+  fatherAnimalId: nullableUuid,
 }).strict();
 
 export type ReproductionCycleStatus = z.infer<typeof reproductionCycleStatusSchema>;
@@ -154,7 +184,10 @@ export interface EggDto {
   id: string;
   clutchId: string;
   code: string | null;
-  status: string;
+  status: typeof eggStatuses[number];
+  hatchedAt?: string | null;
+  offspringAnimalId?: string | null;
+  offspringAnimal?: AnimalSummaryDto | null;
   notes: string | null;
 }
 
@@ -176,6 +209,11 @@ export interface ClutchDto {
   status: string;
   incubatorLabel: string | null;
   incubationStartedAt: string | null;
+  targetTemperatureMinC?: number | null;
+  targetTemperatureMaxC?: number | null;
+  targetHumidityMinPct?: number | null;
+  targetHumidityMaxPct?: number | null;
+  checkIntervalHours?: number | null;
   notes: string | null;
   _count?: { eggs: number; incubationLogs: number };
 }
@@ -215,6 +253,7 @@ export interface ClutchDetailDto extends ClutchDto {
   cycle: Pick<ReproductionCycleSummaryDto, "id" | "name" | "status">;
   eggs: EggDto[];
   incubationLogs: IncubationLogDto[];
+  monitoring?: { temperatureOutOfRange: number; humidityOutOfRange: number; lastCheckAt: string | null; nextCheckDueAt: string | null; averageTemperatureC: number | null; averageHumidityPct: number | null };
 }
 
 export interface ReproductionRecordDto {
