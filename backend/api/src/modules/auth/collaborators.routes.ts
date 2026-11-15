@@ -30,8 +30,8 @@ function escapeHtml(value: string): string {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character] ?? character);
 }
-async function assertPremium(ownerUserId: string): Promise<void> {
-  if (!await hasPaidSubscriptionEntitlement(ownerUserId)) {
+async function assertPremium(ownerUserId: string, hasPremium: (ownerUserId: string) => Promise<boolean>): Promise<void> {
+  if (!await hasPremium(ownerUserId)) {
     throw new AppError(403, "PREMIUM_REQUIRED", "An active Premium subscription is required to invite or join a shared workspace", {
       upgradeRequired: true, billingPath: "/billing",
     });
@@ -46,7 +46,7 @@ async function writeAudit(userId: string, action: string, entityId: string | nul
   });
 }
 
-export function createCollaboratorRouter(sender?: EmailSender) {
+export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (ownerUserId: string) => Promise<boolean> = hasPaidSubscriptionEntitlement) {
   const router = Router();
   const emailSender = sender ?? createConfiguredEmailSender();
 
@@ -91,7 +91,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
     const auth = res.locals.auth as AuthContext;
     const input = parse(inviteSchema, req.body);
     if (input.email === auth.email.toLowerCase()) throw new AppError(400, "SELF_INVITATION_NOT_ALLOWED", "You cannot invite your own account");
-    await assertPremium(auth.userId);
+    await assertPremium(auth.userId, hasPremium);
 
     const now = new Date();
     await prisma.workspaceInvitation.updateMany({
@@ -193,7 +193,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
     if (invitation.email.toLowerCase() !== auth.email.toLowerCase()) {
       throw new AppError(403, "INVITATION_EMAIL_MISMATCH", "Sign in with the email address that received the invitation");
     }
-    await assertPremium(invitation.ownerUserId);
+    await assertPremium(invitation.ownerUserId, hasPremium);
     if (invitation.ownerUserId === auth.userId) throw new AppError(400, "SELF_INVITATION_NOT_ALLOWED", "You cannot join your own workspace");
 
     await prisma.$transaction(async (tx) => {
@@ -225,7 +225,7 @@ export function createCollaboratorRouter(sender?: EmailSender) {
         select: { id: true },
       });
       if (!membership) throw new AppError(404, "WORKSPACE_NOT_FOUND", "Workspace not found");
-      await assertPremium(input.ownerUserId);
+      await assertPremium(input.ownerUserId, hasPremium);
     }
     const result = await prisma.userSession.updateMany({
       where: { id: auth.sessionId, userId: auth.userId },
