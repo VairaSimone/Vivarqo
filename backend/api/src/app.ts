@@ -25,6 +25,7 @@ import { createReproductionRouter } from "./modules/domain/reproduction.routes.j
 import { createInventoryRouter } from "./modules/domain/inventory.routes.js";
 import { createDocumentShareRouter } from "./modules/domain/documents-shares.routes.js";
 import { createAnimalPhotoRouter } from "./modules/domain/animal-photos.routes.js";
+import { createEggPhotoRouter } from "./modules/domain/egg-photos.routes.js";
 import { createFinanceRouter, createNotificationRouter } from "./modules/domain/finance-notifications.routes.js";
 import { createBillingRouter, type BillingRouterOptions } from "./modules/domain/billing.routes.js";
 import { subscriptionAccessGuard } from "./modules/domain/billing-entitlements.js";
@@ -97,6 +98,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1/onboarding", createOnboardingRouter());
   app.use("/api/v1/animals", createAnimalRouter());
   app.use("/api/v1", createAnimalPhotoRouter());
+  app.use("/api/v1", createEggPhotoRouter());
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/imports", createDomainImportRouter());
