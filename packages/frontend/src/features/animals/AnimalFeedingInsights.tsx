@@ -52,7 +52,7 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
       <div className="feeding-insights-grid">
         <div><span>{it ? "Giorni dall'ultimo pasto accettato" : "Days since last accepted meal"}</span><strong>{summary.data.daysSinceLastFeeding == null ? "—" : summary.data.daysSinceLastFeeding}</strong></div>
         <div><span>{it ? "Prossimo pasto previsto" : "Next expected meal"}</span><strong>{date(summary.data.nextMealAt)}</strong></div>
-        <div><span>{it ? "Rifiuti consecutivi" : "Consecutive refusals"}</span><strong>{summary.data.consecutiveRefusals}</strong></div>
+        <div><span>{it ? "Digiuni consecutivi" : "Consecutive fasts"}</span><strong>{summary.data.consecutiveRefusals}</strong></div>
         <div><span>{it ? "Accettazione" : "Acceptance rate"}</span><strong>{percent}</strong><small>{summary.data.acceptedCount} / {summary.data.offeredCount} {it ? "offerti" : "offered"}</small></div>
       </div>
       {summary.data.lastAcceptedAt && <p className="muted-note">{it ? "Ultimo pasto accettato: " : "Last accepted meal: "}{date(summary.data.lastAcceptedAt)} · {summary.data.refusedCount} {it ? "rifiuti registrati" : "refusals recorded"}</p>}
