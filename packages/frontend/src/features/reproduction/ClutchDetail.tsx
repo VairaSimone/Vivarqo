@@ -87,6 +87,7 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     if (!clutch?.incubatorId) return;
     const eventType = window.prompt(locale === "it" ? "Tipo: cleaning, calibration, repair, inspection, other" : "Type: cleaning, calibration, repair, inspection, other", "inspection");
     if (!eventType) return;
+    if (!["cleaning", "calibration", "repair", "inspection", "other"].includes(eventType)) { show(locale === "it" ? "Tipo intervento non valido." : "Invalid maintenance type."); return; }
     const notes = window.prompt(locale === "it" ? "Note manutenzione (facoltative)" : "Maintenance notes (optional)") ?? "";
     try {
       await api.post(`/incubators/${encodeURIComponent(clutch.incubatorId)}/maintenance`, { occurredAt: new Date().toISOString(), eventType, notes: notes || null });
