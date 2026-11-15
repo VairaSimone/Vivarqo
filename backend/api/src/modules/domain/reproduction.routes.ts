@@ -96,7 +96,7 @@ export function createReproductionRouter() {
   });
 
   // Pair insights are derived from owned animals and existing reproduction records.
-  // They deliberately avoid inventing species-specific maturity or weight thresholds.
+  // Thresholds are only applied when the configured species matches both parents.
   router.get("/reproduction-pairs/insights", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const motherId = routeUuid(typeof req.query.motherId === "string" ? req.query.motherId : undefined, "mother id");
@@ -202,10 +202,10 @@ export function createReproductionRouter() {
       ...(!father.birthDate ? ["FATHER_AGE_UNKNOWN"] : []),
       ...(!mother.weightMeasurements[0] ? ["MOTHER_WEIGHT_UNKNOWN"] : []),
       ...(!father.weightMeasurements[0] ? ["FATHER_WEIGHT_UNKNOWN"] : []),
-      ...(breedingProfile?.femaleMinAgeMonths != null && motherAgeMonths != null && motherAgeMonths < breedingProfile.femaleMinAgeMonths ? ["MOTHER_BELOW_MIN_AGE"] : []),
-      ...(breedingProfile?.maleMinAgeMonths != null && fatherAgeMonths != null && fatherAgeMonths < breedingProfile.maleMinAgeMonths ? ["FATHER_BELOW_MIN_AGE"] : []),
-      ...(breedingProfile?.femaleMinWeightG != null && motherWeightG != null && motherWeightG < Number(breedingProfile.femaleMinWeightG) ? ["MOTHER_BELOW_MIN_WEIGHT"] : []),
-      ...(breedingProfile?.maleMinWeightG != null && fatherWeightG != null && fatherWeightG < Number(breedingProfile.maleMinWeightG) ? ["FATHER_BELOW_MIN_WEIGHT"] : []),
+      ...(sameSpecies && breedingProfile?.femaleMinAgeMonths != null && motherAgeMonths != null && motherAgeMonths < breedingProfile.femaleMinAgeMonths ? ["MOTHER_BELOW_MIN_AGE"] : []),
+      ...(sameSpecies && breedingProfile?.maleMinAgeMonths != null && fatherAgeMonths != null && fatherAgeMonths < breedingProfile.maleMinAgeMonths ? ["FATHER_BELOW_MIN_AGE"] : []),
+      ...(sameSpecies && breedingProfile?.femaleMinWeightG != null && motherWeightG != null && motherWeightG < Number(breedingProfile.femaleMinWeightG) ? ["MOTHER_BELOW_MIN_WEIGHT"] : []),
+      ...(sameSpecies && breedingProfile?.maleMinWeightG != null && fatherWeightG != null && fatherWeightG < Number(breedingProfile.maleMinWeightG) ? ["FATHER_BELOW_MIN_WEIGHT"] : []),
     ];
     res.status(200).json({
       pair: {
