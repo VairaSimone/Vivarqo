@@ -45,7 +45,24 @@ function canWriteAsOperator(path: string): boolean {
   ].some((prefix) => startsWithPath(path, prefix));
 }
 
-export function assertRolePermission(role: string, method: string, path: string): void {
+const operatorProtectedAnimalFields = [
+  "morph", "geneticsNotes", "motherAnimalId", "fatherAnimalId",
+  "motherDescription", "fatherDescription",
+];
+function hasGeneticAnimalFields(body: unknown): boolean {
+  const hasFields = (value: unknown) => typeof value === "object" && value !== null &&
+    operatorProtectedAnimalFields.some((field) => Object.prototype.hasOwnProperty.call(value, field));
+  if (hasFields(body)) return true;
+  if (typeof body === "object" && body !== null && "animals" in body && Array.isArray((body as { animals?: unknown }).animals)) {
+    return (body as { animals: unknown[] }).animals.some(hasFields);
+  }
+  return false;
+}
+function isAnimalRecordWrite(path: string): boolean {
+  return path === "/animals" || path === "/animals/bulk" || /^\/animals\/[^/]+$/.test(path);
+}
+
+export function assertRolePermission(role: string, method: string, path: string, body?: unknown): void {
   if (!["admin", "operator", "breeding", "viewer"].includes(role)) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "The collaborator role is not recognized");
   }
@@ -56,6 +73,9 @@ export function assertRolePermission(role: string, method: string, path: string)
   if (!isWrite(method, path)) return;
   if (role === "viewer") {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "This collaborator has read-only access");
+  }
+  if (role === "operator" && isWrite(method, path) && isAnimalRecordWrite(path) && hasGeneticAnimalFields(body)) {
+    throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Genetics and parentage fields require the reproduction role");
   }
   if (role === "operator" && isBreedingPath(path)) {
     throw new AppError(403, "WORKSPACE_PERMISSION_DENIED", "Genetics and reproduction changes require the reproduction role");
@@ -107,7 +127,7 @@ export function createWorkspaceAccessGuard(hasPremium: (ownerUserId: string) => 
         upgradeRequired: true, billingPath: "/billing",
       });
     }
-    assertRolePermission(membership.role, req.method, path);
+    assertRolePermission(membership.role, req.method, path, req.body);
 
     const actorUserId = auth.userId;
     res.locals.auth = {
