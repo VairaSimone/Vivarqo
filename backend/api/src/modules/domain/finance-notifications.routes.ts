@@ -214,23 +214,36 @@ export function createFinanceRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.occurredOn) data.occurredOn = validDate(input.occurredOn);
     if (input.amountCents !== undefined) data.amountCents = BigInt(input.amountCents);
-    for (const key of ["reproductionCycleId", "clutchId", "offspringBatchId"] as const) {
-      if (input[key] === null) data[key] = null;
-      else if (input[key]) {
-        const idValue = input[key] as string;
-        if (key === "reproductionCycleId") {
-          const found = await prisma.reproductionCycle.findFirst({ where: { id: idValue, userId: auth.userId }, select: { id: true } });
-          if (!found) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
-        } else if (key === "clutchId") {
-          const found = await prisma.clutch.findFirst({ where: { id: idValue, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
-          if (!found || (input.reproductionCycleId && found.cycleId !== input.reproductionCycleId)) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account or cycle");
-        } else {
-          const found = await prisma.offspringBatch.findFirst({ where: { id: idValue, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
-          if (!found || (input.reproductionCycleId && found.cycleId !== input.reproductionCycleId) || (input.clutchId && found.clutchId !== input.clutchId)) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account or scope");
-        }
-        data[key] = idValue;
-      }
+    const effectiveCycleId = input.reproductionCycleId !== undefined ? input.reproductionCycleId : existing.reproductionCycleId;
+    const effectiveClutchId = input.clutchId !== undefined ? input.clutchId : existing.clutchId;
+    const effectiveBatchId = input.offspringBatchId !== undefined ? input.offspringBatchId : existing.offspringBatchId;
+    if (input.reproductionCycleId === null && (effectiveClutchId || effectiveBatchId)) {
+      throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "A clutch or offspring batch requires its reproduction cycle");
     }
+    if (effectiveCycleId) {
+      const cycle = await prisma.reproductionCycle.findFirst({ where: { id: effectiveCycleId, userId: auth.userId }, select: { id: true } });
+      if (!cycle) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
+    }
+    let clutchCycleId: string | null = null;
+    if (effectiveClutchId) {
+      const clutch = await prisma.clutch.findFirst({ where: { id: effectiveClutchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true } });
+      if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found in this account");
+      clutchCycleId = clutch.cycleId;
+      if (effectiveCycleId && clutch.cycleId !== effectiveCycleId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Clutch and finance entry must belong to the same cycle");
+      if (!effectiveCycleId && input.reproductionCycleId === undefined) data.reproductionCycleId = clutch.cycleId;
+    }
+    if (effectiveBatchId) {
+      const batch = await prisma.offspringBatch.findFirst({ where: { id: effectiveBatchId, cycle: { userId: auth.userId } }, select: { id: true, cycleId: true, clutchId: true } });
+      if (!batch) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found in this account");
+      const expectedCycleId = effectiveCycleId ?? clutchCycleId;
+      if (expectedCycleId && batch.cycleId !== expectedCycleId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Offspring batch and finance entry must belong to the same cycle");
+      if (effectiveClutchId && batch.clutchId !== effectiveClutchId) throw new AppError(400, "FINANCE_LINK_SCOPE_INVALID", "Offspring batch and selected clutch do not match");
+      if (!effectiveCycleId && input.reproductionCycleId === undefined) data.reproductionCycleId = batch.cycleId;
+      if (!effectiveClutchId && input.clutchId === undefined && batch.clutchId) data.clutchId = batch.clutchId;
+    }
+    if (input.reproductionCycleId !== undefined) data.reproductionCycleId = input.reproductionCycleId;
+    if (input.clutchId !== undefined) data.clutchId = input.clutchId;
+    if (input.offspringBatchId !== undefined) data.offspringBatchId = input.offspringBatchId;
     const entry = await prisma.financeEntry.update({ where: { id }, data: data as never });
     res.status(200).json({ entry: serializeFinance(entry) });
   });
