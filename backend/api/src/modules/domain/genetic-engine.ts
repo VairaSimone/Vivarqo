@@ -123,7 +123,7 @@ export function calculateInbreeding(animals: PedigreeAnimal[], subjectId: string
       if (path.includes(parentId)) { missing.add(`cycle:${parentId}`); continue; }
       ancestors.add(parentId);
       const entries = paths.get(parentId) ?? [];
-      entries.push({ side, generation: generation + 1 });
+      entries.push({ side, generation });
       paths.set(parentId, entries);
       walk(parentId, [...path, parentId], generation + 1, side);
     }
