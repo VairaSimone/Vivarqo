@@ -194,6 +194,18 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       </div>
       <div className="cycle-stats"><span>{pairInsights.data.pair.history.cycleCount} {locale === "it" ? "cicli insieme" : "shared cycles"}</span><span>{pairInsights.data.pair.history.pairingCount} {locale === "it" ? "accoppiamenti registrati" : "pairings recorded"}</span><span>{pairInsights.data.pair.history.clutchCount} {t("clutches")}</span><span>{pairInsights.data.pair.history.offspringBatchCount} {t("offspring")}</span></div>
       <p className="muted-note">{locale === "it" ? "Primo accoppiamento: " : "First pairing: "}{pairInsights.data.pair.history.firstPairingAt ? formatDateTime(pairInsights.data.pair.history.firstPairingAt, locale) : "—"} · {locale === "it" ? "Ultimo: " : "Latest: "}{pairInsights.data.pair.history.lastPairingAt ? formatDateTime(pairInsights.data.pair.history.lastPairingAt, locale) : "—"}</p>
+      {pairInsights.data.pair.history.outcomes.length > 0 && <div><strong>{locale === "it" ? "Esiti registrati nelle riproduzioni precedenti" : "Recorded outcomes in previous breedings"}</strong><ul>{pairInsights.data.pair.history.outcomes.map((outcome, index) => <li key={`${outcome.type}-${outcome.occurredAt}-${index}`}>{formatDateTime(outcome.occurredAt, locale)} · {({
+        pairing: locale === "it" ? "Accoppiamento" : "Pairing",
+        pairing_failed: locale === "it" ? "Accoppiamento non riuscito" : "Unsuccessful pairing",
+        no_deposition: locale === "it" ? "Nessuna deposizione" : "No egg laying",
+        infertile_clutch: locale === "it" ? "Covata non fertile" : "Infertile clutch",
+        embryonic_loss: locale === "it" ? "Perdita embrionale" : "Embryonic loss",
+        stillbirth: locale === "it" ? "Nascita senza piccoli vivi" : "Stillbirth",
+        post_hatch_loss: locale === "it" ? "Perdita dopo la schiusa" : "Post-hatch loss",
+        loss: locale === "it" ? "Perdita" : "Loss",
+        hatch: locale === "it" ? "Schiusa" : "Hatch",
+        live_birth: locale === "it" ? "Nascita viva" : "Live birth"
+      } as Record<string, string>)[outcome.type] ?? outcome.type}{outcome.details ? ` — ${outcome.details}` : ""}</li>)}</ul></div>}
       {pairInsights.data.pair.commonAncestors.length > 0 && <div><strong>{locale === "it" ? "Antenati comuni" : "Common ancestors"}</strong><p>{pairInsights.data.pair.commonAncestors.map((ancestor) => ancestor.name).join(", ")}</p></div>}
       {pairInsights.data.pair.geneticDataIsIncomplete && <p className="muted-note">{locale === "it" ? "Dati genetici incompleti: non è possibile calcolare percentuali affidabili delle combinazioni." : "Genetic data is incomplete: reliable offspring probabilities cannot be calculated."}</p>}
       <p className="muted-note">{locale === "it" ? "Nessuna soglia automatica di età/peso o coefficiente di consanguineità viene inventata: servono parametri validati per specie e pedigree completo." : "No age/weight threshold or inbreeding coefficient is fabricated; validated species parameters and a complete pedigree are required."}</p>
