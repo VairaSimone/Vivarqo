@@ -56,9 +56,24 @@ async function ownedAnimal(userId: string, animalId: string) {
   if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
 }
 async function ownedLocus(userId: string, locusId: string | null | undefined) {
-  if (!locusId) return;
-  const locus = await prisma.geneticLocus.findFirst({ where: { id: locusId, gene: { is: { userId } } }, select: { id: true } });
+  if (!locusId) return [];
+  const locus = await prisma.geneticLocus.findFirst({
+    where: { id: locusId, gene: { is: { userId } } },
+    include: { alleles: { select: { symbol: true } } },
+  });
   if (!locus) throw new AppError(404, "GENETIC_LOCUS_NOT_FOUND", "Genetic locus not found");
+  return locus.alleles.map((allele) => allele.symbol);
+}
+function validateGenotypes(genotypes: Array<string | null | undefined>, allowedAlleles: string[]) {
+  if (!allowedAlleles.length) return; // Existing records remain usable until the breeder completes the catalog.
+  const allowed = new Set(allowedAlleles);
+  for (const value of genotypes) {
+    if (!value) continue;
+    const parts = value.includes("|") ? value.split("|").map((part) => part.trim()) : value.length === 2 ? [...value] : [];
+    if (parts.length !== 2 || parts.some((part) => !part || (part !== "?" && !allowed.has(part)))) {
+      throw new AppError(400, "GENOTYPE_ALLELE_INVALID", "Genotype contains an allele not defined for this locus");
+    }
+  }
 }
 async function ownedSource(userId: string, sourceAnimalId: string | null | undefined, animalId: string) {
   if (!sourceAnimalId) return;
@@ -94,7 +109,9 @@ export function createGeneticTraitsRouter() {
     await ownedAnimal(auth.userId, animalId);
     const input = parseBody(traitCreate, req.body);
     await ownedSource(auth.userId, input.sourceAnimalId, animalId);
-    await ownedLocus(auth.userId, input.locusId);
+    const allowedAlleles = await ownedLocus(auth.userId, input.locusId);
+    validateGenotypes([input.genotype, input.theoreticalGenotype, input.confirmedGenotype], allowedAlleles);
+    if (input.confirmedGenotype && input.certainty !== "confirmed") throw new AppError(400, "CONFIRMED_GENOTYPE_REQUIRES_CONFIRMATION", "A confirmed genotype requires certainty=confirmed");
     const trait = await prisma.$transaction(async (tx) => {
       const created = await tx.animalGeneticTrait.create({
         data: {
@@ -120,7 +137,11 @@ export function createGeneticTraitsRouter() {
     if (!existing) throw new AppError(404, "GENETIC_TRAIT_NOT_FOUND", "Genetic trait not found");
     const source = input.sourceAnimalId !== undefined ? input.sourceAnimalId : existing.sourceAnimalId;
     await ownedSource(auth.userId, source, existing.animalId);
-    await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
+    const allowedAlleles = await ownedLocus(auth.userId, input.locusId !== undefined ? input.locusId : existing.locusId);
+    validateGenotypes([input.genotype, input.theoreticalGenotype, input.confirmedGenotype], allowedAlleles);
+    const nextCertainty = input.certainty ?? existing.certainty;
+    const nextConfirmedGenotype = input.confirmedGenotype !== undefined ? input.confirmedGenotype : existing.confirmedGenotype;
+    if (nextConfirmedGenotype && nextCertainty !== "confirmed") throw new AppError(400, "CONFIRMED_GENOTYPE_REQUIRES_CONFIRMATION", "A confirmed genotype requires certainty=confirmed");
     const trait = await prisma.$transaction(async (tx) => {
       await tx.animalGeneticTraitHistory.create({ data: { traitId: id, animalId: existing.animalId, changedBy: auth.userId, snapshot: existing as never } });
       const updated = await tx.animalGeneticTrait.update({ where: { id }, data: input as never, include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } } });
