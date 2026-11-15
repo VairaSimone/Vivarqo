@@ -42,7 +42,7 @@ function isUniqueViolation(error: unknown): boolean {
     (error as { code?: string }).code === "P2002";
 }
 
-async function writeAudit(userId: string, action: string, entityId: string | null, metadata: Record<string, unknown>, requestId?: string) {
+async function writeAudit(userId: string, action: string, entityId: string | null, metadata: Record<string, string | number | boolean | null>, requestId?: string) {
   await prisma.auditEvent.create({
     data: {
       userId, action, entityType: "workspace_collaboration", entityId,
