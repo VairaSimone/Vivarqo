@@ -22,7 +22,8 @@ const traitCreate = z.object({
   sourceAnimalId: z.string().uuid().nullable().optional(),
   confidenceNote: z.string().trim().max(10_000).nullable().optional(),
   inheritanceMode: z.enum(["autosomal_recessive", "incomplete_dominant", "dominant"]).nullable().optional(),
-  genotype: z.string().regex(/^[A-Za-z]{2}$/).nullable().optional(),
+  genotype: z.string().regex(/^(?:[A-Za-z]{2}|[A-Za-z][A-Za-z0-9_-]{0,11}\\|[A-Za-z][A-Za-z0-9_-]{0,11})$/).nullable().optional(),
+  phenotypeRules: z.record(z.string(), z.string().trim().min(1).max(240)).nullable().optional(),
   certainty: z.enum(["confirmed", "visual", "possible", "carrier", "unverified"]).optional(),
 }).strict();
 const traitPatch = z.object({
@@ -83,7 +84,7 @@ export function createGeneticTraitsRouter() {
         data: {
           animalId, traitName: input.traitName, traitValue: input.traitValue,
           sourceAnimalId: input.sourceAnimalId ?? null, confidenceNote: input.confidenceNote ?? null,
-          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, certainty: input.certainty ?? "unverified",
+          inheritanceMode: input.inheritanceMode ?? null, genotype: input.genotype ?? null, phenotypeRules: input.phenotypeRules ?? null, certainty: input.certainty ?? "unverified",
         },
         include: { sourceAnimal: { select: { id: true, name: true, identifier: true, species: true } } },
       });
