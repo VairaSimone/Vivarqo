@@ -18,6 +18,7 @@ export function AnimalsPage({ locale, navigate, path }: { locale: Locale; naviga
     });
     return () => { active = false; };
   }, [qrToken, navigate, locale]);
+  if (qrToken) return qrError ? <Alert tone="danger">{qrError}</Alert> : <LoadingState />;
   const animalId = path.match(/^\/animals\/([^/?]+)/)?.[1];
   return animalId
     ? <AnimalDetailPage id={animalId} locale={locale} navigate={navigate} />
