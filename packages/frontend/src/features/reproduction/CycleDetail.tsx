@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { ClutchDto, OffspringBatchDto, ReproductiveEventDto, ReproductionCycleDto } from "@vivarqo/contracts/reproduction";
 import { eventTypes } from "./types";
-import { OffspringConversionModal } from "./OffspringConversionModal";
+import { OffspringConversionModal, type OffspringAnimalDraft } from "./OffspringConversionModal";
 import { ReproductiveEventEditor } from "./ReproductiveEventEditor";
 import { ClutchEditor } from "./ClutchEditor";
 import { OffspringManagement } from "./OffspringManagement";
@@ -89,13 +89,24 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     setBatchForm({ clutchId: getString(batch, "clutchId"), bornOn: getString(batch, "bornOn") || todayDate(), count: getString(batch, "count", "1"), notes: getString(batch, "notes") });
     setError(""); setModal("offspring");
   }
-  async function convertBatchAnimals(names: string[], species: string) {
+  async function convertBatchAnimals(drafts: OffspringAnimalDraft[]) {
     if (!conversionBatch) return;
     setConversionBusy(true);
     try {
-      await api.post(`/offspring-batches/${getString(conversionBatch, "id")}/animals`, { animals: names.map((name) => ({ name, species, sex: "unknown" })) });
+      const created = await api.post<{ animals: Array<{ id: string }> }>(`/offspring-batches/${getString(conversionBatch, "id")}/animals`, {
+        animals: drafts.map(({ photo: _photo, ...animal }) => ({
+          ...animal, identifier: animal.identifier || null, morph: animal.morph || null,
+          geneticsNotes: animal.geneticsNotes || null, notes: animal.notes || null,
+          locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
+        }))
+      });
+      for (let index = 0; index < drafts.length; index += 1) {
+        const photo = drafts[index]?.photo;
+        const animalId = created.animals[index]?.id;
+        if (photo && animalId) await api.upload(`/animals/${animalId}/photo`, photo);
+      }
       setConversionBatch(null); resource.reload(); show(t("saveSuccess"));
-    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); resource.reload(); }
     finally { setConversionBusy(false); }
   }
 
