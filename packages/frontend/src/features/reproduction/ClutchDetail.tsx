@@ -29,6 +29,8 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [logsPage, setLogsPage] = useState(1);
   const clutch = resource.data?.clutch;
   const eggsResource = useResource<{ eggs: EggDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/eggs?page=${eggsPage}&pageSize=25` : null);
+  const incubatorsResource = useResource<{ incubators: Array<{ id: string; name: string; identifier: string | null }> }>("/incubators");
+  const transfersResource = useResource<{ transfers: Array<{ id: string; transferredAt: string; fromPosition: string | null; toPosition: string | null; fromIncubator: { name: string } | null; toIncubator: { name: string } | null; notes: string | null }> }>(editingEgg ? `/eggs/${encodeURIComponent(editingEgg.id)}/incubator-transfers` : null);
   const maintenanceResource = useResource<{ maintenance: Array<{ id: string; occurredAt: string; eventType: string; notes: string | null }> }>(clutch?.incubatorId ? `/incubators/${encodeURIComponent(clutch.incubatorId)}/maintenance` : null);
   const logsResource = useResource<{ logs: IncubationLogDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/incubation-logs?page=${logsPage}&pageSize=25` : null);
   const eggs = eggsResource.data?.eggs ?? clutch?.eggs ?? [];
@@ -181,6 +183,21 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   return <div className="page-stack">
     <div className="back-row"><button className="text-link" onClick={() => navigate(`/reproduction-cycles/${getString(cycle, "id")}`)}>← {getString(cycle, "name") || t("cycles")}</button></div>
     <PageHeader eyebrow={t("clutches")} title={formatDate(getString(clutch, "laidOn"), locale)} description={`${locale === "it" ? "Uova registrate" : "Eggs registered"}: ${eggsResource.data?.pagination.total ?? clutch._count?.eggs ?? eggs.length} / ${getString(clutch, "eggCount")} · ${getString(clutch, "incubatorLabel") || "—"}`} action={<Button onClick={() => openLog()}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
+    {clutch.eggSummary && <Panel>
+      <PanelHeader title={locale === "it" ? "Riepilogo covata" : "Clutch summary"} />
+      <div className="cycle-stats">
+        <span>{clutch.eggSummary.registered}/{clutch.eggSummary.declared} {locale === "it" ? "uova registrate" : "eggs registered"}</span>
+        <span>{locale === "it" ? "Fertili" : "Fertile"}: {clutch.eggSummary.byStatus.fertile ?? 0}</span>
+        <span>{locale === "it" ? "Non fertili" : "Infertile"}: {clutch.eggSummary.byStatus.infertile ?? 0}</span>
+        <span>{locale === "it" ? "Schiuse" : "Hatched"}: {clutch.eggSummary.byStatus.hatched ?? 0}</span>
+        <span>{locale === "it" ? "Perse" : "Lost"}: {clutch.eggSummary.byStatus.lost ?? 0}</span>
+      </div>
+      <div className="form-grid">
+        <div><small>{locale === "it" ? "Percentuale di schiusa (uova registrate)" : "Hatch rate (registered eggs)"}</small><p>{clutch.eggSummary.hatchRatePct == null ? "—" : `${clutch.eggSummary.hatchRatePct.toFixed(1)}%`}</p></div>
+        <div><small>{locale === "it" ? "Durata media effettiva" : "Average actual incubation"}</small><p>{clutch.eggSummary.averageIncubationDays == null ? "—" : `${clutch.eggSummary.averageIncubationDays} ${locale === "it" ? "giorni" : "days"}`}</p></div>
+      </div>
+      {clutch.eggSummary.unregisteredDeclared > 0 && <Alert tone="warning">{locale === "it" ? `Mancano ${clutch.eggSummary.unregisteredDeclared} uova da identificare singolarmente.` : `${clutch.eggSummary.unregisteredDeclared} declared eggs have not been registered individually.`}</Alert>}
+    </Panel>}
     <div className="detail-grid">
       <div><EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} onMeasure={(egg) => void openEggMeasurements(egg)} />{eggsResource.data?.pagination && <Pagination page={eggsResource.data.pagination.page} totalPages={eggsResource.data.pagination.totalPages} onChange={setEggsPage} label={t("page")} />}</div>
       <div><IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />{logsResource.data?.pagination && <Pagination page={logsResource.data.pagination.page} totalPages={logsResource.data.pagination.totalPages} onChange={setLogsPage} label={t("page")} />}</div>
@@ -235,7 +252,9 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
             expectedHatchAt: getString(editingEgg, "expectedHatchAt").slice(0,10) || null,
             hatchedAt: getString(editingEgg, "hatchedAt").slice(0,10) || null,
             offspringAnimalId: getString(editingEgg, "offspringAnimalId") || null,
-            notes: getString(editingEgg, "notes") || null
+            notes: getString(editingEgg, "notes") || null,
+            incubatorId: getString(editingEgg, "incubatorId") || null,
+            incubatorPosition: getString(editingEgg, "incubatorPosition") || null
           });
           setEditingEgg(null); resource.reload(); eggsResource.reload(); show(t("saveSuccess"));
         } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -247,6 +266,16 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
           {editingEgg.photoUrl && <Button type="button" variant="secondary" size="sm" disabled={eggPhotoBusy} onClick={() => void deleteEggPhoto()}>{locale === "it" ? "Rimuovi foto" : "Remove photo"}</Button>}
           <small>{locale === "it" ? "JPEG, PNG o WebP; massimo 5 MB." : "JPEG, PNG or WebP; maximum 5 MB."}</small>
         </Field>
+        <Field label={locale === "it" ? "Incubatrice" : "Incubator"}>
+          <Select value={getString(editingEgg, "incubatorId")} onChange={(e) => setEditingEgg({ ...editingEgg, incubatorId: e.target.value || null, incubatorPosition: e.target.value ? getString(editingEgg, "incubatorPosition") : null })}>
+            <option value="">{locale === "it" ? "Non assegnata" : "Not assigned"}</option>
+            {(incubatorsResource.data?.incubators ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}{item.identifier ? ` · ${item.identifier}` : ""}</option>)}
+          </Select>
+        </Field>
+        <Field label={locale === "it" ? "Posizione interna (ripiano / contenitore)" : "Internal position (shelf / container)"}>
+          <Input value={getString(editingEgg, "incubatorPosition")} disabled={!getString(editingEgg, "incubatorId")} onChange={(e) => setEditingEgg({ ...editingEgg, incubatorPosition: e.target.value })} placeholder={locale === "it" ? "Es. Ripiano 2 · box B" : "e.g. Shelf 2 · box B"} />
+        </Field>
+        {transfersResource.data?.transfers?.length ? <div className="record-list"><strong>{locale === "it" ? "Storico trasferimenti" : "Transfer history"}</strong>{transfersResource.data.transfers.map((transfer) => <div className="record-row" key={transfer.id}><div><strong>{transfer.fromIncubator?.name || (locale === "it" ? "Non assegnata" : "Unassigned")} → {transfer.toIncubator?.name || (locale === "it" ? "Non assegnata" : "Unassigned")}</strong><small>{formatDateTime(transfer.transferredAt, locale)} · {transfer.fromPosition || "—"} → {transfer.toPosition || "—"}</small></div></div>)}</div> : null}
         <Field label={t("eggCode")}><Input value={getString(editingEgg, "code")} onChange={(e) => setEditingEgg({ ...editingEgg, code: e.target.value })} /></Field>
         <Field label={t("eggStatus")}><Select value={getString(editingEgg, "status", "unknown")} onChange={(e) => { const status = e.target.value as EggDto["status"]; setEditingEgg({ ...editingEgg, status, hatchedAt: status === "hatched" ? (getString(editingEgg, "hatchedAt").slice(0,10) || todayDate()) : null, offspringAnimalId: status === "hatched" ? getString(editingEgg, "offspringAnimalId") || null : null }); }}>
           <option value="unknown">{locale === "it" ? "Da valutare" : "Unassessed"}</option><option value="fertile">Fertile</option><option value="infertile">{locale === "it" ? "Non fertile" : "Infertile"}</option><option value="damaged">{locale === "it" ? "Danneggiato" : "Damaged"}</option><option value="collapsed">{locale === "it" ? "Collassato" : "Collapsed"}</option><option value="lost">{locale === "it" ? "Perso" : "Lost"}</option><option value="incubating">{locale === "it" ? "In incubazione" : "Incubating"}</option><option value="hatched">{locale === "it" ? "Schiuso" : "Hatched"}</option>
