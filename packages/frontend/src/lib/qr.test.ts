@@ -18,6 +18,14 @@ describe("local QR encoder", () => {
     expect(matrix[0]?.[6]).toBe(true);
   });
 
+  it("encodes an internal animal QR route within supported capacity", () => {
+    const value = "https://vivarqo.it/animals/qr/" + "A".repeat(32);
+    const matrix = qrMatrix(value);
+    expect(matrix.length).toBeGreaterThanOrEqual(21);
+    expect(matrix.length).toBeLessThanOrEqual(37);
+    expect(matrix.every((row) => row.length === matrix.length)).toBe(true);
+  });
+
   it("rejects values longer than the supported QR versions", () => {
     expect(() => qrMatrix("A".repeat(107))).toThrow("QR_VALUE_TOO_LONG");
   });
