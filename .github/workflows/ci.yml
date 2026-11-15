@@ -79,6 +79,12 @@ jobs:
               OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='qr_token') THEN
               RAISE EXCEPTION 'Animal management migration columns are missing';
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='feeding_interval_days')
+              OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='feeding_entries' AND column_name='prey_state')
+              OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='feeding_entries' AND column_name='inventory_item_id')
+              OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='feeding_entries' AND column_name='inventory_deducted') THEN
+              RAISE EXCEPTION 'Advanced feeding migration columns are missing';
+            END IF;
           END $animal_management$;
           SQL
       - name: Verify empty, baseline, partial and drifted database initialization
