@@ -804,6 +804,7 @@ model GeneticAllele {
   isReference Boolean      @default(false) @map("is_reference")
   locus       GeneticLocus @relation(fields: [locusId], references: [id], onDelete: Cascade)
   @@unique([locusId, symbol], map: "genetic_alleles_locus_symbol_key")
+  @@unique([locusId], where: raw("\"is_reference\" = true"), map: "genetic_alleles_one_reference_per_locus_idx")
   @@index([locusId], map: "genetic_alleles_locus_idx")
   @@map("genetic_alleles")
 }
