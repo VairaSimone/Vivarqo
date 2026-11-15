@@ -91,7 +91,7 @@ export function createReproductionRouter() {
       where: { userId: auth.userId, parentAAnimalId: motherId, parentBAnimalId: fatherId },
       select: {
         id: true, name: true, startedOn: true, status: true,
-        events: { where: { eventType: { in: ["pairing", "loss", "hatch", "live_birth"] } }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }], select: { eventType: true, occurredAt: true, details: true } },
+        events: { where: { eventType: { in: ["pairing", "pairing_failed", "no_deposition", "loss", "hatch", "live_birth", "infertile_clutch", "embryonic_loss", "stillbirth", "post_hatch_loss"] } }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }], select: { eventType: true, occurredAt: true, details: true } },
         _count: { select: { clutches: true, offspringBatches: true } },
       },
       orderBy: [{ startedOn: "desc" }],
