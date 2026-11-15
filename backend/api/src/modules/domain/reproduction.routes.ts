@@ -339,11 +339,18 @@ export function createReproductionRouter() {
     const input = parseBody(patchEggSchema, req.body);
     const existing = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } } });
     if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
-    if (input.offspringAnimalId) await assertOwnedAnimals(auth.userId, [input.offspringAnimalId]);
+    if (input.offspringAnimalId) {
+      const linkedAnimal = await prisma.animal.findFirst({ where: { id: input.offspringAnimalId, userId: auth.userId, originClutchId: existing.clutchId }, select: { id: true } });
+      if (!linkedAnimal) throw new AppError(400, "HATCHLING_CLUTCH_MISMATCH", "The linked animal must have been created from this clutch");
+      if (input.status && input.status !== "hatched") throw new AppError(400, "EGG_HATCH_STATUS_REQUIRED", "An egg linked to a hatchling must have hatched status");
+    }
     if (input.status === "hatched" && !input.hatchedAt && !existing.hatchedAt) throw new AppError(400, "HATCH_DATE_REQUIRED", "A hatch date is required when marking an egg as hatched");
-    if (input.offspringAnimalId && input.status && input.status !== "hatched") throw new AppError(400, "EGG_HATCH_STATUS_REQUIRED", "An egg linked to a hatchling must have hatched status");
     const data: Record<string, unknown> = { ...input };
     if (input.hatchedAt !== undefined) data.hatchedAt = input.hatchedAt ? validDate(input.hatchedAt) : null;
+    if (input.offspringAnimalId) {
+      data.status = "hatched";
+      if (input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
+    }
     if (input.status === "hatched" && input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
     const egg = await prisma.$transaction(async (tx) => {
       const updated = await tx.egg.update({ where: { id: eggId }, data: data as never });
@@ -376,11 +383,22 @@ export function createReproductionRouter() {
     const clutchId = routeUuid(req.params.id, "clutch id");
     await ownedClutch(auth.userId, clutchId);
     const input = parseBody(incubationSchema, req.body);
-    const log = await prisma.incubationLog.create({
-      data: {
-        clutchId, recordedAt: new Date(input.recordedAt), temperatureC: input.temperatureC ?? null,
-        humidityPct: input.humidityPct ?? null, eventType: input.eventType, notes: input.notes ?? null,
-      },
+    const log = await prisma.$transaction(async (tx) => {
+      const created = await tx.incubationLog.create({
+        data: {
+          clutchId, recordedAt: new Date(input.recordedAt), temperatureC: input.temperatureC ?? null,
+          humidityPct: input.humidityPct ?? null, eventType: input.eventType, notes: input.notes ?? null,
+        },
+      });
+      const clutch = await tx.clutch.findUnique({ where: { id: clutchId }, include: { cycle: { select: { userId: true } } } });
+      if (clutch?.checkIntervalHours) {
+        const title = "Controllo incubazione · " + clutchId;
+        const dueAt = new Date(created.recordedAt.getTime() + clutch.checkIntervalHours * 60 * 60 * 1000);
+        const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubation", title, status: "open" }, select: { id: true } });
+        if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt } });
+        else await tx.task.create({ data: { userId: auth.userId, title, category: "incubation", dueAt, description: "Controllo programmato per la covata " + (clutch.incubatorLabel || clutchId) } });
+      }
+      return created;
     });
     res.status(201).json({ log });
   });
