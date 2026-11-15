@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AppError } from "../src/errors/app-error.js";
 import { assertRolePermission } from "../src/modules/auth/workspace-access.js";
 
-function expectDenied(role: string, method: string, path: string) {
+function expectDenied(role: string, method: string, path: string, body?: unknown) {
   try {
-    assertRolePermission(role, method, path);
+    assertRolePermission(role, method, path, body);
     throw new Error("Expected workspace permission denial");
   } catch (error) {
     expect(error).toBeInstanceOf(AppError);
@@ -25,6 +25,10 @@ describe("workspace role permissions", () => {
     expect(() => assertRolePermission("operator", "POST", "/feeding-sessions")).not.toThrow();
     expect(() => assertRolePermission("operator", "PATCH", "/animals/123/weights")).not.toThrow();
     expect(() => assertRolePermission("operator", "POST", "/animals/locations")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/animals/123", { notes: "routine care" })).not.toThrow();
+    expectDenied("operator", "PATCH", "/animals/123", { morph: "Albino", geneticsNotes: "carrier" });
+    expectDenied("operator", "POST", "/animals", { motherAnimalId: "00000000-0000-4000-8000-000000000001" });
+    expectDenied("operator", "POST", "/animals/bulk", { animals: [{ name: "A", morph: "Pastel" }] });
     expectDenied("operator", "POST", "/animals/123/genetic-traits");
     expectDenied("operator", "POST", "/reproduction-cycles");
     expectDenied("operator", "POST", "/documents");
