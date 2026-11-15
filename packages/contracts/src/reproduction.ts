@@ -97,6 +97,8 @@ export const patchClutchSchema = z.object({
 export const eggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
   status: eggStatusSchema.default("unknown"),
+  laidAt: z.string().datetime({ offset: true }).nullable().optional(),
+  expectedHatchAt: dateOnly.nullable().optional(),
   hatchedAt: dateOnly.nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
@@ -108,6 +110,8 @@ export const eggSchema = z.object({
 export const patchEggSchema = z.object({
   code: z.string().trim().max(80).nullable().optional(),
   status: eggStatusSchema.optional(),
+  laidAt: z.string().datetime({ offset: true }).nullable().optional(),
+  expectedHatchAt: dateOnly.nullable().optional(),
   hatchedAt: dateOnly.nullable().optional(),
   offspringAnimalId: nullableUuid,
   notes: z.string().trim().max(10_000).nullable().optional(),
