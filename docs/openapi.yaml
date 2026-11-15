@@ -4882,10 +4882,25 @@ components:
             "format": "uuid"
           },
           "confidenceNote": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
+          },
+          "inheritanceMode": {
+            "type": ["string", "null"],
+            "enum": ["autosomal_recessive", "incomplete_dominant", "dominant", "codominant", null]
+          },
+          "genotype": {
+            "type": ["string", "null"],
+            "maxLength": 32,
+            "description": "Diploid genotype; use A|? when only one allele is known."
+          },
+          "phenotypeRules": {
+            "type": ["object", "null"],
+            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 240 },
+            "description": "Explicit mapping from diploid genotype to phenotype; never inferred implicitly."
+          },
+          "certainty": {
+            "type": "string",
+            "enum": ["confirmed", "visual", "possible", "carrier", "unverified"]
           }
         }
       }
@@ -4912,10 +4927,25 @@ components:
             "format": "uuid"
           },
           "confidenceNote": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
+          },
+          "inheritanceMode": {
+            "type": ["string", "null"],
+            "enum": ["autosomal_recessive", "incomplete_dominant", "dominant", "codominant", null]
+          },
+          "genotype": {
+            "type": ["string", "null"],
+            "maxLength": 32,
+            "description": "Diploid genotype; use A|? when only one allele is known."
+          },
+          "phenotypeRules": {
+            "type": ["object", "null"],
+            "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 240 },
+            "description": "Explicit mapping from diploid genotype to phenotype; never inferred implicitly."
+          },
+          "certainty": {
+            "type": "string",
+            "enum": ["confirmed", "visual", "possible", "carrier", "unverified"]
           }
         }
       }
@@ -6747,12 +6777,11 @@ components:
             ],
             "format": "uuid"
           },
-          "confidenceNote": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
+          "confidenceNote": { "type": ["string", "null"] },
+          "inheritanceMode": { "type": ["string", "null"], "enum": ["autosomal_recessive", "incomplete_dominant", "dominant", "codominant", null] },
+          "genotype": { "type": ["string", "null"] },
+          "phenotypeRules": { "type": ["object", "null"], "additionalProperties": { "type": "string" } },
+          "certainty": { "type": "string", "enum": ["confirmed", "visual", "possible", "carrier", "unverified"] },
           "createdAt": {
             "type": "string",
             "format": "date-time"
