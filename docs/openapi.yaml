@@ -26,6 +26,7 @@ tags:
   - name: Imports
   - name: Exports
   - name: Billing
+  - name: Onboarding
 security:
   - sessionCookieDev: []
   - sessionCookieProd: []
@@ -2560,6 +2561,58 @@ paths:
         '204':
           description: Evento riproduttivo eliminato.
         '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/onboarding/progress:
+    get:
+      operationId: getOnboardingProgress
+      tags: [Onboarding]
+      summary: Recupera lo stato del percorso iniziale dell'account
+      responses:
+        '200':
+          description: Stato corrente e storico dei traguardi e dei suggerimenti.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [current, completed, dismissedSuggestions]
+                properties:
+                  current:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                  completed:
+                    type: object
+                    additionalProperties:
+                      type: boolean
+                  dismissedSuggestions:
+                    type: array
+                    items:
+                      type: string
+                      enum: [animal-care, clutch-eggs]
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/onboarding/suggestions/{key}/dismiss:
+    post:
+      operationId: dismissOnboardingSuggestion
+      tags: [Onboarding]
+      summary: Nasconde un suggerimento del percorso iniziale
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [animal-care, clutch-eggs]
+      responses:
+        '204':
+          description: Suggerimento nascosto.
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
           $ref: '#/components/responses/Error'
 
 components:
