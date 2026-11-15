@@ -52,7 +52,7 @@ const traitListQuery = z.object({
 });
 
 async function ownedAnimal(userId: string, animalId: string) {
-  const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true, species: true } });
+  const animal = await prisma.animal.findFirst({ where: { id: animalId, userId }, select: { id: true, species: true, sex: true } });
   if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
   return animal;
 }
@@ -341,6 +341,7 @@ export function createGeneticTraitsRouter() {
     if (input.motherAnimalId === input.fatherAnimalId) throw new AppError(400, "INVALID_PAIRING", "Parents must be different animals");
     const motherAnimal = await ownedAnimal(auth.userId, input.motherAnimalId);
     const fatherAnimal = await ownedAnimal(auth.userId, input.fatherAnimalId);
+    if (motherAnimal.sex !== "female" || fatherAnimal.sex !== "male") throw new AppError(400, "INVALID_PAIRING_SEX", "Select a female mother and a male father");
     if (motherAnimal.species.toLocaleLowerCase() !== fatherAnimal.species.toLocaleLowerCase()) throw new AppError(400, "GENETIC_SPECIES_MISMATCH", "Pairing parents must belong to the same species");
     const [catalog, traits] = await Promise.all([
       prisma.geneticLocus.findMany({ where: { id: { in: input.locusIds }, gene: { is: { userId: auth.userId } } }, include: { alleles: true, gene: { select: { species: true } } } }),
