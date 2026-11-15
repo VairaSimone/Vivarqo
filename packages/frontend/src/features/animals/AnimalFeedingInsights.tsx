@@ -46,7 +46,7 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
   const date = (value: string | null) => value ? new Intl.DateTimeFormat(it ? "it-IT" : "en-GB", { dateStyle: "medium" }).format(new Date(value)) : "—";
   const percent = summary.data?.acceptanceRate == null ? "—" : new Intl.NumberFormat(it ? "it-IT" : "en-GB", { style: "percent", maximumFractionDigits: 1 }).format(summary.data.acceptanceRate);
 
-  return <Panel>
+  return <Panel className="feeding-insights-panel">
     <PanelHeader title={it ? "Andamento alimentazione" : "Feeding overview"} />
     {summary.loading && !summary.data ? <LoadingState /> : summary.error ? <Alert tone="danger">{summary.error.message}</Alert> : summary.data && <>
       <div className="feeding-insights-grid">
