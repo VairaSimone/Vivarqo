@@ -47,6 +47,14 @@ async function assertOwnedAnimals(userId: string, ids: Array<string | null | und
   const rows = await prisma.animal.findMany({ where: { userId, id: { in: expected } }, select: { id: true } });
   if (rows.length !== expected.length) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more animals were not found");
 }
+async function assertCycleParentSexes(userId: string, motherId?: string | null, fatherId?: string | null) {
+  const ids = [...new Set([motherId, fatherId].filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return;
+  const animals = await prisma.animal.findMany({ where: { userId, id: { in: ids } }, select: { id: true, sex: true } });
+  if (animals.length !== ids.length) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more breeding animals were not found");
+  if (motherId && animals.find((animal) => animal.id === motherId)?.sex === "male") throw new AppError(400, "INVALID_MOTHER_SEX", "The mother must be female or have unknown sex");
+  if (fatherId && animals.find((animal) => animal.id === fatherId)?.sex === "female") throw new AppError(400, "INVALID_FATHER_SEX", "The father must be male or have unknown sex");
+}
 async function ownedCycle(userId: string, cycleId: string) {
   const cycle = await prisma.reproductionCycle.findFirst({ where: { id: cycleId, userId } });
   if (!cycle) throw new AppError(404, "REPRODUCTION_CYCLE_NOT_FOUND", "Reproduction cycle not found");
@@ -88,6 +96,7 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(createCycleSchema, req.body);
     await assertOwnedAnimals(auth.userId, [input.parentAAnimalId, input.parentBAnimalId]);
+    await assertCycleParentSexes(auth.userId, input.parentAAnimalId, input.parentBAnimalId);
     const cycle = await prisma.$transaction(async (tx) => {
       const created = await tx.reproductionCycle.create({
         data: {
@@ -163,6 +172,7 @@ export function createReproductionRouter() {
     if (parentA && parentA === parentB) {
       throw new AppError(400, "VALIDATION_ERROR", "Parents must be different animals");
     }
+    await assertCycleParentSexes(auth.userId, parentA, parentB);
     const data: Record<string, unknown> = { ...input };
     if (input.startedOn) data.startedOn = validDate(input.startedOn);
     if (input.endedOn !== undefined) data.endedOn = input.endedOn ? validDate(input.endedOn) : null;
@@ -232,13 +242,32 @@ export function createReproductionRouter() {
       where: { id: clutchId, cycle: { is: { userId: auth.userId } } },
       include: {
         cycle: { select: { id: true, name: true, status: true } },
-        eggs: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100 },
+        eggs: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100, include: { offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } }, history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] } } },
         incubationLogs: { orderBy: [{ recordedAt: "desc" }, { id: "desc" }], take: 100 },
         _count: { select: { eggs: true, incubationLogs: true } },
       },
     });
     if (!clutch) throw new AppError(404, "CLUTCH_NOT_FOUND", "Clutch not found");
-    res.status(200).json({ clutch });
+    const logs = clutch.incubationLogs;
+    const temperatures = logs.map((log) => log.temperatureC === null ? null : Number(log.temperatureC)).filter((value): value is number => value !== null);
+    const humidities = logs.map((log) => log.humidityPct === null ? null : Number(log.humidityPct)).filter((value): value is number => value !== null);
+    const temperatureOutOfRange = logs.filter((log) => log.temperatureC !== null && (
+      (clutch.targetTemperatureMinC !== null && Number(log.temperatureC) < Number(clutch.targetTemperatureMinC)) ||
+      (clutch.targetTemperatureMaxC !== null && Number(log.temperatureC) > Number(clutch.targetTemperatureMaxC))
+    )).length;
+    const humidityOutOfRange = logs.filter((log) => log.humidityPct !== null && (
+      (clutch.targetHumidityMinPct !== null && Number(log.humidityPct) < Number(clutch.targetHumidityMinPct)) ||
+      (clutch.targetHumidityMaxPct !== null && Number(log.humidityPct) > Number(clutch.targetHumidityMaxPct))
+    )).length;
+    const lastCheckAt = logs[0]?.recordedAt?.toISOString() ?? null;
+    const nextCheckDueAt = lastCheckAt && clutch.checkIntervalHours
+      ? new Date(new Date(lastCheckAt).getTime() + clutch.checkIntervalHours * 60 * 60 * 1000).toISOString()
+      : null;
+    res.status(200).json({ clutch, monitoring: {
+      temperatureOutOfRange, humidityOutOfRange, lastCheckAt, nextCheckDueAt,
+      averageTemperatureC: temperatures.length ? temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length : null,
+      averageHumidityPct: humidities.length ? humidities.reduce((sum, value) => sum + value, 0) / humidities.length : null,
+    } });
   });
 
   router.patch("/clutches/:id", requireSession, async (req, res) => {
@@ -280,7 +309,11 @@ export function createReproductionRouter() {
     if (new Set(codes).size !== codes.length) throw new AppError(400, "DUPLICATE_EGG_CODES", "Egg codes must be unique within the request");
     const eggs = await prisma.$transaction(async (tx) => {
       const results = [];
-      for (const egg of input.eggs) results.push(await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, notes: egg.notes ?? null } }));
+      for (const egg of input.eggs) {
+        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, offspringAnimalId: egg.offspringAnimalId ?? null, notes: egg.notes ?? null } });
+        await tx.eggHistory.create({ data: { eggId: created.id, status: created.status, notes: created.notes } });
+        results.push(created);
+      }
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.created", entityType: "egg", metadata: { count: results.length } } });
       return results;
     });
@@ -293,7 +326,17 @@ export function createReproductionRouter() {
     const input = parseBody(patchEggSchema, req.body);
     const existing = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } } });
     if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
-    const egg = await prisma.egg.update({ where: { id: eggId }, data: input as never });
+    if (input.offspringAnimalId) await assertOwnedAnimals(auth.userId, [input.offspringAnimalId]);
+    if (input.status === "hatched" && !input.hatchedAt && !existing.hatchedAt) throw new AppError(400, "HATCH_DATE_REQUIRED", "A hatch date is required when marking an egg as hatched");
+    if (input.offspringAnimalId && input.status && input.status !== "hatched") throw new AppError(400, "EGG_HATCH_STATUS_REQUIRED", "An egg linked to a hatchling must have hatched status");
+    const data: Record<string, unknown> = { ...input };
+    if (input.hatchedAt !== undefined) data.hatchedAt = input.hatchedAt ? validDate(input.hatchedAt) : null;
+    if (input.status === "hatched" && input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
+    const egg = await prisma.$transaction(async (tx) => {
+      const updated = await tx.egg.update({ where: { id: eggId }, data: data as never });
+      if (input.status && input.status !== existing.status) await tx.eggHistory.create({ data: { eggId, status: input.status, notes: input.notes ?? existing.notes } });
+      return updated;
+    });
     res.status(200).json({ egg });
   });
 
@@ -367,7 +410,7 @@ export function createReproductionRouter() {
   router.post("/offspring-batches/:id/animals", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const batchId = routeUuid(req.params.id, "offspring batch id");
-    const batch = await prisma.offspringBatch.findFirst({ where: { id: batchId, cycle: { is: { userId: auth.userId } } } });
+    const batch = await prisma.offspringBatch.findFirst({ where: { id: batchId, cycle: { is: { userId: auth.userId } } }, include: { cycle: { include: { parentA: { select: { id: true, name: true, sex: true } }, parentB: { select: { id: true, name: true, sex: true } } } } } });
     if (!batch) throw new AppError(404, "OFFSPRING_BATCH_NOT_FOUND", "Offspring batch not found");
     const input = parseBody(z.object({ animals: z.array(newAnimalSchema).min(1).max(500) }).strict(), req.body);
     const identifiers = input.animals.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")).filter((v): v is string => Boolean(v));
@@ -376,11 +419,20 @@ export function createReproductionRouter() {
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
       for (const animal of input.animals) {
+        await assertOwnedAnimals(auth.userId, [animal.motherAnimalId, animal.fatherAnimalId]);
+        await assertCycleParentSexes(auth.userId, animal.motherAnimalId ?? batch.cycle.parentAAnimalId, animal.fatherAnimalId ?? batch.cycle.parentBAnimalId);
         animals.push(await tx.animal.create({
           data: {
             userId: auth.userId, originOffspringBatchId: batchId, name: animal.name,
             identifier: animal.identifier ?? null, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
             birthDate: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
+            birthDateEstimated: animal.birthDateEstimated ?? false,
+            geneticsNotes: animal.geneticsNotes ?? null, notes: animal.notes ?? null,
+            locationLabel: animal.locationLabel ?? null, originDescription: animal.originDescription ?? "Nato in allevamento",
+            acquiredDate: animal.acquiredDate ? validDate(animal.acquiredDate) : null,
+            motherAnimalId: animal.motherAnimalId ?? batch.cycle.parentAAnimalId,
+            fatherAnimalId: animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
+            originClutchId: batch.clutchId,
           },
         }));
       }
