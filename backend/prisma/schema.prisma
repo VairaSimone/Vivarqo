@@ -51,6 +51,7 @@ model User {
   financeRecurrences      FinanceRecurrence[]
   subscription            Subscription?
   auditEvents             AuditEvent[]
+  geneticGenes            GeneticGene[]
   @@map("users")
 }
 
@@ -138,6 +139,7 @@ model Animal {
   financeEntries         FinanceEntry[]
   geneticTraits          AnimalGeneticTrait[]  @relation("GeneticTraitAnimal")
   traitsAsSource         AnimalGeneticTrait[]  @relation("GeneticTraitSourceAnimal")
+  geneticTraitHistory    AnimalGeneticTraitHistory[]
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
   @@unique([id, userId], map: "animals_id_user_id_unique")
@@ -744,13 +746,79 @@ model AnimalGeneticTrait {
   genotype       String?  @db.VarChar(32)
   phenotypeRules Json? @map("phenotype_rules") @db.JsonB
   certainty      String   @default("unverified") @db.VarChar(24)
+  locusId        String?  @map("locus_id") @db.Uuid
+  theoreticalGenotype String? @map("theoretical_genotype") @db.VarChar(64)
+  observedPhenotype String? @map("observed_phenotype") @db.VarChar(240)
+  confirmedGenotype String? @map("confirmed_genotype") @db.VarChar(64)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   animal         Animal   @relation("GeneticTraitAnimal", fields: [animalId], references: [id], onDelete: Restrict)
   sourceAnimal   Animal?  @relation("GeneticTraitSourceAnimal", fields: [sourceAnimalId], references: [id], onDelete: Restrict)
+  locus          GeneticLocus? @relation(fields: [locusId], references: [id], onDelete: SetNull)
+  history        AnimalGeneticTraitHistory[]
   @@index([animalId], map: "animal_genetic_traits_animal_idx")
   @@index([sourceAnimalId], map: "animal_genetic_traits_source_animal_idx")
+  @@index([locusId], map: "animal_genetic_traits_locus_idx")
   @@map("animal_genetic_traits")
+}
+
+
+model GeneticGene {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  species     String         @db.VarChar(160)
+  symbol      String         @db.VarChar(40)
+  name        String         @db.VarChar(160)
+  description String?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loci        GeneticLocus[]
+  @@unique([userId, species, symbol], map: "genetic_genes_user_species_symbol_key")
+  @@index([userId, species], map: "genetic_genes_user_species_idx")
+  @@map("genetic_genes")
+}
+
+model GeneticLocus {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  geneId      String                 @map("gene_id") @db.Uuid
+  symbol      String                 @db.VarChar(40)
+  name        String                 @db.VarChar(160)
+  inheritanceMode String             @map("inheritance_mode") @db.VarChar(32)
+  description String?
+  gene        GeneticGene            @relation(fields: [geneId], references: [id], onDelete: Cascade)
+  alleles     GeneticAllele[]
+  traits      AnimalGeneticTrait[]
+  @@unique([geneId, symbol], map: "genetic_loci_gene_symbol_key")
+  @@index([geneId], map: "genetic_loci_gene_idx")
+  @@map("genetic_loci")
+}
+
+model GeneticAllele {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  locusId     String       @map("locus_id") @db.Uuid
+  symbol      String       @db.VarChar(24)
+  name        String       @db.VarChar(120)
+  description String?
+  isReference Boolean      @default(false) @map("is_reference")
+  locus       GeneticLocus @relation(fields: [locusId], references: [id], onDelete: Cascade)
+  @@unique([locusId, symbol], map: "genetic_alleles_locus_symbol_key")
+  @@index([locusId], map: "genetic_alleles_locus_idx")
+  @@map("genetic_alleles")
+}
+
+model AnimalGeneticTraitHistory {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  traitId     String             @map("trait_id") @db.Uuid
+  animalId    String             @map("animal_id") @db.Uuid
+  changedBy   String             @map("changed_by") @db.Uuid
+  snapshot    Json               @db.JsonB
+  changedAt   DateTime           @default(now()) @map("changed_at") @db.Timestamptz(6)
+  trait       AnimalGeneticTrait @relation(fields: [traitId], references: [id], onDelete: Cascade)
+  animal      Animal             @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([animalId, changedAt(sort: Desc)], map: "animal_genetic_history_animal_changed_idx")
+  @@index([traitId, changedAt(sort: Desc)], map: "animal_genetic_history_trait_changed_idx")
+  @@map("animal_genetic_trait_history")
 }
 
 model FinanceEntry {
