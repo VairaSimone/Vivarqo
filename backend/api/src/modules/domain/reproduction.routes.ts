@@ -326,7 +326,7 @@ export function createReproductionRouter() {
     const eggs = await prisma.$transaction(async (tx) => {
       const results = [];
       for (const egg of input.eggs) {
-        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, offspringAnimalId: egg.offspringAnimalId ?? null, notes: egg.notes ?? null } });
+        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, notes: egg.notes ?? null } });
         await tx.eggHistory.create({ data: { eggId: created.id, status: created.status, notes: created.notes } });
         results.push(created);
       }
@@ -342,6 +342,9 @@ export function createReproductionRouter() {
     const input = parseBody(patchEggSchema, req.body);
     const existing = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } } });
     if (!existing) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    if (existing.offspringAnimalId && input.status && input.status !== "hatched" && input.offspringAnimalId === undefined) {
+      throw new AppError(400, "EGG_HATCHLING_LINKED", "Unlink the hatchling before changing a hatched egg to another status");
+    }
     if (input.offspringAnimalId) {
       const linkedAnimal = await prisma.animal.findFirst({ where: { id: input.offspringAnimalId, userId: auth.userId, originClutchId: existing.clutchId }, select: { id: true } });
       if (!linkedAnimal) throw new AppError(400, "HATCHLING_CLUTCH_MISMATCH", "The linked animal must have been created from this clutch");
