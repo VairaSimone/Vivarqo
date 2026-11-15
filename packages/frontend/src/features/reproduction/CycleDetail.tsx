@@ -135,9 +135,22 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   }
   async function editIncubator(incubator: IncubatorDto) {
     const name = window.prompt(locale === "it" ? "Nome incubatrice" : "Incubator name", incubator.name);
-    if (name === null || !name.trim() || name.trim() === incubator.name) return;
+    if (name === null || !name.trim()) return;
+    const identifier = window.prompt(locale === "it" ? "Codice / identificativo (facoltativo)" : "Identifier (optional)", incubator.identifier ?? "");
+    if (identifier === null) return;
+    const capacityValue = window.prompt(locale === "it" ? "Capacità in uova (vuoto = non specificata)" : "Egg capacity (blank = unspecified)", incubator.capacity == null ? "" : String(incubator.capacity));
+    if (capacityValue === null) return;
+    const notes = window.prompt(locale === "it" ? "Note (facoltative)" : "Notes (optional)", incubator.notes ?? "");
+    if (notes === null) return;
+    const capacity = capacityValue.trim() === "" ? null : Number(capacityValue);
+    if (capacity !== null && (!Number.isInteger(capacity) || capacity <= 0 || capacity > 100_000)) {
+      show(locale === "it" ? "La capacità deve essere un intero positivo." : "Capacity must be a positive integer.");
+      return;
+    }
     try {
-      await api.patch(`/incubators/${encodeURIComponent(incubator.id)}`, { name: name.trim() });
+      await api.patch(`/incubators/${encodeURIComponent(incubator.id)}`, {
+        name: name.trim(), identifier: identifier.trim() || null, capacity, notes: notes.trim() || null,
+      });
       await incubatorsResource.reload();
       show(t("saveSuccess"));
     } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
