@@ -715,6 +715,78 @@ paths:
                   refusedCount: { type: integer, minimum: 0 }
                   offeredCount: { type: integer, minimum: 0 }
                   acceptanceRate: { type: [number, 'null'], minimum: 0, maximum: 1 }
+
+  /api/v1/animals/{animalId}/health-records:
+    parameters:
+      - $ref: '#/components/parameters/AnimalId'
+    get:
+      operationId: getAnimalsByAnimalIdHealthRecords
+      tags: [Care]
+      summary: Elenca la cartella sanitaria dell'animale
+      responses:
+        '200':
+          description: Elenco delle registrazioni sanitarie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthRecordsResponse'
+    post:
+      operationId: createAnimalsByAnimalIdHealthRecords
+      tags: [Care]
+      summary: Registra una visita, un sintomo o un trattamento
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/health.routes.ts
+          symbol: recordSchema
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthRecordWrite'
+      responses:
+        '201':
+          description: Registrazione sanitaria creata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthRecordResponse'
+  /api/v1/health-records/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateHealthRecordsById
+      tags: [Care]
+      summary: Aggiorna una registrazione sanitaria
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/health.routes.ts
+          symbol: recordSchema
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthRecordWrite'
+      responses:
+        '200':
+          description: Registrazione aggiornata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthRecordResponse'
+    delete:
+      operationId: deleteHealthRecordsById
+      tags: [Care]
+      summary: Elimina una registrazione sanitaria
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Registrazione eliminata
+
   /api/v1/animals/{animalId}/weights:
     parameters:
       - $ref: '#/components/parameters/AnimalId'
@@ -9001,3 +9073,41 @@ components:
           }
         }
       }
+
+    HealthRecordWrite:
+      type: object
+      additionalProperties: false
+      required: [recordType, status, occurredAt, title]
+      properties:
+        recordType: { type: string, enum: [symptom, visit, diagnosis, suspicion, treatment, checkup] }
+        status: { type: string, enum: [ongoing, resolved, chronic] }
+        occurredAt: { type: string, format: date-time }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        symptoms: { type: [string, 'null'], maxLength: 10000 }
+        diagnosis: { type: [string, 'null'], maxLength: 10000 }
+        suspectedCondition: { type: [string, 'null'], maxLength: 10000 }
+        veterinarian: { type: [string, 'null'], maxLength: 160 }
+        clinic: { type: [string, 'null'], maxLength: 160 }
+        medication: { type: [string, 'null'], maxLength: 160 }
+        dosage: { type: [string, 'null'], maxLength: 120 }
+        frequency: { type: [string, 'null'], maxLength: 120 }
+        treatmentStartAt: { type: [string, 'null'], format: date-time }
+        treatmentEndAt: { type: [string, 'null'], format: date-time }
+        nextDueAt: { type: [string, 'null'], format: date-time }
+        notes: { type: [string, 'null'], maxLength: 20000 }
+    HealthRecordResponse:
+      type: object
+      required: [record]
+      properties:
+        record:
+          type: object
+          additionalProperties: true
+    HealthRecordsResponse:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
