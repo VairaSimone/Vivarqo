@@ -7,6 +7,7 @@ export interface GeneticLocusInput {
   fatherGenotype: string;
   referenceAllele?: string | null;
   phenotypeRules?: Record<string, string> | null;
+  allowedAlleles?: string[];
 }
 export interface GenotypeOutcome { genotype: string; probability: number; phenotype: string | null }
 export interface LocusOutcome { locusId: string; name: string; outcomes: GenotypeOutcome[] }
@@ -57,6 +58,13 @@ export function calculateGenetics(inputs: GeneticLocusInput[]): GeneticCalculati
       incomplete = true;
       loci.push({ locusId: input.locusId, name: input.name, outcomes: [] });
       assumptions.push(`${input.name}: genotipo parentale incompleto o non valido; probabilità non calcolate per questo locus.`);
+      continue;
+    }
+    const allowed = new Set(input.allowedAlleles ?? []);
+    if (allowed.size && [...mother, ...father].some((allele) => !allowed.has(allele))) {
+      incomplete = true;
+      loci.push({ locusId: input.locusId, name: input.name, outcomes: [] });
+      assumptions.push(`${input.name}: il genotipo contiene alleli non presenti nel catalogo del locus.`);
       continue;
     }
     const counts = new Map<string, number>();
