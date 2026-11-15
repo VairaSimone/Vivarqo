@@ -352,13 +352,26 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
     await getOwnedAnimal(auth.userId, animalId);
-    const page     res.status(200).json(metrics);
+    const page = pageOptions(req.query);
+    const [total, weights] = await Promise.all([
+      prisma.weightMeasurement.count({ where: { animalId } }),
+      prisma.weightMeasurement.findMany({ where: { animalId }, orderBy: { measuredAt: "desc" }, skip: (page.page - 1) * page.pageSize, take: page.pageSize }),
+    ]);
+    res.status(200).json({ weights, pagination: { page: page.page, pageSize: page.pageSize, total, totalPages: Math.ceil(total / page.pageSize) } });
+  });
+
+  router.post("/animals/:animalId/weights", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = parseUuid(req.params.animalId!, "animalId");
+    await getOwnedAnimal(auth.userId, animalId, true);
+    const input = parseBody(weightSchema, req.body);
+    const weight = await prisma.$transaction(async (tx) => {
+      const created = await tx.weightMeasurement.create({ data: { animalId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null } });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "weight.created", entityType: "weight", entityId: created.id } });
       return created;
     });
     res.status(201).json({ weight });
   });
-
   router.patch("/weights/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
