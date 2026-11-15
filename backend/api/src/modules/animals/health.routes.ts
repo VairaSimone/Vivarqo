@@ -72,7 +72,7 @@ export function createHealthRouter() {
       } });
       if (input.nextDueAt) {
         await tx.task.create({ data: {
-          userId: auth.userId, animalId, title: "Controllo sanitario: " + input.title,
+          userId: auth.userId, animalId, healthRecordId: record.id, title: "Controllo sanitario: " + input.title,
           description: input.medication ? "Trattamento/farmaco: " + input.medication : "Controllo sanitario programmato",
           category: "custom", dueAt: new Date(input.nextDueAt),
         } });
@@ -89,12 +89,33 @@ export function createHealthRouter() {
     if (!existing) throw new AppError(404, "HEALTH_RECORD_NOT_FOUND", "Health record not found");
     await ownedAnimal(auth.userId, existing.animalId, true);
     const input = parseBody(req.body);
-    const updated = await prisma.healthRecord.update({ where: { id }, data: {
-      ...input, occurredAt: new Date(input.occurredAt),
-      treatmentStartAt: input.treatmentStartAt ? new Date(input.treatmentStartAt) : null,
-      treatmentEndAt: input.treatmentEndAt ? new Date(input.treatmentEndAt) : null,
-      nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null,
-    } });
+    const updated = await prisma.$transaction(async tx => {
+      const record = await tx.healthRecord.update({ where: { id }, data: {
+        ...input, occurredAt: new Date(input.occurredAt),
+        treatmentStartAt: input.treatmentStartAt ? new Date(input.treatmentStartAt) : null,
+        treatmentEndAt: input.treatmentEndAt ? new Date(input.treatmentEndAt) : null,
+        nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null,
+      } });
+      if (input.nextDueAt) {
+        await tx.task.upsert({
+          where: { healthRecordId: id },
+          create: {
+            userId: auth.userId, animalId: existing.animalId, healthRecordId: id,
+            title: "Controllo sanitario: " + input.title,
+            description: input.medication ? "Trattamento/farmaco: " + input.medication : "Controllo sanitario programmato",
+            category: "custom", dueAt: new Date(input.nextDueAt),
+          },
+          update: {
+            title: "Controllo sanitario: " + input.title,
+            description: input.medication ? "Trattamento/farmaco: " + input.medication : "Controllo sanitario programmato",
+            dueAt: new Date(input.nextDueAt), status: "open", completedAt: null,
+          },
+        });
+      } else {
+        await tx.task.deleteMany({ where: { healthRecordId: id } });
+      }
+      return record;
+    });
     res.status(200).json({ record: updated });
   });
   router.delete("/health-records/:id", requireSession, async (req, res) => {
