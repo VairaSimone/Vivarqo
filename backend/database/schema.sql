@@ -1235,14 +1235,14 @@ CREATE TABLE saved_animal_filters (
  updated_at timestamptz(6) NOT NULL DEFAULT now(), CONSTRAINT saved_animal_filters_user_name_unique UNIQUE(user_id,name)
 );
 CREATE INDEX saved_animal_filters_user_updated_idx ON saved_animal_filters(user_id,updated_at DESC);
-CREATE TABLE animal_transfers (
+CREATE TABLE IF NOT EXISTS animal_transfers (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  animal_id uuid NOT NULL REFERENCES animals(id) ON DELETE RESTRICT, transfer_type varchar(16) NOT NULL CHECK(transfer_type IN ('sale','gift','breeder_transfer')),
  recipient_name varchar(160) NOT NULL, recipient_email varchar(254), recipient_breeder varchar(160), transferred_at timestamptz(6) NOT NULL,
  price_cents bigint CHECK(price_cents IS NULL OR price_cents >= 0), notes text, created_at timestamptz(6) NOT NULL DEFAULT now()
 );
-CREATE INDEX animal_transfers_user_date_idx ON animal_transfers(user_id,transferred_at DESC);
-CREATE INDEX animal_transfers_animal_date_idx ON animal_transfers(animal_id,transferred_at DESC);
+CREATE INDEX IF NOT EXISTS animal_transfers_user_date_idx ON animal_transfers(user_id,transferred_at DESC);
+CREATE INDEX IF NOT EXISTS animal_transfers_animal_date_idx ON animal_transfers(animal_id,transferred_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- 9. Alimentazioni avanzate: intervalli, prede e scarico inventario
