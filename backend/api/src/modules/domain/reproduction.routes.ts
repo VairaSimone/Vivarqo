@@ -248,7 +248,7 @@ export function createReproductionRouter() {
   router.post("/incubators", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(incubatorSchema, req.body);
-    const incubator = await prisma.incubator.create({ data: { userId: auth.userId, name: input.name, identifier: input.identifier ?? null, capacity: input.capacity ?? null, notes: input.notes ?? null } });
+    const incubator = await prisma.incubator.create({ data: { userId: auth.userId, name: input.name, identifier: input.identifier ?? null, capacity: input.capacity ?? null, maintenanceIntervalDays: input.maintenanceIntervalDays ?? null, nextMaintenanceAt: input.nextMaintenanceAt ? new Date(input.nextMaintenanceAt) : null, notes: input.notes ?? null } });
     res.status(201).json({ incubator });
   });
 
@@ -258,7 +258,8 @@ export function createReproductionRouter() {
     const input = parseBody(patchIncubatorSchema, req.body);
     const existing = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
     if (!existing) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
-    const incubator = await prisma.incubator.update({ where: { id: incubatorId }, data: input });
+    const data = { ...input, ...(input.nextMaintenanceAt !== undefined ? { nextMaintenanceAt: input.nextMaintenanceAt ? new Date(input.nextMaintenanceAt) : null } : {}) };
+    const incubator = await prisma.incubator.update({ where: { id: incubatorId }, data });
     res.status(200).json({ incubator });
   });
 
@@ -286,7 +287,19 @@ export function createReproductionRouter() {
     const incubator = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId }, select: { id: true } });
     if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
     const input = parseBody(incubatorMaintenanceSchema, req.body);
-    const maintenance = await prisma.incubatorMaintenance.create({ data: { incubatorId, occurredAt: new Date(input.occurredAt), eventType: input.eventType, notes: input.notes ?? null } });
+    const maintenance = await prisma.$transaction(async (tx) => {
+      const created = await tx.incubatorMaintenance.create({ data: { incubatorId, occurredAt: new Date(input.occurredAt), eventType: input.eventType, notes: input.notes ?? null } });
+      const current = await tx.incubator.findUnique({ where: { id: incubatorId }, select: { name: true, maintenanceIntervalDays: true } });
+      if (current?.maintenanceIntervalDays) {
+        const nextMaintenanceAt = new Date(created.occurredAt.getTime() + current.maintenanceIntervalDays * 86_400_000);
+        await tx.incubator.update({ where: { id: incubatorId }, data: { nextMaintenanceAt } });
+        const title = "Manutenzione incubatrice · " + incubatorId;
+        const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubator_maintenance", title, status: "open" }, select: { id: true } });
+        if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt: nextMaintenanceAt } });
+        else await tx.task.create({ data: { userId: auth.userId, title, category: "incubator_maintenance", dueAt: nextMaintenanceAt, description: "Manutenzione programmata: " + (current.name || incubatorId) } });
+      }
+      return created;
+    });
     res.status(201).json({ maintenance });
   });
 
