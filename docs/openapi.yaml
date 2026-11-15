@@ -1252,6 +1252,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalendarResponse'
+  /api/v1/reproduction-statistics:
+    get:
+      operationId: getReproductionStatistics
+      tags: [Reproduction]
+      summary: Aggregated fertility, hatch, loss and seasonal reproduction statistics
+      responses:
+        '200':
+          description: Owner-scoped statistics grouped by season, pair and parent
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   /api/v1/reproduction-cycles:
     get:
       operationId: getReproductionCycles

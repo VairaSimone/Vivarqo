@@ -463,6 +463,87 @@ export function createReproductionRouter() {
     res.status(200).json({ care });
   });
 
+  // Aggregated reproductive outcomes are always scoped to the authenticated owner.
+  // Season is derived from the cycle start year so existing records need no backfill.
+  router.get("/reproduction-statistics", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const cycles = await prisma.reproductionCycle.findMany({
+      where: { userId: auth.userId },
+      select: {
+        id: true, startedOn: true, parentAAnimalId: true, parentBAnimalId: true,
+        parentA: { select: { id: true, name: true } }, parentB: { select: { id: true, name: true } },
+        events: { select: { eventType: true, occurredAt: true } },
+        clutches: { select: { laidOn: true, eggCount: true, eggs: { select: { status: true, hatchedAt: true } } } },
+      },
+      orderBy: [{ startedOn: "asc" }, { id: "asc" }],
+    });
+    type CycleRecord = typeof cycles[number];
+    const summarize = (items: CycleRecord[]) => {
+      let pairingCount = 0, clutchCount = 0, declaredEggCount = 0, registeredEggCount = 0;
+      let fertileEggCount = 0, infertileEggCount = 0, hatchedEggCount = 0, lostEggCount = 0;
+      const pairingToDeposition: number[] = [], depositionToHatch: number[] = [];
+      for (const cycle of items) {
+        const pairings = cycle.events.filter((event) => event.eventType === "pairing").map((event) => event.occurredAt.getTime());
+        pairingCount += pairings.length;
+        const firstPairing = pairings.length ? Math.min(...pairings) : null;
+        const cycleClutches = [...cycle.clutches].sort((a, b) => a.laidOn.getTime() - b.laidOn.getTime());
+        clutchCount += cycleClutches.length;
+        if (firstPairing !== null && cycleClutches[0]) {
+          const days = (cycleClutches[0].laidOn.getTime() - firstPairing) / 86_400_000;
+          if (days >= 0) pairingToDeposition.push(days);
+        }
+        for (const clutch of cycleClutches) {
+          declaredEggCount += clutch.eggCount;
+          registeredEggCount += clutch.eggs.length;
+          const hatchDates = clutch.eggs.flatMap((egg) => egg.hatchedAt ? [egg.hatchedAt.getTime()] : []);
+          if (hatchDates.length) {
+            const days = (Math.min(...hatchDates) - clutch.laidOn.getTime()) / 86_400_000;
+            if (days >= 0) depositionToHatch.push(days);
+          }
+          for (const egg of clutch.eggs) {
+            if (["fertile", "incubating", "hatched"].includes(egg.status)) fertileEggCount += 1;
+            if (egg.status === "infertile") infertileEggCount += 1;
+            if (egg.status === "hatched") hatchedEggCount += 1;
+            if (["lost", "collapsed", "damaged"].includes(egg.status)) lostEggCount += 1;
+          }
+        }
+      }
+      const average = (values: number[]) => values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)) : null;
+      const knownFertility = fertileEggCount + infertileEggCount;
+      return {
+        cycleCount: items.length, pairingCount, clutchCount, declaredEggCount, registeredEggCount,
+        fertileEggCount, infertileEggCount, hatchedEggCount, lostEggCount,
+        fertilityRatePct: knownFertility ? Number((fertileEggCount / knownFertility * 100).toFixed(1)) : null,
+        hatchRatePct: fertileEggCount ? Number((hatchedEggCount / fertileEggCount * 100).toFixed(1)) : null,
+        lossRatePct: registeredEggCount ? Number((lostEggCount / registeredEggCount * 100).toFixed(1)) : null,
+        avgPairingToDepositionDays: average(pairingToDeposition),
+        avgDepositionToHatchDays: average(depositionToHatch),
+      };
+    };
+    const bySeason = new Map<string, CycleRecord[]>(), byPair = new Map<string, CycleRecord[]>();
+    const byParent = new Map<string, { animalId: string; name: string; role: "mother" | "father"; cycles: CycleRecord[] }>();
+    for (const cycle of cycles) {
+      const season = String(cycle.startedOn.getUTCFullYear());
+      bySeason.set(season, [...(bySeason.get(season) ?? []), cycle]);
+      const pairKey = [cycle.parentAAnimalId ?? "unknown-mother", cycle.parentBAnimalId ?? "unknown-father"].join(":");
+      byPair.set(pairKey, [...(byPair.get(pairKey) ?? []), cycle]);
+      if (cycle.parentAAnimalId) {
+        const key = "mother:" + cycle.parentAAnimalId;
+        const group = byParent.get(key) ?? { animalId: cycle.parentAAnimalId, name: cycle.parentA?.name ?? "—", role: "mother" as const, cycles: [] };
+        group.cycles.push(cycle); byParent.set(key, group);
+      }
+      if (cycle.parentBAnimalId) {
+        const key = "father:" + cycle.parentBAnimalId;
+        const group = byParent.get(key) ?? { animalId: cycle.parentBAnimalId, name: cycle.parentB?.name ?? "—", role: "father" as const, cycles: [] };
+        group.cycles.push(cycle); byParent.set(key, group);
+      }
+    }
+    const pairs = [...byPair.entries()].map(([key, group]) => ({ key, motherName: group[0]?.parentA?.name ?? "—", fatherName: group[0]?.parentB?.name ?? "—", ...summarize(group) })).sort((a, b) => b.cycleCount - a.cycleCount);
+    const parents = [...byParent.values()].map((group) => ({ animalId: group.animalId, name: group.name, role: group.role, ...summarize(group.cycles) })).sort((a, b) => b.cycleCount - a.cycleCount);
+    const seasons = [...bySeason.entries()].map(([season, group]) => ({ season, ...summarize(group) })).sort((a, b) => a.season.localeCompare(b.season));
+    res.status(200).json({ summary: summarize(cycles), seasons, pairs, parents });
+  });
+
   router.get("/reproduction-cycles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: reproductionCycleStatusSchema.or(z.literal("all")).default("all") }), req.query);

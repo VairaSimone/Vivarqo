@@ -31,6 +31,12 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
   const batches = useResource<{ offspringBatches: OffspringBatchDto[]; pagination: { page: number; totalPages: number; total: number } }>(
     tab === "offspring" ? `/offspring-batches${queryString({ page: batchPage, pageSize: 25 })}` : null
   );
+  const statistics = useResource<{
+    summary: { cycleCount: number; pairingCount: number; clutchCount: number; declaredEggCount: number; registeredEggCount: number; fertilityRatePct: number | null; hatchRatePct: number | null; lossRatePct: number | null; avgPairingToDepositionDays: number | null; avgDepositionToHatchDays: number | null };
+    seasons: Array<{ season: string; cycleCount: number; clutchCount: number; fertilityRatePct: number | null; hatchRatePct: number | null; lossRatePct: number | null }>;
+    pairs: Array<{ key: string; motherName: string; fatherName: string; cycleCount: number; pairingCount: number; clutchCount: number; fertilityRatePct: number | null; hatchRatePct: number | null }>;
+    parents: Array<{ animalId: string; name: string; role: "mother" | "father"; cycleCount: number; fertilityRatePct: number | null; hatchRatePct: number | null }>;
+  }>("/reproduction-statistics");
   const { toast, show } = useToast();
 
   function openCycle(cycle?: ReproductionCycleSummaryDto) {
@@ -106,6 +112,37 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
     <PageHeader eyebrow={t("navBreeding")} title={t("breedingTitle")} description={t("breedingSubtitle")} action={<Button onClick={() => tab === "cycles" ? openCycle() : (setOffspringForm({ cycleId: "", clutchId: "", bornOn: todayDate(), count: "1", notes: "" }), setOffspringModal(true))}><Icon name="plus" />{tab === "cycles" ? t("newCycle") : t("addOffspring")}</Button>} />
     <div className="tabs-line"><button className={tab === "cycles" ? "selected" : ""} onClick={() => navigate("/reproduction")}>{t("cycles")}</button><button className={tab === "offspring" ? "selected" : ""} onClick={() => navigate("/reproduction?tab=offspring")}>{t("offspring")}</button></div>
     {tab === "cycles" ? <>
+      <Panel>
+        <PanelHeader title={locale === "it" ? "Statistiche riproduttive" : "Breeding statistics"} action={<Button size="sm" variant="secondary" onClick={statistics.reload}>{locale === "it" ? "Aggiorna" : "Refresh"}</Button>} />
+        {statistics.loading && !statistics.data ? <LoadingState /> : statistics.error ? <ErrorState message={statistics.error.message} retry={statistics.reload} /> : statistics.data ? <>
+          <div className="stats-grid">
+            <div className="stat-card"><span>{locale === "it" ? "Cicli" : "Cycles"}</span><strong>{statistics.data.summary.cycleCount}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Accoppiamenti" : "Pairings"}</span><strong>{statistics.data.summary.pairingCount}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Covate" : "Clutches"}</span><strong>{statistics.data.summary.clutchCount}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Uova registrate" : "Registered eggs"}</span><strong>{statistics.data.summary.registeredEggCount} / {statistics.data.summary.declaredEggCount}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Fertilità" : "Fertility"}</span><strong>{statistics.data.summary.fertilityRatePct === null ? "—" : statistics.data.summary.fertilityRatePct + "%"}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Schiusa su uova fertili" : "Hatch rate of fertile eggs"}</span><strong>{statistics.data.summary.hatchRatePct === null ? "—" : statistics.data.summary.hatchRatePct + "%"}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Perdite su uova registrate" : "Losses of registered eggs"}</span><strong>{statistics.data.summary.lossRatePct === null ? "—" : statistics.data.summary.lossRatePct + "%"}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Accoppiamento → deposizione" : "Pairing → deposition"}</span><strong>{statistics.data.summary.avgPairingToDepositionDays === null ? "—" : statistics.data.summary.avgPairingToDepositionDays + " " + (locale === "it" ? "giorni" : "days")}</strong></div>
+            <div className="stat-card"><span>{locale === "it" ? "Deposizione → schiusa" : "Deposition → hatch"}</span><strong>{statistics.data.summary.avgDepositionToHatchDays === null ? "—" : statistics.data.summary.avgDepositionToHatchDays + " " + (locale === "it" ? "giorni" : "days")}</strong></div>
+          </div>
+          <p className="muted-note">{locale === "it" ? "Fertilità = fertili / (fertili + non fertili); schiusa = schiuse / fertili; perdite = perse, collassate o danneggiate / registrate. Le durate considerano solo intervalli completi." : "Fertility = fertile / (fertile + infertile); hatch = hatched / fertile; losses = lost, collapsed or damaged / registered. Durations include complete intervals only."}</p>
+          <h3>{locale === "it" ? "Confronto per stagione" : "Season comparison"}</h3>
+          {statistics.data.seasons.length ? <DataTable columns={[
+            { key: "season", label: locale === "it" ? "Stagione" : "Season" },
+            { key: "cycleCount", label: locale === "it" ? "Cicli" : "Cycles" },
+            { key: "clutchCount", label: locale === "it" ? "Covate" : "Clutches" },
+            { key: "fertilityRatePct", label: locale === "it" ? "Fertilità" : "Fertility", render: (row) => row.fertilityRatePct === null ? "—" : row.fertilityRatePct + "%" },
+            { key: "hatchRatePct", label: locale === "it" ? "Schiusa" : "Hatch", render: (row) => row.hatchRatePct === null ? "—" : row.hatchRatePct + "%" },
+            { key: "lossRatePct", label: locale === "it" ? "Perdite" : "Losses", render: (row) => row.lossRatePct === null ? "—" : row.lossRatePct + "%" },
+          ]} rows={statistics.data.seasons} /> : <p className="muted-note">—</p>}
+          <h3>{locale === "it" ? "Risultati per coppia" : "Results by pair"}</h3>
+          {statistics.data.pairs.length ? <div className="record-list">{statistics.data.pairs.map((pair) => <div className="record-row" key={pair.key}><div><strong>{pair.motherName} × {pair.fatherName}</strong><small>{pair.cycleCount} {locale === "it" ? "cicli" : "cycles"} · {pair.pairingCount} {locale === "it" ? "accoppiamenti" : "pairings"} · {pair.clutchCount} {locale === "it" ? "covate" : "clutches"}</small></div><div className="row-actions"><Badge>{locale === "it" ? "Fertilità" : "Fertility"}: {pair.fertilityRatePct === null ? "—" : pair.fertilityRatePct + "%"}</Badge><Badge>{locale === "it" ? "Schiusa" : "Hatch"}: {pair.hatchRatePct === null ? "—" : pair.hatchRatePct + "%"}</Badge></div></div>)}</div> : <p className="muted-note">—</p>}
+          <h3>{locale === "it" ? "Storico per genitore" : "History by parent"}</h3>
+          {statistics.data.parents.length ? <div className="record-list">{statistics.data.parents.map((parent) => <div className="record-row" key={parent.role + parent.animalId}><div><strong>{parent.name}</strong><small>{parent.role === "mother" ? (locale === "it" ? "Madre" : "Mother") : (locale === "it" ? "Padre" : "Father")} · {parent.cycleCount} {locale === "it" ? "cicli" : "cycles"}</small></div><div className="row-actions"><Badge>{locale === "it" ? "Fertilità" : "Fertility"}: {parent.fertilityRatePct === null ? "—" : parent.fertilityRatePct + "%"}</Badge><Badge>{locale === "it" ? "Schiusa" : "Hatch"}: {parent.hatchRatePct === null ? "—" : parent.hatchRatePct + "%"}</Badge></div></div>)}</div> : <p className="muted-note">—</p>}
+        </> : null}
+      </Panel>
+
       <Panel className="filters-panel"><div className="filter-row"><Select aria-label={t("status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="all">{t("allStatuses")}</option>{cycleStatuses.map((value) => <option value={value} key={value}>{t(`cycleStatus_${value}`)}</option>)}</Select><span className="muted-note">{cycles.data?.pagination.total ?? 0} {t("cycles")}</span></div></Panel>
       {cycles.loading && !cycles.data ? <LoadingState /> : cycles.error ? <ErrorState message={cycles.error.message} retry={cycles.reload} /> :
         cycles.data?.cycles.length ? <div className="cycle-grid">{cycles.data.cycles.map((cycle) => {
