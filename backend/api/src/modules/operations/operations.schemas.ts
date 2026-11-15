@@ -7,6 +7,7 @@ export const taskCategories = [
   "shed_check",
   "cleaning",
   "reproduction",
+  "incubation",
   "document",
   "inventory",
   "custom",
