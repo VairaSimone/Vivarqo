@@ -13,7 +13,7 @@ import { localizationMiddleware } from "./i18n/localization.js";
 import { csrfProtection } from "./modules/auth/csrf.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { createCollaboratorRouter } from "./modules/auth/collaborators.routes.js";
-import { workspaceAccessGuard } from "./modules/auth/workspace-access.js";
+import { createWorkspaceAccessGuard } from "./modules/auth/workspace-access.js";
 import { createOnboardingRouter } from "./modules/onboarding/onboarding.routes.js";
 import { loadOptionalSession } from "./modules/auth/session.js";
 import { createAccountRouter } from "./modules/account/account.routes.js";
@@ -43,6 +43,8 @@ export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
   emailSender?: EmailSender;
   billing?: BillingRouterOptions;
+  /** Internal entitlement seam for deterministic integration tests; production uses Stripe-backed entitlements. */
+  premiumEntitlement?: (ownerUserId: string) => Promise<boolean>;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -97,8 +99,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Validate browser intent before touching a server-side session.
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
-  app.use("/api/v1", createCollaboratorRouter(dependencies.emailSender));
-  app.use("/api/v1", workspaceAccessGuard);
+  app.use("/api/v1", createCollaboratorRouter(dependencies.emailSender, dependencies.premiumEntitlement));
+  app.use("/api/v1", createWorkspaceAccessGuard(dependencies.premiumEntitlement));
   app.use("/api/v1", subscriptionAccessGuard);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
