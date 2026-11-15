@@ -9001,13 +9001,3 @@ components:
           }
         }
       }
- }
- }
-      responses:
-        '200':
-          description: Animale associato al QR interno.
-          content:
-            application/json:
-              schema: { type: object, required: [animal], properties: { animal: { type: object } } }
-        '404': { description: QR non valido o animale non trovato. }
-
