@@ -3031,7 +3031,6 @@ paths:
           in: path
           required: true
           schema: { type: string, pattern: '^[A-Za-z0-9_-]{32}
-    sessionCookieDev:
       type: apiKey
       in: cookie
       name: vivarqo_session
@@ -14834,3 +14833,4 @@ components:
           }
         }
       }
+ }
