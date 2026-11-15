@@ -197,7 +197,7 @@ const messages = {
   en: {
     brandTagline: "Professional breeding management",
     navWorkspace: "Workspace", navToday: "Today", navCalendar: "Calendar", navTasks: "Tasks",
-    navAnimals: "Animals", navFeeding: "Feeding", navFeedingShort: "Feed", navBreeding: "Reproduction",
+    navAnimals: "Animals", navFeeding: "Feeding", navFeedingShort: "Feed", navBreeding: "Reproduction", navGenetics: "Genetics",
     navResources: "Resources", navInventory: "Inventory", navDocuments: "Documents",
     navFinance: "Financial log", navAdmin: "Administration", navImports: "Import",
     navExports: "Export", navPreferences: "Preferences", navSettings: "Settings",
