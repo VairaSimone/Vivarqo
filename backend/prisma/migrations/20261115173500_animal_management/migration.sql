@@ -1,6 +1,6 @@
 ALTER TABLE animals ADD COLUMN location_id uuid;
 ALTER TABLE animals ADD COLUMN qr_token varchar(64);
-CREATE UNIQUE INDEX animals_qr_token_unique ON animals(qr_token) WHERE qr_token IS NOT NULL;
+CREATE UNIQUE INDEX animals_qr_token_unique ON animals(qr_token);
 CREATE TABLE animal_locations (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  parent_id uuid REFERENCES animal_locations(id) ON DELETE RESTRICT, kind varchar(16) NOT NULL CHECK(kind IN ('room','rack','shelf','container')),
