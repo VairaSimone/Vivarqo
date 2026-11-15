@@ -19,9 +19,13 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
   const [logForm, setLogForm] = useState({ recordedAt: localDateTimeValue(), temperatureC: "", humidityPct: "", eventType: "measurement", notes: "" });
   const [editingEgg, setEditingEgg] = useState<EggDto | null>(null);
   const [editingLog, setEditingLog] = useState<IncubationLogDto | null>(null);
+  const [eggsPage, setEggsPage] = useState(1);
+  const [logsPage, setLogsPage] = useState(1);
   const clutch = resource.data?.clutch;
-  const eggs = clutch?.eggs ?? [];
-  const logs = clutch?.incubationLogs ?? [];
+  const eggsResource = useResource<{ eggs: EggDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/eggs?page=${eggsPage}&pageSize=25` : null);
+  const logsResource = useResource<{ logs: IncubationLogDto[]; pagination: { page: number; totalPages: number; total: number } }>(clutch ? `/clutches/${encodeURIComponent(id)}/incubation-logs?page=${logsPage}&pageSize=25` : null);
+  const eggs = eggsResource.data?.eggs ?? clutch?.eggs ?? [];
+  const logs = logsResource.data?.logs ?? clutch?.incubationLogs ?? [];
   const cycle = clutch?.cycle;
   const { toast, show } = useToast();
 
@@ -75,8 +79,8 @@ export function ClutchDetail({ id, locale, navigate }: { id: string; locale: Loc
     <div className="back-row"><button className="text-link" onClick={() => navigate(`/reproduction-cycles/${getString(cycle, "id")}`)}>← {getString(cycle, "name") || t("cycles")}</button></div>
     <PageHeader eyebrow={t("clutches")} title={formatDate(getString(clutch, "laidOn"), locale)} description={`${getString(clutch, "eggCount")} ${t("eggs")} · ${getString(clutch, "incubatorLabel") || "—"}`} action={<Button onClick={() => openLog()}><Icon name="plus" />{t("addIncubationLog")}</Button>} />
     <div className="detail-grid">
-      <EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} />
-      <IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />
+      <div><EggManagement locale={locale} eggs={eggs} onAdd={() => setMode("eggs")} onEdit={setEditingEgg} onDelete={deleteEgg} />{eggsResource.data?.pagination && <Pagination page={eggsResource.data.pagination.page} totalPages={eggsResource.data.pagination.totalPages} onChange={setEggsPage} label={t("page")} />}</div>
+      <div><IncubationLogs locale={locale} logs={logs} onAdd={() => openLog()} onEdit={openLog} onDelete={deleteLog} />{logsResource.data?.pagination && <Pagination page={logsResource.data.pagination.page} totalPages={logsResource.data.pagination.totalPages} onChange={setLogsPage} label={t("page")} />}</div>
     </div>
     {clutch.monitoring && <Panel>
       <PanelHeader title={locale === "it" ? "Monitoraggio incubazione" : "Incubation monitoring"} />
