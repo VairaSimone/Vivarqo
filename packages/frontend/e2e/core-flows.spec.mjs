@@ -662,6 +662,9 @@ test("care, tasks, finance and inventory mutations persist through the live API"
     await page.getByRole("button", { name: "Registra sessione" }).first().click();
     const preyDialog = page.getByRole("dialog");
     await preyDialog.getByRole("checkbox", { name: new RegExp(animalName) }).check();
+    const mealDate = new Date(Date.now() - (outcome === "ate" ? 2 : 1) * 86_400_000);
+    mealDate.setMinutes(mealDate.getMinutes() - mealDate.getTimezoneOffset());
+    await preyDialog.getByLabel("Data e ora").fill(mealDate.toISOString().slice(0, 16));
     await preyDialog.getByLabel("Esito").selectOption(outcome);
     await preyDialog.getByLabel("Alimento").fill("Rat");
     await preyDialog.getByLabel("Stato della preda").selectOption("thawed");
