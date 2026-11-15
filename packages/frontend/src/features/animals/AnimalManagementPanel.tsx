@@ -26,10 +26,15 @@ export function AnimalManagementPanel({ locale }: { locale: Locale }) {
   async function reload() {
     const [l, a] = await Promise.all([
       api.get<{ locations: Location[] }>("/animals/locations"),
-      api.get<{ animals: Animal[] }>("/animals?page=1&pageSize=500&status=active")
+      api.get<{ animals: Animal[]; pagination?: { totalPages: number } }>("/animals?page=1&pageSize=100&status=active")
     ]);
+    const allAnimals = [...a.animals];
+    for (let page = 2; page <= Math.min(100, a.pagination?.totalPages ?? 1); page++) {
+      const next = await api.get<{ animals: Animal[] }>("/animals?page=" + page + "&pageSize=100&status=active");
+      allAnimals.push(...next.animals);
+    }
     setLocations(l.locations);
-    setAnimals(a.animals);
+    setAnimals(allAnimals);
   }
   useEffect(() => { void reload().catch((e) => setError(e instanceof ApiError ? e.message : "Unable to load animal locations")); }, []);
   const byId = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
