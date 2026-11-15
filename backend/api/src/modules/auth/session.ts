@@ -29,6 +29,9 @@ export interface AuthContext {
   locale: string;
   timezone: string;
   emailVerifiedAt: Date;
+  actorUserId?: string;
+  workspaceOwnerId?: string;
+  workspaceRole?: string;
 }
 
 export function clearSessionCookie(res: Response): void {
