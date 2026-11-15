@@ -328,7 +328,7 @@ export function createReproductionRouter() {
         else await tx.task.create({ data: { userId: auth.userId, title, category: "incubation", dueAt, description: "Controllo programmato per la covata " + (updated.incubatorLabel || clutchId) } });
       } else if (reminder) await tx.task.delete({ where: { id: reminder.id } });
       return updated;
-    });
+    }, { isolationLevel: "Serializable" });
     res.status(200).json({ clutch });
   });
 
@@ -372,7 +372,7 @@ export function createReproductionRouter() {
       }
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "egg.created", entityType: "egg", metadata: { count: results.length } } });
       return results;
-    });
+    }, { isolationLevel: "Serializable" });
     res.status(201).json({ eggs, createdCount: eggs.length });
   });
 
@@ -538,7 +538,7 @@ export function createReproductionRouter() {
         }
       }
       return animals;
-    });
+    }, { isolationLevel: "Serializable" });
     res.status(201).json({ animals: created, createdCount: created.length, batchId });
   });
 
@@ -665,7 +665,7 @@ export function createReproductionRouter() {
       const updated = await tx.offspringBatch.update({ where: { id: batchId }, data: data as never });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "offspring_batch.updated", entityType: "offspring_batch", entityId: batchId } });
       return updated;
-    });
+    }, { isolationLevel: "Serializable" });
     res.status(200).json({ offspringBatch: batch });
   });
 
