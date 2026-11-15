@@ -99,7 +99,7 @@ export function AccountSettingsPage({ locale, user, onLocaleChange, onUserUpdate
   }
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("navPreferences")} title={t("settingsTitle")} description={t("settingsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => navigate("/billing")}>{t("subscription")}</Button><Button variant="secondary" onClick={() => navigate("/settings/notifications")}>{t("notificationPreferences")}</Button></div>} />
+    <PageHeader eyebrow={t("navPreferences")} title={t("settingsTitle")} description={t("settingsSubtitle")} action={<div className="inline-actions"><Button variant="secondary" onClick={() => navigate("/billing")}>{t("subscription")}</Button><Button variant="secondary" onClick={() => navigate("/settings/collaborators")}>{locale === "it" ? "Collaboratori" : "Collaborators"}</Button><Button variant="secondary" onClick={() => navigate("/settings/notifications")}>{t("notificationPreferences")}</Button></div>} />
     {error && <Alert tone="danger">{error}</Alert>}
     <div className="settings-grid">
       <Panel><PanelHeader title={t("accountProfile")} description={locale === "it" ? "Informazioni associate al tuo account." : "Information associated with your account."} />
