@@ -176,7 +176,20 @@ export function createReproductionRouter() {
     const data: Record<string, unknown> = { ...input };
     if (input.startedOn) data.startedOn = validDate(input.startedOn);
     if (input.endedOn !== undefined) data.endedOn = input.endedOn ? validDate(input.endedOn) : null;
-    const cycle = await prisma.reproductionCycle.update({ where: { id: cycleId }, data: data as never });
+    const parentsChanged = parentA !== existing.parentAAnimalId || parentB !== existing.parentBAnimalId;
+    const cycle = await prisma.$transaction(async (tx) => {
+      const updated = await tx.reproductionCycle.update({ where: { id: cycleId }, data: data as never });
+      if (parentsChanged) {
+        const batches = await tx.offspringBatch.findMany({ where: { cycleId }, select: { id: true } });
+        if (batches.length) {
+          await tx.animal.updateMany({
+            where: { userId: auth.userId, originOffspringBatchId: { in: batches.map((batch) => batch.id) } },
+            data: { motherAnimalId: parentA ?? null, fatherAnimalId: parentB ?? null },
+          });
+        }
+      }
+      return updated;
+    });
     res.status(200).json({ cycle });
   });
 
