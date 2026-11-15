@@ -656,6 +656,52 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(stockItem?.id).toBeTruthy();
   expect(Number(stockItem.quantityOnHand)).toBe(2);
 
+  // Accepted and refused offered prey both consume the selected stock item.
+  await page.goto("/feeding");
+  for (const outcome of ["ate", "refused"]) {
+    await page.getByRole("button", { name: "Registra sessione" }).first().click();
+    const preyDialog = page.getByRole("dialog");
+    await preyDialog.getByRole("checkbox", { name: new RegExp(animalName) }).check();
+    await preyDialog.getByLabel("Esito").selectOption(outcome);
+    await preyDialog.getByLabel("Alimento").fill("Rat");
+    await preyDialog.getByLabel("Stato della preda").selectOption("thawed");
+    const inventorySelect = preyDialog.getByLabel("Collega preda all'inventario");
+    await expect(inventorySelect.locator('option[value="' + stockItem.id + '"]')).toHaveCount(1);
+    await inventorySelect.selectOption(stockItem.id);
+    await preyDialog.getByLabel("Quantità da scaricare").fill("1");
+    const responsePromise = page.waitForResponse((response) =>
+      response.request().method() === "POST" &&
+      response.url().includes("/api/v1/feeding-sessions") &&
+      response.status() === 201
+    );
+    await preyDialog.getByRole("button", { name: "Registra sessione" }).click();
+    await responsePromise;
+  }
+
+  const stockAfterFeedingsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=100&category=food");
+  const stockAfterFeedings = (await stockAfterFeedingsResponse.json()).items.find((item) => item.id === stockItem.id);
+  expect(Number(stockAfterFeedings.quantityOnHand)).toBe(0);
+  const detailedFeedingsResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/feeding-sessions?page=1&pageSize=100&animalId=" + animal.id);
+  const detailedEntries = (await detailedFeedingsResponse.json()).sessions.flatMap((session) => session.entries);
+  expect(detailedEntries.filter((entry) => entry.inventoryDeducted).length).toBe(2);
+  expect(detailedEntries.filter((entry) => entry.preyState === "thawed").length).toBe(2);
+
+  await page.goto("/animals/" + animal.id);
+  await page.getByLabel("Intervallo previsto (giorni)").fill("14");
+  const intervalSave = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    response.url().endsWith("/api/v1/animals/" + animal.id) &&
+    response.status() === 200
+  );
+  await page.getByRole("button", { name: "Salva intervallo" }).click();
+  await intervalSave;
+  const feedingSummaryResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals/" + animal.id + "/feeding-summary");
+  const feedingSummary = await feedingSummaryResponse.json();
+  expect(feedingSummary).toMatchObject({ feedingIntervalDays: 14, acceptedCount: 1, refusedCount: 1, offeredCount: 2, consecutiveRefusals: 1 });
+  expect(feedingSummary.acceptanceRate).toBe(0.5);
+  expect(feedingSummary.lastAcceptedAt).toBeTruthy();
+  expect(feedingSummary.nextMealAt).toBeTruthy();
+
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
   const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
