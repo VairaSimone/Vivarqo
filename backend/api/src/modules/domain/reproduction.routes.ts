@@ -625,7 +625,7 @@ export function createReproductionRouter() {
       }),
     ]);
     res.status(200).json({
-      clutches,
+      clutches: clutches.map((clutch) => ({ ...clutch, name: `Covata ${clutch.laidOn.toISOString().slice(0, 10)}` })),
       pagination: {
         page: query.page,
         pageSize: query.pageSize,
@@ -791,7 +791,7 @@ export function createReproductionRouter() {
     const averageIncubationDays = incubationDurationsDays.length
       ? incubationDurationsDays.reduce((sum, days) => sum + days, 0) / incubationDurationsDays.length
       : null;
-    res.status(200).json({ clutch: { ...clutch, eggs: clutch.eggs.map(serializeEgg), eggSummary: {
+    res.status(200).json({ clutch: { ...clutch, name: `Covata ${clutch.laidOn.toISOString().slice(0, 10)}`, eggs: clutch.eggs.map(serializeEgg), eggSummary: {
       registered: registeredEggCount,
       declared: clutch.eggCount,
       unregisteredDeclared: Math.max(0, clutch.eggCount - registeredEggCount),
@@ -1073,7 +1073,7 @@ export function createReproductionRouter() {
         include: { cycle: { select: { id: true, name: true } }, clutch: { select: { id: true, laidOn: true, eggCount: true } }, _count: { select: { originAnimals: true } } },
       }),
     ]);
-    res.status(200).json({ offspringBatches: batches, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
+    res.status(200).json({ offspringBatches: batches.map((batch) => ({ ...batch, name: `Nascita ${batch.bornOn.toISOString().slice(0, 10)}` })), pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } });
   });
 
   router.post("/offspring-batches", requireSession, async (req, res) => {
