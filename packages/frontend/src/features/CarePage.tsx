@@ -87,7 +87,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
         performedAt: dateTimeInputToUtc(performedAt, timezone),
         notes: sessionNotes || null,
         entries: selected.map((id) => {
-          const entry = entries[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", notes: "" };
+          const entry = entries[id] ?? { outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", preyState: "unknown", inventoryItemId: "", inventoryQuantity: "", notes: "" };
           return {
             animalId: id,
             outcome: entry.outcome,
