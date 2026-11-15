@@ -6,7 +6,7 @@ import { Alert, Button, LoadingState, PageHeader, Panel } from "../components/ui
 type Allele = { id: string; symbol: string; name: string; isReference: boolean };
 type Locus = { id: string; symbol: string; name: string; inheritanceMode: string; alleles: Allele[] };
 type Gene = { id: string; species: string; symbol: string; name: string; loci: Locus[] };
-type Animal = { id: string; name: string; species: string };
+type Animal = { id: string; name: string; species: string; sex: "female" | "male" | "unknown" };
 type Trait = { id: string; traitName: string; traitValue: string; genotype: string | null; theoreticalGenotype: string | null; observedPhenotype: string | null; confirmedGenotype: string | null; certainty: string; locusId: string | null };
 const modes = ["autosomal_recessive", "dominant", "incomplete_dominant", "codominant"];
 const labels: Record<string, string> = { autosomal_recessive: "Recessiva", dominant: "Dominante", incomplete_dominant: "Dominanza incompleta", codominant: "Codominante" };
@@ -141,7 +141,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       </div>)}</section>)}</div>
     </Panel>
     <Panel><h2>{text("Scheda genetica animale", "Animal genetic record")}</h2>
-      <label>{text("Animale", "Animal")}<select value={animalId} onChange={(e) => setAnimalId(e.target.value)}><option value="">—</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
+      <label>{text("Animale", "Animal")}<select value={animalId} onChange={(e) => setAnimalId(e.target.value)}><option value="">—</option>{animals.filter((animal) => animal.sex === "female").map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
       {animalId && <><form className="form-grid" onSubmit={(e) => void createTrait(e)}>
         <label>{text("Locus", "Locus")}<select value={traitForm.locusId} onChange={(e) => setTraitForm({ ...traitForm, locusId: e.target.value })}><option value="">—</option>{loci.map((locus) => <option key={locus.id} value={locus.id}>{locus.geneName} / {locus.name}</option>)}</select></label>
         <label>{text("Carattere", "Trait")}<input required value={traitForm.traitName} onChange={(e) => setTraitForm({ ...traitForm, traitName: e.target.value })} /></label>
@@ -160,7 +160,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       </>}
     </Panel>
     <Panel><h2>{text("Calcolo incrocio", "Pairing calculator")}</h2><form className="form-grid" onSubmit={(e) => void calculate(e)}>
-      <label>{text("Genitore A", "Parent A")}<select required value={pair.motherAnimalId} onChange={(e) => setPair({ ...pair, motherAnimalId: e.target.value })}><option value="">—</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
+      <label>{text("Genitore A", "Parent A")}<select required value={pair.motherAnimalId} onChange={(e) => setPair({ ...pair, motherAnimalId: e.target.value })}><option value="">—</option>{animals.filter((animal) => animal.sex === "male").map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
       <label>{text("Genitore B", "Parent B")}<select required value={pair.fatherAnimalId} onChange={(e) => setPair({ ...pair, fatherAnimalId: e.target.value })}><option value="">—</option>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</select></label>
       <fieldset className="form-fieldset"><legend>{text("Loci da calcolare", "Loci to calculate")}</legend>{loci.map((locus) => <label className="checkbox-field" key={locus.id}><input type="checkbox" checked={selectedLocusIds.includes(locus.id)} onChange={(e) => setSelectedLocusIds((current) => e.target.checked ? [...current, locus.id] : current.filter((id) => id !== locus.id))} />{locus.geneName} / {locus.name}</label>)}</fieldset>
       <Button type="submit" disabled={busy || !selectedLocusIds.length || !pair.motherAnimalId || !pair.fatherAnimalId || pair.motherAnimalId === pair.fatherAnimalId}>{text("Calcola probabilità", "Calculate probabilities")}</Button>
