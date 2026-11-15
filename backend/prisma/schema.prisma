@@ -379,6 +379,8 @@ model Egg {
   clutchId  String    @map("clutch_id") @db.Uuid
   code      String?   @db.VarChar(80)
   status    String    @default("unknown") @db.VarChar(20)
+  laidAt    DateTime? @map("laid_at") @db.Timestamptz(6)
+  expectedHatchAt DateTime? @map("expected_hatch_at") @db.Date
   hatchedAt DateTime? @map("hatched_at") @db.Date
   offspringAnimalId String? @unique @map("offspring_animal_id") @db.Uuid
   notes     String?
