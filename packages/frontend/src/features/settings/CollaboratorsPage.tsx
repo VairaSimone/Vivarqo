@@ -110,7 +110,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
 
   if (!data) return <div className="page-stack"><PageHeader eyebrow="Workspace" title={en ? "Collaborators" : "Collaboratori"} description={en ? "Manage shared access to your workspace." : "Gestisci gli accessi condivisi al tuo workspace."} />{error ? <Alert tone="danger">{error}</Alert> : <LoadingState />}<Button variant="secondary" onClick={() => void load()}>{en ? "Retry" : "Riprova"}</Button></div>;
   return <div className="page-stack">
-    <PageHeader eyebrow={en ? "Workspace" : "Workspace"} title={en ? "Collaborators" : "Collaboratori"} description={en ? "Invite your team and decide what each person can see and change." : "Invita il tuo team e scegli cosa ogni persona può vedere e modificare."} action={<Button variant="secondary" onClick={() => navigate("/billing")}>{en ? "Subscription" : "Abbonamento"}</Button>} />
+    <PageHeader eyebrow={en ? "Workspace" : "Workspace"} title={en ? "Collaborators" : "Collaboratori"} description={en ? "Invite people into your personal workspace and choose what they can see and change." : "Invita persone nel tuo workspace personale e scegli cosa possono vedere e modificare."} action={<Button variant="secondary" onClick={() => navigate("/billing")}>{en ? "Subscription" : "Abbonamento"}</Button>} />
     {error && <Alert tone="danger">{error}</Alert>}
     {message && <Alert tone="success">{message}</Alert>}
 
@@ -130,7 +130,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
     </Panel>
 
     <Panel>
-      <PanelHeader title={en ? "Invite a collaborator" : "Invita un collaboratore"} description={en ? "Only the workspace owner can invite people and assign roles." : "Solo il proprietario del workspace può invitare persone e assegnare ruoli."} />
+      <PanelHeader title={en ? "Invite a collaborator" : "Invita un collaboratore"} description={en ? "Invitations always belong to your personal workspace, not the shared workspace currently selected." : "Gli inviti vengono sempre associati al tuo workspace personale, non a quello condiviso attualmente selezionato."} />
       {!premium ? <Alert tone="warning">{en ? "Collaborators are a Premium feature. Activate Premium to send invitations." : "I collaboratori sono una funzione Premium. Attiva Premium per inviare inviti."} <button className="text-link" onClick={() => navigate("/billing")}>{en ? "View plans" : "Vai all'abbonamento"}</button></Alert> :
       <form className="form-grid" onSubmit={invite}>
         <Field label={en ? "Email address" : "Indirizzo email"}><input className="control" type="email" required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nome@esempio.it" /></Field>
