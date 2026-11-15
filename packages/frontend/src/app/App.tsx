@@ -211,11 +211,11 @@ export function App() {
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
       const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get("invite");
+      const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
       if (inviteToken && routeOnly(window.location.pathname) === "/settings/collaborators") {
         navigate("/settings/collaborators#invite=" + encodeURIComponent(inviteToken));
         return;
       }
-      const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
       const landing = getString(preferenceResult?.preferences, "defaultLandingPage", "today");
       navigate(landing === "animals" || landing === "calendar" ? "/" + landing : "/today");
     } catch (reason) {
