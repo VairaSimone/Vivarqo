@@ -84,6 +84,7 @@ export interface GeneticTraitDto {
   confidenceNote: string | null;
   inheritanceMode?: "autosomal_recessive" | "incomplete_dominant" | "dominant" | null;
   genotype?: string | null;
+  phenotypeRules?: Record<string, string> | null;
   certainty?: "confirmed" | "visual" | "possible" | "carrier" | "unverified";
 }
 
