@@ -196,6 +196,88 @@ export function createReproductionRouter() {
     });
   });
 
+  router.get("/incubators", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const incubators = await prisma.incubator.findMany({ where: { userId: auth.userId, isActive: true }, orderBy: [{ name: "asc" }] });
+    res.status(200).json({ incubators });
+  });
+
+  router.post("/incubators", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(incubatorSchema, req.body);
+    const incubator = await prisma.incubator.create({ data: { userId: auth.userId, name: input.name, identifier: input.identifier ?? null, capacity: input.capacity ?? null, notes: input.notes ?? null } });
+    res.status(201).json({ incubator });
+  });
+
+  router.get("/incubators/:id/maintenance", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const incubatorId = routeUuid(req.params.id, "incubator id");
+    const incubator = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId }, select: { id: true } });
+    if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    const maintenance = await prisma.incubatorMaintenance.findMany({ where: { incubatorId }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 100 });
+    res.status(200).json({ maintenance });
+  });
+
+  router.post("/incubators/:id/maintenance", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const incubatorId = routeUuid(req.params.id, "incubator id");
+    const incubator = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId }, select: { id: true } });
+    if (!incubator) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
+    const input = parseBody(incubatorMaintenanceSchema, req.body);
+    const maintenance = await prisma.incubatorMaintenance.create({ data: { incubatorId, occurredAt: new Date(input.occurredAt), eventType: input.eventType, notes: input.notes ?? null } });
+    res.status(201).json({ maintenance });
+  });
+
+  router.get("/eggs/:id/measurements", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const egg = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } } }, select: { id: true } });
+    if (!egg) throw new AppError(404, "EGG_NOT_FOUND", "Egg not found");
+    const measurements = await prisma.eggMeasurement.findMany({ where: { eggId }, orderBy: [{ measuredAt: "asc" }, { id: "asc" }] });
+    res.status(200).json({ measurements });
+  });
+
+  router.post("/eggs/:id/measurements", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const eggId = routeUuid(req.params.id, "egg id");
+    const egg = await prisma.egg.findFirst({ where: { id: eggId, clutch: { is: { cycle: { is: { userId: auth.userId } } } }, status: { notIn: ["hatched", "lost"] } }, select: { id: true } });
+    if (!egg) throw new AppError(404, "EGG_NOT_FOUND_OR_CLOSED", "Egg not found or no longer measurable");
+    const input = parseBody(eggMeasurementSchema, req.body);
+    const measurement = await prisma.eggMeasurement.create({ data: { eggId, measuredAt: new Date(input.measuredAt), weightG: input.weightG, notes: input.notes ?? null } });
+    res.status(201).json({ measurement });
+  });
+
+  router.get("/animals/:animalId/hatchling-care", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = routeUuid(req.params.animalId, "animal id");
+    const animal = await prisma.animal.findFirst({ where: { id: animalId, userId: auth.userId, originOffspringBatchId: { not: null } }, select: { id: true } });
+    if (!animal) throw new AppError(404, "HATCHLING_NOT_FOUND", "Hatchling not found");
+    const [care, feedings, weights, sheds] = await Promise.all([
+      prisma.hatchlingCare.findUnique({ where: { animalId } }),
+      prisma.feedingEntry.findMany({ where: { animalId }, orderBy: [{ createdAt: "asc" }], select: { outcome: true, createdAt: true, session: { select: { performedAt: true } } } }),
+      prisma.weightMeasurement.findMany({ where: { animalId }, orderBy: [{ measuredAt: "asc" }] }),
+      prisma.shedRecord.findMany({ where: { animalId }, orderBy: [{ occurredAt: "asc" }] }),
+    ]);
+    res.status(200).json({ care, feedingCount: feedings.length, acceptedFeedings: feedings.filter((entry) => entry.outcome === "accepted").length, feedings, weights, sheds });
+  });
+
+  router.patch("/animals/:animalId/hatchling-care", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const animalId = routeUuid(req.params.animalId, "animal id");
+    const animal = await prisma.animal.findFirst({ where: { id: animalId, userId: auth.userId, originOffspringBatchId: { not: null } }, select: { id: true } });
+    if (!animal) throw new AppError(404, "HATCHLING_NOT_FOUND", "Hatchling not found");
+    const input = parseBody(hatchlingCareSchema, req.body);
+    const data = {
+      ...(input.firstFeedingAt !== undefined ? { firstFeedingAt: input.firstFeedingAt ? new Date(input.firstFeedingAt) : null } : {}),
+      ...(input.firstFeedingAccepted !== undefined ? { firstFeedingAccepted: input.firstFeedingAccepted } : {}),
+      ...(input.firstShedAt !== undefined ? { firstShedAt: input.firstShedAt ? new Date(input.firstShedAt) : null } : {}),
+      ...(input.readyForRehomingAt !== undefined ? { readyForRehomingAt: input.readyForRehomingAt ? new Date(input.readyForRehomingAt) : null } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+    };
+    const care = await prisma.hatchlingCare.upsert({ where: { animalId }, create: { animalId, ...data }, update: data });
+    res.status(200).json({ care });
+  });
+
   router.get("/reproduction-cycles", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const page = parseBody(z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(25), status: reproductionCycleStatusSchema.or(z.literal("all")).default("all") }), req.query);
@@ -382,7 +464,7 @@ export function createReproductionRouter() {
       const created = await tx.clutch.create({
         data: {
           cycleId: input.cycleId, laidOn: validDate(input.laidOn), eggCount: input.eggCount, status: input.status,
-          incubatorLabel: input.incubatorLabel ?? null, incubationStartedAt: input.incubationStartedAt ? new Date(input.incubationStartedAt) : null,
+          incubatorLabel: input.incubatorLabel ?? null, incubatorId: input.incubatorId ?? null, incubationStartedAt: input.incubationStartedAt ? new Date(input.incubationStartedAt) : null,
           targetTemperatureMinC: input.targetTemperatureMinC ?? null, targetTemperatureMaxC: input.targetTemperatureMaxC ?? null,
           targetHumidityMinPct: input.targetHumidityMinPct ?? null, targetHumidityMaxPct: input.targetHumidityMaxPct ?? null,
           checkIntervalHours: input.checkIntervalHours ?? null, notes: input.notes ?? null,
@@ -478,7 +560,7 @@ export function createReproductionRouter() {
         take: query.pageSize,
         include: {
           offspringAnimal: { select: { id: true, name: true, identifier: true, species: true } },
-          history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },
+          history: { orderBy: [{ occurredAt: "asc" }, { id: "asc" }] },\n          measurements: { orderBy: [{ measuredAt: "asc" }, { id: "asc" }] },
         },
       }),
     ]);
@@ -503,7 +585,7 @@ export function createReproductionRouter() {
       }
       const results = [];
       for (const egg of input.eggs) {
-        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, notes: egg.notes ?? null } });
+        const created = await tx.egg.create({ data: { clutchId, code: egg.code ?? null, status: egg.status, laidAt: egg.laidAt ? new Date(egg.laidAt) : null, expectedHatchAt: egg.expectedHatchAt ? validDate(egg.expectedHatchAt) : null, hatchedAt: egg.hatchedAt ? validDate(egg.hatchedAt) : null, notes: egg.notes ?? null } });
         await tx.eggHistory.create({ data: { eggId: created.id, status: created.status, notes: created.notes } });
         results.push(created);
       }
@@ -530,6 +612,8 @@ export function createReproductionRouter() {
     if (input.status === "hatched" && !input.hatchedAt && !existing.hatchedAt) throw new AppError(400, "HATCH_DATE_REQUIRED", "A hatch date is required when marking an egg as hatched");
     const data: Record<string, unknown> = { ...input };
     if (input.hatchedAt !== undefined) data.hatchedAt = input.hatchedAt ? validDate(input.hatchedAt) : null;
+    if (input.laidAt !== undefined) data.laidAt = input.laidAt ? new Date(input.laidAt) : null;
+    if (input.expectedHatchAt !== undefined) data.expectedHatchAt = input.expectedHatchAt ? validDate(input.expectedHatchAt) : null;
     if (input.offspringAnimalId) {
       data.status = "hatched";
       if (input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
