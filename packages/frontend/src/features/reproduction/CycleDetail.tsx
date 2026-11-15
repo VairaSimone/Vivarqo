@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { ClutchDto, OffspringBatchDto, ReproductiveEventDto, ReproductionCycleDto } from "@vivarqo/contracts/reproduction";
+import type { ClutchDto, IncubatorDto, OffspringBatchDto, ReproductiveEventDto, ReproductionCycleDto } from "@vivarqo/contracts/reproduction";
 import { eventTypes } from "./types";
 import { OffspringConversionModal, type OffspringAnimalDraft } from "./OffspringConversionModal";
 import { ReproductiveEventEditor } from "./ReproductiveEventEditor";
@@ -27,10 +27,11 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<CycleDetailEditTarget | null>(null);
   const [eventForm, setEventForm] = useState({ eventType: "pairing", occurredAt: localDateTimeValue(), animalId: "", details: "", temperatureC: "", humidityPct: "" });
-  const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubationStartedAt: "", targetTemperatureMinC: "", targetTemperatureMaxC: "", targetHumidityMinPct: "", targetHumidityMaxPct: "", checkIntervalHours: "", notes: "" });
+  const [clutchForm, setClutchForm] = useState({ laidOn: todayDate(), eggCount: "1", status: "active", incubatorLabel: "", incubatorId: "", incubationStartedAt: "", targetTemperatureMinC: "", targetTemperatureMaxC: "", targetHumidityMinPct: "", targetHumidityMaxPct: "", checkIntervalHours: "", notes: "" });
   const [batchForm, setBatchForm] = useState({ clutchId: "", bornOn: todayDate(), count: "1", notes: "" });
   const { toast, show } = useToast();
   const cycle = resource.data?.cycle;
+  const incubatorsResource = useResource<{ incubators: IncubatorDto[] }>("/incubators");
   const pairInsights = useResource<{ pair: {
     mother: { name: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
     father: { name: string; morph: string | null; geneticsNotes: string | null; ageYears: number | null; lastWeight: { measuredAt: string; weightG: string | number } | null; geneticTraits: Array<{ id: string; traitName: string; traitValue: string; confidenceNote: string | null }> };
@@ -78,6 +79,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       eggCount: getString(clutch, "eggCount", "1"),
       status: getString(clutch, "status", "active"),
       incubatorLabel: getString(clutch, "incubatorLabel"),
+      incubatorId: getString(clutch, "incubatorId"),
       incubationStartedAt: getString(clutch, "incubationStartedAt") ? localDateTimeValue(new Date(getString(clutch, "incubationStartedAt"))) : "",
       targetTemperatureMinC: getString(clutch, "targetTemperatureMinC"),
       targetTemperatureMaxC: getString(clutch, "targetTemperatureMaxC"),
@@ -88,12 +90,23 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     });
     setError(""); setModal("clutch");
   }
+  async function addIncubator() {
+    const name = window.prompt(locale === "it" ? "Nome della nuova incubatrice" : "New incubator name");
+    if (!name?.trim()) return;
+    try {
+      const result = await api.post<{ incubator: IncubatorDto }>("/incubators", { name: name.trim() });
+      await incubatorsResource.reload();
+      setClutchForm((current) => ({ ...current, incubatorId: result.incubator.id, incubatorLabel: current.incubatorLabel || result.incubator.name }));
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
   async function saveClutch(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     try {
       const body = {
         laidOn: clutchForm.laidOn, eggCount: Number(clutchForm.eggCount), status: clutchForm.status,
         incubatorLabel: clutchForm.incubatorLabel || null,
+        incubatorId: clutchForm.incubatorId || null,
         incubationStartedAt: clutchForm.incubationStartedAt ? new Date(clutchForm.incubationStartedAt).toISOString() : null,
         targetTemperatureMinC: clutchForm.targetTemperatureMinC === "" ? null : Number(clutchForm.targetTemperatureMinC),
         targetTemperatureMaxC: clutchForm.targetTemperatureMaxC === "" ? null : Number(clutchForm.targetTemperatureMaxC),
@@ -224,7 +237,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     </Panel>}
     {conversionBatch && <OffspringConversionModal key={getString(conversionBatch, "id")} batch={conversionBatch} locale={locale} busy={conversionBusy} onClose={() => setConversionBatch(null)} onSubmit={convertBatchAnimals} />}
     {modal === "event" && <ReproductiveEventEditor locale={locale} isEditing={Boolean(editing)} form={eventForm} onChange={setEventForm} error={error} busy={busy} onClose={() => setModal(null)} onSubmit={saveEvent} />}
-    {modal === "clutch" && <ClutchEditor locale={locale} isEditing={Boolean(editing)} form={clutchForm} onChange={setClutchForm} error={error} busy={busy} onClose={() => { setEditing(null); setModal(null); }} onSubmit={saveClutch} />}
+    {modal === "clutch" && <ClutchEditor locale={locale} isEditing={Boolean(editing)} form={clutchForm} onChange={setClutchForm} error={error} busy={busy} onClose={() => { setEditing(null); setModal(null); }} onSubmit={saveClutch} incubators={incubatorsResource.data?.incubators ?? []} onAddIncubator={() => void addIncubator()} />}
     {tab === "offspring" && <><OffspringManagement locale={locale} batches={offspring} clutches={clutches} editorOpen={modal === "offspring"} isEditing={Boolean(editing)} form={batchForm} error={error} busy={busy} onAdd={() => openBatch()} onConvert={setConversionBatch} onEdit={openBatch} onDelete={deleteBatch} onChange={setBatchForm} onClose={() => { setEditing(null); setModal(null); }} onSubmit={saveBatch} />{offspringPageResource.data?.pagination && <Pagination page={offspringPageResource.data.pagination.page} totalPages={offspringPageResource.data.pagination.totalPages} onChange={setOffspringPage} label={t("page")} />}</>}
     {toast}
   </div>;
