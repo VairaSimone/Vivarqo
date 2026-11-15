@@ -3134,6 +3134,28 @@ paths:
         '200': { description: Invito accettato. }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/leave:
+    post:
+      operationId: leaveSharedWorkspace
+      tags: [Collaboration]
+      summary: Revoca autonomamente la propria adesione a un workspace
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/auth/collaborators.routes.ts
+          symbol: workspaceSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ownerUserId]
+              properties:
+                ownerUserId: { type: string, format: uuid }
+      responses:
+        '204': { description: Adesione revocata e sessioni del workspace disattivate. }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/collaborators/active-workspace:
     post:
       operationId: setActiveWorkspace
