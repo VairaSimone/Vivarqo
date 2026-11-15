@@ -38,7 +38,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [hatchlingCareModal, setHatchlingCareModal] = useState(false);
   const [hatchlingCareBusy, setHatchlingCareBusy] = useState(false);
   const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", notes: "" });
-  const [traitForm, setTraitForm = useState({
+  const [traitForm, setTraitForm] = useState({
     traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", certainty: "unverified",
   });
   const [recordForm, setRecordForm] = useState({ date: "", weight: "", outcome: "complete", category: "general", title: "", body: "", notes: "" });
