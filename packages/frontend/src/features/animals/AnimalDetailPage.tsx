@@ -37,7 +37,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [traitError, setTraitError] = useState("");
   const [hatchlingCareModal, setHatchlingCareModal] = useState(false);
   const [hatchlingCareBusy, setHatchlingCareBusy] = useState(false);
-  const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", notes: "" });
+  const [hatchlingCareForm, setHatchlingCareForm] = useState({ firstFeedingAt: "", firstFeedingAccepted: "", firstShedAt: "", readyForRehomingAt: "", healthStatus: "unknown", healthNotes: "", notes: "" });
   const [traitForm, setTraitForm] = useState({
     traitName: "", traitValue: "", sourceAnimalId: "", confidenceNote: "", inheritanceMode: "", genotype: "", certainty: "unverified",
   });
@@ -59,7 +59,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
-  const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
+  const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
 
   useEffect(() => {
@@ -273,6 +273,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       firstFeedingAccepted: care?.firstFeedingAccepted == null ? "" : care.firstFeedingAccepted ? "yes" : "no",
       firstShedAt: care?.firstShedAt?.slice(0, 10) ?? "",
       readyForRehomingAt: care?.readyForRehomingAt?.slice(0, 10) ?? "",
+      healthStatus: care?.healthStatus ?? "unknown",
+      healthNotes: care?.healthNotes ?? "",
       notes: care?.notes ?? "",
     });
     setHatchlingCareModal(true);
@@ -287,6 +289,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         firstFeedingAccepted: hatchlingCareForm.firstFeedingAccepted === "" ? null : hatchlingCareForm.firstFeedingAccepted === "yes",
         firstShedAt: toIso(hatchlingCareForm.firstShedAt),
         readyForRehomingAt: toIso(hatchlingCareForm.readyForRehomingAt),
+        healthStatus: hatchlingCareForm.healthStatus,
+        healthNotes: hatchlingCareForm.healthNotes || null,
         notes: hatchlingCareForm.notes || null,
       });
       setHatchlingCareModal(false);
@@ -479,6 +483,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Field label={locale === "it" ? "Prima alimentazione accettata?" : "First feeding accepted?"}><Select value={hatchlingCareForm.firstFeedingAccepted} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAccepted: e.target.value })}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="yes">{locale === "it" ? "Sì" : "Yes"}</option><option value="no">{locale === "it" ? "No" : "No"}</option></Select></Field>
         <Field label={locale === "it" ? "Data prima muta" : "First shed date"}><Input type="date" value={hatchlingCareForm.firstShedAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstShedAt: e.target.value })} /></Field>
         <Field label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming from"}><Input type="date" value={hatchlingCareForm.readyForRehomingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, readyForRehomingAt: e.target.value })} /></Field>
+        <Field label={locale === "it" ? "Stato di salute" : "Health status"}><Select value={hatchlingCareForm.healthStatus} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, healthStatus: e.target.value })}><option value="unknown">{locale === "it" ? "Non valutato" : "Unknown"}</option><option value="healthy">{locale === "it" ? "Regolare" : "Healthy"}</option><option value="monitoring">{locale === "it" ? "Da monitorare" : "Monitoring"}</option><option value="treatment">{locale === "it" ? "In trattamento" : "Under treatment"}</option></Select></Field>
+        <Field label={locale === "it" ? "Note sanitarie" : "Health notes"}><Textarea rows={2} value={hatchlingCareForm.healthNotes} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, healthNotes: e.target.value })} /></Field>
+
         <Field label={t("notes")}><Textarea rows={3} value={hatchlingCareForm.notes} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setHatchlingCareModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={hatchlingCareBusy}>{t("save")}</Button></div>
       </form>
