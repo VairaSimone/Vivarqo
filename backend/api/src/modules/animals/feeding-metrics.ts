@@ -25,7 +25,7 @@ export function calculateFeedingMetrics(
   const offeredCount = acceptedCount + refusedCount;
   let consecutiveRefusals = 0;
   for (const entry of entries) {
-    if (entry.outcome === "ate") break;
+    if (entry.outcome === "ate" || entry.outcome === "unknown") break;
     if (entry.outcome === "refused") consecutiveRefusals += 1;
   }
   const lastAcceptedAt = entries.find((entry) => entry.outcome === "ate")?.performedAt ?? null;
