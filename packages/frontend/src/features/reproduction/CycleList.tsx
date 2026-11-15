@@ -115,7 +115,7 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
       <Panel>
         <PanelHeader title={locale === "it" ? "Statistiche riproduttive" : "Breeding statistics"} action={<Button size="sm" variant="secondary" onClick={statistics.reload}>{locale === "it" ? "Aggiorna" : "Refresh"}</Button>} />
         {statistics.loading && !statistics.data ? <LoadingState /> : statistics.error ? <ErrorState message={statistics.error.message} retry={statistics.reload} /> : statistics.data ? <>
-          <div className="stats-grid">
+          <div className="form-grid">
             <div className="stat-card"><span>{locale === "it" ? "Cicli" : "Cycles"}</span><strong>{statistics.data.summary.cycleCount}</strong></div>
             <div className="stat-card"><span>{locale === "it" ? "Accoppiamenti" : "Pairings"}</span><strong>{statistics.data.summary.pairingCount}</strong></div>
             <div className="stat-card"><span>{locale === "it" ? "Covate" : "Clutches"}</span><strong>{statistics.data.summary.clutchCount}</strong></div>
@@ -128,14 +128,10 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
           </div>
           <p className="muted-note">{locale === "it" ? "Fertilità = fertili / (fertili + non fertili); schiusa = schiuse / fertili; perdite = perse, collassate o danneggiate / registrate. Le durate considerano solo intervalli completi." : "Fertility = fertile / (fertile + infertile); hatch = hatched / fertile; losses = lost, collapsed or damaged / registered. Durations include complete intervals only."}</p>
           <h3>{locale === "it" ? "Confronto per stagione" : "Season comparison"}</h3>
-          {statistics.data.seasons.length ? <DataTable columns={[
-            { key: "season", label: locale === "it" ? "Stagione" : "Season" },
-            { key: "cycleCount", label: locale === "it" ? "Cicli" : "Cycles" },
-            { key: "clutchCount", label: locale === "it" ? "Covate" : "Clutches" },
-            { key: "fertilityRatePct", label: locale === "it" ? "Fertilità" : "Fertility", render: (row) => row.fertilityRatePct === null ? "—" : row.fertilityRatePct + "%" },
-            { key: "hatchRatePct", label: locale === "it" ? "Schiusa" : "Hatch", render: (row) => row.hatchRatePct === null ? "—" : row.hatchRatePct + "%" },
-            { key: "lossRatePct", label: locale === "it" ? "Perdite" : "Losses", render: (row) => row.lossRatePct === null ? "—" : row.lossRatePct + "%" },
-          ]} rows={statistics.data.seasons} /> : <p className="muted-note">—</p>}
+          {statistics.data.seasons.length ? <DataTable
+            headers={[locale === "it" ? "Stagione" : "Season", locale === "it" ? "Cicli" : "Cycles", locale === "it" ? "Covate" : "Clutches", locale === "it" ? "Fertilità" : "Fertility", locale === "it" ? "Schiusa" : "Hatch", locale === "it" ? "Perdite" : "Losses"]}
+            rows={statistics.data.seasons.map((season) => [season.season, season.cycleCount, season.clutchCount, season.fertilityRatePct === null ? "—" : season.fertilityRatePct + "%", season.hatchRatePct === null ? "—" : season.hatchRatePct + "%", season.lossRatePct === null ? "—" : season.lossRatePct + "%"])}
+          /> : <p className="muted-note">—</p>}
           <h3>{locale === "it" ? "Risultati per coppia" : "Results by pair"}</h3>
           {statistics.data.pairs.length ? <div className="record-list">{statistics.data.pairs.map((pair) => <div className="record-row" key={pair.key}><div><strong>{pair.motherName} × {pair.fatherName}</strong><small>{pair.cycleCount} {locale === "it" ? "cicli" : "cycles"} · {pair.pairingCount} {locale === "it" ? "accoppiamenti" : "pairings"} · {pair.clutchCount} {locale === "it" ? "covate" : "clutches"}</small></div><div className="row-actions"><Badge>{locale === "it" ? "Fertilità" : "Fertility"}: {pair.fertilityRatePct === null ? "—" : pair.fertilityRatePct + "%"}</Badge><Badge>{locale === "it" ? "Schiusa" : "Hatch"}: {pair.hatchRatePct === null ? "—" : pair.hatchRatePct + "%"}</Badge></div></div>)}</div> : <p className="muted-note">—</p>}
           <h3>{locale === "it" ? "Storico per genitore" : "History by parent"}</h3>
