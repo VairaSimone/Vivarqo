@@ -225,7 +225,10 @@ export async function processQueuedDomainImport(jobId: string, userId: string, l
             reproductionCycleId: (item.reproductionCycleId as string | null | undefined) ?? null,
             clutchId: (item.clutchId as string | null | undefined) ?? null,
             offspringBatchId: (item.offspringBatchId as string | null | undefined) ?? null,
-            recurrenceId: (item.recurrenceId as string | null | undefined) ?? null,
+            // Imported ledger rows are independent transactions: never attach them to a live recurrence,
+            // otherwise importing a backup could collide with the recurrence/date unique constraint
+            // or cause the worker to treat historical rows as generated occurrences.
+            recurrenceId: null,
           } });
           createdId = created.id; break;
         }
@@ -352,17 +355,15 @@ export function createDomainImportRouter() {
     const cycleIds = new Set<string>();
     const clutchIds = new Set<string>();
     const offspringBatchIds = new Set<string>();
-    const recurrenceIds = new Set<string>();
     const documentIds = new Set<string>();
     for (const row of sourceRows) {
       if (typeof row.record.cycleId === "string" && z.string().uuid().safeParse(row.record.cycleId).success) cycleIds.add(row.record.cycleId);
       if (typeof row.record.reproductionCycleId === "string" && z.string().uuid().safeParse(row.record.reproductionCycleId).success) cycleIds.add(row.record.reproductionCycleId);
       if (typeof row.record.clutchId === "string" && z.string().uuid().safeParse(row.record.clutchId).success) clutchIds.add(row.record.clutchId);
       if (typeof row.record.offspringBatchId === "string" && z.string().uuid().safeParse(row.record.offspringBatchId).success) offspringBatchIds.add(row.record.offspringBatchId);
-      if (typeof row.record.recurrenceId === "string" && z.string().uuid().safeParse(row.record.recurrenceId).success) recurrenceIds.add(row.record.recurrenceId);
       if (typeof row.record.documentId === "string" && z.string().uuid().safeParse(row.record.documentId).success) documentIds.add(row.record.documentId);
     }
-    const [animals, animalsByIdentifier, cycles, clutches, offspringBatches, recurrences, documents] = await Promise.all([
+    const [animals, animalsByIdentifier, cycles, clutches, offspringBatches, documents] = await Promise.all([
       animalKeys.size ? prisma.animal.findMany({ where: { userId: auth.userId, id: { in: [...animalKeys] } }, select: { id: true } }) : Promise.resolve([]),
       animalIdentifiers.size ? prisma.animal.findMany({ where: { userId: auth.userId, identifier: { in: [...animalIdentifiers], mode: "insensitive" } }, select: { id: true, identifier: true } }) : Promise.resolve([]),
       cycleIds.size
@@ -371,8 +372,6 @@ export function createDomainImportRouter() {
         ? prisma.clutch.findMany({ where: { id: { in: [...clutchIds] }, cycle: { is: { userId: auth.userId } } }, select: { id: true, cycleId: true } }) : Promise.resolve([]),
       offspringBatchIds.size
         ? prisma.offspringBatch.findMany({ where: { id: { in: [...offspringBatchIds] }, cycle: { is: { userId: auth.userId } } }, select: { id: true, cycleId: true, clutchId: true } }) : Promise.resolve([]),
-      recurrenceIds.size
-        ? prisma.financeRecurrence.findMany({ where: { id: { in: [...recurrenceIds] }, userId: auth.userId }, select: { id: true } }) : Promise.resolve([]),
       documentIds.size ? prisma.document.findMany({ where: { id: { in: [...documentIds] }, userId: auth.userId, deletedAt: null }, select: { id: true } }) : Promise.resolve([]),
     ]);
     const ownedAnimalIds = new Set(animals.map((item) => item.id));
@@ -381,7 +380,6 @@ export function createDomainImportRouter() {
     const ownedClutchIds = new Set(clutches.map((item) => item.id));
     const ownedClutchCycleById = new Map(clutches.map((item) => [item.id, item.cycleId]));
     const ownedBatchById = new Map(offspringBatches.map((item) => [item.id, { cycleId: item.cycleId, clutchId: item.clutchId }]));
-    const ownedRecurrenceIds = new Set(recurrences.map((item) => item.id));
     const ownedDocumentIds = new Set(documents.map((item) => item.id));
     const errors: Report["errors"] = [];
     const validRows: Row[] = [];
@@ -436,7 +434,6 @@ export function createDomainImportRouter() {
           else if (record.clutchId && batch.clutchId !== record.clutchId) relationError = { column: "offspringBatchId", message: "Offspring batch and selected clutch do not match" };
           else { record.reproductionCycleId ??= batch.cycleId; record.clutchId ??= batch.clutchId; }
         }
-        if (record.recurrenceId && !ownedRecurrenceIds.has(String(record.recurrenceId))) relationError = { column: "recurrenceId", message: "Recurrence not found in this account" };
       }
       if (relationError) { errors.push({ row: row.rowNumber, column: map[relationError.column] ?? relationError.column, reason: relationError.message }); continue; }
       const validated = schema.safeParse(record);
