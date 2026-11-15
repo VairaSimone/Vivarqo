@@ -4,6 +4,11 @@ import {
   createEventSchema,
   patchEventSchema,
   patchCycleSchema,
+  createClutchSchema,
+  patchClutchSchema,
+  eggSchema,
+  patchEggSchema,
+  newAnimalSchema,
 } from "@vivarqo/contracts/reproduction";
 
 describe("shared reproduction contracts", () => {
@@ -44,5 +49,40 @@ describe("shared reproduction contracts", () => {
   it("does not allow empty patch payloads", () => {
     expect(patchEventSchema.safeParse({}).success).toBe(false);
     expect(patchCycleSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+
+describe("reproduction lifecycle contracts", () => {
+  it("accepts only controlled egg lifecycle statuses", () => {
+    expect(eggSchema.safeParse({ code: "E-01", status: "fertile" }).success).toBe(true);
+    expect(eggSchema.safeParse({ code: "E-02", status: "something-free-text" }).success).toBe(false);
+  });
+
+  it("requires a valid hatch date format and accepts a linked hatchling id", () => {
+    const animalId = "c0a80101-0000-4000-8000-000000000001";
+    expect(patchEggSchema.safeParse({ status: "hatched", hatchedAt: "2026-11-15", offspringAnimalId: animalId }).success).toBe(true);
+    expect(patchEggSchema.safeParse({ status: "hatched", hatchedAt: "15/11/2026" }).success).toBe(false);
+  });
+
+  it("rejects inverted incubation target ranges", () => {
+    expect(createClutchSchema.safeParse({
+      cycleId: "c0a80101-0000-4000-8000-000000000001",
+      laidOn: "2026-11-15",
+      eggCount: 4,
+      targetTemperatureMinC: 32,
+      targetTemperatureMaxC: 30,
+    }).success).toBe(false);
+    expect(patchClutchSchema.safeParse({ targetHumidityMinPct: 80, targetHumidityMaxPct: 70 }).success).toBe(false);
+  });
+
+  it("accepts individual hatchling genetics, notes and parent links", () => {
+    const parentId = "c0a80101-0000-4000-8000-000000000001";
+    const parsed = newAnimalSchema.safeParse({
+      name: "Hatchling 1", species: "Python regius", sex: "female",
+      morph: "Pastel", identifier: "H-001", geneticsNotes: "Possible het clown",
+      notes: "First shed complete", motherAnimalId: parentId,
+    });
+    expect(parsed.success).toBe(true);
   });
 });
