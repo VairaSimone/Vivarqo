@@ -239,7 +239,10 @@ export function createReproductionRouter() {
       const created = await tx.clutch.create({
         data: {
           cycleId: input.cycleId, laidOn: validDate(input.laidOn), eggCount: input.eggCount, status: input.status,
-          incubatorLabel: input.incubatorLabel ?? null, incubationStartedAt: input.incubationStartedAt ? new Date(input.incubationStartedAt) : null, notes: input.notes ?? null,
+          incubatorLabel: input.incubatorLabel ?? null, incubationStartedAt: input.incubationStartedAt ? new Date(input.incubationStartedAt) : null,
+          targetTemperatureMinC: input.targetTemperatureMinC ?? null, targetTemperatureMaxC: input.targetTemperatureMaxC ?? null,
+          targetHumidityMinPct: input.targetHumidityMinPct ?? null, targetHumidityMaxPct: input.targetHumidityMaxPct ?? null,
+          checkIntervalHours: input.checkIntervalHours ?? null, notes: input.notes ?? null,
         },
       });
       await tx.auditEvent.create({ data: { userId: auth.userId, action: "clutch.created", entityType: "clutch", entityId: created.id } });
