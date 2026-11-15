@@ -70,6 +70,10 @@ describe("calculateInbreeding", () => {
     const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "p1", fatherId: "p2" }, { id: "f", motherId: "p3", fatherId: "p4" }, { id: "p1", motherId: "gm1", fatherId: "gm2" }, { id: "p3", motherId: "gm1", fatherId: "gm2" }, { id: "p2" }, { id: "p4" }, { id: "gm1" }, { id: "gm2" }], "child");
     expect(result.coefficient).toBe(0.0625);
   });
+  it("includes the inbreeding coefficient of a shared ancestor", () => {
+    const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "a", fatherId: "m2" }, { id: "f", motherId: "a", fatherId: "f2" }, { id: "a", motherId: "g1", fatherId: "g2" }, { id: "g1", motherId: "h1", fatherId: "h2" }, { id: "g2", motherId: "h1", fatherId: "h2" }, { id: "m2" }, { id: "f2" }, { id: "h1" }, { id: "h2" }], "child");
+    expect(result.coefficient).toBe(0.15625);
+  });
   it("returns zero for a complete unrelated founder pedigree", () => {
     const result = calculateInbreeding([{ id: "child", motherId: "m", fatherId: "f" }, { id: "m", motherId: "mm", fatherId: "mf" }, { id: "f", motherId: "fm", fatherId: "ff" }, ...["mm","mf","fm","ff"].map((id) => ({ id }))], "child");
     expect(result.coefficient).toBe(0);
