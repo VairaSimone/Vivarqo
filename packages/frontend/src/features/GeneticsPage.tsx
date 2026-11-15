@@ -27,7 +27,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
   const [calculation, setCalculation] = useState<unknown>(null);
   const [inbreeding, setInbreeding] = useState<Record<string, unknown> | null>(null);
   const [history, setHistory] = useState<Array<{ id: string; changedAt: string; snapshot: Record<string, unknown> }>>([]);
-  const [pedigree, setPedigree] = useState<{ nodes: Array<{ id: string; name: string; species: string; generation: number }>; missingParents: Array<{ childId: string; role: string; description: string | null }> } | null>(null);
+  const [pedigree, setPedigree] = useState<{ nodes: Array<{ id: string; name: string; species: string; generation: number }>; edges: Array<{ childId: string; parentId: string; role: "mother" | "father" }>; missingParents: Array<{ childId: string; role: string; description: string | null }> } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,7 +51,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       api.get<{ traits: Trait[] }>(`/animals/${id}/genetic-traits`),
       api.get<{ history: Array<{ id: string; changedAt: string; snapshot: Record<string, unknown> }> }>(`/animals/${id}/genetic-history`),
       api.get<{ inbreeding: Record<string, unknown> }>(`/animals/${id}/inbreeding`),
-      api.get<{ nodes: Array<{ id: string; name: string; species: string; generation: number }>; missingParents: Array<{ childId: string; role: string; description: string | null }> }>(`/animals/${id}/pedigree`),
+      api.get<{ nodes: Array<{ id: string; name: string; species: string; generation: number }>; edges: Array<{ childId: string; parentId: string; role: "mother" | "father" }>; missingParents: Array<{ childId: string; role: string; description: string | null }> }>(`/animals/${id}/pedigree`),
     ]);
     setTraits(traitResult.traits); setHistory(historyResult.history); setInbreeding(inbreedingResult.inbreeding); setPedigree(pedigreeResult);
   }
@@ -155,7 +155,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       </form>
       <ul>{traits.map((trait) => <li key={trait.id}><strong>{trait.traitName}</strong> · {trait.traitValue} — {text("teorico", "theoretical")}: {trait.theoreticalGenotype || "—"}; {text("osservato", "observed")}: {trait.observedPhenotype || "—"}; {text("confermato", "confirmed")}: {trait.confirmedGenotype || "—"} ({trait.certainty})</li>)}</ul>
       <h3>{text("Consanguineità e genealogia", "Inbreeding and pedigree")}</h3>{inbreeding && <p>{text("Completezza", "Completeness")}: {String(inbreeding.completeness)} · {text("Consanguineità", "Inbreeding")}: {inbreeding.coefficient === null ? text("non calcolabile con dati incompleti", "not available with incomplete data") : `${(Number(inbreeding.coefficient) * 100).toFixed(2)}%`} · {text("Antenati noti", "Known ancestors")}: {String(inbreeding.knownAncestors)} · {text("Collegamenti mancanti", "Missing links")}: {String(inbreeding.missingParentLinks)} · {String(inbreeding.note)}</p>}
-      <h3>{text("Genealogia registrata", "Recorded pedigree")}</h3><ul>{pedigree?.nodes.map((node) => <li key={node.id}>{node.name} · {node.species} · {text("generazione", "generation")} {node.generation}</li>)}</ul>{pedigree?.missingParents.map((parent, index) => <p key={parent.childId + parent.role + index}>{text("Genitore non registrato", "Unrecorded parent")}: {parent.role}{parent.description ? " — " + parent.description : ""}</p>)}
+      <h3>{text("Genealogia registrata", "Recorded pedigree")}</h3><ul>{pedigree?.nodes.map((node) => <li key={node.id}>{node.name} · {node.species} · {text("generazione", "generation")} {node.generation}</li>)}</ul><ul>{pedigree?.edges.map((edge, index) => <li key={edge.childId + edge.parentId + edge.role + index}>{pedigree.nodes.find((node) => node.id === edge.childId)?.name ?? edge.childId} — {edge.role === "mother" ? text("madre", "mother") : text("padre", "father")}: {pedigree.nodes.find((node) => node.id === edge.parentId)?.name ?? edge.parentId}</li>)}</ul>{pedigree?.missingParents.map((parent, index) => <p key={parent.childId + parent.role + index}>{text("Genitore non registrato", "Unrecorded parent")}: {parent.role}{parent.description ? " — " + parent.description : ""}</p>)}
       <h3>{text("Storico genetico", "Genetic history")}</h3><ul>{history.map((item) => <li key={item.id}>{new Date(item.changedAt).toLocaleString(en ? "en-GB" : "it-IT")} · {String(item.snapshot.traitName ?? "Trait")}</li>)}</ul>
       </>}
     </Panel>
