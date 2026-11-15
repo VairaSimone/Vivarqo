@@ -371,7 +371,9 @@ export function createReproductionRouter() {
     if (input.status === "hatched" && input.hatchedAt === undefined && !existing.hatchedAt) data.hatchedAt = new Date();
     const egg = await prisma.$transaction(async (tx) => {
       const updated = await tx.egg.update({ where: { id: eggId }, data: data as never });
-      if (input.status && input.status !== existing.status) await tx.eggHistory.create({ data: { eggId, status: input.status, notes: input.notes ?? existing.notes } });
+      if ((input.status && input.status !== existing.status) || (input.notes !== undefined && input.notes !== existing.notes)) {
+        await tx.eggHistory.create({ data: { eggId, status: input.status ?? existing.status, notes: input.notes ?? existing.notes } });
+      }
       return updated;
     });
     res.status(200).json({ egg });
