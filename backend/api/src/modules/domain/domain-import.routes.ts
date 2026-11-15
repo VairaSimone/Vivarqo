@@ -30,7 +30,7 @@ const aliases: Record<string, string> = {
   quantityonhand: "quantityOnHand", giacenza: "quantityOnHand", quantity: "quantityOnHand",
   minimumquantity: "minimumQuantity", scortaminima: "minimumQuantity", notes: "notes", note: "notes", isactive: "isActive", attivo: "isActive",
   entrytype: "entryType", tipo: "entryType", occurredon: "occurredOn", dataoperazione: "occurredOn", amountcents: "amountCents", importocentesimi: "amountCents",
-  reproductioncycleid: "reproductionCycleId", cycleid: "reproductionCycleId", clutchid: "clutchId", offspringbatchid: "offspringBatchId", recurrenceid: "recurrenceId",
+  reproductioncycleid: "reproductionCycleId", offspringbatchid: "offspringBatchId", recurrenceid: "recurrenceId",
   amounteur: "amountEUR", importoeur: "amountEUR", importo: "amountEUR", currency: "currency", valuta: "currency", description: "description", descrizione: "description",
   startedon: "startedOn", datainizio: "startedOn", endedon: "endedOn", datafine: "endedOn", status: "status", stato: "status",
   eventtype: "eventType", tipoevento: "eventType", occurredat: "occurredAt", dataevento: "occurredAt", details: "details", dettagli: "details",
