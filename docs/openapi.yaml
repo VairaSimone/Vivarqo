@@ -6821,6 +6821,10 @@ components:
             ],
             "format": "uuid"
           },
+          "reproductionCycleId": { "type": ["string", "null"], "format": "uuid" },
+          "clutchId": { "type": ["string", "null"], "format": "uuid" },
+          "offspringBatchId": { "type": ["string", "null"], "format": "uuid" },
+          "recurrenceId": { "type": ["string", "null"], "format": "uuid" },
           "createdAt": {
             "type": "string",
             "format": "date-time"
