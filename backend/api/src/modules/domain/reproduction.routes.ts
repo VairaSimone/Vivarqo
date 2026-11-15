@@ -193,7 +193,14 @@ export function createReproductionRouter() {
         const batches = await tx.offspringBatch.findMany({ where: { cycleId }, select: { id: true } });
         if (batches.length) {
           await tx.animal.updateMany({
-            where: { userId: auth.userId, originOffspringBatchId: { in: batches.map((batch) => batch.id) } },
+            where: {
+              userId: auth.userId,
+              originOffspringBatchId: { in: batches.map((batch) => batch.id) },
+              AND: [
+                { OR: [{ motherAnimalId: existing.parentAAnimalId }, { motherAnimalId: null }] },
+                { OR: [{ fatherAnimalId: existing.parentBAnimalId }, { fatherAnimalId: null }] },
+              ],
+            },
             data: { motherAnimalId: parentA ?? null, fatherAnimalId: parentB ?? null },
           });
         }
