@@ -705,6 +705,22 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   expect(feedingSummary.lastAcceptedAt).toBeTruthy();
   expect(feedingSummary.nextMealAt).toBeTruthy();
 
+  // Editing an offered meal to "not offered" restores its previously deducted stock.
+  await page.goto("/feeding");
+  await page.getByRole("button", { name: "Modifica" }).first().click();
+  const editPreyDialog = page.getByRole("dialog");
+  await editPreyDialog.getByLabel("Esito").selectOption("not_offered");
+  const updatePreyResponse = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    response.url().includes("/api/v1/feeding-entries/") &&
+    response.status() === 200
+  );
+  await editPreyDialog.getByRole("button", { name: "Salva modifiche" }).click();
+  await updatePreyResponse;
+  const restoredStockResponse = await page.context().request.get("http://127.0.0.1:4173/api/v1/inventory/items?page=1&pageSize=100&category=food");
+  const restoredStock = (await restoredStockResponse.json()).items.find((item) => item.id === stockItem.id);
+  expect(Number(restoredStock.quantityOnHand)).toBe(1);
+
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
   const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
