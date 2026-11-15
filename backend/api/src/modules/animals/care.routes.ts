@@ -348,7 +348,7 @@ export function createCareRouter() {
     const animal = await getOwnedAnimal(auth.userId, animalId);
     const entries = await prisma.feedingEntry.findMany({
       where: { animalId, session: { is: { userId: auth.userId } } },
-      orderBy: [{ session: { performedAt: "desc" } }, { id: "desc" }],
+      orderBy: [{ session: { performedAt: "desc" } }, { createdAt: "desc" }, { id: "desc" }],
       select: { outcome: true, session: { select: { performedAt: true } } },
     });
     const metrics = calculateFeedingMetrics(
