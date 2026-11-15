@@ -487,6 +487,9 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     const noDocZip = Buffer.from((await getZip(noDocumentFiles.body.downloadPath)).body as Buffer);
     expect(noDocZip.subarray(0, 2).toString("hex")).toBe("504b");
     expect(noDocZip.includes(Buffer.from("documents.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("finance_entries.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("finance_budgets.csv"))).toBe(true);
+    expect(noDocZip.includes(Buffer.from("finance_recurrences.csv"))).toBe(true);
     expect(noDocZip.includes(Buffer.from("'  =HYPERLINK("))).toBe(true);
     expect(noDocZip.includes(Buffer.from(documentPath))).toBe(false);
 
