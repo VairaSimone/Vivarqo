@@ -64,6 +64,23 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
+      - name: Verify animal management migration objects on PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            IF to_regclass('public.animal_locations') IS NULL
+              OR to_regclass('public.animal_location_moves') IS NULL
+              OR to_regclass('public.saved_animal_filters') IS NULL
+              OR to_regclass('public.animal_transfers') IS NULL THEN
+              RAISE EXCEPTION 'Animal management migration tables are missing';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='location_id')
+              OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='animals' AND column_name='qr_token') THEN
+              RAISE EXCEPTION 'Animal management migration columns are missing';
+            END IF;
+          END $;
+          SQL
       - name: Verify empty, baseline, partial and drifted database initialization
         run: bash backend/scripts/schema-initialization-drill.sh
       - name: Verify isolated application and read-only backup database roles
