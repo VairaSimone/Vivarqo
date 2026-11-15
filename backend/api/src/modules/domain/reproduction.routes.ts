@@ -287,10 +287,29 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const incubatorId = routeUuid(req.params.id, "incubator id");
     const input = parseBody(patchIncubatorSchema, req.body);
-    const existing = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId, isActive: true }, select: { id: true } });
+    const existing = await prisma.incubator.findFirst({ where: { id: incubatorId, userId: auth.userId, isActive: true }, select: { id: true, name: true } });
     if (!existing) throw new AppError(404, "INCUBATOR_NOT_FOUND", "Incubator not found");
-    const data = { ...input, ...(input.nextMaintenanceAt !== undefined ? { nextMaintenanceAt: input.nextMaintenanceAt ? new Date(input.nextMaintenanceAt) : null } : {}) };
-    const incubator = await prisma.incubator.update({ where: { id: incubatorId }, data });
+    const data: Record<string, unknown> = { ...input, ...(input.nextMaintenanceAt !== undefined ? { nextMaintenanceAt: input.nextMaintenanceAt ? new Date(input.nextMaintenanceAt) : null } : {}) };
+    const incubator = await prisma.$transaction(async (tx) => {
+      const title = "Manutenzione incubatrice · " + incubatorId;
+      const reminder = await tx.task.findFirst({ where: { userId: auth.userId, category: "incubator_maintenance", title, status: "open" }, select: { id: true } });
+      if (input.maintenanceIntervalDays === null) {
+        data.nextMaintenanceAt = null;
+        if (reminder) await tx.task.delete({ where: { id: reminder.id } });
+      } else if (input.maintenanceIntervalDays !== undefined) {
+        const latest = await tx.incubatorMaintenance.findFirst({ where: { incubatorId }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], select: { occurredAt: true } });
+        const dueAt = new Date((latest?.occurredAt ?? new Date()).getTime() + input.maintenanceIntervalDays * 86_400_000);
+        data.nextMaintenanceAt = dueAt;
+        if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt, description: "Manutenzione programmata: " + existing.name } });
+        else await tx.task.create({ data: { userId: auth.userId, title, category: "incubator_maintenance", dueAt, description: "Manutenzione programmata: " + existing.name } });
+      } else if (input.nextMaintenanceAt !== undefined) {
+        if (data.nextMaintenanceAt instanceof Date) {
+          if (reminder) await tx.task.update({ where: { id: reminder.id }, data: { dueAt: data.nextMaintenanceAt as Date } });
+          else await tx.task.create({ data: { userId: auth.userId, title, category: "incubator_maintenance", dueAt: data.nextMaintenanceAt as Date, description: "Manutenzione programmata: " + existing.name } });
+        } else if (reminder) await tx.task.delete({ where: { id: reminder.id } });
+      }
+      return tx.incubator.update({ where: { id: incubatorId }, data: data as never });
+    });
     res.status(200).json({ incubator });
   });
 
