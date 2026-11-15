@@ -24,6 +24,7 @@ export interface AnimalDto {
   previousBreeder: string | null;
   locationLabel: string | null;
   locationId?: string | null;
+  feedingIntervalDays?: number | null;
   status: AnimalStatusDto;
   notes: string | null;
   photoUrl?: string | null;
