@@ -510,6 +510,7 @@ export function createReproductionRouter() {
         });
         animals.push(createdAnimal);
         if (animal.eggId) {
+          if (!batch.clutchId) throw new AppError(400, "EGG_CLUTCH_REQUIRED", "This offspring batch is not linked to a clutch");
           const egg = await tx.egg.findFirst({ where: { id: animal.eggId, clutchId: batch.clutchId, offspringAnimalId: null } });
           if (!egg) throw new AppError(409, "EGG_ALREADY_LINKED", "The selected egg is no longer available");
           await tx.egg.update({ where: { id: egg.id }, data: { status: "hatched", hatchedAt: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn, offspringAnimalId: createdAnimal.id } });
