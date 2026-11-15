@@ -5063,7 +5063,7 @@ components:
           "locusId": { "type": ["string", "null"], "format": "uuid" },
           "theoreticalGenotype": { "type": ["string", "null"], "maxLength": 64 },
           "observedPhenotype": { "type": ["string", "null"], "maxLength": 240 },
-          "confirmedGenotype": { "type": ["string", "null"], "maxLength": 64 },
+          "confirmedGenotype": { "type": ["string", "null"], "maxLength": 64 }
         }
       }
     GeneticTraitPatch:
