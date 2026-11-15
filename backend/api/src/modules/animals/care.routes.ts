@@ -342,18 +342,11 @@ export function createCareRouter() {
       orderBy: [{ session: { performedAt: "desc" } }, { id: "desc" }],
       select: { outcome: true, session: { select: { performedAt: true } } },
     });
-    const metrics = calculateFeedingMetrics(entries.map((entry) => ({ outcome: entry.outcome, performedAt: entry.session.performedAt })), animal.feedingIntervalDays);
-    res.status(200).json({
-      feedingIntervalDays: animal.feedingIntervalDays,
-      lastAcceptedAt,
-      daysSinceLastFeeding,
-      nextMealAt,
-      consecutiveRefusals,
-      acceptedCount: accepted.length,
-      refusedCount: refused.length,
-      offeredCount,
-      acceptanceRate: offeredCount > 0 ? accepted.length / offeredCount : null,
-    });
+    const metrics = calculateFeedingMetrics(
+      entries.map((entry) => ({ outcome: entry.outcome, performedAt: entry.session.performedAt })),
+      animal.feedingIntervalDays,
+    );
+    res.status(200).json(metrics);
   });
   router.get("/animals/:animalId/weights", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
