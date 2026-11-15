@@ -54,13 +54,13 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     try {
       if (editing) await api.patch(`/reproductive-events/${getString(editing, "id")}`, body);
       else await api.post(`/reproduction-cycles/${id}/events`, body);
-      setModal(null); resource.reload(); show(t("saveSuccess"));
+      setModal(null); resource.reload(); eventsPageResource.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
   async function deleteEvent(event: ReproductiveEventDto) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete(`/reproductive-events/${getString(event, "id")}`); resource.reload(); }
+    try { await api.delete(`/reproductive-events/${getString(event, "id")}`); resource.reload(); eventsPageResource.reload(); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
   function openClutch(clutch?: ClutchDto) {
@@ -96,13 +96,13 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       };
       if (editing) await api.patch("/clutches/" + getString(editing, "id"), body);
       else await api.post("/clutches", { cycleId: id, ...body });
-      setEditing(null); setModal(null); resource.reload(); show(t("saveSuccess"));
+      setEditing(null); setModal(null); resource.reload(); clutchesPageResource.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
   async function deleteClutch(clutch: ClutchDto) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete("/clutches/" + getString(clutch, "id")); resource.reload(); show(t("delete")); }
+    try { await api.delete("/clutches/" + getString(clutch, "id")); resource.reload(); clutchesPageResource.reload(); show(t("delete")); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
   function openBatch(batch?: OffspringBatchDto) {
@@ -151,13 +151,13 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
       const body = { clutchId: batchForm.clutchId || null, bornOn: batchForm.bornOn, count: Number(batchForm.count), notes: batchForm.notes || null };
       if (editing) await api.patch("/offspring-batches/" + getString(editing, "id"), body);
       else await api.post("/offspring-batches", { cycleId: id, ...body });
-      setEditing(null); setModal(null); resource.reload(); show(t("saveSuccess"));
+      setEditing(null); setModal(null); resource.reload(); offspringPageResource.reload(); show(t("saveSuccess"));
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
     finally { setBusy(false); }
   }
   async function deleteBatch(batch: OffspringBatchDto) {
     if (!window.confirm(t("confirmDelete"))) return;
-    try { await api.delete("/offspring-batches/" + getString(batch, "id")); resource.reload(); show(t("delete")); }
+    try { await api.delete("/offspring-batches/" + getString(batch, "id")); resource.reload(); offspringPageResource.reload(); show(t("delete")); }
     catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
