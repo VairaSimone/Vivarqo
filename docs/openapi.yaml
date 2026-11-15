@@ -2365,7 +2365,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AnimalId'
       responses:
-        '200': { description: Nodi, relazioni e genitori non registrati. }
+        '200': { description: "Nodi, relazioni e genitori non registrati." }
   /api/v1/finance/entries:
     get:
       operationId: getFinanceEntries
