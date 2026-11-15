@@ -274,7 +274,10 @@ export function createCareRouter() {
       if (stockFieldsChanged) {
         const nextOutcome = input.outcome ?? owned.outcome;
         const nextItemId = input.inventoryItemId !== undefined ? input.inventoryItemId : owned.inventoryItemId;
-        const nextQuantity = input.inventoryQuantity !== undefined ? input.inventoryQuantity : (owned.inventoryQuantity === null ? null : Number(owned.inventoryQuantity));
+        const nextQuantity = input.inventoryItemId === null && input.inventoryQuantity === undefined
+          ? null
+          : input.inventoryQuantity !== undefined ? input.inventoryQuantity : (owned.inventoryQuantity === null ? null : Number(owned.inventoryQuantity));
+        if (Boolean(nextItemId) !== Boolean(nextQuantity)) throw new AppError(400, "INVALID_INVENTORY_LINK", "Inventory item and quantity must be provided together");
         if ((nextOutcome === "ate" || nextOutcome === "refused") && nextItemId && nextQuantity) {
           const locked = await tx.$queryRaw<Array<{ quantity_on_hand: string; is_active: boolean; category: string; name: string }>>`SELECT quantity_on_hand::text, is_active, category, name FROM inventory_items WHERE id = ${nextItemId}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`;
           const item = locked[0];
