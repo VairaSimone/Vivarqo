@@ -20,11 +20,12 @@ export interface OffspringAnimalDraft {
   notes: string;
   photo: File | null;
   eggId: string;
+  initialWeightG: string;
 }
 const emptyAnimal = (): OffspringAnimalDraft => ({
   name: "", species: "", sex: "unknown", morph: "", identifier: "",
   geneticsNotes: "", birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "",
-  locationLabel: "", notes: "", photo: null, eggId: "",
+  locationLabel: "", notes: "", photo: null, eggId: "", initialWeightG: "",
 });
 
 export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmit }: {
@@ -65,8 +66,8 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
         <span>{animals.length} / {maximum}</span>
       </div>
       <p className="muted-note">{locale === "it"
-        ? "Ogni piccolo diventa una scheda animale completa. Madre, padre e covata vengono collegati automaticamente al ciclo di provenienza."
-        : "Each offspring becomes a full animal profile. Parents and clutch are linked automatically from the source cycle."}</p>
+        ? "Ogni piccolo diventa una scheda animale completa. Madre, padre, covata e uovo vengono collegati automaticamente. Se lasci vuoto l'identificativo, viene generato un codice progressivo univoco per questa covata. Puoi registrare subito il peso iniziale."
+        : "Each offspring becomes a full animal profile. Parents, clutch and egg are linked automatically. If identifier is blank, a unique sequential code is generated for this batch. You can record the initial weight now."}</p>
       {animals.map((animal, index) => <section className="animal-editor-section" key={index}>
         <div className="subsection-heading"><h3>{locale === "it" ? "Piccolo" : "Offspring"} {index + 1}</h3>
           <Button type="button" variant="ghost" disabled={animals.length <= 1} onClick={() => setAnimals((current) => current.filter((_, i) => i !== index))}>{locale === "it" ? "Rimuovi" : "Remove"}</Button>
@@ -79,6 +80,7 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
             <option value="unknown">{t("unknown")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option>
           </Select></Field>
           <Field label={t("morph")}><Input maxLength={200} value={animal.morph} onChange={(e) => update(index, { morph: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Peso iniziale (g)" : "Initial weight (g)"}><Input type="number" min="0.01" max="100000" step="0.01" value={animal.initialWeightG} onChange={(e) => update(index, { initialWeightG: e.target.value })} /></Field>
           <Field label={t("birthDate")}><Input type="date" value={animal.birthDate || batch.bornOn} onChange={(e) => update(index, { birthDate: e.target.value })} /></Field>
           <Field label={t("location")}><Input maxLength={160} value={animal.locationLabel} onChange={(e) => update(index, { locationLabel: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Data acquisizione" : "Acquired date"}><Input type="date" value={animal.acquiredDate} onChange={(e) => update(index, { acquiredDate: e.target.value })} /></Field>

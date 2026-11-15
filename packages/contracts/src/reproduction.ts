@@ -217,6 +217,7 @@ export const newAnimalSchema = z.object({
   motherAnimalId: nullableUuid,
   fatherAnimalId: nullableUuid,
   eggId: nullableUuid,
+  initialWeightG: z.coerce.number().positive().max(100_000).nullable().optional(),
 }).strict();
 
 export type ReproductionCycleStatus = z.infer<typeof reproductionCycleStatusSchema>;

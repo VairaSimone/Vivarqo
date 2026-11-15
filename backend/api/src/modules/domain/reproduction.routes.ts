@@ -1124,13 +1124,15 @@ export function createReproductionRouter() {
       }
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
-      for (const animal of input.animals) {
+      for (const [index, animal] of input.animals.entries()) {
         await assertOwnedAnimals(auth.userId, [animal.motherAnimalId, animal.fatherAnimalId]);
         await assertCycleParentSexes(auth.userId, animal.motherAnimalId ?? batch.cycle.parentAAnimalId, animal.fatherAnimalId ?? batch.cycle.parentBAnimalId);
         const createdAnimal = await tx.animal.create({
           data: {
             userId: auth.userId, originOffspringBatchId: batchId, name: animal.name,
-            identifier: animal.identifier ?? null, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
+            // Stable, sequential, human-readable ID. The full batch UUID prevents collisions
+            // between separate clutches/batches; caller-supplied identifiers remain untouched.
+            identifier: animal.identifier?.trim() || `OFF-${batchId}-${String(index + 1).padStart(3, "0")}`, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
             birthDate: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
             birthDateEstimated: animal.birthDateEstimated ?? false,
             geneticsNotes: animal.geneticsNotes ?? null, notes: animal.notes ?? null,
@@ -1142,6 +1144,16 @@ export function createReproductionRouter() {
           },
         });
         animals.push(createdAnimal);
+        if (animal.initialWeightG != null) {
+          await tx.weightMeasurement.create({
+            data: {
+              animalId: createdAnimal.id,
+              measuredAt: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
+              weightG: animal.initialWeightG,
+              notes: "Initial hatchling weight",
+            },
+          });
+        }
         if (animal.eggId) {
           if (!batch.clutchId) throw new AppError(400, "EGG_CLUTCH_REQUIRED", "This offspring batch is not linked to a clutch");
           const egg = await tx.egg.findFirst({ where: { id: animal.eggId, clutchId: batch.clutchId, offspringAnimalId: null } });
