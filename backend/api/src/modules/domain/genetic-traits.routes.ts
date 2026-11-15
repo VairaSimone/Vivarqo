@@ -32,7 +32,8 @@ const traitPatch = z.object({
   sourceAnimalId: z.string().uuid().nullable().optional(),
   confidenceNote: z.string().trim().max(10_000).nullable().optional(),
   inheritanceMode: z.enum(["autosomal_recessive", "incomplete_dominant", "dominant"]).nullable().optional(),
-  genotype: z.string().regex(/^[A-Za-z]{2}$/).nullable().optional(),
+  genotype: z.string().regex(/^(?:[A-Za-z]{2}|[A-Za-z][A-Za-z0-9_-]{0,11}\\|[A-Za-z][A-Za-z0-9_-]{0,11})$/).nullable().optional(),
+  phenotypeRules: z.record(z.string(), z.string().trim().min(1).max(240)).nullable().optional(),
   certainty: z.enum(["confirmed", "visual", "possible", "carrier", "unverified"]).optional(),
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
 
