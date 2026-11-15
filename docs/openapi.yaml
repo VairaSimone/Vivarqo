@@ -9099,6 +9099,7 @@ components:
         originDescription: { type: [string, 'null'], maxLength: 5000 }
         previousBreeder: { type: [string, 'null'], maxLength: 160 }
         locationLabel: { type: [string, 'null'], maxLength: 160 }
+        feedingIntervalDays: { type: [integer, 'null'], minimum: 1, maximum: 365 }
         status: { type: string, enum: [active, sold, transferred, deceased] }
         notes: { type: [string, 'null'], maxLength: 10000 }
     FeedingSessionWrite:
