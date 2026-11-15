@@ -27,7 +27,7 @@ export function EggManagement({ locale, eggs, onAdd, onEdit, onDelete, onMeasure
   return <Panel>
     <PanelHeader title={t("eggs")} action={<Button size="sm" onClick={onAdd}><Icon name="plus" />{t("addEggs")}</Button>} />
     {eggs.length ? <div className="egg-grid">{eggs.map((egg) => <div className="egg-card" key={egg.id}>
-      <span><Icon name="egg" size={18} /></span><strong>{egg.code || "—"}</strong>
+      {egg.photoUrl ? <img src={egg.photoUrl} alt={locale === "it" ? `Foto uovo ${egg.code || ""}` : `Egg ${egg.code || ""} photo`} style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8 }} /> : <span><Icon name="egg" size={18} /></span>}<strong>{egg.code || "—"}</strong>
       <Badge tone={egg.status === "hatched" ? "success" : egg.status === "lost" || egg.status === "damaged" || egg.status === "collapsed" ? "danger" : "neutral"}>{labels[egg.status]?.[locale] ?? egg.status}</Badge>
       {egg.measurements?.length ? <small>{locale === "it" ? "Ultimo peso: " : "Latest weight: "}{egg.measurements[egg.measurements.length - 1]?.weightG} g</small> : null}
       {egg.expectedHatchAt && <small>{locale === "it" ? "Schiusa prevista: " : "Expected hatch: "}{formatDate(egg.expectedHatchAt, locale)}</small>}
