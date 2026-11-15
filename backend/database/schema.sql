@@ -207,6 +207,7 @@ CREATE TABLE tasks (
                         CHECK (status IN ('open', 'completed', 'dismissed')),
     completed_at        TIMESTAMPTZ,
     reminder_rule_id    UUID REFERENCES reminder_rules(id) ON DELETE SET NULL,
+    health_record_id     UUID UNIQUE REFERENCES health_records(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
