@@ -171,9 +171,30 @@ export function createCareRouter() {
           if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
           if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
           const balance = (available - requested) / 1000;
-          await tx.stockMovement.create({
-            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after prey was offered" },
+          const costRows = await tx.$queryRaw<Array<{ unit_cost_cents: string | null }>>`
+            SELECT CASE WHEN SUM(quantity) > 0
+              THEN ROUND(SUM(quantity * unit_cost_cents) / SUM(quantity))::text
+              ELSE NULL END AS unit_cost_cents
+            FROM stock_movements
+            WHERE item_id = ${entry.inventoryItemId}::uuid
+              AND movement_type = 'in' AND unit_cost_cents IS NOT NULL
+          `;
+          const unitCostCents = costRows[0]?.unit_cost_cents ? Number(costRows[0].unit_cost_cents) : null;
+          const movement = await tx.stockMovement.create({
+            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, unitCostCents, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after prey was offered" },
           });
+          if (unitCostCents !== null) {
+            const amountCents = Math.round(unitCostCents * Number(entry.inventoryQuantity));
+            if (Number.isSafeInteger(amountCents) && amountCents > 0) {
+              await tx.financeEntry.create({ data: {
+                userId: auth.userId, animalId: entry.animalId, entryType: "expense",
+                occurredOn: new Date(input.performedAt.slice(0, 10) + "T00:00:00.000Z"),
+                amountCents: BigInt(amountCents), currency: "EUR", category: "Alimentazione",
+                description: "Consumo alimento da inventario",
+                sourceStockMovementId: movement.id,
+              } });
+            }
+          }
           await tx.inventoryItem.update({ where: { id: entry.inventoryItemId }, data: { quantityOnHand: balance } });
           await tx.feedingEntry.update({ where: { id: createdEntry.id }, data: { inventoryDeducted: true } });
         }
@@ -239,6 +260,8 @@ export function createCareRouter() {
         if (current === null || restore === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
         const restored = current + restore;
         if (restored > 999_999_999_999) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Restored inventory stock exceeds the supported precision");
+        const originalMovement = await tx.stockMovement.findFirst({ where: { itemId: owned.inventoryItemId, reference: "Feeding entry " + id }, select: { id: true } });
+        if (originalMovement) await tx.financeEntry.deleteMany({ where: { userId: auth.userId, sourceStockMovementId: originalMovement.id } });
         await tx.stockMovement.create({ data: { itemId: owned.inventoryItemId, movementType: "in", quantity: Number(owned.inventoryQuantity), occurredAt: new Date(), reference: "Feeding entry reversal " + id, notes: "Automatic stock restoration after feeding edit" } });
         await tx.inventoryItem.update({ where: { id: owned.inventoryItemId }, data: { quantityOnHand: restored / 1000 } });
       }
