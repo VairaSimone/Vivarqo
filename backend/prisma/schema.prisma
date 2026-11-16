@@ -41,6 +41,7 @@ model User {
   incubators              Incubator[]
   breedingProfiles        SpeciesBreedingProfile[]
   inventoryItems          InventoryItem[]
+  inventorySuppliers      InventorySupplier[]
   documents               Document[]
   documentDeletionJobs    DocumentDeletionJob[]
   publicShares            PublicShare[]
@@ -621,6 +622,43 @@ model HatchlingCare {
   @@map("hatchling_care")
 }
 
+model InventorySupplier {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(160)
+  email     String?  @db.VarChar(254)
+  phone     String?  @db.VarChar(40)
+  website   String?  @db.VarChar(255)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lots      InventoryLot[]
+  @@unique([id, userId], map: "inventory_suppliers_id_user_id_unique")
+  @@index([userId, name], map: "inventory_suppliers_user_name_idx")
+  @@map("inventory_suppliers")
+}
+
+model InventoryLot {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemId            String             @map("item_id") @db.Uuid
+  supplierId        String?            @map("supplier_id") @db.Uuid
+  lotCode           String?            @map("lot_code") @db.VarChar(120)
+  quantityReceived  Decimal            @map("quantity_received") @db.Decimal(12, 3)
+  quantityRemaining Decimal            @map("quantity_remaining") @db.Decimal(12, 3)
+  unitCostCents     Int?               @map("unit_cost_cents")
+  purchasedAt       DateTime           @map("purchased_at") @db.Timestamptz(6)
+  expiresAt         DateTime?          @map("expires_at") @db.Date
+  notes             String?
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  item              InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  supplier          InventorySupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  movements         StockMovement[]
+  @@index([itemId, expiresAt], map: "inventory_lots_item_expiry_idx")
+  @@index([supplierId, purchasedAt(sort: Desc)], map: "inventory_lots_supplier_purchased_idx")
+  @@map("inventory_lots")
+}
+
 model InventoryItem {
   id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId          String          @map("user_id") @db.Uuid
@@ -635,6 +673,7 @@ model InventoryItem {
   updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   movements       StockMovement[]
+  lots            InventoryLot[]
   feedingEntries  FeedingEntry[]
   @@unique([id, userId], map: "inventory_items_id_user_id_unique")
   @@index([userId, isActive], map: "inventory_items_user_active_idx")
@@ -651,7 +690,9 @@ model StockMovement {
   reference     String?       @db.VarChar(160)
   notes         String?
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  lotId         String?       @map("lot_id") @db.Uuid
   item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lot           InventoryLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
   financeEntry  FinanceEntry?
   @@index([itemId, occurredAt(sort: Desc)], map: "stock_movements_item_occurred_idx")
   @@map("stock_movements")
