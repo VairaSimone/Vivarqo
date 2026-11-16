@@ -68,6 +68,7 @@ export const dashboardTodayResponseSchema = z.object({
     completedToday: z.boolean(), upcoming: z.boolean().default(false), imminentReminders: z.boolean(),
   }),
   imminentReminders: z.array(dashboardReminderSchema),
+  feedingAlerts: z.array(z.object({ id: z.string(), name: z.string(), species: z.string(), lastMealAt: z.string().nullable(), daysSinceLastMeal: z.number().int().nonnegative(), feedingIntervalDays: z.number().int().positive() }).passthrough()).default([]),
   quickActions: z.array(z.object({ key: z.string(), label: z.string(), targetPath: z.string() })).optional(),
   recentEvents: z.array(dashboardRecentEventSchema),
 }).passthrough();
