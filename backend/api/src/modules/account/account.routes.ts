@@ -35,8 +35,8 @@ const preferencesPatchSchema = z.object({
   theme: z.enum(["system", "light", "dark"]).optional(),
   dashboardLayout: z.object({
     order: z.array(z.enum(["priorities", "quickActions", "feedingAlerts", "reminders", "recent", "summary", "onboarding", "plan"])).max(8),
-    visibility: z.record(z.string(), z.boolean()).refine((value) => Object.keys(value).length <= 8),
-  }).strict().optional(),
+    visibility: z.record(z.enum(["priorities", "quickActions", "feedingAlerts", "reminders", "recent", "summary", "onboarding", "plan"]), z.boolean()),
+  }).strict().refine((layout) => new Set(layout.order).size === layout.order.length, "Widget order must not contain duplicates").optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one preference is required");
 
 export function createAccountRouter(sender?: EmailSender) {
