@@ -1040,6 +1040,7 @@ model UserPreference {
   dateFormat          String   @default("locale") @map("date_format") @db.VarChar(16)
   defaultLandingPage  String   @default("today") @map("default_landing_page") @db.VarChar(40)
   compactTables       Boolean  @default(false) @map("compact_tables")
+  dashboardLayout     Json     @default("{}") @map("dashboard_layout") @db.JsonB
   theme               String   @default("system") @db.VarChar(16)
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
