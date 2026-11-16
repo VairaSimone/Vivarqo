@@ -188,6 +188,22 @@ function ImportPage({ locale }: { locale: Locale }) {
   const canConfirm = Boolean(jobId) && !busy && !mappingDirty && missingFields.length === 0
     && validRowCount > 0 && !(entity === "animals" && duplicates.length > 0 && !allowDuplicates);
 
+  async function undoImport() {
+    if (!jobId) return;
+    const completed = status === "completed";
+    const message = completed
+      ? (locale === "it" ? "Annullare questa importazione? I record creati verranno eliminati solo se non sono stati modificati o utilizzati successivamente." : "Roll back this import? Created records are deleted only if they have not been changed or used since import.")
+      : (locale === "it" ? "Annullare questa importazione in attesa?" : "Cancel this pending import?");
+    if (!window.confirm(message)) return;
+    setBusy(true); setError("");
+    try {
+      await api.post("/imports/" + encodeURIComponent(jobId) + "/undo", {});
+      await job.reload();
+      show(locale === "it" ? "Importazione annullata." : "Import cancelled.");
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+    finally { setBusy(false); }
+  }
+
   async function confirmImport() {
     if (!canConfirm || !jobId) return;
     setBusy(true);
@@ -215,6 +231,7 @@ function ImportPage({ locale }: { locale: Locale }) {
             <Select value={entity} onChange={(e) => changeEntity(e.target.value)} disabled={busy}>
               {importEntities.map((value) => <option value={value} key={value}>{labels[value]}</option>)}
             </Select>
+            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "vivarqo-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello Excel" : "Download Excel template"}</Button></div>
           </Field>
           <Field label={t("chooseFile")}>
             <Input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -301,10 +318,15 @@ function ImportPage({ locale }: { locale: Locale }) {
       </div>
     </Panel>}
     {jobId && <Panel>
-      <PanelHeader title={t("importStatus")} action={<Button variant="ghost" size="sm" onClick={job.reload}><Icon name="refresh" />{t("refresh")}</Button>} />
+      <PanelHeader title={t("importStatus")} action={<div className="row-actions">
+        {(status === "preview" || status === "queued" || status === "completed") && <Button variant="secondary" size="sm" onClick={() => void undoImport()} disabled={busy}>
+          <Icon name="undo-2" />{status === "completed" ? (locale === "it" ? "Annulla importazione" : "Roll back import") : (locale === "it" ? "Annulla" : "Cancel")}
+        </Button>}
+        <Button variant="ghost" size="sm" onClick={job.reload}><Icon name="refresh" />{t("refresh")}</Button>
+      </div>} />
       {job.loading && !job.data ? <LoadingState /> : job.error ? <ErrorState message={job.error.message} retry={job.reload} /> : <>
         <div className="status-row">
-          <Badge tone={status === "completed" ? "success" : status === "failed" ? "danger" : "info"}>
+          <Badge tone={status === "completed" ? "success" : status === "failed" ? "danger" : status === "cancelled" || status === "rolled_back" ? "warning" : "info"}>
             {t(status === "preview" ? "preview" : status || "queued")}
           </Badge>
           <span>{Number(job.data?.createdCount ?? 0)} {t("created")} · {Number(job.data?.errorCount ?? 0)} {t("errors")} · {Number(job.data?.skippedCount ?? 0)} {t("skipped")}</span>
