@@ -194,7 +194,14 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
     },
     {
       name: "eggs.csv", emptyHeaders: EMPTY_HEADERS["eggs.csv"]!,
-      rows: () => paginateRows((cursor, take) => prisma.egg.findMany({ where: { clutch: { is: { cycle: { is: { userId } } } } }, ...page(cursor, take) })),
+      rows: () => mapRows(
+        paginateRows((cursor, take) => prisma.egg.findMany({ where: { clutch: { is: { cycle: { is: { userId } } } } }, ...page(cursor, take) })),
+        (egg) => ({
+          ...egg,
+          photoArchivePath: egg.photoKey ? `egg-photos/${egg.id}.${String(egg.photoKey).split(".").pop()}` : null,
+          photoKey: null,
+        }),
+      ),
     },
     {
       name: "incubation_logs.csv", emptyHeaders: EMPTY_HEADERS["incubation_logs.csv"]!,
