@@ -80,9 +80,11 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   async function complete(id: string) {
     setCompleting(id);
     try {
-      await api.post(`/tasks/${id}/complete`);
+      const result = await api.post<{ nextTask: { dueAt: string } | null; nextDueAt: string | null }>(`/tasks/${id}/complete`);
       setOptimisticallyCompleted((current) => current.includes(id) ? current : [...current, id]);
-      show(t("taskCompleted"));
+      show(result.nextDueAt
+        ? (locale === "it" ? `Attività completata. Prossima scadenza: ${formatDateTime(result.nextDueAt, locale, timezone)}` : `Task completed. Next due: ${formatDateTime(result.nextDueAt, locale, timezone)}`)
+        : t("taskCompleted"));
       resource.reload();
     } catch (error) {
       setOptimisticallyCompleted((current) => current.filter((taskId) => taskId !== id));
@@ -95,12 +97,21 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const taskCard = (task: DashboardTaskDto, late = false, isComplete = false) => {
     const id = task.id;
     const animal = task.animal;
+    const category = task.category || "custom";
+    const categoryIcon = category === "feeding" ? "feed" : category === "weighing" ? "weight" : category === "shed_check" ? "leaf" : category === "reproduction" || category === "incubation" ? "egg" : category === "inventory" ? "box" : category === "document" ? "file" : "calendar";
+    const categoryLabel: Record<string, string> = { feeding: locale === "it" ? "Alimentazione" : "Feeding", weighing: locale === "it" ? "Peso" : "Weight", shed_check: locale === "it" ? "Muta" : "Shed", cleaning: locale === "it" ? "Pulizia" : "Cleaning", reproduction: locale === "it" ? "Riproduzione" : "Reproduction", incubation: locale === "it" ? "Incubazione" : "Incubation", document: locale === "it" ? "Documento" : "Document", inventory: locale === "it" ? "Scorte" : "Inventory", custom: locale === "it" ? "Personalizzata" : "Custom" };
     return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}`} key={id}>
       <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={t("completeTask")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
-      <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
-        <strong>{task.title}</strong>
-        <small>{getString(animal, "name") || t("noAnimalLinked")} · {formatDateTime(task.dueAt, locale, timezone)}</small>
-      </button>
+      <div className="dashboard-task-content">
+        <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
+          <strong>{task.title}</strong>
+          <small>{formatDateTime(task.dueAt, locale, timezone)}</small>
+        </button>
+        <div className="dashboard-task-meta"><span className="dashboard-task-category"><Icon name={categoryIcon} size={13} />{categoryLabel[category] ?? categoryLabel.custom}</span>
+          {animal && <button className="dashboard-task-animal" onClick={() => navigate(`/animals/${encodeURIComponent(getString(animal, "id"))}`)}>{getString(animal, "name")}</button>}
+          {task.recurrence?.enabled && <span className="dashboard-task-recurrence" title={locale === "it" ? `Ricorrente ogni ${task.recurrence.intervalDays} giorni` : `Repeats every ${task.recurrence.intervalDays} days`}>{locale === "it" ? `Ricorrente · prossima ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}` : `Repeats · next ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}`}</span>}
+        </div>
+      </div>
       {late && <Badge tone="danger">{t("overdue")}</Badge>}
       {isComplete && <Badge tone="success">{t("completed")}</Badge>}
       {!isComplete && <button className="dashboard-row-open" aria-label={t("openTask")} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}><Icon name="chevron" size={16} /></button>}
@@ -173,7 +184,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
             <QuickAction icon="feed" label={t("newFeeding")} onClick={() => navigate("/feeding?create=1")} />
-            <QuickAction icon="weight" label={t("addWeight")} onClick={() => navigate("/animals?weigh=1")} />
+            <QuickAction icon="weight" label={t("addWeight")} onClick={() => navigate("/animals")} />
+            <QuickAction icon="leaf" label={locale === "it" ? "Registra muta" : "Record shed"} onClick={() => navigate("/animals")} />
+            <QuickAction icon="egg" label={locale === "it" ? "Riproduzione" : "Reproduction"} onClick={() => navigate("/reproduction-cycles")} />
             <QuickAction icon="calendar" label={t("addTask")} onClick={() => navigate("/tasks?create=1")} />
             <QuickAction icon="snake" label={t("addAnimal")} onClick={() => navigate("/animals?create=1")} />
           </div>
@@ -183,12 +196,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           <PanelHeader title={locale === "it" ? "Animali da controllare" : "Animals to check"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
           <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
           {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => {
-            const noHistory = animal.lastMealAt === null;
-            const overdueMeal = !noHistory && animal.daysSinceLastMeal > animal.feedingIntervalDays;
-            const nearDue = !noHistory && !overdueMeal && animal.daysSinceLastMeal >= Math.max(1, Math.floor(animal.feedingIntervalDays * 0.8));
-            const status = noHistory ? (locale === "it" ? "Nessuna alimentazione registrata" : "No feeding history") : overdueMeal ? (locale === "it" ? "Alimentazione in ritardo" : "Feeding overdue") : nearDue ? (locale === "it" ? "In prossimità della scadenza" : "Due soon") : (locale === "it" ? "Regolare" : "On track");
+            const noHistory = animal.feedingStatus === "no_history";
+            const overdueMeal = animal.feedingStatus === "overdue";
+            const nearDue = animal.feedingStatus === "due_soon";
+            const status = noHistory ? (locale === "it" ? "Nessuna alimentazione registrata" : "No feeding history") : overdueMeal ? (locale === "it" ? "Alimentazione in ritardo" : "Feeding overdue") : (locale === "it" ? "In prossimità della scadenza" : "Due soon");
             return <button className={`simple-row dashboard-reminder-row dashboard-animal-alert${overdueMeal ? " dashboard-reminder-overdue" : ""}`} key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
-              <span className="simple-row-icon"><Icon name={noHistory ? "info" : overdueMeal ? "alert" : "clock"} size={16} /></span>
+              {animal.photoUrl ? <img className="dashboard-animal-photo" src={animal.photoUrl} alt="" loading="lazy" /> : <span className="simple-row-icon"><Icon name={noHistory ? "info" : overdueMeal ? "alert" : "clock"} size={16} /></span>}
               <span className="dashboard-reminder-copy"><strong>{animal.name}</strong><small>{animal.species} · {noHistory ? (locale === "it" ? "Nessun pasto nello storico" : "No meal in history") : (locale === "it" ? `Ultimo pasto: ${formatDateTime(animal.lastMealAt, locale, timezone)} · ${animal.daysSinceLastMeal} gg / intervallo ${animal.feedingIntervalDays} gg` : `Last meal: ${formatDateTime(animal.lastMealAt, locale, timezone)} · ${animal.daysSinceLastMeal}d / interval ${animal.feedingIntervalDays}d`)}</small><span className={`dashboard-animal-status ${overdueMeal ? "is-overdue" : nearDue ? "is-near" : ""}`}>{status}</span></span>
               <Icon name="chevron" size={15} />
             </button>;
