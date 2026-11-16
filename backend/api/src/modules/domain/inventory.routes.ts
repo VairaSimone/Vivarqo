@@ -213,6 +213,24 @@ export function createInventoryRouter() {
       else if (input.movementType === "out") newAmount = currentAmount - amount;
       else newAmount = amount;
       if (newAmount < 0) throw new AppError(409, "INSUFFICIENT_STOCK", "The movement would make stock negative", { available: currentAmount / scale, requested: input.quantity });
+      const stockToRemove = input.movementType === "out" ? amount : input.movementType === "adjustment" && newAmount < currentAmount ? currentAmount - newAmount : 0;
+      if (stockToRemove > 0) {
+        let remainingToRemove = stockToRemove;
+        const lots = await tx.$queryRaw<Array<{ id: string; quantity_remaining: string }>>`
+          SELECT id::text, quantity_remaining::text
+          FROM inventory_lots
+          WHERE item_id = ${id}::uuid AND quantity_remaining > 0
+          ORDER BY expires_at ASC NULLS LAST, purchased_at ASC, id ASC
+          FOR UPDATE
+        `;
+        for (const lot of lots) {
+          if (remainingToRemove <= 0) break;
+          const lotAvailable = asMilli(lot.quantity_remaining);
+          const taken = Math.min(remainingToRemove, lotAvailable);
+          await tx.inventoryLot.update({ where: { id: lot.id }, data: { quantityRemaining: { decrement: taken / scale } } });
+          remainingToRemove -= taken;
+        }
+      }
       if (newAmount > 999_999_999_999) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Resulting stock exceeds the supported precision");
       const movement = await tx.stockMovement.create({
         data: {
