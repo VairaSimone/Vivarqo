@@ -273,7 +273,7 @@ export function createBackupRestoreRouter() {
     const byName = new Map(archive.map((entry) => [entry.name, entry.bytes]));
     const manifestBytes = byName.get("manifest.json");
     if (!manifestBytes) fail("BACKUP_MANIFEST_MISSING", "Backup manifest is missing");
-    let manifest: { format?: unknown; formatVersion?: unknown; accountId?: unknown; modules?: unknown; checksums?: unknown };
+    let manifest: { format?: unknown; formatVersion?: unknown; accountId?: unknown; modules?: unknown; checksums?: unknown; includeDocuments?: unknown };
     try { manifest = JSON.parse(manifestBytes.toString("utf8")) as typeof manifest; }
     catch { return fail("BACKUP_MANIFEST_INVALID", "Backup manifest is not valid JSON"); }
     if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 1 ||
