@@ -223,7 +223,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
             item ? `${getString(item, "name")} · ${formatNumber(entry.averageDailyConsumption, locale, 3)} ${entry.unit ?? ""}` : entry.itemId,
             entry.forecastDaysRemaining === null ? "—" : (locale === "it" ? `${Math.floor(entry.forecastDaysRemaining)} giorni` : `${Math.floor(entry.forecastDaysRemaining)} days`),
           ];
-        })} empty={locale === "it" ? "Consumo medio non ancora disponibile: servono movimenti di scarico negli ultimi 30 giorni." : "Average use is not available yet; stock-out movements are needed in the last 30 days."} />}
+        })} empty={locale === "it" ? "Consumo medio non ancora disponibile: servono movimenti di scarico negli ultimi 30 giorni." : "Average use is not available yet; stock-out movements are needed in the last 30 days."} />
       </>}
     </Panel>
     <Panel>
