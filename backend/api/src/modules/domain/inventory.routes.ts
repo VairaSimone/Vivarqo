@@ -40,6 +40,22 @@ const patchItemSchema = z.object({
   notes: z.string().trim().max(10_000).nullable().optional(),
   isActive: z.boolean().optional(),
 }).strict().refine((v) => Object.keys(v).length > 0, "At least one field is required");
+const supplierCreateSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  email: z.string().trim().email().max(254).nullable().optional(),
+  phone: z.string().trim().max(40).nullable().optional(),
+  website: z.string().trim().url().max(255).nullable().optional(),
+  notes: z.string().trim().max(5000).nullable().optional(),
+}).strict();
+const lotCreateSchema = z.object({
+  supplierId: z.string().uuid().nullable().optional(),
+  lotCode: z.string().trim().max(120).nullable().optional(),
+  quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((v) => hasMaximumDecimalPlaces(v, 3)),
+  unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
+  purchasedAt: z.string().datetime({ offset: true }),
+  expiresAt: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional(),
+  notes: z.string().trim().max(5000).nullable().optional(),
+}).strict();
 const movementSchema = z.object({
   movementType: z.enum(movementTypes),
   quantity: z.coerce.number().finite().min(0).max(999_999_999.999)
@@ -306,13 +322,7 @@ export function createInventoryRouter() {
 
   router.post("/inventory/suppliers", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const input = parseBody(z.object({
-      name: z.string().trim().min(1).max(160),
-      email: z.string().trim().email().max(254).nullable().optional(),
-      phone: z.string().trim().max(40).nullable().optional(),
-      website: z.string().trim().url().max(255).nullable().optional(),
-      notes: z.string().trim().max(5000).nullable().optional(),
-    }).strict(), req.body);
+    const input = parseBody(supplierCreateSchema, req.body);
     const supplier = await prisma.inventorySupplier.create({ data: { userId: auth.userId, ...input } });
     res.status(201).json({ supplier });
   });
@@ -333,15 +343,7 @@ export function createInventoryRouter() {
   router.post("/inventory/items/:id/lots", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeUuid(req.params.id);
-    const input = parseBody(z.object({
-      supplierId: z.string().uuid().nullable().optional(),
-      lotCode: z.string().trim().max(120).nullable().optional(),
-      quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((v) => hasMaximumDecimalPlaces(v, 3)),
-      unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
-      purchasedAt: z.string().datetime({ offset: true }),
-      expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-      notes: z.string().trim().max(5000).nullable().optional(),
-    }).strict(), req.body);
+    const input = parseBody(lotCreateSchema, req.body);
     const result = await prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<Array<{ id: string; is_active: boolean }>>`
         SELECT id::text, is_active FROM inventory_items
