@@ -832,6 +832,7 @@ CREATE TABLE user_preferences (
     date_format           VARCHAR(16) NOT NULL DEFAULT 'locale',
     default_landing_page  VARCHAR(40) NOT NULL DEFAULT 'today',
     compact_tables        BOOLEAN NOT NULL DEFAULT FALSE,
+    dashboard_layout      JSONB NOT NULL DEFAULT '{}'::jsonb,
     theme                 VARCHAR(16) NOT NULL DEFAULT 'system',
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
