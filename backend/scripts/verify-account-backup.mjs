@@ -50,7 +50,7 @@ async function hashZipEntry(entryName) {
 try {
   const manifestBytes = await readZipEntry("manifest.json");
   const manifest = JSON.parse(manifestBytes.toString("utf8"));
-  if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 1) {
+  if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 2) {
     throw new Error("Unsupported or invalid Vivarqo backup format");
   }
   if (typeof manifest.accountId !== "string" || !Array.isArray(manifest.modules) ||
