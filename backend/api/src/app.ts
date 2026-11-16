@@ -35,6 +35,7 @@ import { createFinanceRouter, createNotificationRouter } from "./modules/domain/
 import { createBillingRouter, type BillingRouterOptions } from "./modules/domain/billing.routes.js";
 import { subscriptionAccessGuard } from "./modules/domain/billing-entitlements.js";
 import { createExportRouter } from "./modules/domain/exports.routes.js";
+import { createBackupRestoreRouter } from "./modules/domain/backup-restore.routes.js";
 import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
@@ -126,6 +127,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createBillingRouter(dependencies.billing));
   const exportRouter = createExportRouter();
   app.use("/api/v1/exports", exportRouter);
+  app.use("/api/v1/exports", createBackupRestoreRouter());
   // Compatibility route required by the product specification; both paths share capacity controls.
   app.use("/api/v1/account/export", exportRouter);
 
