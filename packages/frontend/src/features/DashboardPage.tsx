@@ -15,6 +15,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const resource = useResource<DashboardTodayDto>("/home/today", parseDashboardTodayResponse);
   const { toast, show } = useToast();
   const [completing, setCompleting] = useState<string | null>(null);
+  const [taskFilter, setTaskFilter] = useState<"all" | "overdue" | "today" | "upcoming" | "completed">("all");
+  const [optimisticallyCompleted, setOptimisticallyCompleted] = useState<string[]>([]);
   const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>(() => {
     const defaults = { priorities: true, plan: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true };
     try { const saved = JSON.parse(window.localStorage.getItem("vivarqo.dashboard.widgets") || "{}") as Record<string, unknown>; return Object.fromEntries(Object.entries(defaults).map(([key, value]) => [key, typeof saved[key] === "boolean" ? saved[key] : value])); } catch { return defaults; }
@@ -64,7 +66,10 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const due = data?.tasks.dueToday ?? [];
   const overdue = data?.tasks.overdue ?? [];
   const upcoming = data?.tasks.upcoming ?? [];
-  const completed = data?.tasks.completedToday ?? [];
+  const completed = [...(data?.tasks.completedToday ?? []), ...(data?.tasks.dueToday ?? []).filter((task) => optimisticallyCompleted.includes(task.id))];
+  const visibleOverdue = overdue.filter((task) => !optimisticallyCompleted.includes(task.id));
+  const visibleDue = due.filter((task) => !optimisticallyCompleted.includes(task.id));
+  const visibleUpcoming = upcoming.filter((task) => !optimisticallyCompleted.includes(task.id));
   const reminders = data?.imminentReminders ?? [];
   const feedingAlerts = data?.feedingAlerts ?? [];
   const recent = data?.recentEvents ?? [];
@@ -75,9 +80,11 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     setCompleting(id);
     try {
       await api.post(`/tasks/${id}/complete`);
+      setOptimisticallyCompleted((current) => current.includes(id) ? current : [...current, id]);
       show(t("taskCompleted"));
       resource.reload();
     } catch (error) {
+      setOptimisticallyCompleted((current) => current.filter((taskId) => taskId !== id));
       show(error instanceof ApiError ? error.message : t("operationFailed"));
     } finally {
       setCompleting(null);
@@ -120,32 +127,35 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? "Sposta su" : "Move up"}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? "Sposta giù" : "Move down"}>↓</Button></span></div>)}</div>}</Panel></div>
       {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}><Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section">
-          <PanelHeader title={t("overdue")} action={overdue.length > 0 ? <Badge tone="danger">{counts?.overdue ?? overdue.length}</Badge> : undefined} />
-          {overdue.length
-            ? overdue.slice(0, 6).map((task) => taskCard(task, true))
-            : <EmptyState title={t("overdueClear")} description={t("overdueClearHint")} />}
+          <PanelHeader title={t("overdue")} action={visibleOverdue.length > 0 ? <Badge tone="danger">{visibleOverdue.length}</Badge> : undefined} />
+          <div className="dashboard-task-filters" role="group" aria-label={locale === "it" ? "Filtra attività" : "Filter tasks"}>
+            {(["all", "overdue", "today", "upcoming", "completed"] as const).map((key) => <button key={key} type="button" className={taskFilter === key ? "dashboard-task-filter is-active" : "dashboard-task-filter"} aria-pressed={taskFilter === key} onClick={() => setTaskFilter(key)}>{({ all: locale === "it" ? "Tutte" : "All", overdue: locale === "it" ? "Scadute" : "Overdue", today: locale === "it" ? "Oggi" : "Today", upcoming: locale === "it" ? "Prossimi 7 giorni" : "Next 7 days", completed: locale === "it" ? "Completate" : "Completed" })[key]}</button>)}
+          </div>
+          {(taskFilter === "all" || taskFilter === "overdue") && (visibleOverdue.length
+            ? visibleOverdue.slice(0, 6).map((task) => taskCard(task, true))
+            : <EmptyState title={t("overdueClear")} description={t("overdueClearHint")} />)}
           {Boolean(truncated?.overdue) && <p className="muted-note">{t("truncatedNotice")}</p>}
         </section>
 
         <div className="panel-separator" />
         <section className="dashboard-task-section">
-          <PanelHeader title={t("dueToday")} action={due.length > 0 ? <Badge tone="warning">{counts?.dueToday ?? due.length}</Badge> : undefined} />
-          {due.length
-            ? due.slice(0, 8).map((task) => taskCard(task))
-            : <EmptyState title={t("todayClear")} description={t("todayClearHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?create=1")}><Icon name="plus" size={14} />{t("addTask")}</Button>} />}
+          <PanelHeader title={t("dueToday")} action={visibleDue.length > 0 ? <Badge tone="warning">{visibleDue.length}</Badge> : undefined} />
+          {(taskFilter === "all" || taskFilter === "today") && (visibleDue.length
+            ? visibleDue.slice(0, 8).map((task) => taskCard(task))
+            : <EmptyState title={t("todayClear")} description={t("todayClearHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?create=1")}><Icon name="plus" size={14} />{t("addTask")}</Button>} />)}
           {Boolean(truncated?.dueToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
         </section>
 
         <div className="panel-separator" />
         <section className="dashboard-task-section">
-          <PanelHeader title={t("upcomingTasks")} action={upcoming.length > 0 ? <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button> : undefined} />
-          {upcoming.length
-            ? upcoming.slice(0, 6).map((task) => taskCard(task))
-            : <EmptyState title={t("upcomingEmpty")} description={t("upcomingEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/calendar")}><Icon name="calendar" size={14} />{t("openCalendar")}</Button>} />}
+          <PanelHeader title={t("upcomingTasks")} action={visibleUpcoming.length > 0 ? <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button> : undefined} />
+          {(taskFilter === "all" || taskFilter === "upcoming") && (visibleUpcoming.length
+            ? visibleUpcoming.slice(0, 6).map((task) => taskCard(task))
+            : <EmptyState title={t("upcomingEmpty")} description={t("upcomingEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/calendar")}><Icon name="calendar" size={14} />{t("openCalendar")}</Button>} />)}
           {Boolean(truncated?.upcoming) && <p className="muted-note">{t("truncatedNotice")}</p>}
         </section>
 
-        {completed.length > 0 && <>
+        {(taskFilter === "all" || taskFilter === "completed") && completed.length > 0 && <>
           <div className="panel-separator" />
           <section className="dashboard-task-section">
             <PanelHeader title={t("completedToday")} action={<Badge tone="success">{counts?.completedToday ?? completed.length}</Badge>} />
@@ -167,7 +177,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </Panel></div>}
 
       {widgetVisibility.feedingAlerts && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("feedingAlerts") }}><Panel>
-          <PanelHeader title={locale === "it" ? "Animali senza pasto" : "Animals overdue for a meal"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
+          <PanelHeader title={locale === "it" ? "Animali da controllare" : "Animals to check"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
           <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
           {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => <button className="simple-row dashboard-reminder-row dashboard-reminder-overdue" key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
             <span className="simple-row-icon"><Icon name="alert" size={16} /></span>
