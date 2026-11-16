@@ -131,7 +131,8 @@ function parseCsv(bytes: Buffer): CsvRow[] {
       else cell += char;
     } else if (char === '"' && cell.length === 0) quoted = true;
     else if (char === ",") { row.push(cell); cell = ""; }
-    else if (char === "\\n") { row.push(cell.replace(/\\r$/, "")); matrix.push(row); row = []; cell = ""; }
+    else if (char === "\
+") { row.push(cell.replace(/\\r$/, "")); matrix.push(row); row = []; cell = ""; }
     else cell += char;
   }
   if (quoted) fail("BACKUP_CSV_INVALID", "CSV contains an unterminated quoted field");
@@ -365,16 +366,20 @@ export function createBackupRestoreRouter() {
       const references: Array<[string, string, string]> = [
         ["feeding_entries", "sessionId", "feeding_sessions"], ["feeding_entries", "animalId", "animals"],
         ["weights", "animalId", "animals"], ["sheds", "animalId", "animals"], ["animal_notes", "animalId", "animals"],
-        ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],\n        ["animals", "motherAnimalId", "animals"], ["animals", "fatherAnimalId", "animals"],\n        ["animals", "originClutchId", "clutches"], ["animals", "originOffspringBatchId", "offspring_batches"],
+        ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],
+        ["animals", "motherAnimalId", "animals"], ["animals", "fatherAnimalId", "animals"],
+        ["animals", "originClutchId", "clutches"], ["animals", "originOffspringBatchId", "offspring_batches"],
         ["reproductive_events", "cycleId", "reproduction_cycles"], ["reproductive_events", "animalId", "animals"],
         ["clutches", "cycleId", "reproduction_cycles"], ["eggs", "clutchId", "clutches"], ["eggs", "offspringAnimalId", "animals"],
         ["incubation_logs", "clutchId", "clutches"], ["offspring_batches", "cycleId", "reproduction_cycles"],
         ["offspring_batches", "clutchId", "clutches"], ["inventory_lots", "itemId", "inventory_items"],
         ["inventory_lots", "supplierId", "inventory_suppliers"], ["stock_movements", "itemId", "inventory_items"],
         ["stock_movements", "lotId", "inventory_lots"], ["finance_entries", "animalId", "animals"],
-        ["documents", "animalId", "animals"], ["documents", "cycleId", "reproduction_cycles"],\n        ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
+        ["documents", "animalId", "animals"], ["documents", "cycleId", "reproduction_cycles"],
+        ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
         ["finance_entries", "clutchId", "clutches"], ["finance_entries", "offspringBatchId", "offspring_batches"],
-        ["finance_entries", "recurrenceId", "finance_recurrences"], ["finance_entries", "sourceStockMovementId", "stock_movements"],\n        ["finance_recurrences", "animalId", "animals"], ["finance_recurrences", "documentId", "documents"], ["feeding_entries", "inventoryItemId", "inventory_items"],
+        ["finance_entries", "recurrenceId", "finance_recurrences"], ["finance_entries", "sourceStockMovementId", "stock_movements"],
+        ["finance_recurrences", "animalId", "animals"], ["finance_recurrences", "documentId", "documents"], ["feeding_entries", "inventoryItemId", "inventory_items"],
         ["tasks", "animalId", "animals"], ["tasks", "reminderRuleId", "reminder_rules"],
         ["reminder_rules", "animalId", "animals"], ["animal_genetic_traits", "animalId", "animals"],
         ["animal_genetic_traits", "sourceAnimalId", "animals"], ["public_shares", "animalId", "animals"],
