@@ -412,8 +412,8 @@ function ExportPage({ locale }: { locale: Locale }) {
     <Panel>
       <PanelHeader title={locale === "it" ? "Ripristina da backup ZIP" : "Restore from ZIP backup"} />
       <p className="muted-note">{locale === "it"
-        ? "Carica un backup Vivarqo completo, con tutte le sezioni e gli allegati. Per sicurezza il ripristino è consentito solo su un account senza dati gestionali: non sovrascrive né unisce dati esistenti."
-        : "Upload a complete Vivarqo backup with all sections and attachments. For safety, restore is allowed only on an account without existing business data; it never overwrites or merges existing records."}</p>
+        ? "Carica un backup Vivarqo completo, con tutte le sezioni e gli allegati. Per sicurezza il ripristino è consentito solo su un account senza dati gestionali: non sovrascrive né unisce dati esistenti. Gli ID devono inoltre essere liberi: se i record originali sono ancora presenti in questo database, usa un database pulito o rimuovi prima quei record."
+        : "Upload a complete Vivarqo backup with all sections and attachments. For safety, restore is allowed only on an account without existing business data; it never overwrites or merges existing records. IDs must also be free: if the original records still exist in this database, use a clean database or remove those records first."}</p>
       <Field label={locale === "it" ? "Archivio ZIP" : "ZIP archive"}>
         <input type="file" accept=".zip,application/zip" onChange={(event) => { setRestoreFile(event.target.files?.[0] ?? null); setRestoreError(""); }} />
       </Field>
