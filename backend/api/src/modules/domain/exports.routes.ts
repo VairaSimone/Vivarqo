@@ -19,7 +19,7 @@ function csvCell(value: unknown): string {
   if (typeof value === "string") rendered = value;
   else if (typeof value === "bigint") rendered = value.toString();
   else if (value instanceof Date) rendered = value.toISOString();
-  else if (typeof value === "object" && value !== null && "toString" in value && value.constructor?.name === "Decimal") rendered = String(value);
+  else if (typeof value === "object" && value !== null && "toFixed" in value && typeof value.toFixed === "function") rendered = String(value);
   else if (typeof value === "object") rendered = JSON.stringify(value);
   else rendered = String(value);
 
