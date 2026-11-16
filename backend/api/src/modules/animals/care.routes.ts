@@ -9,6 +9,7 @@ import { decimalToScaledInteger } from "../domain/decimal-precision.js";
 import { calculateFeedingMetrics } from "./feeding-metrics.js";
 import {
   feedingSessionSchema,
+  bulkCareRecordsSchema,
   noteSchema,
   pageQuerySchema,
   patchFeedingEntrySchema,
@@ -53,6 +54,62 @@ function pageOptions(query: unknown) {
 
 export function createCareRouter() {
   const router = Router();
+
+  router.post("/care-records/bulk", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(bulkCareRecordsSchema, req.body);
+    const created = await prisma.$transaction(async (tx) => {
+      const owned = await tx.animal.findMany({
+        where: { userId: auth.userId, id: { in: input.animalIds } },
+        select: { id: true, status: true, archivedAt: true },
+      });
+      if (owned.length !== input.animalIds.length) {
+        throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more animals were not found");
+      }
+      if (owned.some((animal) => animal.status !== "active" || animal.archivedAt !== null)) {
+        throw new AppError(409, "ANIMAL_NOT_ACTIVE", "Bulk care records can only be added to active animals");
+      }
+
+      if (input.kind === "weight") {
+        const records = await tx.weightMeasurement.createManyAndReturn({
+          data: input.animalIds.map((animalId) => ({
+            animalId,
+            measuredAt: new Date(input.measuredAt),
+            weightG: input.weightG,
+            notes: input.notes ?? null,
+          })),
+        });
+        await tx.auditEvent.create({
+          data: {
+            userId: auth.userId,
+            action: "weight.bulk_created",
+            entityType: "weight",
+            metadata: { count: records.length, animalIds: input.animalIds },
+          },
+        });
+        return { kind: input.kind, records, createdCount: records.length };
+      }
+
+      const records = await tx.shedRecord.createManyAndReturn({
+        data: input.animalIds.map((animalId) => ({
+          animalId,
+          occurredAt: new Date(input.occurredAt),
+          outcome: input.outcome,
+          notes: input.notes ?? null,
+        })),
+      });
+      await tx.auditEvent.create({
+        data: {
+          userId: auth.userId,
+          action: "shed.bulk_created",
+          entityType: "shed",
+          metadata: { count: records.length, animalIds: input.animalIds },
+        },
+      });
+      return { kind: input.kind, records, createdCount: records.length };
+    });
+    res.status(201).json(created);
+  });
 
   router.get("/feeding-sessions", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
