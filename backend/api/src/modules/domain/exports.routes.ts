@@ -373,12 +373,12 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
   ];
   const fullBackup = ["animals", "feedings", "reproduction", "finance", "inventory"].every((module) => modules.includes(module));
   const moduleByFile: Record<string, string> = {
-    "animals.csv": "animals", "animal_genetic_traits.csv": "animals", "public_shares.csv": "animals",
+    "animals.csv": "animals", "animal_locations.csv": "animals", "animal_location_moves.csv": "animals", "animal_transfers.csv": "animals", "saved_animal_filters.csv": "animals", "user_preferences.csv": "animals", "hatchling_care.csv": "animals", "animal_genetic_traits.csv": "animals", "animal_genetic_trait_history.csv": "animals", "genetic_genes.csv": "animals", "genetic_loci.csv": "animals", "genetic_alleles.csv": "animals", "public_shares.csv": "animals",
     "feeding_sessions.csv": "feedings", "feeding_entries.csv": "feedings", "weights.csv": "feedings",
-    "sheds.csv": "feedings", "animal_notes.csv": "feedings", "tasks.csv": "feedings",
+    "sheds.csv": "feedings", "animal_notes.csv": "feedings", "health_records.csv": "feedings", "tasks.csv": "feedings",
     "reminder_rules.csv": "feedings", "notifications.csv": "feedings", "notification_preferences.csv": "feedings",
     "reproduction_cycles.csv": "reproduction", "reproductive_events.csv": "reproduction", "clutches.csv": "reproduction",
-    "eggs.csv": "reproduction", "incubation_logs.csv": "reproduction", "offspring_batches.csv": "reproduction",
+    "eggs.csv": "reproduction", "incubation_logs.csv": "reproduction", "offspring_batches.csv": "reproduction", "incubators.csv": "reproduction", "incubator_maintenance.csv": "reproduction", "clutch_history.csv": "reproduction", "egg_history.csv": "reproduction", "egg_measurements.csv": "reproduction", "egg_incubator_transfers.csv": "reproduction",
     "finance_entries.csv": "finance", "finance_budgets.csv": "finance", "finance_recurrences.csv": "finance",
     "inventory_items.csv": "inventory", "inventory_suppliers.csv": "inventory", "inventory_lots.csv": "inventory",
     "stock_movements.csv": "inventory",
