@@ -32,6 +32,14 @@ export function createHomeCalendarRouter() {
       upcomingTaskCount,
       imminentReminderCount,
       feedingAlerts,
+      activeAnimalCount,
+      feedingTodayCount,
+      lowStockItems,
+      recentOffspringBatches,
+      recentIncubatorMaintenance,
+      recentAnimalUpdates,
+      dueIncubatorMaintenance,
+      eggsNearHatch,
     ] = await Promise.all([
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } },
@@ -130,6 +138,42 @@ export function createHomeCalendarRouter() {
         ORDER BY COALESCE(last_meal.performed_at, a.created_at) ASC
         LIMIT 100
       `,
+      prisma.animal.count({ where: { userId: auth.userId, status: "active" } }),
+      prisma.feedingEntry.count({ where: { session: { is: { userId: auth.userId, performedAt: { gte: bounds.start, lt: bounds.end } } }, animal: { is: { userId: auth.userId } } } }),
+      prisma.$queryRaw<Array<{ id: string; name: string; quantityOnHand: string; minimumQuantity: string; unit: string }>>`
+        SELECT id, name, quantity_on_hand::text AS "quantityOnHand",
+          minimum_quantity::text AS "minimumQuantity", unit
+        FROM inventory_items
+        WHERE user_id = ${auth.userId}::uuid AND is_active = TRUE
+          AND minimum_quantity IS NOT NULL AND quantity_on_hand <= minimum_quantity
+        ORDER BY (minimum_quantity - quantity_on_hand) DESC, name ASC
+        LIMIT 50
+      `,
+      prisma.offspringBatch.findMany({
+        where: { cycle: { is: { userId: auth.userId } }, bornOn: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { bornOn: "desc" }, take: 15,
+        include: { cycle: { select: { id: true, name: true } } },
+      }),
+      prisma.incubatorMaintenance.findMany({
+        where: { incubator: { is: { userId: auth.userId } }, occurredAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { occurredAt: "desc" }, take: 15,
+        include: { incubator: { select: { id: true, name: true } } },
+      }),
+      prisma.animal.findMany({
+        where: { userId: auth.userId, status: "active", updatedAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
+        orderBy: { updatedAt: "desc" }, take: 15,
+        select: { id: true, name: true, updatedAt: true },
+      }),
+      prisma.incubator.findMany({
+        where: { userId: auth.userId, isActive: true, maintenanceIntervalDays: { not: null }, nextMaintenanceAt: { lte: nextWeekLimit } },
+        orderBy: { nextMaintenanceAt: "asc" }, take: 20,
+        select: { id: true, name: true, nextMaintenanceAt: true, maintenanceIntervalDays: true },
+      }),
+      prisma.egg.findMany({
+        where: { clutch: { is: { cycle: { is: { userId: auth.userId } } } }, expectedHatchAt: { gte: bounds.start, lte: nextWeekLimit }, status: { notIn: ["hatched", "failed"] } },
+        orderBy: { expectedHatchAt: "asc" }, take: 30,
+        include: { clutch: { select: { cycleId: true, cycle: { select: { name: true } } } } },
+      }),
     ]);
 
     const serializeTask = (task: typeof dueToday[number]) => {
@@ -158,7 +202,10 @@ export function createHomeCalendarRouter() {
       ...recentSheds.map((item) => ({ type: "shed" as const, occurredAt: item.occurredAt, title: "Shed recorded", targetPath: `/animals/${item.animalId}`, record: item })),
       ...recentNotes.map((item) => ({ type: "note" as const, occurredAt: item.occurredAt, title: item.title ?? "Animal note", targetPath: `/animals/${item.animalId}`, record: item })),
       ...recentReproductionEvents.map((item) => ({ type: "reproduction" as const, occurredAt: item.occurredAt, title: item.eventType, targetPath: `/reproduction-cycles/${item.cycleId}`, record: item })),
-    ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, 15);
+      ...recentOffspringBatches.map((item) => ({ type: "birth" as const, occurredAt: item.bornOn, title: `Nascita: ${item.count} piccoli`, targetPath: `/reproduction-cycles/${item.cycleId}`, record: item })),
+      ...recentIncubatorMaintenance.map((item) => ({ type: "incubation" as const, occurredAt: item.occurredAt, title: `Controllo incubatrice: ${item.incubator.name}`, targetPath: "/reproduction-cycles", record: item })),
+      ...recentAnimalUpdates.map((item) => ({ type: "animal_update" as const, occurredAt: item.updatedAt, title: `Scheda aggiornata: ${item.name}`, targetPath: `/animals/${item.id}`, record: item })),
+    ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, 20);
 
     res.status(200).json({
       date: today,
@@ -170,7 +217,20 @@ export function createHomeCalendarRouter() {
         completedToday: completedTodayCount,
         upcoming: upcomingTaskCount,
         imminentReminders: imminentReminderCount,
+        activeAnimals: activeAnimalCount,
+        feedingsToday: feedingTodayCount,
+        lowStock: lowStockItems.length,
       },
+      overview: {
+        activeAnimals: activeAnimalCount,
+        feedingsToday: feedingTodayCount,
+        lowStockItems,
+      },
+      smartSuggestions: [
+        ...dueIncubatorMaintenance.map((item) => ({ id: `incubator-${item.id}`, type: "incubator_maintenance", title: item.name, dueAt: item.nextMaintenanceAt, targetPath: "/reproduction-cycles" })),
+        ...eggsNearHatch.map((item) => ({ id: `egg-${item.id}`, type: "expected_hatch", title: item.clutch.cycle.name ?? "Covata", dueAt: item.expectedHatchAt, targetPath: `/reproduction-cycles/${item.clutch.cycleId}` })),
+        ...reminders.map((item) => ({ id: item.id, type: item.category, title: item.title, dueAt: item.nextDueAt, targetPath: item.animalId ? `/animals/${item.animalId}` : "/tasks" })),
+      ],
       truncated: {
         dueToday: dueTodayCount > dueToday.length,
         overdue: overdueCount > overdue.length,
