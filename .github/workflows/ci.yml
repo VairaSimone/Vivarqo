@@ -306,7 +306,7 @@ jobs:
         run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts --cleanup
       - name: Upload browser screenshots, traces and reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snakebee-e2e-browser-artifacts
           path: |
