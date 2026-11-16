@@ -151,7 +151,9 @@ function parseCsv(bytes: Buffer): CsvRow[] {
 function sha256(bytes: Buffer): string { return createHash("sha256").update(bytes).digest("hex"); }
 function snakeCase(value: string): string { return value.replace(/[A-Z]/g, (letter) => "_" + letter.toLowerCase()); }
 
-const TABLES = [
+type TableSpec = { file: string; table: string; user?: boolean; deferred?: readonly string[] };
+
+const TABLES: readonly TableSpec[] = [
   { file: "animals.csv", table: "animals", deferred: ["motherAnimalId", "fatherAnimalId", "originClutchId", "originOffspringBatchId"], user: true },
   { file: "feeding_sessions.csv", table: "feeding_sessions", user: true },
   { file: "reproduction_cycles.csv", table: "reproduction_cycles", user: true },
@@ -178,9 +180,7 @@ const TABLES = [
   { file: "animal_genetic_traits.csv", table: "animal_genetic_traits" },
   { file: "public_shares.csv", table: "public_shares", user: true },
   { file: "notification_preferences.csv", table: "notification_preferences", user: true },
-] as const;
-
-type TableSpec = { file: string; table: string; user?: boolean; deferred?: readonly string[] };
+];
 type ColumnInfo = { column_name: string; data_type: string; udt_name: string };
 
 function normalizeCell(value: string, column: ColumnInfo): unknown {
@@ -281,7 +281,7 @@ export function createBackupRestoreRouter() {
     catch { return fail("BACKUP_MANIFEST_INVALID", "Backup manifest is not valid JSON"); }
     if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 1 ||
         typeof manifest.accountId !== "string" || !z.string().uuid().safeParse(manifest.accountId).success ||
-        !Array.isArray(manifest.modules) || !FULL_MODULES.every((module) => manifest.modules!.includes(module)) || manifest.includeDocuments !== true ||
+        !Array.isArray(manifest.modules) || !FULL_MODULES.every((module) => (manifest.modules as unknown[]).includes(module)) || manifest.includeDocuments !== true ||
         typeof manifest.checksums !== "object" || manifest.checksums === null || Array.isArray(manifest.checksums)) {
       fail("BACKUP_FORMAT_UNSUPPORTED", "Only complete Vivarqo account backups can be restored");
     }
@@ -359,10 +359,10 @@ export function createBackupRestoreRouter() {
           fail("BACKUP_ATTACHMENT_INVALID", "A document attachment has an unexpected size or MIME type");
         }
       }
-      const expectedPhotos = new Set([
-        ...(parsedTables.get("animals") ?? []).map((row) => row.photoArchivePath).filter((value): value is string => typeof value === "string" && value.length > 0),
-        ...(parsedTables.get("eggs") ?? []).map((row) => row.photoArchivePath).filter((value): value is string => typeof value === "string" && value.length > 0),
-      ]);
+      const expectedPhotos = new Set<string>();
+      for (const row of [...(parsedTables.get("animals") ?? []), ...(parsedTables.get("eggs") ?? [])]) {
+        if (row.photoArchivePath) expectedPhotos.add(row.photoArchivePath);
+      }
       for (const photoPath of expectedPhotos) {
         if (!attachmentKeys.has(photoPath)) fail("BACKUP_ATTACHMENT_MISSING", "A referenced animal or egg photo is missing from the backup");
       }
@@ -377,10 +377,10 @@ export function createBackupRestoreRouter() {
         columnsByTable.set(spec.table, columns);
       }
       const importedIds = new Map<string, Set<string>>();
-      for (const spec of TABLES) importedIds.set(spec.table, new Set((parsedTables.get(spec.table) ?? []).map((row) => row.id)));
+      for (const spec of TABLES) importedIds.set(spec.table, new Set((parsedTables.get(spec.table) ?? []).map((row) => row.id).filter((id): id is string => typeof id === "string" && id.length > 0)));
       const references: Array<[string, string, string]> = [
         ["feeding_entries", "sessionId", "feeding_sessions"], ["feeding_entries", "animalId", "animals"],
-        ["weights", "animalId", "animals"], ["sheds", "animalId", "animals"], ["animal_notes", "animalId", "animals"],
+        ["weight_measurements", "animalId", "animals"], ["shed_records", "animalId", "animals"], ["animal_notes", "animalId", "animals"],
         ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],
         ["animals", "motherAnimalId", "animals"], ["animals", "fatherAnimalId", "animals"],
         ["animals", "originClutchId", "clutches"], ["animals", "originOffspringBatchId", "offspring_batches"],
@@ -466,7 +466,7 @@ export function createBackupRestoreRouter() {
         }
         await tx.auditEvent.create({ data: {
           userId: auth.userId, action: "account.backup_restored", entityType: "account",
-          metadata: { sourceAccountId: manifest.accountId, restoredRecords: restored, formatVersion: 1 },
+          metadata: { sourceAccountId: manifest.accountId as string, restoredRecords: restored, formatVersion: 1 },
         } });
         return { restoredRecords: restored };
       }, { maxWait: 10_000, timeout: 120_000 });
