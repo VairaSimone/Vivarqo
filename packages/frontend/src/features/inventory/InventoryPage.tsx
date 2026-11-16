@@ -124,6 +124,58 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     } finally { setBusy(false); }
   }
 
+
+  async function editSupplier(supplier: { id: string; name: string }) {
+    const name = window.prompt(locale === "it" ? "Nome fornitore" : "Supplier name", supplier.name);
+    if (name === null || !name.trim()) return;
+    try {
+      await api.patch(`/inventory/suppliers/${supplier.id}`, { name: name.trim() });
+      setSuppliers((current) => current.map((entry) => entry.id === supplier.id ? { ...entry, name: name.trim() } : entry));
+      show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function deleteSupplier(supplier: { id: string; name: string }) {
+    if (!window.confirm(locale === "it" ? `Eliminare il fornitore "${supplier.name}"? I lotti resteranno senza fornitore.` : `Delete supplier "${supplier.name}"? Existing lots will be kept without a supplier.`)) return;
+    try {
+      await api.delete(`/inventory/suppliers/${supplier.id}`);
+      setSuppliers((current) => current.filter((entry) => entry.id !== supplier.id));
+      setLotForm((current) => ({ ...current, supplierId: current.supplierId === supplier.id ? "" : current.supplierId }));
+      const response = await api.get<{ lots: typeof lots }>(`/inventory/items/${getString(lotItem, "id")}/lots`);
+      setLots(response.lots); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function editLot(lot: (typeof lots)[number]) {
+    const lotCode = window.prompt(locale === "it" ? "Codice lotto" : "Lot code", lot.lotCode ?? "");
+    if (lotCode === null) return;
+    const expiry = window.prompt(locale === "it" ? "Scadenza (AAAA-MM-GG, vuoto = nessuna)" : "Expiry (YYYY-MM-DD, blank = none)", lot.expiresAt?.slice(0, 10) ?? "");
+    if (expiry === null) return;
+    if (expiry && !/^\\d{4}-\\d{2}-\\d{2}$/.test(expiry)) { show(locale === "it" ? "Data di scadenza non valida." : "Invalid expiry date."); return; }
+    try {
+      await api.patch(`/inventory/items/${getString(lotItem, "id")}/lots/${lot.id}`, { lotCode: lotCode.trim() || null, expiresAt: expiry || null });
+      const response = await api.get<{ lots: typeof lots }>(`/inventory/items/${getString(lotItem, "id")}/lots`);
+      setLots(response.lots); summary.reload(); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function countLot(lot: (typeof lots)[number]) {
+    const counted = window.prompt(locale === "it" ? "Quantità fisica rilevata" : "Counted physical quantity", String(lot.quantityRemaining));
+    if (counted === null) return;
+    const value = Number(counted.replace(",", "."));
+    if (!Number.isFinite(value) || value < 0 || Math.round(value * 1000) !== value * 1000) { show(locale === "it" ? "Inserisci una quantità valida (max 3 decimali)." : "Enter a valid quantity (max 3 decimals)."); return; }
+    try {
+      await api.post(`/inventory/items/${getString(lotItem, "id")}/lots/${lot.id}/count`, { countedQuantity: value, occurredAt: new Date().toISOString(), notes: locale === "it" ? "Rettifica da inventario fisico" : "Physical inventory count" });
+      const response = await api.get<{ lots: typeof lots }>(`/inventory/items/${getString(lotItem, "id")}/lots`);
+      setLots(response.lots); resource.reload(); summary.reload(); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+  async function deleteLot(lot: (typeof lots)[number]) {
+    if (!window.confirm(locale === "it" ? "Eliminare questo lotto? È possibile solo se non ha consumi o rettifiche." : "Delete this lot? Only unused lots without adjustments can be deleted.")) return;
+    try {
+      await api.delete(`/inventory/items/${getString(lotItem, "id")}/lots/${lot.id}`);
+      const response = await api.get<{ lots: typeof lots }>(`/inventory/items/${getString(lotItem, "id")}/lots`);
+      setLots(response.lots); resource.reload(); summary.reload(); show(t("saveSuccess"));
+    } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
+  }
+
   async function saveMovement(event: FormEvent) {
     event.preventDefault(); if (!movementItem) return; setBusy(true); setError("");
     try {
@@ -198,11 +250,12 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     {lotItem && <Modal title={`${locale === "it" ? "Lotti e fornitori" : "Lots and suppliers"} · ${getString(lotItem, "name")}`} onClose={() => setLotItem(null)} wide>
       {error && <Alert tone="danger">{error}</Alert>}
       <PanelHeader title={locale === "it" ? "Lotti registrati" : "Registered lots"} />
-      <DataTable headers={[locale === "it" ? "Lotto" : "Lot", locale === "it" ? "Fornitore" : "Supplier", t("available"), locale === "it" ? "Costo unitario" : "Unit cost", locale === "it" ? "Scadenza" : "Expiry"]} rows={lots.map((lot) => [
+      <DataTable headers={[locale === "it" ? "Lotto" : "Lot", locale === "it" ? "Fornitore" : "Supplier", t("available"), locale === "it" ? "Costo unitario" : "Unit cost", locale === "it" ? "Scadenza" : "Expiry", locale === "it" ? "Azioni" : "Actions"]} rows={lots.map((lot) => [
         lot.lotCode || "—", lot.supplier?.name || "—",
         formatNumber(getString(lot, "quantityRemaining"), locale, 3),
         lot.unitCostCents === null ? "—" : (lot.unitCostCents / 100).toLocaleString(locale === "it" ? "it-IT" : "en-GB", { style: "currency", currency: "EUR" }),
         lot.expiresAt ? formatDate(lot.expiresAt, locale) : "—",
+        <div className="row-actions"><IconButton label={locale === "it" ? "Modifica lotto" : "Edit lot"} onClick={() => void editLot(lot)}><Icon name="edit" /></IconButton><IconButton label={locale === "it" ? "Conteggio fisico" : "Physical count"} onClick={() => void countLot(lot)}><Icon name="clipboard-check" /></IconButton><IconButton label={locale === "it" ? "Elimina lotto" : "Delete lot"} onClick={() => void deleteLot(lot)}><Icon name="trash-2" /></IconButton></div>,
       ])} empty={locale === "it" ? "Nessun lotto registrato" : "No lots recorded"} mobileLayout="scroll" />
       <div className="panel-separator" />
       <PanelHeader title={locale === "it" ? "Registra un acquisto / nuovo lotto" : "Record a purchase / new lot"} />
@@ -218,6 +271,9 @@ export function InventoryPage({ locale }: { locale: Locale }) {
         <Field label={t("notes")}><Textarea rows={2} value={lotForm.notes} onChange={(e) => setLotForm({ ...lotForm, notes: e.target.value })} /></Field>
         <Button type="submit" disabled={busy}>{locale === "it" ? "Registra lotto e carico" : "Save lot and stock-in"}</Button>
       </form>
+      <div className="panel-separator" />
+      <PanelHeader title={locale === "it" ? "Fornitori" : "Suppliers"} />
+      <DataTable headers={[locale === "it" ? "Nome" : "Name", locale === "it" ? "Azioni" : "Actions"]} rows={suppliers.map((supplier) => [supplier.name, <div className="row-actions"><IconButton label={locale === "it" ? "Modifica fornitore" : "Edit supplier"} onClick={() => void editSupplier(supplier)}><Icon name="edit" /></IconButton><IconButton label={locale === "it" ? "Elimina fornitore" : "Delete supplier"} onClick={() => void deleteSupplier(supplier)}><Icon name="trash-2" /></IconButton></div>])} empty={locale === "it" ? "Nessun fornitore" : "No suppliers"} mobileLayout="scroll" />
       <div className="panel-separator" />
       <PanelHeader title={locale === "it" ? "Aggiungi fornitore" : "Add supplier"} />
       <form className="form-grid" onSubmit={createSupplier}>
