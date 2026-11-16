@@ -137,6 +137,10 @@ export async function dispatchInventoryNotifications(now = new Date()): Promise<
       WHERE i.is_active = TRUE AND i.minimum_quantity IS NOT NULL
         AND i.quantity_on_hand <= i.minimum_quantity
         AND u.deleted_at IS NULL AND u.account_status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n WHERE n.user_id = i.user_id AND n.category = 'inventory'
+            AND n.target_path = '/inventory?alert=low-stock&item=' || i.id::text || '&day=' || ${dayKey}
+        )
       ORDER BY i.user_id, i.id LIMIT 500
     `,
     prisma.$queryRaw<Array<{ user_id: string; locale: string; id: string; item_name: string; lot_code: string | null; expires_at: Date; quantity_remaining: string; unit: string }>>`
@@ -147,6 +151,10 @@ export async function dispatchInventoryNotifications(now = new Date()): Promise<
       WHERE l.quantity_remaining > 0 AND l.expires_at IS NOT NULL
         AND l.expires_at <= ${new Date(now.getTime() + 30 * 86400000)}
         AND u.deleted_at IS NULL AND u.account_status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n WHERE n.user_id = i.user_id AND n.category = 'inventory'
+            AND n.target_path = '/inventory?alert=expiry&lot=' || l.id::text || '&day=' || ${dayKey}
+        )
       ORDER BY i.user_id, l.expires_at, l.id LIMIT 500
     `,
   ]);
