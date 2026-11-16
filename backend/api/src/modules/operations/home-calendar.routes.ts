@@ -37,31 +37,31 @@ export function createHomeCalendarRouter() {
         where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } },
         orderBy: { dueAt: "asc" },
         take: 100,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { lt: now } },
         orderBy: { dueAt: "asc" },
         take: 100,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.task.findMany({
         where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } },
         orderBy: { completedAt: "desc" },
         take: 100,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: nextWeekLimit } },
         orderBy: { dueAt: "asc" },
         take: 100,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.reminderRule.findMany({
         where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } },
         orderBy: { nextDueAt: "asc" },
         take: 20,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.feedingSession.findMany({
         where: { userId: auth.userId, performedAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
@@ -103,8 +103,14 @@ export function createHomeCalendarRouter() {
       prisma.$queryRaw<Array<{ id: string; name: string; identifier: string | null; species: string; lastMealAt: Date | null; daysSinceLastMeal: number; feedingIntervalDays: number }>>`
         SELECT a.id, a.name, a.identifier, a.species,
           last_meal.performed_at AS "lastMealAt",
-          FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_meal.performed_at, a.created_at))) / 86400)::int AS "daysSinceLastMeal",
-          a.feeding_interval_days AS "feedingIntervalDays"
+          CASE WHEN last_meal.performed_at IS NULL THEN 0
+            ELSE FLOOR(EXTRACT(EPOCH FROM (NOW() - last_meal.performed_at)) / 86400)::int END AS "daysSinceLastMeal",
+          a.feeding_interval_days AS "feedingIntervalDays",
+          CASE WHEN last_meal.performed_at IS NULL THEN 'no_history'
+            WHEN last_meal.performed_at < NOW() - (a.feeding_interval_days * INTERVAL '1 day') THEN 'overdue'
+            ELSE 'due_soon' END AS "feedingStatus",
+          CASE WHEN a.photo_key IS NULL THEN NULL
+            ELSE '/api/v1/animals/' || a.id::text || '/photo?v=' || (EXTRACT(EPOCH FROM a.updated_at) * 1000)::bigint::text END AS "photoUrl"
         FROM animals a
         LEFT JOIN LATERAL (
           SELECT fs.performed_at
@@ -117,11 +123,34 @@ export function createHomeCalendarRouter() {
         WHERE a.user_id = ${auth.userId}::uuid
           AND a.status = 'active'
           AND a.feeding_interval_days IS NOT NULL
-          AND COALESCE(last_meal.performed_at, a.created_at) < NOW() - (a.feeding_interval_days * INTERVAL '1 day')
+          AND (
+            last_meal.performed_at IS NULL
+            OR last_meal.performed_at <= NOW() - (a.feeding_interval_days * 0.8 * INTERVAL '1 day')
+          )
         ORDER BY COALESCE(last_meal.performed_at, a.created_at) ASC
         LIMIT 100
       `,
     ]);
+
+    const serializeTask = (task: typeof dueToday[number]) => {
+      const { animal, reminderRule, ...taskFields } = task;
+      return {
+        ...taskFields,
+        animal: animal ? {
+          id: animal.id,
+          name: animal.name,
+          identifier: animal.identifier,
+          species: animal.species,
+          photoUrl: animal.photoKey ? `/api/v1/animals/${animal.id}/photo?v=${animal.updatedAt.getTime()}` : null,
+        } : null,
+        recurrence: reminderRule ? {
+          ruleId: reminderRule.id,
+          intervalDays: reminderRule.intervalDays,
+          nextDueAt: reminderRule.nextDueAt,
+          enabled: reminderRule.isEnabled,
+        } : null,
+      };
+    };
 
     const recentEvents = [
       ...recentFeedings.map((item) => ({ type: "feeding" as const, occurredAt: item.performedAt, title: "Feeding session", targetPath: "/feeding", record: item })),
@@ -134,7 +163,7 @@ export function createHomeCalendarRouter() {
     res.status(200).json({
       date: today,
       timezone: auth.timezone,
-      tasks: { dueToday, overdue, completedToday, upcoming: upcomingTasks },
+      tasks: { dueToday: dueToday.map(serializeTask), overdue: overdue.map(serializeTask), completedToday: completedToday.map(serializeTask), upcoming: upcomingTasks.map(serializeTask) },
       counts: {
         dueToday: dueTodayCount,
         overdue: overdueCount,
@@ -178,7 +207,7 @@ export function createHomeCalendarRouter() {
         },
         orderBy: { dueAt: "asc" },
         take: 500,
-        include: { animal: { select: { id: true, name: true, identifier: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
       }),
       prisma.reproductiveEvent.findMany({
         where: { cycle: { is: { userId: auth.userId } }, occurredAt: { gte: from.start, lt: to.start } },
@@ -186,7 +215,7 @@ export function createHomeCalendarRouter() {
         take: 500,
         include: {
           cycle: { select: { id: true, name: true } },
-          animal: { select: { id: true, name: true, identifier: true } },
+          animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } },
         },
       }),
       prisma.clutch.findMany({
