@@ -168,8 +168,8 @@ export async function dispatchInventoryNotifications(now = new Date()): Promise<
       targetPath: `/inventory?alert=low-stock&item=${item.id}&day=${dayKey}`,
     })),
     ...lots.map((lot) => {
-      const expired = new Date(lot.expires_at).getTime() < Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-      const date = new Date(lot.expires_at).toISOString().slice(0, 10);
+      const expired = lot.expires_at.getTime() < Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      const date = lot.expires_at.toISOString().slice(0, 10);
       return {
         userId: lot.user_id, locale: lot.locale,
         title: expired
