@@ -190,10 +190,17 @@ kbd { padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; bac
 .dashboard-intro h2 { margin: 8px 0 6px; font-size: 25px; font-weight: 600; }
 .dashboard-intro p { margin: 0; color: #c7d4cc; font-size: 11px; }
 .intro-mark { display: grid; place-items: center; width: 86px; height: 86px; border: 1px solid rgba(255,255,255,.15); border-radius: 50%; color: #b2c6b8; }
-.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); gap: 15px; }
-.dashboard-tasks { grid-row: span 2; }
-.dashboard-side { display: flex; flex-direction: column; gap: 15px; min-width: 0; }
-.dashboard-recent { grid-column: 2; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .8fr); gap: 15px; align-items: start; }
+.dashboard-widget { min-width: 0; }
+.dashboard-widget-priorities { grid-row: span 2; }
+.dashboard-widget-summary, .dashboard-widget-settings-panel { grid-column: 1 / -1; }
+.dashboard-recent { grid-column: auto; }
+.dashboard-widget-settings { display: grid; gap: 7px; }
+.dashboard-widget-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 4px 0; border-top: 1px solid var(--border); }
+.dashboard-widget-setting label { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--text); font-size: 12px; cursor: pointer; }
+.dashboard-widget-setting input { width: 16px; height: 16px; accent-color: var(--forest); }
+.dashboard-widget-setting > span { display: flex; gap: 4px; flex: 0 0 auto; }
+.dashboard-widget-setting .btn { min-width: 32px; padding-inline: 8px; font-size: 14px; }
 .task-row { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .task-row:last-child { border-bottom: 0; }
 .task-check { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
