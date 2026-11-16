@@ -44,6 +44,16 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [quickNotes, setQuickNotes] = useState("");
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickError, setQuickError] = useState("");
+  const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
+  const [bulkCareModal, setBulkCareModal] = useState(false);
+  const [bulkCareKind, setBulkCareKind] = useState<"weight" | "shed">("weight");
+  const [bulkCareDate, setBulkCareDate] = useState(todayDate());
+  const [bulkCareWeight, setBulkCareWeight] = useState("");
+  const [bulkCareOutcome, setBulkCareOutcome] = useState("complete");
+  const [bulkCareNotes, setBulkCareNotes] = useState("");
+  const [bulkCareBusy, setBulkCareBusy] = useState(false);
+  const [bulkCareError, setBulkCareError] = useState("");
+
   const [editing, setEditing] = useState<AnimalDto | null>(null);
   const [form, setForm] = useState<AnimalForm>(emptyAnimal);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -202,7 +212,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   });
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value="" onChange={(e) => applySavedFilter(e.target.value)}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button><Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
+    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value="" onChange={(e) => applySavedFilter(e.target.value)}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button>{selectedAnimalIds.length > 0 && <Button variant="secondary" onClick={() => { setBulkCareError(""); setBulkCareModal(true); }}>{locale === "it" ? `Registra su ${selectedAnimalIds.length} animali` : `Record for ${selectedAnimalIds.length} animals`}</Button>}<Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
     <AnimalManagementPanel locale={locale} />
     <Panel>
       <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
@@ -218,9 +228,38 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> :
         rows.length === 0 && (pager?.total ?? 0) === 0 && !q && !species && !morph && !location && !sex && status === "active"
           ? <EmptyState title={locale === "it" ? "Non hai ancora aggiunto animali" : "You haven't added any animals yet"} description={locale === "it" ? "Crea la scheda del primo esemplare oppure importa la tua collezione da Excel per iniziare a gestire alimentazioni, pesi e mute." : "Create your first animal profile or import your collection from Excel to start tracking feedings, weights and sheds."} action={<Button onClick={openCreate}><Icon name="plus" size={15} />{t("animalNew")}</Button>} />
-          : <DataTable headers={[t("name"), t("species"), t("morph"), t("sex"), t("location"), t("status"), t("actions")]} rows={rows} empty={t("noAnimals")} />}
+          : <DataTable headers={[locale === "it" ? "Seleziona" : "Select", t("name"), t("species"), t("morph"), t("sex"), t("location"), t("status"), t("actions")]} rows={rows} empty={t("noAnimals")} />}
       {pager && <Pagination page={pager.page} totalPages={pager.totalPages} onChange={setPage} label={t("page")} />}
     </Panel>
+    {bulkCareModal && <Modal title={locale === "it" ? "Registrazione multipla" : "Bulk care record"} onClose={() => setBulkCareModal(false)} wide>
+      <form className="form-stack" onSubmit={async (event) => {
+        event.preventDefault();
+        setBulkCareBusy(true); setBulkCareError("");
+        let succeeded = 0;
+        const failures: string[] = [];
+        for (const animalId of selectedAnimalIds) {
+          try {
+            if (bulkCareKind === "weight") {
+              await api.post(`/animals/${encodeURIComponent(animalId)}/weights`, { measuredAt: new Date(bulkCareDate + "T12:00:00").toISOString(), weightG: weightToGrams(bulkCareWeight), notes: bulkCareNotes || null });
+            } else {
+              await api.post(`/animals/${encodeURIComponent(animalId)}/sheds`, { occurredAt: new Date(bulkCareDate + "T12:00:00").toISOString(), outcome: bulkCareOutcome, notes: bulkCareNotes || null });
+            }
+            succeeded++;
+          } catch { failures.push(animals.find((animal) => getString(animal, "id") === animalId)?.name || animalId); }
+        }
+        setBulkCareBusy(false);
+        if (failures.length) setBulkCareError(locale === "it" ? `Registrazioni riuscite: ${succeeded}. Non riuscite: ${failures.join(", ")}. Puoi riprovare solo gli animali non riusciti selezionandoli nuovamente.` : `Saved: ${succeeded}. Failed: ${failures.join(", ")}. You can retry only the failed animals by selecting them again.`);
+        else { setBulkCareModal(false); setSelectedAnimalIds([]); setBulkCareWeight(""); setBulkCareNotes(""); show(locale === "it" ? `Registrazione salvata su ${succeeded} animali.` : `Record saved for ${succeeded} animals.`); }
+      }}>
+        {bulkCareError && <Alert tone="danger">{bulkCareError}</Alert>}
+        <p>{locale === "it" ? `L'operazione verrà applicata a ${selectedAnimalIds.length} animali selezionati nella pagina corrente. Ogni registrazione è indipendente: in caso di errore alcune potrebbero essere già state salvate.` : `This operation applies to ${selectedAnimalIds.length} animals selected on the current page. Each record is independent, so some may be saved if another fails.`}</p>
+        <Field label={locale === "it" ? "Tipo di registrazione" : "Record type"}><Select value={bulkCareKind} onChange={(event) => setBulkCareKind(event.target.value as "weight" | "shed")}><option value="weight">{locale === "it" ? "Pesatura" : "Weight"}</option><option value="shed">{locale === "it" ? "Muta" : "Shed"}</option></Select></Field>
+        <Field label={locale === "it" ? "Data" : "Date"}><Input type="date" required value={bulkCareDate} onChange={(event) => setBulkCareDate(event.target.value)} /></Field>
+        {bulkCareKind === "weight" ? <Field label={`${t("weight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" max="100000000" step="0.01" required value={bulkCareWeight} onChange={(event) => setBulkCareWeight(event.target.value)} /></Field> : <Field label={locale === "it" ? "Esito muta" : "Shed outcome"}><Select value={bulkCareOutcome} onChange={(event) => setBulkCareOutcome(event.target.value)}><option value="complete">{locale === "it" ? "Completa" : "Complete"}</option><option value="incomplete">{locale === "it" ? "Incompleta" : "Incomplete"}</option><option value="retained">{locale === "it" ? "Residui trattenuti" : "Retained shed"}</option></Select></Field>}
+        <Field label={t("notes")}><Textarea rows={2} value={bulkCareNotes} onChange={(event) => setBulkCareNotes(event.target.value)} /></Field>
+        <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setBulkCareModal(false)} disabled={bulkCareBusy}>{t("cancel")}</Button><Button type="submit" disabled={bulkCareBusy || selectedAnimalIds.length === 0 || (bulkCareKind === "weight" && !bulkCareWeight)}>{bulkCareBusy ? t("loading") : (locale === "it" ? "Registra" : "Save records")}</Button></div>
+      </form>
+    </Modal>}
     {bulkModal && <Modal title={t("bulkCreateAnimals")} onClose={() => setBulkModal(false)} wide>
       <form className="form-stack" onSubmit={async (event) => {
         event.preventDefault(); setBulkBusy(true); setBulkError("");
