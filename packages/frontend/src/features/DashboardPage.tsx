@@ -37,7 +37,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   useEffect(() => {
     if (!layoutReady) return;
     const timer = window.setTimeout(() => {
-      void api.patch("/account/preferences", { dashboardLayout: { order: widgetOrder, visibility: widgetVisibility } }).catch(() => {
+      void api.patch("/account/preferences", { dashboardLayout: { order: widgetOrder, visibility: widgetVisibility } }).then(() => accountPreferences.reload()).catch(() => {
         showLayoutSaveError();
       });
     }, 350);
