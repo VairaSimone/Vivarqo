@@ -364,8 +364,8 @@ function ExportPage({ locale }: { locale: Locale }) {
   async function restoreBackup() {
     if (!restoreFile) return;
     const confirmed = window.confirm(locale === "it"
-      ? "Il ripristino è consentito solo su un account senza dati gestionali. I dati del backup verranno associati a questo account. Continuare?"
-      : "Restore is allowed only on an account with no existing business data. Backup records will be assigned to this account. Continue?");
+      ? "Il ripristino è consentito solo su un account senza dati gestionali. I dati gestionali verranno associati a questo account. Email, password, sessioni e abbonamento Stripe non vengono trasferiti. Il ripristino non può essere annullato. Continuare?"
+      : "Restore is allowed only on an account with no existing business data. Backup business data will be assigned to this account. Email, password, sessions and Stripe subscription are not transferred. Restore cannot be undone. Continue?");
     if (!confirmed) return;
     setRestoreBusy(true); setRestoreError("");
     try {
@@ -412,8 +412,8 @@ function ExportPage({ locale }: { locale: Locale }) {
     <Panel>
       <PanelHeader title={locale === "it" ? "Ripristina da backup ZIP" : "Restore from ZIP backup"} />
       <p className="muted-note">{locale === "it"
-        ? "Carica un backup Vivarqo completo, con tutte le sezioni e gli allegati. Per sicurezza il ripristino è consentito solo su un account senza dati gestionali: non sovrascrive né unisce dati esistenti. Gli ID devono inoltre essere liberi: se i record originali sono ancora presenti in questo database, usa un database pulito o rimuovi prima quei record."
-        : "Upload a complete Vivarqo backup with all sections and attachments. For safety, restore is allowed only on an account without existing business data; it never overwrites or merges existing records. IDs must also be free: if the original records still exist in this database, use a clean database or remove those records first."}</p>
+        ? "Carica un backup Vivarqo completo, con tutte le sezioni e gli allegati. Per sicurezza il ripristino è consentito solo su un account senza dati gestionali: non sovrascrive né unisce dati esistenti. Gli ID devono inoltre essere liberi: se i record originali sono ancora presenti in questo database, usa un database pulito o rimuovi prima quei record. Email, password, sessioni e abbonamento Stripe restano quelli dell’account di destinazione e non vengono ripristinati."
+        : "Upload a complete Vivarqo backup with all sections and attachments. For safety, restore is allowed only on an account without existing business data; it never overwrites or merges existing records. IDs must also be free: if the original records still exist in this database, use a clean database or remove those records first. The destination account keeps its own email, password, sessions and Stripe subscription; these are not restored."}</p>
       <Field label={locale === "it" ? "Archivio ZIP" : "ZIP archive"}>
         <input type="file" accept=".zip,application/zip" onChange={(event) => { setRestoreFile(event.target.files?.[0] ?? null); setRestoreError(""); }} />
       </Field>
