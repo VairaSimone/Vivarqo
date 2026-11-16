@@ -369,7 +369,13 @@ export function createInventoryRouter() {
     const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const [lowStock, expiredLots, expiringLots, usage] = await Promise.all([
-      prisma.inventoryItem.findMany({ where: { userId: auth.userId, isActive: true, minimumQuantity: { not: null }, quantityOnHand: { lte: prisma.inventoryItem.fields.minimumQuantity } } as never, select: { id: true, name: true, quantityOnHand: true, minimumQuantity: true, unit: true } }),
+      prisma.$queryRaw<Array<{ id: string; name: string; quantity_on_hand: string; minimum_quantity: string; unit: string }>>`
+        SELECT id::text, name, quantity_on_hand::text, minimum_quantity::text, unit
+        FROM inventory_items
+        WHERE user_id = ${auth.userId}::uuid AND is_active = TRUE
+          AND minimum_quantity IS NOT NULL AND quantity_on_hand <= minimum_quantity
+        ORDER BY name ASC
+      `,
       prisma.inventoryLot.findMany({ where: { item: { userId: auth.userId }, quantityRemaining: { gt: 0 }, expiresAt: { lt: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z") } }, include: { item: { select: { id: true, name: true, unit: true } } }, orderBy: { expiresAt: "asc" } }),
       prisma.inventoryLot.findMany({ where: { item: { userId: auth.userId }, quantityRemaining: { gt: 0 }, expiresAt: { gte: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z"), lte: horizon } }, include: { item: { select: { id: true, name: true, unit: true } } }, orderBy: { expiresAt: "asc" } }),
       prisma.$queryRaw<Array<{ item_id: string; consumed: string }>>`
