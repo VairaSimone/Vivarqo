@@ -112,6 +112,7 @@ jobs:
           bash -n backend/scripts/backup-offsite-restic.sh
           bash -n backend/scripts/restore-postgres-restic.sh
           bash -n backend/scripts/verify-production-backup-mount.sh
+          node --check backend/scripts/verify-account-backup.mjs
           sh -n backend/infra/docker/backup-loop.sh
       - name: Docker build
         run: docker build -f backend/Dockerfile -t vivarqo-api:ci .
