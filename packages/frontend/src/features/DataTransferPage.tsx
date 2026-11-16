@@ -186,7 +186,7 @@ function ImportPage({ locale }: { locale: Locale }) {
   const missingLabels = missingFields.map((group) => group.map(fieldLabel).join(" / "));
   const hasMultipleSheets = getString(preview, "fileType") === "xlsx" && sheets.length > 1;
   const canConfirm = Boolean(jobId) && !busy && !mappingDirty && missingFields.length === 0
-    && validRowCount > 0 && !(entity === "animals" && duplicates.length > 0 && !allowDuplicates);
+    && validRowCount > 0 && !(duplicates.length > 0 && !allowDuplicates);
 
   async function undoImport() {
     if (!jobId) return;
@@ -210,7 +210,7 @@ function ImportPage({ locale }: { locale: Locale }) {
     setError("");
     try {
       await api.post("/imports/" + encodeURIComponent(jobId) + "/confirm",
-        entity === "animals" ? { allowPossibleDuplicates: allowDuplicates } : {});
+        { allowPossibleDuplicates: allowDuplicates });
       job.reload();
       show(t("queued"));
     } catch (reason) {
