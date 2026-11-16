@@ -500,19 +500,26 @@ export function createBackupRestoreRouter() {
         let restored = 0;
         for (const spec of TABLES) {
           if (spec.table === "documents") {
-          for (const row of parsedTables.get("documents") ?? []) {
-            const archivePath = row.archivePath;
-            const storageKey = archivePath ? attachmentKeys.get(archivePath) : undefined;
-            if (!storageKey) fail("BACKUP_ATTACHMENT_MISSING", "Backup document attachment is missing");
-            const values = [row.id, auth.userId, row.animalId || null, row.cycleId || null, row.originalFilename,
-              storageKey, row.mimeType, row.sizeBytes, row.category, row.note || null, row.createdAt || new Date().toISOString()];
+          const documentRowsToInsert = parsedTables.get("documents") ?? [];
+          for (let offset = 0; offset < documentRowsToInsert.length; offset += 200) {
+            const batch = documentRowsToInsert.slice(offset, offset + 200);
+            const values: unknown[] = [];
+            const tuples = batch.map((row, rowIndex) => {
+              const archivePath = row.archivePath;
+              const storageKey = archivePath ? attachmentKeys.get(archivePath) : undefined;
+              if (!storageKey) fail("BACKUP_ATTACHMENT_MISSING", "Backup document attachment is missing");
+              const rowValues = [row.id, auth.userId, row.animalId || null, row.cycleId || null, row.originalFilename,
+                storageKey, row.mimeType, row.sizeBytes, row.category, row.note || null, row.createdAt || new Date().toISOString()];
+              values.push(...rowValues);
+              const placeholders = rowValues.map((_, index) => "$" + (rowIndex * rowValues.length + index + 1));
+              return "(" + placeholders.join(", ") + ")";
+            });
             await tx.$executeRawUnsafe(
-              "INSERT INTO documents (id, user_id, animal_id, cycle_id, original_filename, storage_key, mime_type, size_bytes, category, note, created_at) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8::bigint,$9,$10,$11::timestamptz)",
+              "INSERT INTO documents (id, user_id, animal_id, cycle_id, original_filename, storage_key, mime_type, size_bytes, category, note, created_at) VALUES " + tuples.join(", "),
               ...values as never[],
             );
-            restored += 1;
+            restored += batch.length;
           }
-  
             continue;
           }
           restored += await insertRows(tx, spec, parsedTables.get(spec.table) ?? [], auth.userId, manifest.accountId as string, columnsByTable, attachmentKeys);
