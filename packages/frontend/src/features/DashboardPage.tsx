@@ -66,7 +66,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const due = data?.tasks.dueToday ?? [];
   const overdue = data?.tasks.overdue ?? [];
   const upcoming = data?.tasks.upcoming ?? [];
-  const completed = [...(data?.tasks.completedToday ?? []), ...(data?.tasks.dueToday ?? []).filter((task) => optimisticallyCompleted.includes(task.id))];
+  const taskLookup = [...overdue, ...due, ...upcoming];
+  const completed = [...(data?.tasks.completedToday ?? []), ...taskLookup.filter((task) => optimisticallyCompleted.includes(task.id) && !(data?.tasks.completedToday ?? []).some((done) => done.id === task.id))];
   const visibleOverdue = overdue.filter((task) => !optimisticallyCompleted.includes(task.id));
   const visibleDue = due.filter((task) => !optimisticallyCompleted.includes(task.id));
   const visibleUpcoming = upcoming.filter((task) => !optimisticallyCompleted.includes(task.id));
@@ -127,7 +128,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     <div className="dashboard-grid">
       <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? "Sposta su" : "Move up"}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? "Sposta giù" : "Move down"}>↓</Button></span></div>)}</div>}</Panel></div>
       {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}><Panel className="dashboard-tasks dashboard-priorities">
-        <section className="dashboard-task-section dashboard-overdue-section">
+        <section className="dashboard-task-section dashboard-overdue-section" style={{ display: taskFilter === "all" || taskFilter === "overdue" ? undefined : "none" }}>
           <PanelHeader title={t("overdue")} action={visibleOverdue.length > 0 ? <Badge tone="danger">{visibleOverdue.length}</Badge> : undefined} />
           <div className="dashboard-task-filters" role="group" aria-label={locale === "it" ? "Filtra attività" : "Filter tasks"}>
             {(["all", "overdue", "today", "upcoming", "completed"] as const).map((key) => <button key={key} type="button" className={taskFilter === key ? "dashboard-task-filter is-active" : "dashboard-task-filter"} aria-pressed={taskFilter === key} onClick={() => setTaskFilter(key)}>{({ all: locale === "it" ? "Tutte" : "All", overdue: locale === "it" ? "Scadute" : "Overdue", today: locale === "it" ? "Oggi" : "Today", upcoming: locale === "it" ? "Prossimi 7 giorni" : "Next 7 days", completed: locale === "it" ? "Completate" : "Completed" })[key]}</button>)}
@@ -139,7 +140,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </section>
 
         <div className="panel-separator" />
-        <section className="dashboard-task-section">
+        <section className="dashboard-task-section" style={{ display: taskFilter === "all" || taskFilter === "today" ? undefined : "none" }}>
           <PanelHeader title={t("dueToday")} action={visibleDue.length > 0 ? <Badge tone="warning">{visibleDue.length}</Badge> : undefined} />
           {(taskFilter === "all" || taskFilter === "today") && (visibleDue.length
             ? visibleDue.slice(0, 8).map((task) => taskCard(task))
@@ -148,7 +149,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </section>
 
         <div className="panel-separator" />
-        <section className="dashboard-task-section">
+        <section className="dashboard-task-section" style={{ display: taskFilter === "all" || taskFilter === "upcoming" ? undefined : "none" }}>
           <PanelHeader title={t("upcomingTasks")} action={visibleUpcoming.length > 0 ? <Button variant="ghost" size="sm" onClick={() => navigate("/tasks")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button> : undefined} />
           {(taskFilter === "all" || taskFilter === "upcoming") && (visibleUpcoming.length
             ? visibleUpcoming.slice(0, 6).map((task) => taskCard(task))
@@ -229,9 +230,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}><Panel className="dashboard-summary">
       <PanelHeader title={t("dashboardSummary")} />
       <div className="dashboard-summary-grid">
-        <Metric label={t("overdue")} value={getNumber(counts, "overdue")} tone="danger" icon="alert" />
-        <Metric label={t("dueToday")} value={getNumber(counts, "dueToday")} tone="primary" icon="calendar" />
-        <Metric label={t("completedToday")} value={getNumber(counts, "completedToday")} tone="success" icon="checkCircle" />
+        <Metric label={t("overdue")} value={Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)} tone="danger" icon="alert" />
+        <Metric label={t("dueToday")} value={Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)} tone="primary" icon="calendar" />
+        <Metric label={t("completedToday")} value={getNumber(counts, "completedToday") + optimisticallyCompleted.length} tone="success" icon="checkCircle" />
         <Metric label={t("upcomingReminders")} value={getNumber(counts, "imminentReminders")} tone="neutral" icon="clock" />
       </div>
       </Panel></div>}
