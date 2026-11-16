@@ -34,7 +34,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const [widgetOrder, setWidgetOrder] = useState<WidgetKey[]>(() => {
     try {
       const saved = JSON.parse(window.localStorage.getItem("vivarqo.dashboard.order") || "[]") as unknown[];
-      const valid = saved.filter((key): key is WidgetKey => widgetKeys.includes(key as WidgetKey));
+      const valid = [...new Set(saved.filter((key): key is WidgetKey => widgetKeys.includes(key as WidgetKey)))];
       return [...valid, ...widgetKeys.filter((key) => !valid.includes(key))];
     } catch { return [...widgetKeys]; }
   });
