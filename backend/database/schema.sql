@@ -1442,3 +1442,111 @@ CREATE INDEX IF NOT EXISTS inventory_lots_item_expiry_idx ON inventory_lots(item
 CREATE INDEX IF NOT EXISTS inventory_lots_supplier_purchased_idx ON inventory_lots(supplier_id, purchased_at DESC);
 ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS lot_id UUID REFERENCES inventory_lots(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS stock_movements_lot_idx ON stock_movements(lot_id);
+
+
+-- Genetic catalog, trait history and named integrity constraints.
+BEGIN;
+
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS locus_id UUID;
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS theoretical_genotype VARCHAR(64);
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS observed_phenotype VARCHAR(240);
+ALTER TABLE animal_genetic_traits ADD COLUMN IF NOT EXISTS confirmed_genotype VARCHAR(64);
+
+CREATE TABLE IF NOT EXISTS genetic_genes (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  species VARCHAR(160) NOT NULL,
+  symbol VARCHAR(40) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT genetic_genes_pkey PRIMARY KEY (id),
+  CONSTRAINT genetic_genes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS genetic_genes_user_species_symbol_key ON genetic_genes(user_id, species, symbol);
+CREATE INDEX IF NOT EXISTS genetic_genes_user_species_idx ON genetic_genes(user_id, species);
+
+CREATE TABLE IF NOT EXISTS genetic_loci (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  gene_id UUID NOT NULL,
+  symbol VARCHAR(40) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  inheritance_mode VARCHAR(32) NOT NULL,
+  description TEXT,
+  CONSTRAINT genetic_loci_pkey PRIMARY KEY (id),
+  CONSTRAINT genetic_loci_gene_id_fkey FOREIGN KEY (gene_id) REFERENCES genetic_genes(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS genetic_loci_gene_symbol_key ON genetic_loci(gene_id, symbol);
+CREATE INDEX IF NOT EXISTS genetic_loci_gene_idx ON genetic_loci(gene_id);
+
+CREATE TABLE IF NOT EXISTS genetic_alleles (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  locus_id UUID NOT NULL,
+  symbol VARCHAR(24) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  description TEXT,
+  is_reference BOOLEAN NOT NULL DEFAULT FALSE,
+  CONSTRAINT genetic_alleles_pkey PRIMARY KEY (id),
+  CONSTRAINT genetic_alleles_locus_id_fkey FOREIGN KEY (locus_id) REFERENCES genetic_loci(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS genetic_alleles_locus_symbol_key ON genetic_alleles(locus_id, symbol);
+CREATE UNIQUE INDEX IF NOT EXISTS genetic_alleles_one_reference_per_locus_idx ON genetic_alleles(locus_id) WHERE is_reference = TRUE;
+CREATE INDEX IF NOT EXISTS genetic_alleles_locus_idx ON genetic_alleles(locus_id);
+
+CREATE TABLE IF NOT EXISTS animal_genetic_trait_history (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  trait_id UUID,
+  animal_id UUID NOT NULL,
+  changed_by UUID NOT NULL,
+  snapshot JSONB NOT NULL,
+  changed_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT animal_genetic_trait_history_pkey PRIMARY KEY (id),
+  CONSTRAINT animal_genetic_trait_history_trait_id_fkey FOREIGN KEY (trait_id) REFERENCES animal_genetic_traits(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT animal_genetic_trait_history_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT animal_genetic_trait_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS animal_genetic_history_animal_changed_idx ON animal_genetic_trait_history(animal_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS animal_genetic_history_trait_changed_idx ON animal_genetic_trait_history(trait_id, changed_at DESC);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'animal_genetic_traits_locus_id_fkey') THEN
+    ALTER TABLE animal_genetic_traits ADD CONSTRAINT animal_genetic_traits_locus_id_fkey
+      FOREIGN KEY (locus_id) REFERENCES genetic_loci(id) ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS animal_genetic_traits_locus_idx ON animal_genetic_traits(locus_id);
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'health_records_type_check') THEN
+    ALTER TABLE health_records ADD CONSTRAINT health_records_type_check
+      CHECK (record_type IN ('symptom','visit','diagnosis','suspicion','treatment','checkup'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'incubators_capacity_positive') THEN
+    ALTER TABLE incubators ADD CONSTRAINT incubators_capacity_positive
+      CHECK (capacity IS NULL OR capacity > 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'egg_measurements_weight_positive') THEN
+    ALTER TABLE egg_measurements ADD CONSTRAINT egg_measurements_weight_positive CHECK (weight_g > 0);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'species_breeding_profiles_age_nonnegative') THEN
+    ALTER TABLE species_breeding_profiles ADD CONSTRAINT species_breeding_profiles_age_nonnegative CHECK (
+      (female_min_age_months IS NULL OR female_min_age_months >= 0) AND
+      (male_min_age_months IS NULL OR male_min_age_months >= 0)
+    );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'species_breeding_profiles_weight_positive') THEN
+    ALTER TABLE species_breeding_profiles ADD CONSTRAINT species_breeding_profiles_weight_positive CHECK (
+      (female_min_weight_g IS NULL OR female_min_weight_g > 0) AND
+      (male_min_weight_g IS NULL OR male_min_weight_g > 0)
+    );
+  END IF;
+END $$;
+
+-- Match Prisma's non-partial unique indexes for nullable finance source links.
+DROP INDEX IF EXISTS finance_entries_source_transfer_unique;
+CREATE UNIQUE INDEX finance_entries_source_transfer_unique ON finance_entries(source_transfer_id);
+DROP INDEX IF EXISTS finance_entries_source_stock_movement_unique;
+CREATE UNIQUE INDEX finance_entries_source_stock_movement_unique ON finance_entries(source_stock_movement_id);
+
+COMMIT;
