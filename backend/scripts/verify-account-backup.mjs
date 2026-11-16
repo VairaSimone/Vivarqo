@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 
 const archive = process.argv[2];
 if (!archive || process.argv.includes("--help")) {
@@ -70,8 +69,8 @@ try {
       throw new Error(`Checksum mismatch: ${entryName}`);
     }
   }
-  process.stdout.write(`Backup verified: ${entries.length} files, account ${manifest.accountId}, modules ${manifest.modules.join(", ")}\\n`);
+  process.stdout.write(`Backup verified: ${entries.length} files, account ${manifest.accountId}, modules ${manifest.modules.join(", ")}\n`);
 } catch (error) {
-  process.stderr.write((error instanceof Error ? error.message : String(error)) + "\\n");
+  process.stderr.write((error instanceof Error ? error.message : String(error)) + "\n");
   process.exitCode = 1;
 }
