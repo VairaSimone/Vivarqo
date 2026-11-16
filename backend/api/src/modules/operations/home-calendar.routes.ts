@@ -35,6 +35,7 @@ export function createHomeCalendarRouter() {
       activeAnimalCount,
       feedingTodayCount,
       lowStockItems,
+      lowStockCountResult,
       recentOffspringBatches,
       recentIncubatorMaintenance,
       recentAnimalUpdates,
@@ -147,7 +148,12 @@ export function createHomeCalendarRouter() {
         WHERE user_id = ${auth.userId}::uuid AND is_active = TRUE
           AND minimum_quantity IS NOT NULL AND quantity_on_hand <= minimum_quantity
         ORDER BY (minimum_quantity - quantity_on_hand) DESC, name ASC
-        LIMIT 50
+        LIMIT 20
+      `,
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) AS count FROM inventory_items
+        WHERE user_id = ${auth.userId}::uuid AND is_active = TRUE
+          AND minimum_quantity IS NOT NULL AND quantity_on_hand <= minimum_quantity
       `,
       prisma.offspringBatch.findMany({
         where: { cycle: { is: { userId: auth.userId } }, bornOn: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
@@ -219,12 +225,13 @@ export function createHomeCalendarRouter() {
         imminentReminders: imminentReminderCount,
         activeAnimals: activeAnimalCount,
         feedingsToday: feedingTodayCount,
-        lowStock: lowStockItems.length,
+        lowStock: Number(lowStockCountResult[0]?.count ?? 0n),
       },
       overview: {
         activeAnimals: activeAnimalCount,
         feedingsToday: feedingTodayCount,
         lowStockItems,
+        lowStockCount: Number(lowStockCountResult[0]?.count ?? 0n),
       },
       smartSuggestions: [
         ...dueIncubatorMaintenance.map((item) => ({ id: `incubator-${item.id}`, type: "incubator_maintenance", title: item.name, dueAt: item.nextMaintenanceAt, targetPath: "/reproduction-cycles" })),
