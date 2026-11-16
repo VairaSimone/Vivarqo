@@ -258,7 +258,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           setBulkCareNotes("");
           show(locale === "it" ? `Registrazione salvata atomicamente su ${result.createdCount} animali.` : `Record saved atomically for ${result.createdCount} animals.`);
         } catch (error) {
-          setBulkCareError(error instanceof ApiError ? error.message : (locale === "it" ? "Registrazione non riuscita. Nessun record è stato salvato." : "Bulk record failed. No records were saved."));
+          setBulkCareError(error instanceof ApiError ? error.message : (locale === "it" ? "Il server non ha confermato la registrazione. Verifica lo storico prima di riprovare." : "The server did not confirm the operation. Check the record history before retrying."));
         } finally {
           setBulkCareBusy(false);
         }
