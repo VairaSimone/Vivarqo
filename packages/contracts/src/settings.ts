@@ -4,6 +4,7 @@ export interface AccountPreferencesDto {
   dateFormat: "locale" | "dd/MM/yyyy" | "yyyy-MM-dd" | string;
   defaultLandingPage: string;
   compactTables: boolean;
+  dashboardLayout?: { order: string[]; visibility: Record<string, boolean> };
   theme: "system" | "light" | "dark" | string;
   timezone?: string;
 }
