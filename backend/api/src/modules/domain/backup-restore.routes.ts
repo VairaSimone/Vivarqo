@@ -308,6 +308,10 @@ export function createBackupRestoreRouter() {
       const bytes = byName.get(spec.file);
       if (!bytes) fail("BACKUP_FILE_MISSING", `Backup is missing ${spec.file}`);
       const rows = parseCsv(bytes);
+      const ids = rows.map((row) => row.id);
+      if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
+        fail("BACKUP_ROW_ID_INVALID", "A backup CSV contains missing or duplicate record IDs");
+      }
       totalRows += rows.length;
       if (totalRows > MAX_ROWS) fail("BACKUP_ROW_LIMIT", "Backup contains too many records", 413);
       parsedTables.set(spec.table, rows);
