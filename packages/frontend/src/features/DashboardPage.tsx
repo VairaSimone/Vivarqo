@@ -232,7 +232,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       <div className="dashboard-summary-grid">
         <Metric label={t("overdue")} value={Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)} tone="danger" icon="alert" />
         <Metric label={t("dueToday")} value={Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)} tone="primary" icon="calendar" />
-        <Metric label={t("completedToday")} value={getNumber(counts, "completedToday") + optimisticallyCompleted.length} tone="success" icon="checkCircle" />
+        <Metric label={t("completedToday")} value={getNumber(counts, "completedToday") + optimisticallyCompleted.filter((id) => taskLookup.some((task) => task.id === id)).length} tone="success" icon="checkCircle" />
         <Metric label={t("upcomingReminders")} value={getNumber(counts, "imminentReminders")} tone="neutral" icon="clock" />
       </div>
       </Panel></div>}
