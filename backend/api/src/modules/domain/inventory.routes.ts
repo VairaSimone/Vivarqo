@@ -504,15 +504,16 @@ export function createInventoryRouter() {
     const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id), lotId = routeUuid(req.params.lotId);
     const input = parseBody(physicalCountSchema, req.body);
     const result = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{ quantity_remaining: string; item_quantity: string }>>`
-        SELECT l.quantity_remaining::text, i.quantity_on_hand::text AS item_quantity
+      const rows = await tx.$queryRaw<Array<{ quantity_remaining: string; quantity_received: string; item_quantity: string }>>`
+        SELECT l.quantity_remaining::text, l.quantity_received::text, i.quantity_on_hand::text AS item_quantity
         FROM inventory_lots l JOIN inventory_items i ON i.id = l.item_id
         WHERE l.id = ${lotId}::uuid AND l.item_id = ${id}::uuid AND i.user_id = ${auth.userId}::uuid
         FOR UPDATE OF l, i
       `;
       const current = rows[0];
       if (!current) throw new AppError(404, "INVENTORY_LOT_NOT_FOUND", "Inventory lot not found");
-      const previous = asMilli(current.quantity_remaining), counted = asMilli(input.countedQuantity), delta = counted - previous;
+      const previous = asMilli(current.quantity_remaining), counted = asMilli(input.countedQuantity), received = asMilli(current.quantity_received), delta = counted - previous;
+      if (counted > received) throw new AppError(409, "INVENTORY_COUNT_EXCEEDS_LOT", "A lot count cannot exceed its originally received quantity; use an untracked stock adjustment for excess stock");
       if (delta !== 0) {
         await tx.inventoryLot.update({ where: { id: lotId }, data: { quantityRemaining: counted / scale } });
         await tx.stockMovement.create({ data: {
