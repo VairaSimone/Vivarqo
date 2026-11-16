@@ -674,4 +674,66 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .expect(409);
     expect(deletion.body.code).toBe("ANIMAL_HAS_HISTORY");
   });
+
+  it("creates bulk care records atomically and rejects mixed active/archived selections", async () => {
+    const owner = await account();
+    const first = await createAnimal(owner, "Bulk care first");
+    const second = await createAnimal(owner, "Bulk care second");
+    const third = await createAnimal(owner, "Bulk care third");
+
+    const weight = await owner.agent
+      .post("/api/v1/care-records/bulk")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        kind: "weight",
+        animalIds: [first.id, second.id],
+        measuredAt: "2026-11-16T12:00:00.000Z",
+        weightG: 1450,
+        notes: "Bulk weigh-in",
+      })
+      .expect(201);
+    expect(weight.body.createdCount).toBe(2);
+    expect(weight.body.records).toHaveLength(2);
+
+    const shed = await owner.agent
+      .post("/api/v1/care-records/bulk")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        kind: "shed",
+        animalIds: [first.id, second.id],
+        occurredAt: "2026-11-15T12:00:00.000Z",
+        outcome: "partial",
+      })
+      .expect(201);
+    expect(shed.body.createdCount).toBe(2);
+
+    await owner.agent
+      .post(`/api/v1/animals/${second.id}/archive`)
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(200);
+
+    await owner.agent
+      .post("/api/v1/care-records/bulk")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({
+        kind: "weight",
+        animalIds: [first.id, second.id, third.id],
+        measuredAt: "2026-11-17T12:00:00.000Z",
+        weightG: 1500,
+      })
+      .expect(409);
+
+    expect(await prisma.weightMeasurement.count({
+      where: { animalId: third.id, measuredAt: new Date("2026-11-17T12:00:00.000Z") },
+    })).toBe(0);
+    expect(await prisma.weightMeasurement.count({
+      where: { animalId: { in: [first.id, second.id] }, notes: "Bulk weigh-in" },
+    })).toBe(2);
+  });
+
 });
