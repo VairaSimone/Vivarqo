@@ -123,6 +123,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
 
     <OnboardingChecklist locale={locale} onNavigate={navigate} />
 
+    <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "01 — SITUAZIONE OPERATIVA" : "01 — DAILY OVERVIEW"}</span><p>{locale === "it" ? "Prima le scadenze, poi il resto." : "Deadlines first, everything else after."}</p></div>
     <div className="dashboard-grid">
       <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? "Sposta su" : "Move up"}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? "Sposta giù" : "Move down"}>↓</Button></span></div>)}</div>}</Panel></div>
       {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}><Panel className="dashboard-tasks dashboard-priorities">
@@ -165,6 +166,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </>}
       </Panel></div>}
 
+      <div className="dashboard-section-heading dashboard-section-heading-secondary"><span className="eyebrow">{locale === "it" ? "02 — OPERAZIONI" : "02 — OPERATIONS"}</span><p>{locale === "it" ? "Registra le attività di cura." : "Record routine care."}</p></div>
       {widgetVisibility.plan && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
       {widgetVisibility.quickActions && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("quickActions") }}><Panel>
           <PanelHeader title={t("quickActions")} />
@@ -179,11 +181,17 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       {widgetVisibility.feedingAlerts && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("feedingAlerts") }}><Panel>
           <PanelHeader title={locale === "it" ? "Animali da controllare" : "Animals to check"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
           <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
-          {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => <button className="simple-row dashboard-reminder-row dashboard-reminder-overdue" key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
-            <span className="simple-row-icon"><Icon name="alert" size={16} /></span>
-            <span className="dashboard-reminder-copy"><strong>{animal.name}</strong><small>{animal.species} · {locale === "it" ? `${animal.daysSinceLastMeal} giorni senza pasto (intervallo ${animal.feedingIntervalDays} gg)` : `${animal.daysSinceLastMeal} days without a meal (interval ${animal.feedingIntervalDays} days)`}</small></span>
-            <Icon name="chevron" size={15} />
-          </button>) : <EmptyState title={locale === "it" ? "Nessun animale in ritardo" : "No animals overdue"} description={locale === "it" ? "Gli animali con intervallo di alimentazione configurato sono in regola." : "Animals with a configured feeding interval are up to date."} />}
+          {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => {
+            const noHistory = animal.lastMealAt === null;
+            const overdueMeal = !noHistory && animal.daysSinceLastMeal > animal.feedingIntervalDays;
+            const nearDue = !noHistory && !overdueMeal && animal.daysSinceLastMeal >= Math.max(1, Math.floor(animal.feedingIntervalDays * 0.8));
+            const status = noHistory ? (locale === "it" ? "Nessuna alimentazione registrata" : "No feeding history") : overdueMeal ? (locale === "it" ? "Alimentazione in ritardo" : "Feeding overdue") : nearDue ? (locale === "it" ? "In prossimità della scadenza" : "Due soon") : (locale === "it" ? "Regolare" : "On track");
+            return <button className={`simple-row dashboard-reminder-row dashboard-animal-alert${overdueMeal ? " dashboard-reminder-overdue" : ""}`} key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
+              <span className="simple-row-icon"><Icon name={noHistory ? "info" : overdueMeal ? "alert" : "clock"} size={16} /></span>
+              <span className="dashboard-reminder-copy"><strong>{animal.name}</strong><small>{animal.species} · {noHistory ? (locale === "it" ? "Nessun pasto nello storico" : "No meal in history") : (locale === "it" ? `Ultimo pasto: ${formatDateTime(animal.lastMealAt, locale, timezone)} · ${animal.daysSinceLastMeal} gg / intervallo ${animal.feedingIntervalDays} gg` : `Last meal: ${formatDateTime(animal.lastMealAt, locale, timezone)} · ${animal.daysSinceLastMeal}d / interval ${animal.feedingIntervalDays}d`)}</small><span className={`dashboard-animal-status ${overdueMeal ? "is-overdue" : nearDue ? "is-near" : ""}`}>{status}</span></span>
+              <Icon name="chevron" size={15} />
+            </button>;
+          }) : <EmptyState title={locale === "it" ? "Nessun controllo alimentazione" : "No feeding checks"} description={locale === "it" ? "Non risultano animali da controllare in base agli intervalli configurati." : "No animals currently need a feeding check based on their configured intervals."} />}
           <Button size="sm" variant="ghost" onClick={() => toggleWidget("feedingAlerts", false)}>{locale === "it" ? "Nascondi widget" : "Hide widget"}</Button>
         </Panel></div>}
       {widgetVisibility.reminders && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("reminders") }}><Panel>
@@ -202,6 +210,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           {Boolean(truncated?.imminentReminders) && <p className="muted-note">{t("truncatedNotice")}</p>}
       </Panel></div>}
 
+      <div className="dashboard-section-heading dashboard-section-heading-secondary"><span className="eyebrow">{locale === "it" ? "03 — MONITORAGGIO" : "03 — MONITORING"}</span><p>{locale === "it" ? "Controlli e andamento dell’allevamento." : "Checks and collection activity."}</p></div>
       {widgetVisibility.recent && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("recent") }}><Panel className="dashboard-recent">
         <PanelHeader title={t("recentActivity")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/animals")}>{t("viewAll")}</Button>} />
         {recent.length
