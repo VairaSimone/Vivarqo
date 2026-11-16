@@ -42,9 +42,9 @@ describe.skipIf(!enabled)("Full account ZIP backup restore integration", () => {
       await prisma.reminderRule.deleteMany({ where: { userId: users } });
       await prisma.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } });
       await prisma.inventoryLot.deleteMany({ where: { itemId: { in: itemIds } } });
+      await prisma.feedingEntry.deleteMany({ where: { sessionId: { in: sessionIds } } });
       await prisma.inventoryItem.deleteMany({ where: { userId: users } });
       await prisma.inventorySupplier.deleteMany({ where: { userId: users } });
-      await prisma.feedingEntry.deleteMany({ where: { sessionId: { in: sessionIds } } });
       await prisma.feedingSession.deleteMany({ where: { userId: users } });
       await prisma.incubationLog.deleteMany({ where: { clutchId: { in: clutchIds } } });
       await prisma.egg.deleteMany({ where: { clutchId: { in: clutchIds } } });
