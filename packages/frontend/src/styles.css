@@ -2833,3 +2833,36 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .collaborator-row .btn { margin-left:auto; }
   .role-summary { grid-template-columns:1fr; }
 }
+
+
+/* Onboarding checklist: seven persistent milestones, compact and responsive. */
+.onboarding-checklist { display:grid; gap:16px; }
+.onboarding-checklist-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.onboarding-checklist-heading > div:first-child { min-width:0; }
+.onboarding-checklist-heading h2 { margin:6px 0 5px; font-size:20px; line-height:1.25; }
+.onboarding-checklist-heading p,.onboarding-checklist-description { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+.onboarding-checklist-heading-actions { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+.onboarding-checklist-progress { display:grid; justify-items:end; gap:2px; min-width:70px; }
+.onboarding-checklist-progress strong { color:var(--forest-2); font-size:24px; font-variant-numeric:tabular-nums; line-height:1; }
+.onboarding-checklist-progress span { color:var(--muted); font-size:11px; }
+.onboarding-checklist-track { height:8px; overflow:hidden; border-radius:99px; background:var(--surface-soft); }
+.onboarding-checklist-track span { display:block; height:100%; border-radius:inherit; background:var(--forest-2); transition:width .2s ease; }
+.onboarding-checklist-items { display:grid; gap:0; margin:0; padding:0; list-style:none; }
+.onboarding-checklist-items li { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:12px; min-width:0; padding:12px 0; border-bottom:1px solid var(--border); }
+.onboarding-checklist-items li:last-child { border-bottom:0; }
+.onboarding-checklist-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:9px; background:var(--surface-soft); color:var(--forest-2); }
+.onboarding-checklist-items li.is-complete .onboarding-checklist-icon { background:var(--success-bg); color:var(--success); }
+.onboarding-checklist-copy { min-width:0; }
+.onboarding-checklist-copy strong { display:block; font-size:14px; line-height:1.35; }
+.onboarding-checklist-copy p { margin:3px 0 0; color:var(--muted); font-size:12px; line-height:1.45; }
+.onboarding-checklist-items .btn { min-height:34px; font-size:12px; }
+.onboarding-checklist-done { display:inline-flex; align-items:center; gap:5px; color:var(--success); font-size:12px; font-weight:700; white-space:nowrap; }
+.onboarding-checklist-footnote { margin:0; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:11px; line-height:1.5; }
+@media(max-width:640px) {
+  .onboarding-checklist { padding:15px; }
+  .onboarding-checklist-heading { flex-direction:column; }
+  .onboarding-checklist-heading-actions { width:100%; justify-content:space-between; }
+  .onboarding-checklist-items li { grid-template-columns:32px minmax(0,1fr); gap:9px; }
+  .onboarding-checklist-items li > .btn,.onboarding-checklist-items li > .onboarding-checklist-done { grid-column:2; justify-self:start; }
+  .onboarding-checklist-copy strong { font-size:13px; }
+}
