@@ -463,7 +463,7 @@ async function* exportEntries(
 
   if (!includeDocuments || (!modules.includes("animals") && !modules.includes("reproduction"))) {
     const manifest = {
-      format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
+      format: "vivarqo-account-backup", formatVersion: 2, createdAt: createdAt.toISOString(),
       accountId: userId, modules, includeDocuments: false, checksums,
     };
     yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8")) };
@@ -494,7 +494,7 @@ async function* exportEntries(
     yield { name: archiveName, chunks };
   }
   const manifest = {
-    format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
+    format: "vivarqo-account-backup", formatVersion: 2, createdAt: createdAt.toISOString(),
     accountId: userId, modules, includeDocuments: true, checksums,
   };
   yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8")) };
