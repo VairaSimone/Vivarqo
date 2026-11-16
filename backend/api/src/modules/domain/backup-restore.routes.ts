@@ -10,7 +10,7 @@ import { deletePrivateObject, storePrivateObject, validatePrivateFile } from "./
 
 const MAX_ENTRIES = 20_000;
 const MAX_ROWS = 100_000;
-const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
+const MAX_ENTRY_BYTES = env.EXPORT_MAX_ARCHIVE_BYTES;
 const FULL_MODULES = ["animals", "feedings", "reproduction", "finance", "inventory"];
 
 type ArchiveEntry = { name: string; bytes: Buffer };
