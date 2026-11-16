@@ -27,6 +27,8 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [performedAt, setPerformedAt] = useState(localDateTimeValue(new Date(), timezone));
   const [sessionNotes, setSessionNotes] = useState("");
   const [animalSearch, setAnimalSearch] = useState("");
+  const [animalSpecies, setAnimalSpecies] = useState("");
+  const [animalLocation, setAnimalLocation] = useState("");
   const [animalPage, setAnimalPage] = useState(1);
   const [selected, setSelected] = useState<string[]>(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
   const [selectedNames, setSelectedNames] = useState<Record<string, string>>({});
@@ -38,7 +40,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const listUrl = "/feeding-sessions" + queryString({ page, pageSize: 25, animalId, outcome, q });
   const resource = useResource<FeedingSessionsResponseDto>(listUrl, parseFeedingSessionsResponse);
   const animalsResource = useResource<{ animals: AnimalOption[]; pagination: { total: number; page: number; totalPages: number } }>(
-    modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, status: "active", sort: "name" }) : null
+    modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, species: animalSpecies, location: animalLocation, status: "active", sort: "name" }) : null
   );
   const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(modal || editEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
 
@@ -55,7 +57,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
 
   function openNew(isBulk: boolean) {
     setBulk(isBulk); setModal(true); setError(""); setFormDirty(false); setSelected(animalId ? [animalId] : []);
-    setEntries({}); setSelectedNames({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalPage(1);
+    setEntries({}); setSelectedNames({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalSpecies(""); setAnimalLocation(""); setAnimalPage(1);
   }
 
   function toggleAnimal(id: string) {
@@ -190,6 +192,15 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
           <Field label={t("notes")}><Input value={sessionNotes} onChange={(e) => { setSessionNotes(e.target.value); setFormDirty(true); }} /></Field>
         </div>
         <div className="selector-header"><div><strong>{t("selectAnimals")} <span className="field-required" aria-hidden="true">*</span></strong><small>{selected.length} {t("selected")}</small></div><label className="search-control"><Icon name="search" /><input value={animalSearch} onChange={(e) => setAnimalSearch(e.target.value)} placeholder={t("search")} /></label></div>
+        {bulk && <div className="feeding-group-filters">
+          <label>{locale === "it" ? "Specie" : "Species"}<Input value={animalSpecies} onChange={(event) => { setAnimalSpecies(event.target.value); setAnimalPage(1); }} placeholder={locale === "it" ? "Filtra per specie" : "Filter by species"} /></label>
+          <label>{locale === "it" ? "Rack / collocazione" : "Rack / location"}<Input value={animalLocation} onChange={(event) => { setAnimalLocation(event.target.value); setAnimalPage(1); }} placeholder={locale === "it" ? "Es. rack 4" : "e.g. rack 4"} /></label>
+          <Button type="button" size="sm" variant="secondary" disabled={!animalResults.length} onClick={() => {
+            setSelected((current) => [...new Set([...current, ...animalResults.map((animal) => animal.id)])]);
+            setSelectedNames((current) => ({ ...current, ...Object.fromEntries(animalResults.map((animal) => [animal.id, animal.name])) }));
+            setFormDirty(true);
+          }}>{locale === "it" ? "Seleziona pagina" : "Select page"}</Button>
+        </div>}
         {selected.length > 0 && <div className="feeding-selected-animals" aria-label={locale === "en" ? "Selected animals" : "Animali selezionati"}>{selected.map((id) => <span className="feeding-selected-chip" key={id}>{selectedNames[id] || animalResults.find((item) => item.id === id)?.name || id}<button type="button" aria-label={(locale === "en" ? "Remove " : "Rimuovi ") + (selectedNames[id] || id)} onClick={() => toggleAnimal(id)}><Icon name="close" size={12} /></button></span>)}</div>}
         {animalsResource.loading && !animalsResource.data ? <LoadingState /> : <div className="animal-picker">
           {animalResults.map((animal) => <label className={`animal-option ${selected.includes(animal.id) ? "selected" : ""}`} key={animal.id}><input type="checkbox" checked={selected.includes(animal.id)} onChange={() => toggleAnimal(animal.id)} /><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{animal.name}</strong><small>{animal.identifier || animal.species}</small></span><i>{selected.includes(animal.id) ? <Icon name="check" size={16} /> : null}</i></label>)}
