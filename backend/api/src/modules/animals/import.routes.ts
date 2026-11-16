@@ -386,6 +386,91 @@ export function createImportRouter() {
     });
   });
 
+
+  router.post("/:id/undo", requireSession, persistentRateLimit(10, "import-undo"), async (req, res) => {
+    const userId = authId(res);
+    const jobId = parseUuid(req.params.id!);
+    const outcome = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ status: string; entity_type: string; report: unknown }>>`
+        SELECT status, entity_type, report FROM import_jobs
+        WHERE id = ${jobId}::uuid AND user_id = ${userId}::uuid
+        FOR UPDATE
+      `;
+      const job = rows[0];
+      if (!job) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
+      if (job.status === "preview" || job.status === "queued") {
+        const changed = await tx.importJob.updateMany({
+          where: { id: jobId, userId, status: job.status },
+          data: { status: "cancelled", leaseToken: null, processingStartedAt: null, lastErrorCode: null },
+        });
+        if (changed.count !== 1) throw new AppError(409, "IMPORT_NOT_CANCELLABLE", "The import has already started");
+        await tx.auditEvent.create({ data: { userId, action: "import.cancelled", entityType: "import_job", entityId: jobId } });
+        return { status: "cancelled", deletedCount: 0 };
+      }
+      if (job.status !== "completed") throw new AppError(409, "IMPORT_NOT_UNDOABLE", "Only a completed import can be rolled back");
+      if (!job.report || typeof job.report !== "object" || Array.isArray(job.report)) {
+        throw new AppError(409, "IMPORT_ROLLBACK_UNAVAILABLE", "The import does not contain a rollback manifest");
+      }
+      const report = job.report as Record<string, unknown>;
+      const ids = (value: unknown): string[] => Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && z.string().uuid().safeParse(entry).success) : [];
+      let deletedCount = 0;
+      const deleteByIds = async (delegate: { deleteMany(args: { where: { id: { in: string[] } } }): Promise<{ count: number }> }, values: unknown) => {
+        const selected = ids(values);
+        if (!selected.length) return;
+        deletedCount += (await delegate.deleteMany({ where: { id: { in: selected } } })).count;
+      };
+      const entity = job.entity_type;
+      if (entity === "animals") {
+        const importedIds = ids(report.importedAnimalIds);
+        if (!importedIds.length && Number(report.createdCount ?? 0) > 0) throw new AppError(409, "IMPORT_ROLLBACK_UNAVAILABLE", "This older animal import has no rollback manifest");
+        await deleteByIds(tx.animal, importedIds);
+      } else if (["weights", "sheds", "notes", "feedings"].includes(entity)) {
+        const records = Array.isArray(report.createdRecords) ? report.createdRecords as Array<{ kind?: unknown; ids?: unknown }> : [];
+        if (!records.length && Number(report.createdCount ?? 0) > 0) throw new AppError(409, "IMPORT_ROLLBACK_UNAVAILABLE", "This older care import has no rollback manifest");
+        for (const record of records) {
+          if (record.kind === "weights") await deleteByIds(tx.weightMeasurement, record.ids);
+          else if (record.kind === "sheds") await deleteByIds(tx.shedRecord, record.ids);
+          else if (record.kind === "notes") await deleteByIds(tx.animalNote, record.ids);
+          else if (record.kind === "feedingEntries") await deleteByIds(tx.feedingEntry, record.ids);
+          else if (record.kind === "feedings") await deleteByIds(tx.feedingSession, record.ids);
+        }
+      } else if (["finance", "inventory", "reproductionCycles", "reproductiveEvents", "clutches", "eggs", "incubationLogs", "offspringBatches"].includes(entity)) {
+        const createdRows = Array.isArray(report.createdRows) ? report.createdRows as Array<{ id?: unknown }> : [];
+        const createdIds = createdRows.map((row) => row.id).filter((value): value is string => typeof value === "string" && z.string().uuid().safeParse(value).success);
+        if (!createdIds.length && Number(report.createdCount ?? 0) > 0) throw new AppError(409, "IMPORT_ROLLBACK_UNAVAILABLE", "This import has no rollback manifest");
+        if (entity === "finance") await deleteByIds(tx.financeEntry, createdIds);
+        else if (entity === "inventory") {
+          const items = await tx.inventoryItem.findMany({ where: { id: { in: createdIds }, userId }, select: { id: true } });
+          for (const item of items) {
+            const movements = await tx.stockMovement.findMany({ where: { itemId: item.id }, select: { id: true, reference: true } });
+            if (movements.some((movement) => movement.reference !== "Import apertura") || movements.length > 1) {
+              throw new AppError(409, "IMPORT_ROLLBACK_CONFLICT", "An imported inventory item has been used since import; it cannot be safely rolled back");
+            }
+            if (await tx.inventoryLot.count({ where: { itemId: item.id } }) > 0) {
+              throw new AppError(409, "IMPORT_ROLLBACK_CONFLICT", "An imported inventory item now has lots; it cannot be safely rolled back");
+            }
+            await tx.stockMovement.deleteMany({ where: { itemId: item.id } });
+            deletedCount += (await tx.inventoryItem.deleteMany({ where: { id: item.id, userId } })).count;
+          }
+        } else if (entity === "reproductiveEvents") await deleteByIds(tx.reproductiveEvent, createdIds);
+        else if (entity === "clutches") await deleteByIds(tx.clutch, createdIds);
+        else if (entity === "eggs") await deleteByIds(tx.egg, createdIds);
+        else if (entity === "incubationLogs") await deleteByIds(tx.incubationLog, createdIds);
+        else if (entity === "offspringBatches") await deleteByIds(tx.offspringBatch, createdIds);
+        else if (entity === "reproductionCycles") await deleteByIds(tx.reproductionCycle, createdIds);
+      } else {
+        throw new AppError(409, "IMPORT_ROLLBACK_UNSUPPORTED", "This import type does not support rollback");
+      }
+      await tx.auditEvent.create({
+        data: { userId, action: "import.rolled_back", entityType: "import_job", entityId: jobId,
+          metadata: { entityType: entity, deletedCount } },
+      });
+      await tx.importJob.update({ where: { id: jobId }, data: { status: "rolled_back", leaseToken: null, processingStartedAt: null } });
+      return { status: "rolled_back", deletedCount };
+    }, { maxWait: 10_000, timeout: 120_000 });
+    res.status(200).json({ importId: jobId, ...outcome });
+  });
+
   router.get("/:id", requireSession, async (req, res) => {
     const userId = authId(res);
     const id = parseUuid(req.params.id!);
