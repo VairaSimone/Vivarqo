@@ -117,27 +117,28 @@ export async function processQueuedCareImport(jobId: string, userId: string, lea
   const report = reportFrom(job.report);
   await prisma.$transaction(async (tx) => {
     let createdCount = 0;
+    const createdRecords: Array<{ kind: string; ids: string[] }> = [];
     if (report.entityType === "weights") {
       const records = report.validRows.map(({ record: value }) => {
         const record = value as { animalId: string; measuredAt: string; weightG: number; notes?: string | null };
         return { animalId: record.animalId, measuredAt: new Date(record.measuredAt), weightG: record.weightG, notes: record.notes ?? null };
       });
-      if (records.length) await tx.weightMeasurement.createMany({ data: records });
-      createdCount = records.length;
+      const created = records.length ? await tx.weightMeasurement.createManyAndReturn({ data: records, select: { id: true } }) : [];
+      createdCount = created.length; createdRecords.push({ kind: "weights", ids: created.map((row) => row.id) });
     } else if (report.entityType === "sheds") {
       const records = report.validRows.map(({ record: value }) => {
         const record = value as { animalId: string; occurredAt: string; outcome: "complete" | "partial" | "unknown"; notes?: string | null };
         return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), outcome: record.outcome, notes: record.notes ?? null };
       });
-      if (records.length) await tx.shedRecord.createMany({ data: records });
-      createdCount = records.length;
+      const created = records.length ? await tx.shedRecord.createManyAndReturn({ data: records, select: { id: true } }) : [];
+      createdCount = created.length; createdRecords.push({ kind: "sheds", ids: created.map((row) => row.id) });
     } else if (report.entityType === "notes") {
       const records = report.validRows.map(({ record: value }) => {
         const record = value as { animalId: string; occurredAt: string; title?: string | null; category: string; body: string };
         return { animalId: record.animalId, occurredAt: new Date(record.occurredAt), title: record.title ?? null, category: record.category, body: record.body };
       });
-      if (records.length) await tx.animalNote.createMany({ data: records });
-      createdCount = records.length;
+      const created = records.length ? await tx.animalNote.createManyAndReturn({ data: records, select: { id: true } }) : [];
+      createdCount = created.length; createdRecords.push({ kind: "notes", ids: created.map((row) => row.id) });
     } else {
       const byTimestamp = new Map<string, Array<{ rowNumber: number; record: Record<string, unknown> }>>();
       for (const row of report.validRows) {
@@ -146,8 +147,10 @@ export async function processQueuedCareImport(jobId: string, userId: string, lea
         rows.push(row);
         byTimestamp.set(timestamp, rows);
       }
+      const sessionIds: string[] = [], entryIds: string[] = [];
       for (const [timestamp, rows] of byTimestamp) {
         const session = await tx.feedingSession.create({ data: { userId, performedAt: new Date(timestamp) } });
+        sessionIds.push(session.id);
         const entries = rows.map(({ record: value }) => {
           const record = value as {
             animalId: string; outcome: "ate" | "refused" | "not_offered" | "unknown";
@@ -159,11 +162,15 @@ export async function processQueuedCareImport(jobId: string, userId: string, lea
             foodWeightG: record.foodWeightG ?? null, notes: record.notes ?? null,
           };
         });
-        if (entries.length) await tx.feedingEntry.createMany({ data: entries });
+        if (entries.length) {
+          const createdEntries = await tx.feedingEntry.createManyAndReturn({ data: entries, select: { id: true } });
+          entryIds.push(...createdEntries.map((entry) => entry.id));
+        }
         createdCount += entries.length;
       }
+      createdRecords.push({ kind: "feedings", ids: sessionIds }, { kind: "feedingEntries", ids: entryIds });
     }
-    const finalReport = { ...report, createdCount, skippedCount: report.errors.length, errors: report.errors };
+    const finalReport = { ...report, createdRecords, createdCount, skippedCount: report.errors.length, errors: report.errors };
     await tx.auditEvent.create({
       data: { userId, action: "care_records.imported", entityType: "import_job", entityId: jobId,
         metadata: { entityType: report.entityType, createdCount, errorCount: report.errors.length } },
