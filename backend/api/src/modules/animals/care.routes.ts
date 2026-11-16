@@ -233,28 +233,61 @@ export function createCareRouter() {
           if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
           if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
           const balance = (available - requested) / 1000;
-          const costRows = await tx.$queryRaw<Array<{ unit_cost_cents: string | null }>>`
-            SELECT CASE WHEN SUM(quantity) > 0
-              THEN ROUND(SUM(quantity * unit_cost_cents) / SUM(quantity))::text
-              ELSE NULL END AS unit_cost_cents
-            FROM stock_movements
-            WHERE item_id = ${entry.inventoryItemId}::uuid
-              AND movement_type = 'in' AND unit_cost_cents IS NOT NULL
+          // Consume dated lots first (FEFO: earliest expiry, then oldest purchase).
+          // Legacy/opening stock without a lot remains consumable after tracked lots.
+          const lots = await tx.$queryRaw<Array<{ id: string; quantity_remaining: string; unit_cost_cents: number | null }>>`
+            SELECT id::text, quantity_remaining::text, unit_cost_cents
+            FROM inventory_lots
+            WHERE item_id = ${entry.inventoryItemId}::uuid AND quantity_remaining > 0
+            ORDER BY expires_at ASC NULLS LAST, purchased_at ASC, id ASC
+            FOR UPDATE
           `;
-          const unitCostCents = costRows[0]?.unit_cost_cents ? Number(costRows[0].unit_cost_cents) : null;
-          const movement = await tx.stockMovement.create({
-            data: { itemId: entry.inventoryItemId, movementType: "out", quantity: entry.inventoryQuantity!, unitCostCents, occurredAt: new Date(input.performedAt), reference: "Feeding entry " + createdEntry.id, notes: "Automatic deduction after prey was offered" },
-          });
-          if (unitCostCents !== null) {
-            const amountCents = (BigInt(unitCostCents) * BigInt(requested) + 500n) / 1000n;
-            if (amountCents > 0n) await tx.financeEntry.create({ data: {
-              userId: auth.userId, animalId: entry.animalId, entryType: "expense",
-              occurredOn: new Date(input.performedAt.slice(0, 10) + "T00:00:00.000Z"),
-              amountCents, currency: "EUR", category: "Alimentazione",
-              description: "Consumo alimento da inventario",
-              sourceStockMovementId: movement.id,
-            } });
+          let remaining = requested;
+          const allocations: Array<{ lotId: string | null; quantityMilli: number; unitCostCents: number | null }> = [];
+          for (const lot of lots) {
+            if (remaining <= 0) break;
+            const lotAvailable = decimalToScaledInteger(lot.quantity_remaining, 3);
+            if (lotAvailable === null || lotAvailable <= 0) continue;
+            const taken = Math.min(remaining, lotAvailable);
+            await tx.inventoryLot.update({ where: { id: lot.id }, data: { quantityRemaining: { decrement: taken / 1000 } } });
+            allocations.push({ lotId: lot.id, quantityMilli: taken, unitCostCents: lot.unit_cost_cents });
+            remaining -= taken;
           }
+          if (remaining > 0) {
+            const costRows = await tx.$queryRaw<Array<{ unit_cost_cents: string | null }>>`
+              SELECT CASE WHEN SUM(quantity) > 0
+                THEN ROUND(SUM(quantity * unit_cost_cents) / SUM(quantity))::text
+                ELSE NULL END AS unit_cost_cents
+              FROM stock_movements
+              WHERE item_id = ${entry.inventoryItemId}::uuid
+                AND movement_type = 'in' AND unit_cost_cents IS NOT NULL AND lot_id IS NULL
+            `;
+            const unitCostCents = costRows[0]?.unit_cost_cents ? Number(costRows[0].unit_cost_cents) : null;
+            allocations.push({ lotId: null, quantityMilli: remaining, unitCostCents });
+          }
+          for (const allocation of allocations) {
+            const movement = await tx.stockMovement.create({
+              data: {
+                itemId: entry.inventoryItemId, lotId: allocation.lotId,
+                movementType: "out", quantity: allocation.quantityMilli / 1000,
+                unitCostCents: allocation.unitCostCents,
+                occurredAt: new Date(input.performedAt),
+                reference: "Feeding entry " + createdEntry.id,
+                notes: allocation.lotId ? "Automatic FEFO lot deduction after prey was offered" : "Automatic deduction from untracked opening stock",
+              },
+            });
+            if (allocation.unitCostCents !== null) {
+              const amountCents = (BigInt(allocation.unitCostCents) * BigInt(allocation.quantityMilli) + 500n) / 1000n;
+              if (amountCents > 0n) await tx.financeEntry.create({ data: {
+                userId: auth.userId, animalId: entry.animalId, entryType: "expense",
+                occurredOn: new Date(input.performedAt.slice(0, 10) + "T00:00:00.000Z"),
+                amountCents, currency: "EUR", category: "Alimentazione",
+                description: "Consumo alimento da inventario",
+                sourceStockMovementId: movement.id,
+              } });
+            }
+          }
+          const balance = (available - requested) / 1000;
           await tx.inventoryItem.update({ where: { id: entry.inventoryItemId }, data: { quantityOnHand: balance } });
           await tx.feedingEntry.update({ where: { id: createdEntry.id }, data: { inventoryDeducted: true } });
         }
