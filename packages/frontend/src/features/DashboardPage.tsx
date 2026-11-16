@@ -193,7 +193,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         {(taskFilter === "all" || taskFilter === "completed") && completed.length > 0 && <>
           <div className="panel-separator" />
           <section className="dashboard-task-section">
-            <PanelHeader title={t("completedToday")} action={<Badge tone="success">{counts?.completedToday ?? completed.length}</Badge>} />
+            <PanelHeader title={t("completedToday")} action={<Badge tone="success">{Math.max(counts?.completedToday ?? 0, completed.length)}</Badge>} />
             {completed.slice(0, 4).map((task) => taskCard(task, false, true))}
             {Boolean(truncated?.completedToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
           </section>
