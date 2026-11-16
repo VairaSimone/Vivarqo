@@ -50,7 +50,13 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
     });
     setError(""); setModal(true);
   }
-  useEffect(() => { if (createRequested && tab === "cycles") openCycle(); }, [createRequested, tab]);
+  useEffect(() => {
+    if (!createRequested || tab !== "cycles") return;
+    setEditing(null);
+    setCycleForm({ name: "", startedOn: todayDate(), endedOn: "", status: "planned", parentAAnimalId: "", parentBAnimalId: "", notes: "" });
+    setError("");
+    setModal(true);
+  }, [createRequested, tab]);
 
   async function saveCycle(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
