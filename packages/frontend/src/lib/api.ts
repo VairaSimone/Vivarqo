@@ -82,6 +82,7 @@ function invalidateAfterMutation(path: string): void {
     feeding: ["/feeding", "/animals", "/home/today"],
     "feeding-sessions": ["/feeding-sessions", "/animals", "/home/today", "/onboarding"],
     "feeding-entries": ["/feeding-sessions", "/animals", "/home/today", "/onboarding"],
+    "care-records": ["/animals", "/home/today", "/calendar", "/tasks"],
     tasks: ["/tasks", "/home/today", "/calendar", "/onboarding"],
     reminders: ["/tasks", "/home/today", "/calendar", "/onboarding"],
     inventory: ["/inventory", "/finance"],
