@@ -286,6 +286,11 @@ export function createBackupRestoreRouter() {
     for (const spec of TABLES) {
       if (typeof checksums[spec.file] !== "string") fail("BACKUP_CHECKSUM_MISSING", "Backup is missing a required file checksum");
     }
+    for (const entry of archive) {
+      if (entry.name !== "manifest.json" && entry.name !== "README.txt" && typeof checksums[entry.name] !== "string") {
+        fail("BACKUP_CHECKSUM_MISSING", "Backup contains a file without a SHA-256 checksum");
+      }
+    }
     for (const [name, expected] of Object.entries(checksums)) {
       const bytes = byName.get(name);
       if (!bytes || typeof expected !== "string" || sha256(bytes) !== expected) fail("BACKUP_CHECKSUM_MISMATCH", "Backup file is missing or its SHA-256 checksum is invalid");
