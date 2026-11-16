@@ -330,7 +330,10 @@ export function createBackupRestoreRouter() {
         const row = documentRows.get(archivePath);
         if (!row) fail("BACKUP_ATTACHMENT_UNREFERENCED", "Backup contains an attachment with no document record");
         const fileBytes = byName.get(archivePath)!;
-        if (Number(row.sizeBytes) !== fileBytes.length) fail("BACKUP_ATTACHMENT_INVALID", "A document attachment has an unexpected size");
+        const validated = validatePrivateFile(fileBytes, String(row.mimeType));
+        if (Number(row.sizeBytes) !== fileBytes.length || validated.mimeType !== row.mimeType) {
+          fail("BACKUP_ATTACHMENT_INVALID", "A document attachment has an unexpected size or MIME type");
+        }
       }
       const expectedPhotos = new Set([
         ...(parsedTables.get("animals") ?? []).map((row) => row.photoArchivePath).filter(Boolean),
