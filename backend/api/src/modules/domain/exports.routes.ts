@@ -316,7 +316,7 @@ async function* exportEntries(
     yield { name: table.name, chunks };
   }
 
-  if (!includeDocuments) {
+  if (!includeDocuments || (!modules.includes("animals") && !modules.includes("reproduction"))) {
     const manifest = {
       format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
       accountId: userId, modules, includeDocuments: false, checksums,
