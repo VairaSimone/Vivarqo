@@ -210,6 +210,8 @@ type ColumnInfo = { column_name: string; data_type: string; udt_name: string };
 
 function normalizeCell(value: string, column: ColumnInfo): unknown {
   if (value === "") return null;
+  if (column.data_type === "date") return value.slice(0, 10);
+  if (column.data_type === "timestamp without time zone") return new Date(value).toISOString().replace("Z", "");
   if (column.data_type === "time without time zone" || column.data_type === "time with time zone") {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) fail("BACKUP_VALUE_INVALID", "Backup contains an invalid time value");
