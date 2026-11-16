@@ -65,6 +65,7 @@ export function createCareRouter() {
         SELECT id::text AS id, status, archived_at
         FROM animals
         WHERE user_id = ${auth.userId}::uuid AND id = ANY(${input.animalIds}::uuid[])
+        ORDER BY id
         FOR UPDATE
       `;
       if (owned.length !== input.animalIds.length) {
