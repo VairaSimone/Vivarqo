@@ -233,9 +233,18 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           ? <div className="activity-list">{recent.slice(0, 8).map((event, index) => {
               const target = getString(event, "targetPath");
               const eventType = getString(event, "type");
+              const rawTitle = getString(event, "title");
+              const eventTitle = eventType === "feeding" ? (locale === "it" ? "Alimentazione registrata" : "Feeding recorded")
+                : eventType === "weight" ? (locale === "it" ? "Peso registrato" : "Weight recorded")
+                : eventType === "shed" ? (locale === "it" ? "Muta registrata" : "Shed recorded")
+                : eventType === "reproduction" ? ({ mating: locale === "it" ? "Accoppiamento registrato" : "Mating recorded", laying: locale === "it" ? "Deposizione registrata" : "Egg laying recorded" } as Record<string, string>)[rawTitle] ?? rawTitle
+                : eventType === "birth" ? (locale === "it" ? rawTitle.replace("Nascita:", "Nascita registrata:") : rawTitle.replace("Nascita:", "Birth recorded:"))
+                : eventType === "incubation" ? (locale === "it" ? rawTitle : rawTitle.replace("Controllo incubatrice:", "Incubator check:"))
+                : eventType === "animal_update" ? (locale === "it" ? rawTitle : rawTitle.replace("Scheda aggiornata:", "Animal profile updated:"))
+                : rawTitle;
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
                 <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "note" ? "file" : "leaf"} size={15} /></span>
-                <span className="activity-copy"><strong>{getString(event, "title")}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
+                <span className="activity-copy"><strong>{eventTitle}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
                 <Icon name="chevron" size={15} />
               </button>;
             })}</div>
