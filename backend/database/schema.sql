@@ -437,6 +437,7 @@ CREATE TABLE export_jobs (
     status                VARCHAR(20) NOT NULL DEFAULT 'pending',
     storage_key           TEXT,
     include_documents     BOOLEAN NOT NULL DEFAULT FALSE,
+    modules               TEXT[] NOT NULL DEFAULT ARRAY['animals', 'feedings', 'reproduction', 'finance', 'inventory']::TEXT[] CHECK (cardinality(modules) BETWEEN 1 AND 5 AND modules <@ ARRAY['animals', 'feedings', 'reproduction', 'finance', 'inventory']::TEXT[]),
     processing_started_at TIMESTAMPTZ,
     lease_token           UUID,
     attempts              INTEGER NOT NULL DEFAULT 0,
