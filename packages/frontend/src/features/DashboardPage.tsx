@@ -78,6 +78,13 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const overview = data?.overview;
   const smartSuggestions = data?.smartSuggestions ?? [];
   const truncated = data?.truncated;
+  const dashboardTone = visibleOverdue.length > 0 ? "critical" : visibleDue.length > 0 ? "attention" : "normal";
+  const greeting = getGreeting(timezone, locale);
+  const dayStatus = visibleOverdue.length > 0
+    ? (locale === "it" ? `${visibleOverdue.length} ${visibleOverdue.length === 1 ? "attività in ritardo" : "attività in ritardo"} da verificare` : `${visibleOverdue.length} overdue ${visibleOverdue.length === 1 ? "task" : "tasks"} to review`)
+    : visibleDue.length > 0
+      ? (locale === "it" ? `${visibleDue.length} attività da gestire oggi` : `${visibleDue.length} tasks to handle today`)
+      : (locale === "it" ? "Nessuna urgenza: puoi dedicarti alla routine." : "No urgent items. You can focus on routine care.");
 
   async function complete(id: string) {
     setCompleting(id);
@@ -102,7 +109,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     const category = task.category || "custom";
     const categoryIcon = category === "feeding" ? "feed" : category === "weighing" ? "weight" : category === "shed_check" ? "leaf" : category === "reproduction" || category === "incubation" ? "egg" : category === "inventory" ? "box" : category === "document" ? "file" : "calendar";
     const categoryLabel: Record<string, string> = { feeding: locale === "it" ? "Alimentazione" : "Feeding", weighing: locale === "it" ? "Peso" : "Weight", shed_check: locale === "it" ? "Muta" : "Shed", cleaning: locale === "it" ? "Pulizia" : "Cleaning", reproduction: locale === "it" ? "Riproduzione" : "Reproduction", incubation: locale === "it" ? "Incubazione" : "Incubation", document: locale === "it" ? "Documento" : "Document", inventory: locale === "it" ? "Scorte" : "Inventory", custom: locale === "it" ? "Personalizzata" : "Custom" };
-    return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}`} key={id}>
+    return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}${isComplete ? " is-complete" : ""}`} key={id}>
       <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={t("completeTask")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
       <div className="dashboard-task-content">
         <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
@@ -124,13 +131,13 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   if (resource.error) return <ErrorState message={resource.error.message} retry={resource.reload} />;
 
   return <div className="page-stack dashboard-page">
-    <PageHeader eyebrow={formatDate(new Date(), locale)} title={t("dashboardTitle")} description={t("dashboardSubtitle")} action={<Button onClick={() => navigate("/calendar")} variant="secondary"><Icon name="calendar" size={16} />{t("openCalendar")}</Button>} />
+    <PageHeader eyebrow={formatDate(new Date(), locale, timezone)} title={t("dashboardTitle")} description={t("dashboardSubtitle")} action={<Button onClick={() => navigate("/calendar")} variant="secondary"><Icon name="calendar" size={16} />{t("openCalendar")}</Button>} />
 
-    <div className="dashboard-intro">
+    <div className={`dashboard-intro dashboard-intro-${dashboardTone}`} aria-live="polite">
       <div>
         <span className="eyebrow">{locale === "it" ? "PRIORITÀ DELL'ALLEVAMENTO" : "COLLECTION PRIORITIES"}</span>
-        <h2>{t("dashboardPrompt")}</h2>
-        <p>{t("dashboardPromptHint")}</p>
+        <h2>{greeting}</h2>
+        <p>{dayStatus}</p>
       </div>
       <div className="intro-mark"><Icon name="leaf" size={34} /></div>
     </div>
@@ -258,15 +265,15 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
 
       {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}><Panel className="dashboard-summary">
       <PanelHeader title={locale === "it" ? "Stato dell'allevamento" : "Collection overview"} />
-      <div className="dashboard-overview-grid">
-        <button className="dashboard-overview-card" onClick={() => navigate("/animals?status=active")}>
-          <span>{locale === "it" ? "Animali attivi" : "Active animals"}</span><strong>{overview?.activeAnimals ?? 0}</strong><small>{locale === "it" ? "Totale allevamento" : "Collection total"}</small>
+      <div className="dashboard-overview-grid" aria-label={locale === "it" ? "Indicatori dell'allevamento" : "Collection indicators"}>
+        <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=active")}>
+          <strong>{overview?.activeAnimals ?? 0}</strong><span>{locale === "it" ? "Animali attivi" : "Active animals"}</span>
         </button>
-        <button className="dashboard-overview-card" onClick={() => navigate("/feeding")}>
-          <span>{locale === "it" ? "Alimentazioni oggi" : "Feedings today"}</span><strong>{overview?.feedingsToday ?? 0}</strong><small>{locale === "it" ? "Registrate" : "Recorded"}</small>
+        <button className="dashboard-overview-item" onClick={() => navigate("/feeding")}>
+          <strong>{overview?.feedingsToday ?? 0}</strong><span>{locale === "it" ? "Alimentazioni oggi" : "Feedings today"}</span>
         </button>
-        <button className="dashboard-overview-card" onClick={() => navigate("/inventory?lowStock=true")}>
-          <span>{locale === "it" ? "Scorte basse" : "Low stock"}</span><strong>{overview?.lowStockCount ?? 0}</strong><small>{locale === "it" ? "Articoli sotto soglia" : "Items below threshold"}</small>
+        <button className="dashboard-overview-item dashboard-overview-item-stock" onClick={() => navigate("/inventory?lowStock=true")}>
+          <strong>{overview?.lowStockCount ?? 0}</strong><span>{locale === "it" ? "Scorte basse" : "Low stock"}</span>
         </button>
       </div>
       {(overview?.lowStockItems.length ?? 0) > 0 && <div className="dashboard-low-stock-list">
@@ -281,12 +288,11 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           <span>{item.title}</span><small>{item.dueAt ? formatDateTime(item.dueAt, locale, timezone) : ""}</small>
         </button>)}
       </div>}
-      <PanelHeader title={t("dashboardSummary")} />
-      <div className="dashboard-summary-grid">
-        <Metric label={t("overdue")} value={Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)} tone="danger" icon="alert" />
-        <Metric label={t("dueToday")} value={Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)} tone="primary" icon="calendar" />
-        <Metric label={t("completedToday")} value={getNumber(counts, "completedToday") + optimisticallyCompleted.filter((id) => taskLookup.some((task) => task.id === id)).length} tone="success" icon="checkCircle" />
-        <Metric label={t("upcomingReminders")} value={getNumber(counts, "imminentReminders")} tone="neutral" icon="clock" />
+      <div className="dashboard-daily-pulse" aria-label={t("dashboardSummary")}>
+        <button onClick={() => navigate("/tasks?status=overdue")} className="dashboard-pulse-item pulse-critical"><span>{Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)}</span><small>{t("overdue")}</small></button>
+        <button onClick={() => navigate("/tasks?due=today")} className="dashboard-pulse-item"><span>{Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)}</span><small>{t("dueToday")}</small></button>
+        <button onClick={() => navigate("/tasks?status=completed")} className="dashboard-pulse-item pulse-positive"><span>{getNumber(counts, "completedToday") + optimisticallyCompleted.filter((id) => taskLookup.some((task) => task.id === id)).length}</span><small>{t("completedToday")}</small></button>
+        <button onClick={() => navigate("/tasks")} className="dashboard-pulse-item"><span>{getNumber(counts, "imminentReminders")}</span><small>{t("upcomingReminders")}</small></button>
       </div>
       </Panel></div>}
     </div>
@@ -299,13 +305,16 @@ function getObject(value: unknown, key: string): unknown {
   return (value as Record<string, unknown>)[key] ?? null;
 }
 
-function formatDate(value: Date, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "it" ? "it-IT" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(value);
+function formatDate(value: Date, locale: Locale, timezone: string): string {
+  return new Intl.DateTimeFormat(locale === "it" ? "it-IT" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: timezone }).format(value);
 }
 
-function Metric({ label, value, tone, icon }: { label: string; value: number; tone: string; icon: "alert" | "calendar" | "checkCircle" | "clock" }) {
-  return <div className="metric-card"><span className={`metric-icon metric-${tone}`}><Icon name={icon} size={18} /></span><div><span className="metric-label">{label}</span><strong>{value}</strong></div></div>;
+function getGreeting(timezone: string, locale: Locale): string {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: timezone }).format(new Date()));
+  if (locale === "it") return hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 }
+
 function QuickAction({ label, icon, onClick }: { label: string; icon: "snake" | "feed" | "weight" | "calendar"; onClick: () => void }) {
   return <button className="quick-action" onClick={onClick}><span><Icon name={icon} size={19} /></span><strong>{label}</strong><Icon name="arrow" size={14} /></button>;
 }
