@@ -392,7 +392,8 @@ export function createBackupRestoreRouter() {
             (SELECT count(*) FROM inventory_suppliers WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM finance_budgets WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM finance_recurrences WHERE user_id = ${auth.userId}::uuid) +
-            (SELECT count(*) FROM public_shares WHERE user_id = ${auth.userId}::uuid) +\n            (SELECT count(*) FROM notification_preferences WHERE user_id = ${auth.userId}::uuid)
+            (SELECT count(*) FROM public_shares WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM notification_preferences WHERE user_id = ${auth.userId}::uuid)
           ) AS count`;
         if (Number(existing[0]?.count ?? 0) > 0) fail("BACKUP_TARGET_NOT_EMPTY", "Restore is allowed only on an account without existing business data", 409);
         for (const spec of TABLES) {
