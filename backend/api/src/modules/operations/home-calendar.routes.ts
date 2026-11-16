@@ -100,7 +100,7 @@ export function createHomeCalendarRouter() {
       prisma.task.count({ where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: nextWeekLimit } } }),
       prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } } }),
-      prisma.$queryRaw<Array<{ id: string; name: string; identifier: string | null; species: string; lastMealAt: Date | null; daysSinceLastMeal: number; feedingIntervalDays: number }>>`
+      prisma.$queryRaw<Array<{ id: string; name: string; identifier: string | null; species: string; lastMealAt: Date | null; daysSinceLastMeal: number; feedingIntervalDays: number; feedingStatus: "no_history" | "overdue" | "due_soon"; photoUrl: string | null }>>`
         SELECT a.id, a.name, a.identifier, a.species,
           last_meal.performed_at AS "lastMealAt",
           CASE WHEN last_meal.performed_at IS NULL THEN 0
