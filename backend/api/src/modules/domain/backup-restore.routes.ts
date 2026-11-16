@@ -309,9 +309,15 @@ export function createBackupRestoreRouter() {
     const attachmentKeys = new Map<string, string>();
     try {
       for (const [name, bytes] of byName) {
-        if (!name.startsWith("documents/")) continue;
+        const folder = name.startsWith("documents/") ? "documents"
+          : name.startsWith("animal-photos/") ? "animal-photos"
+          : name.startsWith("egg-photos/") ? "egg-photos" : null;
+        if (!folder) continue;
         const validated = validatePrivateFile(bytes, "application/octet-stream");
-        const key = await storePrivateObject("documents", validated.extension as "pdf" | "jpg" | "png" | "webp", bytes);
+        if (folder !== "documents" && !validated.mimeType.startsWith("image/")) {
+          fail("BACKUP_ATTACHMENT_INVALID", "An animal or egg photo is not an image");
+        }
+        const key = await storePrivateObject(folder, validated.extension as "pdf" | "jpg" | "png" | "webp", bytes);
         uploadedObjects.push(key);
         attachmentKeys.set(name, key);
       }
