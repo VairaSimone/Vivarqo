@@ -259,4 +259,48 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect(preview.body.invalidRows).toBe(1);
     expect(preview.body.errors[0].reason).toContain("Ciclo non trovato in questo account");
   });
+
+  it("downloads Excel-compatible templates, detects exact duplicates and requires explicit confirmation", async () => {
+    const owner = await account();
+    const template = await owner.agent.get("/api/v1/imports/templates/inventory").expect(200);
+    expect(template.headers["content-type"]).toContain("text/csv");
+    expect(template.text).toContain("name,category,unit");
+    const csv = "entryType,occurredOn,amountEUR,currency,category,description\n" +
+      "expense,2026-10-02,19.99,EUR,food,Duplicate receipt\n" +
+      "expense,2026-10-02,19.99,EUR,food,Duplicate receipt\n";
+    const preview = await owner.agent.post("/api/v1/imports?entity=finance")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv").send(Buffer.from(csv, "utf8")).expect(201);
+    expect(preview.body.possibleDuplicates).toHaveLength(1);
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(409);
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ allowPossibleDuplicates: true }).expect(202);
+    await dispatchImportJob(preview.body.importId);
+    expect(await prisma.financeEntry.count({ where: { userId: owner.userId, description: "Duplicate receipt" } })).toBe(2);
+  });
+
+  it("cancels an unstarted import and transactionally rolls back an unused imported inventory item", async () => {
+    const owner = await account();
+    const pending = await owner.agent.post("/api/v1/imports?entity=inventory")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).set("Content-Type", "text/csv")
+      .send(Buffer.from("name,category,unit,quantityOnHand\nCancelled stock,food,pcs,2\n", "utf8")).expect(201);
+    await owner.agent.post("/api/v1/imports/" + pending.body.importId + "/undo")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    expect((await owner.agent.get("/api/v1/imports/" + pending.body.importId).expect(200)).body.status).toBe("cancelled");
+
+    const preview = await owner.agent.post("/api/v1/imports?entity=inventory")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).set("Content-Type", "text/csv")
+      .send(Buffer.from("name,category,unit,quantityOnHand\nRollback stock,food,pcs,2\n", "utf8")).expect(201);
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/confirm")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(202);
+    await dispatchImportJob(preview.body.importId);
+    const created = await prisma.inventoryItem.findFirstOrThrow({ where: { userId: owner.userId, name: "Rollback stock" } });
+    await owner.agent.post("/api/v1/imports/" + preview.body.importId + "/undo")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    expect(await prisma.inventoryItem.findUnique({ where: { id: created.id } })).toBeNull();
+    expect((await owner.agent.get("/api/v1/imports/" + preview.body.importId).expect(200)).body.status).toBe("rolled_back");
+  });
+
 });
