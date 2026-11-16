@@ -32,6 +32,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [status, setStatus] = useState("active");
   const [sort, setSort] = useState("updatedAt");
   const [page, setPage] = useState(1);
+  const [selectedSavedFilterId, setSelectedSavedFilterId] = useState("");
   const [modal, setModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState("");
@@ -84,6 +85,19 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       await api.post("/animals/filters", { name: name.trim(), filters: { q, species, morph, location, sex, status, sort } });
       savedFiltersResource.reload();
       show(locale === "it" ? "Filtro salvato." : "Filter saved.");
+    } catch (reason) {
+      show(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+
+  async function deleteSavedFilter() {
+    if (!selectedSavedFilterId) return;
+    if (!window.confirm(locale === "it" ? "Eliminare il filtro salvato?" : "Delete this saved filter?")) return;
+    try {
+      await api.delete(`/animals/filters/${encodeURIComponent(selectedSavedFilterId)}`);
+      setSelectedSavedFilterId("");
+      savedFiltersResource.reload();
+      show(locale === "it" ? "Filtro eliminato." : "Saved filter deleted.");
     } catch (reason) {
       show(reason instanceof ApiError ? reason.message : t("operationFailed"));
     }
@@ -212,7 +226,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   });
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value="" onChange={(e) => applySavedFilter(e.target.value)}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button>{selectedAnimalIds.length > 0 && <Button variant="secondary" onClick={() => { setBulkCareError(""); setBulkCareModal(true); }}>{locale === "it" ? `Registra su ${selectedAnimalIds.length} animali` : `Record for ${selectedAnimalIds.length} animals`}</Button>}<Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
+    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value={selectedSavedFilterId} onChange={(e) => { setSelectedSavedFilterId(e.target.value); applySavedFilter(e.target.value); }}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" disabled={!selectedSavedFilterId} onClick={() => void deleteSavedFilter()}>{locale === "it" ? "Elimina filtro" : "Delete filter"}</Button><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button>{selectedAnimalIds.length > 0 && <Button variant="secondary" onClick={() => { setBulkCareError(""); setBulkCareModal(true); }}>{locale === "it" ? `Registra su ${selectedAnimalIds.length} animali` : `Record for ${selectedAnimalIds.length} animals`}</Button>}<Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
     <AnimalManagementPanel locale={locale} />
     <Panel>
       <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
