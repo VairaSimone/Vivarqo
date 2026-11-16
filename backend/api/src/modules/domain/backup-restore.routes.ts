@@ -336,7 +336,7 @@ export function createBackupRestoreRouter() {
         }
       }
       const expectedPhotos = new Set([
-        ...(parsedTables.get("animals") ?? []).map((row) => row.photoArchivePath).filter(Boolean),
+        ...(parsedTables.get("animals") ?? []).map((row) => row.photoArchivePath).filter((value): value is string => typeof value === "string" && value.length > 0),
         ...(parsedTables.get("eggs") ?? []).map((row) => row.photoArchivePath).filter(Boolean),
       ]);
       for (const photoPath of expectedPhotos) {
