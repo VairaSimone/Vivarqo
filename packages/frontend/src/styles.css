@@ -2866,3 +2866,44 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .onboarding-checklist-items li > .btn,.onboarding-checklist-items li > .onboarding-checklist-done { grid-column:2; justify-self:start; }
   .onboarding-checklist-copy strong { font-size:13px; }
 }
+
+
+/* Dashboard hierarchy, task filters and feeding-check states. */
+.dashboard-section-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 3px 0 -7px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+.dashboard-section-heading .eyebrow { color: var(--forest-2); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.dashboard-section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+.dashboard-section-heading-secondary { margin-top: 8px; }
+.dashboard-task-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+.dashboard-task-filter {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+  padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer;
+}
+.dashboard-task-filter:hover { border-color: var(--sage); color: var(--forest); }
+.dashboard-task-filter.is-active { border-color: var(--forest-2); background: var(--forest); color: #fff; }
+.dashboard-animal-alert { align-items: center; min-height: 74px; }
+.dashboard-animal-alert .simple-row-icon { width: 38px; height: 38px; flex-basis: 38px; }
+.dashboard-animal-status {
+  display: inline-block; width: max-content; max-width: 100%; margin-top: 4px;
+  padding: 2px 7px; border-radius: 999px; background: var(--success-bg);
+  color: var(--success); font-size: 11px; font-weight: 700;
+}
+.dashboard-animal-status.is-near { background: var(--warning-bg); color: var(--warning); }
+.dashboard-animal-status.is-overdue { background: var(--danger-bg); color: var(--danger); }
+.dashboard-task-row .task-check { width: 24px; height: 24px; flex-basis: 24px; }
+.dashboard-task-row .task-main small { font-size: 13px !important; }
+@media (max-width: 760px) {
+  .dashboard-section-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .dashboard-section-heading p { font-size: 12px; }
+  .dashboard-task-filters { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+  .dashboard-task-filter { flex: 0 0 auto; }
+}
