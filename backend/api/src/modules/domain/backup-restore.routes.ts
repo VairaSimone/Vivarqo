@@ -286,6 +286,18 @@ export function createBackupRestoreRouter() {
       fail("BACKUP_FORMAT_UNSUPPORTED", "Only complete Vivarqo account backups can be restored");
     }
     const checksums = manifest.checksums as Record<string, unknown>;
+    const allowedFiles = new Set(["README.txt", "manifest.json", "account.csv", "subscriptions.csv", ...TABLES.map((spec) => spec.file)]);
+    for (const entry of archive) {
+      if (!allowedFiles.has(entry.name) && !entry.name.startsWith("documents/") &&
+          !entry.name.startsWith("animal-photos/") && !entry.name.startsWith("egg-photos/")) {
+        fail("BACKUP_ENTRY_UNSUPPORTED", "Backup contains an unexpected archive entry");
+      }
+    }
+    for (const requiredFile of ["account.csv", "subscriptions.csv"]) {
+      if (!byName.has(requiredFile) || typeof checksums[requiredFile] !== "string") {
+        fail("BACKUP_FILE_MISSING", "Backup account metadata is incomplete");
+      }
+    }
     for (const spec of TABLES) {
       if (typeof checksums[spec.file] !== "string") fail("BACKUP_CHECKSUM_MISSING", "Backup is missing a required file checksum");
     }
