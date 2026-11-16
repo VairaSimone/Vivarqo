@@ -237,6 +237,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         setBulkCareBusy(true); setBulkCareError("");
         let succeeded = 0;
         const failures: string[] = [];
+        const failedIds: string[] = [];
         for (const animalId of selectedAnimalIds) {
           try {
             if (bulkCareKind === "weight") {
@@ -245,10 +246,10 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
               await api.post(`/animals/${encodeURIComponent(animalId)}/sheds`, { occurredAt: new Date(bulkCareDate + "T12:00:00").toISOString(), outcome: bulkCareOutcome, notes: bulkCareNotes || null });
             }
             succeeded++;
-          } catch { failures.push(animals.find((animal) => getString(animal, "id") === animalId)?.name || animalId); }
+          } catch { failedIds.push(animalId); failures.push(animals.find((animal) => getString(animal, "id") === animalId)?.name || animalId); }
         }
         setBulkCareBusy(false);
-        if (failures.length) setBulkCareError(locale === "it" ? `Registrazioni riuscite: ${succeeded}. Non riuscite: ${failures.join(", ")}. Puoi riprovare solo gli animali non riusciti selezionandoli nuovamente.` : `Saved: ${succeeded}. Failed: ${failures.join(", ")}. You can retry only the failed animals by selecting them again.`);
+        if (failures.length) { setSelectedAnimalIds(failedIds); setBulkCareError(locale === "it" ? `Registrazioni riuscite: ${succeeded}. Non riuscite: ${failures.join(", ")}. La selezione è stata aggiornata: un nuovo tentativo riguarderà solo gli animali non riusciti.` : `Saved: ${succeeded}. Failed: ${failures.join(", ")}. Selection now contains only failed animals, so retrying will not duplicate successful records.`); }
         else { setBulkCareModal(false); setSelectedAnimalIds([]); setBulkCareWeight(""); setBulkCareNotes(""); show(locale === "it" ? `Registrazione salvata su ${succeeded} animali.` : `Record saved for ${succeeded} animals.`); }
       }}>
         {bulkCareError && <Alert tone="danger">{bulkCareError}</Alert>}
