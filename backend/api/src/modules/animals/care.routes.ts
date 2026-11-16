@@ -232,7 +232,6 @@ export function createCareRouter() {
           const requested = decimalToScaledInteger(entry.inventoryQuantity!, 3);
           if (available === null || requested === null) throw new AppError(400, "QUANTITY_OUT_OF_RANGE", "Invalid inventory quantity");
           if (available < requested) throw new AppError(409, "INSUFFICIENT_STOCK", "Not enough prey in inventory", { available: available / 1000, requested: requested / 1000, item: item.name });
-          const balance = (available - requested) / 1000;
           // Consume dated lots first (FEFO: earliest expiry, then oldest purchase).
           // Legacy/opening stock without a lot remains consumable after tracked lots.
           const lots = await tx.$queryRaw<Array<{ id: string; quantity_remaining: string; unit_cost_cents: number | null }>>`
