@@ -151,6 +151,27 @@ export const patchNoteSchema = z.object({
   body: z.string().trim().min(1).max(20_000).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
+export const bulkCareRecordsSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("weight"),
+    animalIds: z.array(z.string().uuid()).min(1).max(500),
+    measuredAt: z.string().datetime({ offset: true }),
+    weightG: z.coerce.number().positive().max(100_000_000),
+    notes: z.string().trim().max(5_000).nullable().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("shed"),
+    animalIds: z.array(z.string().uuid()).min(1).max(500),
+    occurredAt: z.string().datetime({ offset: true }),
+    outcome: shedOutcomeSchema,
+    notes: z.string().trim().max(5_000).nullable().optional(),
+  }).strict(),
+]).superRefine((value, ctx) => {
+  if (new Set(value.animalIds).size !== value.animalIds.length) {
+    ctx.addIssue({ code: "custom", path: ["animalIds"], message: "An animal can appear only once in a bulk care record" });
+  }
+});
+
 export const pageQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
