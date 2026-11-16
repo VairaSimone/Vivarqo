@@ -180,7 +180,7 @@ const TABLES = [
   { file: "notification_preferences.csv", table: "notification_preferences", user: true },
 ] as const;
 
-type TableSpec = typeof TABLES[number];
+type TableSpec = { file: string; table: string; user?: boolean; deferred?: readonly string[] };
 type ColumnInfo = { column_name: string; data_type: string; udt_name: string };
 
 function normalizeCell(value: string, column: ColumnInfo): unknown {
@@ -205,7 +205,7 @@ function normalizeCell(value: string, column: ColumnInfo): unknown {
 }
 
 async function insertRows(
-  tx: typeof prisma,
+  tx: Pick<typeof prisma, "$executeRawUnsafe">,
   spec: TableSpec,
   rows: CsvRow[],
   ownerId: string,
@@ -222,8 +222,8 @@ async function insertRows(
     if (spec.user && row.userId !== sourceOwnerId) fail("BACKUP_OWNER_MISMATCH", "A backup row belongs to a different source account");
     const names: string[] = [], values: unknown[] = [];
     for (const [field, rawValue] of Object.entries(row)) {
-      if (field === "archivePath" || (spec.deferred as readonly string[] | undefined)?.includes(field)) continue;
-      if (field === "locationId" || field === "incubatorId" || field === "locusId" || field === "healthRecordId") {
+      if (field === "archivePath" || field === "photoArchivePath" || (spec.deferred ?? []).includes(field)) continue;
+      if (field === "locationId" || field === "incubatorId" || field === "locusId" || field === "healthRecordId" || field === "sourceTransferId") {
         if (rawValue) fail("BACKUP_RELATION_UNSUPPORTED", "This backup contains relationships to data not included in its archive");
         continue;
       }
@@ -239,6 +239,11 @@ async function insertRows(
       names.push(columnName);
       if (field === "userId") values.push(ownerId);
       else values.push(normalizeCell(rawValue, column));
+    }
+    if (row.photoArchivePath) {
+      const key = documentKeys.get(row.photoArchivePath);
+      if (!key) fail("BACKUP_ATTACHMENT_MISSING", "A referenced animal or egg photo is missing from the backup");
+      names.push("photo_key"); values.push(key);
     }
     if (!names.includes("id")) fail("BACKUP_ROW_ID_INVALID", "Backup row is missing its ID");
     if (spec.user && !names.includes("user_id")) {
@@ -278,6 +283,9 @@ export function createBackupRestoreRouter() {
       fail("BACKUP_FORMAT_UNSUPPORTED", "Only complete Vivarqo account backups can be restored");
     }
     const checksums = manifest.checksums as Record<string, unknown>;
+    for (const spec of TABLES) {
+      if (typeof checksums[spec.file] !== "string") fail("BACKUP_CHECKSUM_MISSING", "Backup is missing a required file checksum");
+    }
     for (const [name, expected] of Object.entries(checksums)) {
       const bytes = byName.get(name);
       if (!bytes || typeof expected !== "string" || sha256(bytes) !== expected) fail("BACKUP_CHECKSUM_MISMATCH", "Backup file is missing or its SHA-256 checksum is invalid");
@@ -307,7 +315,10 @@ export function createBackupRestoreRouter() {
         uploadedObjects.push(key);
         attachmentKeys.set(name, key);
       }
-      const documentRows = new Map(documents.map((row) => [row.archivePath, row]));
+      const documentRows = new Map(documents.filter((row) => row.archivePath).map((row) => [row.archivePath, row]));
+      for (const row of documents) {
+        if (!row.archivePath) fail("BACKUP_ATTACHMENT_MISSING", "This backup does not contain all document attachments");
+      }
       for (const [archivePath, key] of attachmentKeys) {
         const row = documentRows.get(archivePath);
         if (!row) fail("BACKUP_ATTACHMENT_UNREFERENCED", "Backup contains an attachment with no document record");
@@ -325,16 +336,16 @@ export function createBackupRestoreRouter() {
       const references: Array<[string, string, string]> = [
         ["feeding_entries", "sessionId", "feeding_sessions"], ["feeding_entries", "animalId", "animals"],
         ["weights", "animalId", "animals"], ["sheds", "animalId", "animals"], ["animal_notes", "animalId", "animals"],
-        ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],
+        ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],\n        ["animals", "motherAnimalId", "animals"], ["animals", "fatherAnimalId", "animals"],\n        ["animals", "originClutchId", "clutches"], ["animals", "originOffspringBatchId", "offspring_batches"],
         ["reproductive_events", "cycleId", "reproduction_cycles"], ["reproductive_events", "animalId", "animals"],
-        ["clutches", "cycleId", "reproduction_cycles"], ["eggs", "clutchId", "clutches"],
+        ["clutches", "cycleId", "reproduction_cycles"], ["eggs", "clutchId", "clutches"], ["eggs", "offspringAnimalId", "animals"],
         ["incubation_logs", "clutchId", "clutches"], ["offspring_batches", "cycleId", "reproduction_cycles"],
         ["offspring_batches", "clutchId", "clutches"], ["inventory_lots", "itemId", "inventory_items"],
         ["inventory_lots", "supplierId", "inventory_suppliers"], ["stock_movements", "itemId", "inventory_items"],
         ["stock_movements", "lotId", "inventory_lots"], ["finance_entries", "animalId", "animals"],
         ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
         ["finance_entries", "clutchId", "clutches"], ["finance_entries", "offspringBatchId", "offspring_batches"],
-        ["finance_entries", "recurrenceId", "finance_recurrences"], ["feeding_entries", "inventoryItemId", "inventory_items"],
+        ["finance_entries", "recurrenceId", "finance_recurrences"], ["finance_entries", "sourceStockMovementId", "stock_movements"],\n        ["finance_recurrences", "animalId", "animals"], ["finance_recurrences", "documentId", "documents"], ["feeding_entries", "inventoryItemId", "inventory_items"],
         ["tasks", "animalId", "animals"], ["tasks", "reminderRuleId", "reminder_rules"],
         ["reminder_rules", "animalId", "animals"], ["animal_genetic_traits", "animalId", "animals"],
         ["animal_genetic_traits", "sourceAnimalId", "animals"], ["public_shares", "animalId", "animals"],
@@ -360,7 +371,7 @@ export function createBackupRestoreRouter() {
             (SELECT count(*) FROM inventory_suppliers WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM finance_budgets WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM finance_recurrences WHERE user_id = ${auth.userId}::uuid) +
-            (SELECT count(*) FROM public_shares WHERE user_id = ${auth.userId}::uuid)
+            (SELECT count(*) FROM public_shares WHERE user_id = ${auth.userId}::uuid) +\n            (SELECT count(*) FROM notification_preferences WHERE user_id = ${auth.userId}::uuid)
           ) AS count`;
         if (Number(existing[0]?.count ?? 0) > 0) fail("BACKUP_TARGET_NOT_EMPTY", "Restore is allowed only on an account without existing business data", 409);
         for (const spec of TABLES) {
@@ -376,7 +387,7 @@ export function createBackupRestoreRouter() {
         let restored = 0;
         for (const spec of TABLES) {
           if (spec.table === "documents") continue;
-          restored += await insertRows(tx as typeof prisma, spec, parsedTables.get(spec.table) ?? [], auth.userId, manifest.accountId as string, columnsByTable, attachmentKeys);
+          restored += await insertRows(tx, spec, parsedTables.get(spec.table) ?? [], auth.userId, manifest.accountId as string, columnsByTable, attachmentKeys);
         }
         for (const row of parsedTables.get("documents") ?? []) {
           const archivePath = row.archivePath;
