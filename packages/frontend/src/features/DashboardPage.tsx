@@ -15,14 +15,41 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const resource = useResource<DashboardTodayDto>("/home/today", parseDashboardTodayResponse);
   const { toast, show } = useToast();
   const [completing, setCompleting] = useState<string | null>(null);
-  const [feedingWidgetVisible, setFeedingWidgetVisible] = useState(() => {
-    try { return window.localStorage.getItem("vivarqo.dashboard.feeding-alerts") !== "hidden"; } catch { return true; }
-  });
   const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>(() => {
     const defaults = { priorities: true, plan: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true };
     try { const saved = JSON.parse(window.localStorage.getItem("vivarqo.dashboard.widgets") || "{}") as Record<string, unknown>; return Object.fromEntries(Object.entries(defaults).map(([key, value]) => [key, typeof saved[key] === "boolean" ? saved[key] : value])); } catch { return defaults; }
   });
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
+  const widgetKeys = ["priorities", "plan", "quickActions", "feedingAlerts", "reminders", "recent", "summary"] as const;
+  type WidgetKey = typeof widgetKeys[number];
+  const widgetLabels: Record<WidgetKey, string> = {
+    priorities: locale === "it" ? "Attività e priorità" : "Tasks and priorities",
+    plan: locale === "it" ? "Piano e utilizzo" : "Plan and usage",
+    quickActions: locale === "it" ? "Azioni rapide" : "Quick actions",
+    feedingAlerts: locale === "it" ? "Avvisi alimentazione" : "Feeding alerts",
+    reminders: locale === "it" ? "Promemoria" : "Reminders",
+    recent: locale === "it" ? "Attività recenti" : "Recent activity",
+    summary: locale === "it" ? "Riepilogo" : "Summary",
+  };
+  const [widgetOrder, setWidgetOrder] = useState<WidgetKey[]>(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("vivarqo.dashboard.order") || "[]") as unknown[];
+      const valid = saved.filter((key): key is WidgetKey => widgetKeys.includes(key as WidgetKey));
+      return [...valid, ...widgetKeys.filter((key) => !valid.includes(key))];
+    } catch { return [...widgetKeys]; }
+  });
+  function moveWidget(key: WidgetKey, direction: -1 | 1) {
+    setWidgetOrder((current) => {
+      const index = current.indexOf(key);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      try { window.localStorage.setItem("vivarqo.dashboard.order", JSON.stringify(next)); } catch { /* Session-only preference. */ }
+      return next;
+    });
+  }
+
   function toggleWidget(key: string, visible: boolean) { setWidgetVisibility((current) => { const next = { ...current, [key]: visible }; try { window.localStorage.setItem("vivarqo.dashboard.widgets", JSON.stringify(next)); } catch { /* Session-only preference. */ } return next; }); }
   const data = resource.data;
   const due = data?.tasks.dueToday ?? [];
@@ -81,8 +108,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     <OnboardingChecklist locale={locale} onNavigate={navigate} />
 
     <div className="dashboard-grid">
-      <div className="dashboard-side"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? "Chiudi" : "Configura"}</Button>} />{widgetSettingsOpen && <div>{([["priorities", "Attività e priorità"], ["plan", "Piano e utilizzo"], ["quickActions", "Azioni rapide"], ["feedingAlerts", "Avvisi alimentazione"], ["reminders", "Promemoria"], ["recent", "Attività recenti"], ["summary", "Riepilogo"]] as const).map(([key, label]) => <label key={key} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 0"}}><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{label}</label>)}</div>}</Panel></div>
-      {widgetVisibility.priorities && <Panel className="dashboard-tasks dashboard-priorities">
+      <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings">{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? "Sposta su" : "Move up"}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? "Sposta giù" : "Move down"}>↓</Button></span></div>)}</div>}</Panel></div>
+      {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}><Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section">
           <PanelHeader title={t("overdue")} action={overdue.length > 0 ? <Badge tone="danger">{counts?.overdue ?? overdue.length}</Badge> : undefined} />
           {overdue.length
@@ -117,11 +144,10 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
             {Boolean(truncated?.completedToday) && <p className="muted-note">{t("truncatedNotice")}</p>}
           </section>
         </>}
-      </Panel>}
+      </Panel></div>}
 
-      <div className="dashboard-side">
-        {widgetVisibility.plan && <PlanUsageSummary locale={locale} compact onNavigate={navigate} />}
-        {widgetVisibility.quickActions && <Panel>
+      {widgetVisibility.plan && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}}
+      {widgetVisibility.quickActions && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("quickActions") }}><Panel>
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
             <QuickAction icon="feed" label={t("newFeeding")} onClick={() => navigate("/feeding?create=1")} />
@@ -129,9 +155,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
             <QuickAction icon="calendar" label={t("addTask")} onClick={() => navigate("/tasks?create=1")} />
             <QuickAction icon="snake" label={t("addAnimal")} onClick={() => navigate("/animals?create=1")} />
           </div>
-        </Panel>}
+      </Panel></div>}
 
-        {widgetVisibility.feedingAlerts && feedingWidgetVisible && <Panel>
+      {widgetVisibility.feedingAlerts && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("feedingAlerts") }}><Panel>
           <PanelHeader title={locale === "it" ? "Animali senza pasto" : "Animals overdue for a meal"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
           <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
           {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => <button className="simple-row dashboard-reminder-row dashboard-reminder-overdue" key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
@@ -139,16 +165,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
             <span className="dashboard-reminder-copy"><strong>{animal.name}</strong><small>{animal.species} · {locale === "it" ? `${animal.daysSinceLastMeal} giorni senza pasto (intervallo ${animal.feedingIntervalDays} gg)` : `${animal.daysSinceLastMeal} days without a meal (interval ${animal.feedingIntervalDays} days)`}</small></span>
             <Icon name="chevron" size={15} />
           </button>) : <EmptyState title={locale === "it" ? "Nessun animale in ritardo" : "No animals overdue"} description={locale === "it" ? "Gli animali con intervallo di alimentazione configurato sono in regola." : "Animals with a configured feeding interval are up to date."} />}
-          <Button size="sm" variant="ghost" onClick={() => {
-            setFeedingWidgetVisible(false);
-            try { window.localStorage.setItem("vivarqo.dashboard.feeding-alerts", "hidden"); } catch { /* Storage can be unavailable in private browsing. */ }
-          }}>{locale === "it" ? "Nascondi widget" : "Hide widget"}</Button>
+          <Button size="sm" variant="ghost" onClick={() => toggleWidget("feedingAlerts", false)}>{locale === "it" ? "Nascondi widget" : "Hide widget"}</Button>
         </Panel>}
-        {!feedingWidgetVisible && <Button size="sm" variant="secondary" onClick={() => {
-          setFeedingWidgetVisible(true);
-          try { window.localStorage.setItem("vivarqo.dashboard.feeding-alerts", "visible"); } catch { /* Storage can be unavailable in private browsing. */ }
-        }}>{locale === "it" ? "Mostra widget alimentazioni" : "Show feeding alerts widget"}</Button>}
-        {widgetVisibility.reminders && <Panel>
+      {widgetVisibility.reminders && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("reminders") }}><Panel>
           <PanelHeader title={t("upcomingReminders")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks?tab=reminders")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
           {reminders.length
             ? reminders.slice(0, 5).map((rule) => {
@@ -162,10 +181,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
               })
             : <EmptyState title={t("remindersEmpty")} description={t("remindersEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?tab=reminders&create=1")}>{t("createReminder")}</Button>} />}
           {Boolean(truncated?.imminentReminders) && <p className="muted-note">{t("truncatedNotice")}</p>}
-        </Panel>}
-      </div>
+      </Panel></div>}
 
-      {widgetVisibility.recent && <Panel className="dashboard-recent">
+      {widgetVisibility.recent && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("recent") }}><Panel className="dashboard-recent">
         <PanelHeader title={t("recentActivity")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/animals")}>{t("viewAll")}</Button>} />
         {recent.length
           ? <div className="activity-list">{recent.slice(0, 8).map((event, index) => {
@@ -178,10 +196,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
               </button>;
             })}</div>
           : <EmptyState title={t("noRecentActivity")} description={t("recentActivityEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/animals")}>{t("navAnimals")}</Button>} />}
-      </Panel>}
-    </div>
+      </Panel></div>}
 
-    {widgetVisibility.summary && <Panel className="dashboard-summary">
+      {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}><Panel className="dashboard-summary">
       <PanelHeader title={t("dashboardSummary")} />
       <div className="dashboard-summary-grid">
         <Metric label={t("overdue")} value={getNumber(counts, "overdue")} tone="danger" icon="alert" />
@@ -189,7 +206,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         <Metric label={t("completedToday")} value={getNumber(counts, "completedToday")} tone="success" icon="checkCircle" />
         <Metric label={t("upcomingReminders")} value={getNumber(counts, "imminentReminders")} tone="neutral" icon="clock" />
       </div>
-    </Panel>}
+      </Panel></div>}
+    </div>
     {toast}
   </div>;
 }
