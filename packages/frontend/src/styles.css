@@ -2907,3 +2907,22 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .dashboard-task-filters { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
   .dashboard-task-filter { flex: 0 0 auto; }
 }
+
+
+/* Rich dashboard rows: keep animal navigation and task metadata readable. */
+.dashboard-task-content { display:flex; flex:1 1 auto; min-width:0; flex-direction:column; gap:4px; }
+.dashboard-task-content .task-main { width:100%; min-width:0; text-align:left; }
+.dashboard-task-content .task-main strong { display:block; overflow-wrap:anywhere; }
+.dashboard-task-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; min-width:0; color:var(--muted); font-size:12px; }
+.dashboard-task-category { display:inline-flex; align-items:center; gap:4px; color:var(--forest-2); font-weight:700; }
+.dashboard-task-animal { padding:0; border:0; background:transparent; color:var(--forest-2); font:inherit; font-weight:650; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+.dashboard-task-recurrence { color:var(--muted); }
+.dashboard-animal-photo { width:42px; height:42px; flex:0 0 42px; border-radius:12px; object-fit:cover; background:var(--surface-muted, var(--surface)); }
+.dashboard-animal-alert { align-items:center; min-height:76px; }
+.dashboard-animal-alert .dashboard-reminder-copy { min-width:0; }
+.dashboard-animal-alert .dashboard-reminder-copy small { overflow-wrap:anywhere; }
+@media (max-width:760px) {
+ .dashboard-task-row { align-items:flex-start; }
+ .dashboard-task-meta { gap:5px 8px; }
+ .dashboard-animal-photo { width:38px; height:38px; flex-basis:38px; }
+}
