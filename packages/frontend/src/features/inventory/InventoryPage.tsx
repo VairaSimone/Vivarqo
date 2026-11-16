@@ -20,6 +20,11 @@ export function InventoryPage({ locale }: { locale: Locale }) {
   const [itemModal, setItemModal] = useState(false);
   const [editing, setEditing] = useState<InventoryItemDto | null>(null);
   const [form, setForm] = useState({ name: "", category: "food", unit: "unit", quantityOnHand: "0", minimumQuantity: "", notes: "" });
+  const [lotItem, setLotItem] = useState<InventoryItemDto | null>(null);
+  const [lots, setLots] = useState<Array<{ id: string; lotCode: string | null; quantityReceived: number | string; quantityRemaining: number | string; unitCostCents: number | null; purchasedAt: string; expiresAt: string | null; supplier: { id: string; name: string } | null }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [lotForm, setLotForm] = useState({ supplierId: "", lotCode: "", quantity: "", unitCost: "", purchasedAt: localDateTimeValue(), expiresAt: "", notes: "" });
+  const [newSupplierName, setNewSupplierName] = useState("");
   const [movementItem, setMovementItem] = useState<InventoryItemDto | null>(null);
   const [movementForm, setMovementForm] = useState({ movementType: "in", quantity: "", occurredAt: localDateTimeValue(), unitCost: "", reference: "", notes: "" });
   const [busy, setBusy] = useState(false);
@@ -57,6 +62,56 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     setMovementForm({ movementType: "in", quantity: "", occurredAt: localDateTimeValue(), unitCost: "", reference: "", notes: "" });
     setError("");
   }
+  async function openLots(item: InventoryItemDto) {
+    setLotItem(item);
+    setError("");
+    setLotForm({ supplierId: "", lotCode: "", quantity: "", unitCost: "", purchasedAt: localDateTimeValue(), expiresAt: "", notes: "" });
+    try {
+      const [lotResponse, supplierResponse] = await Promise.all([
+        api.get<{ lots: typeof lots }>(`/inventory/items/${getString(item, "id")}/lots`),
+        api.get<{ suppliers: typeof suppliers }>("/inventory/suppliers"),
+      ]);
+      setLots(lotResponse.lots);
+      setSuppliers(supplierResponse.suppliers);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    }
+  }
+  async function saveLot(event: FormEvent) {
+    event.preventDefault();
+    if (!lotItem) return;
+    setBusy(true); setError("");
+    try {
+      await api.post(`/inventory/items/${getString(lotItem, "id")}/lots`, {
+        supplierId: lotForm.supplierId || null,
+        lotCode: lotForm.lotCode || null,
+        quantity: Number(lotForm.quantity),
+        unitCostCents: lotForm.unitCost ? Math.round(Number(lotForm.unitCost.replace(",", ".")) * 100) : null,
+        purchasedAt: dateTimeInputToUtc(lotForm.purchasedAt),
+        expiresAt: lotForm.expiresAt || null,
+        notes: lotForm.notes || null,
+      });
+      const response = await api.get<{ lots: typeof lots }>(`/inventory/items/${getString(lotItem, "id")}/lots`);
+      setLots(response.lots); resource.reload(); show(t("saveSuccess"));
+      setLotForm({ ...lotForm, lotCode: "", quantity: "", unitCost: "", expiresAt: "", notes: "" });
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally { setBusy(false); }
+  }
+  async function createSupplier(event: FormEvent) {
+    event.preventDefault();
+    if (!newSupplierName.trim()) return;
+    setBusy(true); setError("");
+    try {
+      const response = await api.post<{ supplier: { id: string; name: string } }>("/inventory/suppliers", { name: newSupplierName.trim() });
+      setSuppliers((current) => [...current, response.supplier].sort((a, b) => a.name.localeCompare(b.name)));
+      setLotForm((current) => ({ ...current, supplierId: response.supplier.id }));
+      setNewSupplierName("");
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally { setBusy(false); }
+  }
+
   async function saveMovement(event: FormEvent) {
     event.preventDefault(); if (!movementItem) return; setBusy(true); setError("");
     try {
@@ -82,7 +137,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
     <strong className="number-cell">{formatNumber(getString(item, "quantityOnHand"), locale, 3)} {getString(item, "unit")}</strong>,
     getString(item, "minimumQuantity") ? formatNumber(getString(item, "minimumQuantity"), locale, 3) : "—",
     Boolean(item.isActive) && item.minimumQuantity !== null && Number(item.quantityOnHand) <= Number(item.minimumQuantity) ? <Badge tone="warning">{t("lowStock")}</Badge> : <Badge tone={Boolean(item.isActive) ? "success" : "neutral"}>{Boolean(item.isActive) ? t("active") : t("archived")}</Badge>,
-    <div className="row-actions"><IconButton label={t("movements")} onClick={() => openMovement(item)}><Icon name="clock" /></IconButton><IconButton label={t("edit")} onClick={() => openItem(item)}><Icon name="edit" /></IconButton>{Boolean(item.isActive) && <IconButton label={t("archive")} onClick={() => void archiveItem(item)}><Icon name="archive" /></IconButton>}</div>
+    <div className="row-actions"><IconButton label={locale === "it" ? "Lotti e scadenze" : "Lots and expiry"} onClick={() => void openLots(item)}><Icon name="layers" /></IconButton><IconButton label={t("movements")} onClick={() => openMovement(item)}><Icon name="clock" /></IconButton><IconButton label={t("edit")} onClick={() => openItem(item)}><Icon name="edit" /></IconButton>{Boolean(item.isActive) && <IconButton label={t("archive")} onClick={() => void archiveItem(item)}><Icon name="archive" /></IconButton>}</div>
   ]);
 
   return <div className="page-stack">
@@ -106,6 +161,36 @@ export function InventoryPage({ locale }: { locale: Locale }) {
         <Field label={t("minimumQuantity")}><Input type="number" min="0" max="999999999.999" step="0.001" value={form.minimumQuantity} onChange={(e) => setForm({ ...form, minimumQuantity: e.target.value })} /></Field>
         <Field label={t("notes")}><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setItemModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
+      </form>
+    </Modal>}
+    {lotItem && <Modal title={`${locale === "it" ? "Lotti e fornitori" : "Lots and suppliers"} · ${getString(lotItem, "name")}`} onClose={() => setLotItem(null)} wide>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <PanelHeader title={locale === "it" ? "Lotti registrati" : "Registered lots"} />
+      <DataTable headers={[locale === "it" ? "Lotto" : "Lot", locale === "it" ? "Fornitore" : "Supplier", t("available"), locale === "it" ? "Costo unitario" : "Unit cost", locale === "it" ? "Scadenza" : "Expiry"]} rows={lots.map((lot) => [
+        lot.lotCode || "—", lot.supplier?.name || "—",
+        formatNumber(getString(lot, "quantityRemaining"), locale, 3),
+        lot.unitCostCents === null ? "—" : (lot.unitCostCents / 100).toLocaleString(locale === "it" ? "it-IT" : "en-GB", { style: "currency", currency: "EUR" }),
+        lot.expiresAt ? formatDate(lot.expiresAt, locale) : "—",
+      ])} empty={locale === "it" ? "Nessun lotto registrato" : "No lots recorded"} mobileLayout="scroll" />
+      <div className="panel-separator" />
+      <PanelHeader title={locale === "it" ? "Registra un acquisto / nuovo lotto" : "Record a purchase / new lot"} />
+      <form className="form-stack" onSubmit={saveLot}>
+        <div className="form-grid">
+          <Field label={locale === "it" ? "Fornitore" : "Supplier"}><Select value={lotForm.supplierId} onChange={(e) => setLotForm({ ...lotForm, supplierId: e.target.value })}><option value="">—</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select></Field>
+          <Field label={locale === "it" ? "Codice lotto" : "Lot code"}><Input value={lotForm.lotCode} onChange={(e) => setLotForm({ ...lotForm, lotCode: e.target.value })} /></Field>
+          <Field label={t("quantity")}><Input required type="number" min="0.001" step="0.001" value={lotForm.quantity} onChange={(e) => setLotForm({ ...lotForm, quantity: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Costo unitario (€)" : "Unit cost (€)"}><Input type="number" min="0" step="0.01" value={lotForm.unitCost} onChange={(e) => setLotForm({ ...lotForm, unitCost: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Acquistato il" : "Purchased at"}><Input required type="datetime-local" value={lotForm.purchasedAt} onChange={(e) => setLotForm({ ...lotForm, purchasedAt: e.target.value })} /></Field>
+          <Field label={locale === "it" ? "Scadenza" : "Expiry date"}><Input type="date" value={lotForm.expiresAt} onChange={(e) => setLotForm({ ...lotForm, expiresAt: e.target.value })} /></Field>
+        </div>
+        <Field label={t("notes")}><Textarea rows={2} value={lotForm.notes} onChange={(e) => setLotForm({ ...lotForm, notes: e.target.value })} /></Field>
+        <Button type="submit" disabled={busy}>{locale === "it" ? "Registra lotto e carico" : "Save lot and stock-in"}</Button>
+      </form>
+      <div className="panel-separator" />
+      <PanelHeader title={locale === "it" ? "Aggiungi fornitore" : "Add supplier"} />
+      <form className="form-grid" onSubmit={createSupplier}>
+        <Field label={locale === "it" ? "Nome fornitore" : "Supplier name"}><Input required value={newSupplierName} onChange={(e) => setNewSupplierName(e.target.value)} /></Field>
+        <div className="modal-actions"><Button type="submit" disabled={busy || !newSupplierName.trim()}>{locale === "it" ? "Aggiungi" : "Add supplier"}</Button></div>
       </form>
     </Modal>}
     {movementItem && <Modal title={`${t("movements")} · ${getString(movementItem, "name")}`} onClose={() => setMovementItem(null)} wide>
