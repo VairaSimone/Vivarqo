@@ -130,7 +130,7 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
 
-  return [
+  const tables: ExportTable[] = [
     {
       name: "account.csv", emptyHeaders: EMPTY_HEADERS["account.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.user.findMany({
