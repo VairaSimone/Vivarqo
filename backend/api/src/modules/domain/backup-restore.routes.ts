@@ -20,12 +20,16 @@ function fail(code: string, message: string, status = 400): never {
   throw new AppError(status, code, message);
 }
 
+const CRC32_TABLE = new Uint32Array(256);
+for (let value = 0; value < 256; value += 1) {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  CRC32_TABLE[value] = crc >>> 0;
+}
+
 function crc32(bytes: Buffer): number {
   let crc = 0xffff_ffff;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
-  }
+  for (const byte of bytes) crc = CRC32_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
   return (crc ^ 0xffff_ffff) >>> 0;
 }
 
@@ -53,7 +57,7 @@ function readBackupZip(archive: Buffer): ArchiveEntry[] {
     fail("BACKUP_ZIP_LIMIT", "Backup contains too many files or invalid directory offsets", 413);
   }
   const count = Number(countBig), centralSize = Number(centralSizeBig), centralOffset = Number(centralOffsetBig);
-  if (centralOffset + centralSize > archive.length) fail("BACKUP_ZIP_INVALID", "ZIP directory exceeds archive bounds");
+  if (centralOffset + centralSize !== zip64Offset || centralOffset + centralSize > archive.length) fail("BACKUP_ZIP_INVALID", "ZIP directory exceeds archive bounds");
   const entries: ArchiveEntry[] = [];
   const names = new Set<string>();
   let offset = centralOffset;
@@ -98,18 +102,22 @@ function readBackupZip(archive: Buffer): ArchiveEntry[] {
       }
       if (!found) fail("BACKUP_ZIP_INVALID", "ZIP64 size information is missing");
     }
-    if (!Number.isSafeInteger(uncompressedSize) || !Number.isSafeInteger(compressedSize) ||
-        uncompressedSize !== compressedSize || uncompressedSize > MAX_ENTRY_BYTES) {
+    if (!Number.isSafeInteger(uncompressedSize) || !Number.isSafeInteger(compressedSize) || !Number.isSafeInteger(localOffset) ||
+        uncompressedSize !== compressedSize || uncompressedSize > MAX_ENTRY_BYTES || localOffset >= centralOffset) {
       fail("BACKUP_ENTRY_LIMIT", "Backup entry is too large or compressed unexpectedly", 413);
     }
     totalUncompressed += uncompressedSize;
     if (totalUncompressed > env.EXPORT_MAX_ARCHIVE_BYTES) fail("BACKUP_SIZE_INVALID", "Backup expands beyond the configured size limit", 413);
     if (localOffset + 30 > archive.length || archive.readUInt32LE(localOffset) !== 0x04034b50) fail("BACKUP_ZIP_INVALID", "ZIP local header is invalid");
+    const localFlags = archive.readUInt16LE(localOffset + 6);
+    const localMethod = archive.readUInt16LE(localOffset + 8);
     const localNameLength = archive.readUInt16LE(localOffset + 26);
     const localExtraLength = archive.readUInt16LE(localOffset + 28);
+    const localName = archive.subarray(localOffset + 30, localOffset + 30 + localNameLength).toString("utf8");
+    if (localFlags !== flags || localMethod !== method || localName !== name) fail("BACKUP_ZIP_INVALID", "ZIP local and central headers do not match");
     const dataStart = localOffset + 30 + localNameLength + localExtraLength;
     const dataEnd = dataStart + compressedSize;
-    if (dataEnd > archive.length) fail("BACKUP_ZIP_INVALID", "ZIP entry exceeds archive bounds");
+    if (dataEnd > centralOffset) fail("BACKUP_ZIP_INVALID", "ZIP entry overlaps the central directory");
     const bytes = archive.subarray(dataStart, dataEnd);
     if (crc32(bytes) !== crc) fail("BACKUP_CHECKSUM_MISMATCH", "A ZIP entry failed its CRC check");
     entries.push({ name, bytes });
