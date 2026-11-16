@@ -231,7 +231,7 @@ function ImportPage({ locale }: { locale: Locale }) {
             <Select value={entity} onChange={(e) => changeEntity(e.target.value)} disabled={busy}>
               {importEntities.map((value) => <option value={value} key={value}>{labels[value]}</option>)}
             </Select>
-            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "vivarqo-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello Excel" : "Download Excel template"}</Button></div>
+            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "vivarqo-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello CSV per Excel" : "Download CSV template for Excel"}</Button></div>
           </Field>
           <Field label={t("chooseFile")}>
             <Input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
