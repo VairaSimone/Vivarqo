@@ -143,8 +143,14 @@ async function processOne(now: Date): Promise<boolean> {
       // Push alerts may appear on a locked device. Never expose user-entered task titles there.
       title: attempt.notification.category === "task_due"
         ? (english ? "Vivarqo reminder" : "Promemoria Vivarqo")
-        : "Vivarqo",
-      body: attempt.notification.body,
+        : attempt.notification.category === "inventory"
+          ? (english ? "Inventory alert" : "Avviso inventario")
+          : "Vivarqo",
+      // Inventory item names and quantities can be sensitive on a locked screen.
+      // Keep details in the authenticated in-app notification center only.
+      body: attempt.notification.category === "inventory"
+        ? (english ? "Check your stock levels and expiry dates." : "Controlla le scorte e le date di scadenza.")
+        : attempt.notification.body,
       url: attempt.notification.targetPath ?? "/",
       category: attempt.notification.category,
     }, getVapidCredentials());
