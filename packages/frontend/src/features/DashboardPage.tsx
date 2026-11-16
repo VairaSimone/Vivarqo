@@ -234,7 +234,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
               const target = getString(event, "targetPath");
               const eventType = getString(event, "type");
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
-                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "thermometer" : eventType === "animal_update" ? "edit" : eventType === "note" ? "file" : "leaf"} size={15} /></span>
+                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "note" ? "file" : "leaf"} size={15} /></span>
                 <span className="activity-copy"><strong>{getString(event, "title")}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
                 <Icon name="chevron" size={15} />
               </button>;
@@ -263,7 +263,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       {smartSuggestions.length > 0 && <div className="dashboard-smart-suggestions">
         <strong>{locale === "it" ? "Da tenere d'occhio" : "Worth checking"}</strong>
         {smartSuggestions.slice(0, 5).map((item) => <button key={item.id} onClick={() => navigate(item.targetPath)}>
-          <Icon name={item.type === "expected_hatch" ? "egg" : item.type === "incubator_maintenance" ? "thermometer" : "calendar"} size={15} />
+          <Icon name={item.type === "expected_hatch" ? "egg" : item.type === "incubator_maintenance" ? "clock" : "calendar"} size={15} />
           <span>{item.title}</span><small>{item.dueAt ? formatDateTime(item.dueAt, locale, timezone) : ""}</small>
         </button>)}
       </div>}
