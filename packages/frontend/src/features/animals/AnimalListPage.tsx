@@ -235,25 +235,36 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       <form className="form-stack" onSubmit={async (event) => {
         event.preventDefault();
         setBulkCareBusy(true); setBulkCareError("");
-        let succeeded = 0;
-        const failures: string[] = [];
-        const failedIds: string[] = [];
-        for (const animalId of selectedAnimalIds) {
-          try {
-            if (bulkCareKind === "weight") {
-              await api.post(`/animals/${encodeURIComponent(animalId)}/weights`, { measuredAt: new Date(bulkCareDate + "T12:00:00").toISOString(), weightG: weightToGrams(bulkCareWeight), notes: bulkCareNotes || null });
-            } else {
-              await api.post(`/animals/${encodeURIComponent(animalId)}/sheds`, { occurredAt: new Date(bulkCareDate + "T12:00:00").toISOString(), outcome: bulkCareOutcome, notes: bulkCareNotes || null });
-            }
-            succeeded++;
-          } catch { failedIds.push(animalId); failures.push(animals.find((animal) => getString(animal, "id") === animalId)?.name || animalId); }
+        try {
+          const payload = bulkCareKind === "weight"
+            ? {
+                kind: "weight" as const,
+                animalIds: selectedAnimalIds,
+                measuredAt: new Date(bulkCareDate + "T12:00:00").toISOString(),
+                weightG: weightToGrams(bulkCareWeight),
+                notes: bulkCareNotes || null,
+              }
+            : {
+                kind: "shed" as const,
+                animalIds: selectedAnimalIds,
+                occurredAt: new Date(bulkCareDate + "T12:00:00").toISOString(),
+                outcome: bulkCareOutcome as "complete" | "partial" | "unknown",
+                notes: bulkCareNotes || null,
+              };
+          const result = await api.post<{ createdCount: number }>("/care-records/bulk", payload);
+          setBulkCareModal(false);
+          setSelectedAnimalIds([]);
+          setBulkCareWeight("");
+          setBulkCareNotes("");
+          show(locale === "it" ? `Registrazione salvata atomicamente su ${result.createdCount} animali.` : `Record saved atomically for ${result.createdCount} animals.`);
+        } catch (error) {
+          setBulkCareError(error instanceof ApiError ? error.message : (locale === "it" ? "Registrazione non riuscita. Nessun record è stato salvato." : "Bulk record failed. No records were saved."));
+        } finally {
+          setBulkCareBusy(false);
         }
-        setBulkCareBusy(false);
-        if (failures.length) { setSelectedAnimalIds(failedIds); setBulkCareError(locale === "it" ? `Registrazioni riuscite: ${succeeded}. Non riuscite: ${failures.join(", ")}. La selezione è stata aggiornata: un nuovo tentativo riguarderà solo gli animali non riusciti.` : `Saved: ${succeeded}. Failed: ${failures.join(", ")}. Selection now contains only failed animals, so retrying will not duplicate successful records.`); }
-        else { setBulkCareModal(false); setSelectedAnimalIds([]); setBulkCareWeight(""); setBulkCareNotes(""); show(locale === "it" ? `Registrazione salvata su ${succeeded} animali.` : `Record saved for ${succeeded} animals.`); }
       }}>
         {bulkCareError && <Alert tone="danger">{bulkCareError}</Alert>}
-        <p>{locale === "it" ? `L'operazione verrà applicata a ${selectedAnimalIds.length} animali selezionati nella pagina corrente. Ogni registrazione è indipendente: in caso di errore alcune potrebbero essere già state salvate.` : `This operation applies to ${selectedAnimalIds.length} animals selected on the current page. Each record is independent, so some may be saved if another fails.`}</p>
+        <p>{locale === "it" ? `L'operazione verrà applicata a ${selectedAnimalIds.length} animali selezionati nella pagina corrente. La registrazione è atomica: se un controllo fallisce, non viene salvato alcun record.` : `This operation applies to ${selectedAnimalIds.length} animals selected on the current page. The operation is atomic: if validation or insertion fails, no records are saved.`}</p>
         <Field label={locale === "it" ? "Tipo di registrazione" : "Record type"}><Select value={bulkCareKind} onChange={(event) => setBulkCareKind(event.target.value as "weight" | "shed")}><option value="weight">{locale === "it" ? "Pesatura" : "Weight"}</option><option value="shed">{locale === "it" ? "Muta" : "Shed"}</option></Select></Field>
         <Field label={locale === "it" ? "Data" : "Date"}><Input type="date" required value={bulkCareDate} onChange={(event) => setBulkCareDate(event.target.value)} /></Field>
         {bulkCareKind === "weight" ? <Field label={`${t("weight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" max="100000000" step="0.01" required value={bulkCareWeight} onChange={(event) => setBulkCareWeight(event.target.value)} /></Field> : <Field label={locale === "it" ? "Esito muta" : "Shed outcome"}><Select value={bulkCareOutcome} onChange={(event) => setBulkCareOutcome(event.target.value)}><option value="complete">{locale === "it" ? "Completa" : "Complete"}</option><option value="partial">{locale === "it" ? "Parziale" : "Partial"}</option><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option></Select></Field>}
