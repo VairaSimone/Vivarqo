@@ -160,10 +160,15 @@ describe.skipIf(!enabled)("Full account ZIP backup restore integration", () => {
     const restoredChild = await prisma.animal.findUniqueOrThrow({ where: { id: child.id } });
     expect(restoredChild.userId).toBe(target.userId);
     expect(restoredChild.motherAnimalId).toBe(parent.id);
-    expect((await prisma.feedingEntry.findFirstOrThrow({ where: { animalId: child.id } })).sessionId).toBe(session.id);
+    const restoredFeeding = await prisma.feedingEntry.findFirstOrThrow({ where: { animalId: child.id } });
+    expect(restoredFeeding.sessionId).toBe(session.id);
+    expect(restoredFeeding.inventoryItemId).toBe(item.id);
     expect((await prisma.inventoryLot.findUniqueOrThrow({ where: { id: lot.id } })).supplierId).toBe(supplier.id);
     expect((await prisma.stockMovement.findUniqueOrThrow({ where: { id: movement.id } })).lotId).toBe(lot.id);
-    expect((await prisma.financeEntry.findUniqueOrThrow({ where: { id: finance.id } })).sourceStockMovementId).toBe(movement.id);
+    const restoredFinance = await prisma.financeEntry.findUniqueOrThrow({ where: { id: finance.id } });
+    expect(restoredFinance.sourceStockMovementId).toBe(movement.id);
+    expect(restoredFinance.reproductionCycleId).toBe(cycle.id);
+    expect(restoredFinance.clutchId).toBe(clutch.id);
     expect((await prisma.clutch.findUniqueOrThrow({ where: { id: clutch.id } })).cycleId).toBe(cycle.id);
 
     await target.agent.post("/api/v1/exports/restore")
