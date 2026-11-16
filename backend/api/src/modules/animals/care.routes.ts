@@ -59,14 +59,18 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(bulkCareRecordsSchema, req.body);
     const created = await prisma.$transaction(async (tx) => {
-      const owned = await tx.animal.findMany({
-        where: { userId: auth.userId, id: { in: input.animalIds } },
-        select: { id: true, status: true, archivedAt: true },
-      });
+      // Lock the selected rows until commit so an archive/status change cannot
+      // race the active-animal validation and leave records on an inactive animal.
+      const owned = await tx.$queryRaw<Array<{ id: string; status: string; archived_at: Date | null }>>`
+        SELECT id::text AS id, status, archived_at
+        FROM animals
+        WHERE user_id = ${auth.userId}::uuid AND id = ANY(${input.animalIds}::uuid[])
+        FOR UPDATE
+      `;
       if (owned.length !== input.animalIds.length) {
         throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more animals were not found");
       }
-      if (owned.some((animal) => animal.status !== "active" || animal.archivedAt !== null)) {
+      if (owned.some((animal) => animal.status !== "active" || animal.archived_at !== null)) {
         throw new AppError(409, "ANIMAL_NOT_ACTIVE", "Bulk care records can only be added to active animals");
       }
 
@@ -84,7 +88,7 @@ export function createCareRouter() {
             userId: auth.userId,
             action: "weight.bulk_created",
             entityType: "weight",
-            metadata: { count: records.length, animalIds: input.animalIds },
+            metadata: { count: records.length },
           },
         });
         return { kind: input.kind, records, createdCount: records.length };
