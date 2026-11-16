@@ -61,7 +61,7 @@ export function createHomeCalendarRouter() {
         where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } },
         orderBy: { nextDueAt: "asc" },
         take: 20,
-        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
       prisma.feedingSession.findMany({
         where: { userId: auth.userId, performedAt: { gte: new Date(bounds.start.getTime() - 7 * 86_400_000), lt: bounds.end } },
@@ -207,7 +207,7 @@ export function createHomeCalendarRouter() {
         },
         orderBy: { dueAt: "asc" },
         take: 500,
-        include: { animal: { select: { id: true, name: true, identifier: true, species: true, photoKey: true, updatedAt: true } }, reminderRule: { select: { id: true, intervalDays: true, nextDueAt: true, isEnabled: true } } },
+        include: { animal: { select: { id: true, name: true, identifier: true } } },
       }),
       prisma.reproductiveEvent.findMany({
         where: { cycle: { is: { userId: auth.userId } }, occurredAt: { gte: from.start, lt: to.start } },
