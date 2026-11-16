@@ -301,7 +301,7 @@ export function createBackupRestoreRouter() {
     let manifest: { format?: unknown; formatVersion?: unknown; accountId?: unknown; modules?: unknown; checksums?: unknown; includeDocuments?: unknown };
     try { manifest = JSON.parse(manifestBytes.toString("utf8")) as typeof manifest; }
     catch { return fail("BACKUP_MANIFEST_INVALID", "Backup manifest is not valid JSON"); }
-    if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 1 ||
+    if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 2 ||
         typeof manifest.accountId !== "string" || !z.string().uuid().safeParse(manifest.accountId).success ||
         !Array.isArray(manifest.modules) || !FULL_MODULES.every((module) => (manifest.modules as unknown[]).includes(module)) || manifest.includeDocuments !== true ||
         typeof manifest.checksums !== "object" || manifest.checksums === null || Array.isArray(manifest.checksums)) {
@@ -507,7 +507,7 @@ export function createBackupRestoreRouter() {
         }
         await tx.auditEvent.create({ data: {
           userId: auth.userId, action: "account.backup_restored", entityType: "account",
-          metadata: { sourceAccountId: manifest.accountId as string, restoredRecords: restored, formatVersion: 1 },
+          metadata: { sourceAccountId: manifest.accountId as string, restoredRecords: restored, formatVersion: 2 },
         } });
         return { restoredRecords: restored };
       }, { maxWait: 10_000, timeout: 120_000 });
