@@ -75,6 +75,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const feedingAlerts = data?.feedingAlerts ?? [];
   const recent = data?.recentEvents ?? [];
   const counts = data?.counts;
+  const overview = data?.overview;
+  const smartSuggestions = data?.smartSuggestions ?? [];
   const truncated = data?.truncated;
 
   async function complete(id: string) {
@@ -232,7 +234,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
               const target = getString(event, "targetPath");
               const eventType = getString(event, "type");
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
-                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" ? "egg" : "leaf"} size={15} /></span>
+                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "thermometer" : eventType === "animal_update" ? "edit" : eventType === "note" ? "file" : "leaf"} size={15} /></span>
                 <span className="activity-copy"><strong>{getString(event, "title")}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
                 <Icon name="chevron" size={15} />
               </button>;
@@ -241,6 +243,30 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </Panel></div>}
 
       {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}><Panel className="dashboard-summary">
+      <PanelHeader title={locale === "it" ? "Stato dell'allevamento" : "Collection overview"} />
+      <div className="dashboard-overview-grid">
+        <button className="dashboard-overview-card" onClick={() => navigate("/animals?status=active")}>
+          <span>{locale === "it" ? "Animali attivi" : "Active animals"}</span><strong>{overview?.activeAnimals ?? 0}</strong><small>{locale === "it" ? "Totale allevamento" : "Collection total"}</small>
+        </button>
+        <button className="dashboard-overview-card" onClick={() => navigate("/feeding")}>
+          <span>{locale === "it" ? "Alimentazioni oggi" : "Feedings today"}</span><strong>{overview?.feedingsToday ?? 0}</strong><small>{locale === "it" ? "Registrate" : "Recorded"}</small>
+        </button>
+        <button className="dashboard-overview-card" onClick={() => navigate("/inventory?filter=low-stock")}>
+          <span>{locale === "it" ? "Scorte basse" : "Low stock"}</span><strong>{overview?.lowStockItems.length ?? 0}</strong><small>{locale === "it" ? "Articoli sotto soglia" : "Items below threshold"}</small>
+        </button>
+      </div>
+      {(overview?.lowStockItems.length ?? 0) > 0 && <div className="dashboard-low-stock-list">
+        {overview?.lowStockItems.slice(0, 4).map((item) => <button key={item.id} onClick={() => navigate(`/inventory?item=${encodeURIComponent(item.id)}`)}>
+          <span>{item.name}</span><small>{item.quantityOnHand} / {item.minimumQuantity} {item.unit}</small>
+        </button>)}
+      </div>}
+      {smartSuggestions.length > 0 && <div className="dashboard-smart-suggestions">
+        <strong>{locale === "it" ? "Da tenere d'occhio" : "Worth checking"}</strong>
+        {smartSuggestions.slice(0, 5).map((item) => <button key={item.id} onClick={() => navigate(item.targetPath)}>
+          <Icon name={item.type === "expected_hatch" ? "egg" : item.type === "incubator_maintenance" ? "thermometer" : "calendar"} size={15} />
+          <span>{item.title}</span><small>{item.dueAt ? formatDateTime(item.dueAt, locale, timezone) : ""}</small>
+        </button>)}
+      </div>}
       <PanelHeader title={t("dashboardSummary")} />
       <div className="dashboard-summary-grid">
         <Metric label={t("overdue")} value={Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)} tone="danger" icon="alert" />
