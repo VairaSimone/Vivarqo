@@ -321,7 +321,7 @@ async function* exportEntries(
       format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
       accountId: userId, modules, includeDocuments: false, checksums,
     };
-    yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\\n", "utf8")) };
+    yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\n", "utf8")) };
     return;
   }
   const documents = paginateRows((cursor, take) => prisma.document.findMany({
