@@ -252,7 +252,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           <span>{locale === "it" ? "Alimentazioni oggi" : "Feedings today"}</span><strong>{overview?.feedingsToday ?? 0}</strong><small>{locale === "it" ? "Registrate" : "Recorded"}</small>
         </button>
         <button className="dashboard-overview-card" onClick={() => navigate("/inventory?lowStock=true")}>
-          <span>{locale === "it" ? "Scorte basse" : "Low stock"}</span><strong>{overview?.lowStockItems.length ?? 0}</strong><small>{locale === "it" ? "Articoli sotto soglia" : "Items below threshold"}</small>
+          <span>{locale === "it" ? "Scorte basse" : "Low stock"}</span><strong>{overview?.lowStockCount ?? 0}</strong><small>{locale === "it" ? "Articoli sotto soglia" : "Items below threshold"}</small>
         </button>
       </div>
       {(overview?.lowStockItems.length ?? 0) > 0 && <div className="dashboard-low-stock-list">
