@@ -245,15 +245,36 @@ async function insertRows(
 ): Promise<number> {
   const columns = columnsByTable.get(spec.table) ?? [];
   const columnByName = new Map(columns.map((column) => [column.column_name, column] as const));
+  const isPhotoTable = spec.table === "animals" || spec.table === "eggs";
+  const batch: unknown[][] = [];
+  let insertColumns: string[] | undefined;
   let count = 0;
+
+  const flush = async () => {
+    if (!batch.length || !insertColumns) return;
+    const width = insertColumns.length;
+    const values = batch.flat();
+    const tuples = batch.map((_, rowIndex) => {
+      const placeholders = insertColumns!.map((_, columnIndex) => "$" + (rowIndex * width + columnIndex + 1));
+      return "(" + placeholders.join(", ") + ")";
+    });
+    const sql = `INSERT INTO "${spec.table}" (${insertColumns.map((name) => `"${name}"`).join(", ")}) VALUES ${tuples.join(", ")}`;
+    await tx.$executeRawUnsafe(sql, ...values as never[]);
+    count += batch.length;
+    batch.length = 0;
+  };
+
   for (const row of rows) {
     const id = row.id;
     if (!id || !z.string().uuid().safeParse(id).success) fail("BACKUP_ROW_ID_INVALID", "Backup contains a row with an invalid ID");
     if (spec.user && row.userId !== sourceOwnerId) fail("BACKUP_OWNER_MISMATCH", "A backup row belongs to a different source account");
-    const names: string[] = [], values: unknown[] = [];
+    const names: string[] = [];
+    const values: unknown[] = [];
     for (const [field, rawValue] of Object.entries(row)) {
       if (field === "archivePath" || field === "photoArchivePath" || (spec.deferred ?? []).includes(field)) continue;
-      if (field === "changedBy" && rawValue !== sourceOwnerId) fail("BACKUP_OWNER_MISMATCH", "Genetic history references a user outside the source account");
+      if (field === "changedBy" && rawValue !== sourceOwnerId) {
+        fail("BACKUP_OWNER_MISMATCH", "Genetic history references a user outside the source account");
+      }
       if (field === "photoKey") {
         if (rawValue) fail("BACKUP_ATTACHMENT_MISSING", "Backup references a photo without an archived photo file");
         continue;
@@ -265,26 +286,27 @@ async function insertRows(
       if (field === "userId" || field === "changedBy") values.push(ownerId);
       else values.push(normalizeCell(rawValue, column));
     }
-    if (row.photoArchivePath) {
-      const key = documentKeys.get(row.photoArchivePath);
-      if (!key) fail("BACKUP_ATTACHMENT_MISSING", "A referenced animal or egg photo is missing from the backup");
-      names.push("photo_key"); values.push(key);
+    if (isPhotoTable) {
+      const photoPath = row.photoArchivePath;
+      const key = photoPath ? documentKeys.get(photoPath) : null;
+      if (photoPath && !key) fail("BACKUP_ATTACHMENT_MISSING", "A referenced animal or egg photo is missing from the backup");
+      if (!columnByName.has("photo_key")) fail("BACKUP_SCHEMA_MISMATCH", "Photo storage column is missing from the database schema");
+      names.push("photo_key");
+      values.push(key);
     }
     if (!names.includes("id")) fail("BACKUP_ROW_ID_INVALID", "Backup row is missing its ID");
     if (spec.user && !names.includes("user_id")) {
-      names.push("user_id"); values.push(ownerId);
+      names.push("user_id");
+      values.push(ownerId);
     }
-    if (spec.table === "documents") {
-      const archivePath = row.archivePath;
-      const storageKey = archivePath ? documentKeys.get(archivePath) : undefined;
-      if (!storageKey) fail("BACKUP_ATTACHMENT_MISSING", "A document attachment is missing from the backup");
-      names.push("storage_key"); values.push(storageKey);
+    if (!insertColumns) insertColumns = names;
+    else if (names.length !== insertColumns.length || names.some((name, index) => name !== insertColumns![index])) {
+      fail("BACKUP_CSV_INVALID", "Rows in a backup table do not share the same column layout");
     }
-    const placeholders = values.map((_, index) => "$" + (index + 1)).join(", ");
-    const sql = `INSERT INTO "${spec.table}" (${names.map((name) => `"${name}"`).join(", ")}) VALUES (${placeholders})`;
-    await tx.$executeRawUnsafe(sql, ...values as never[]);
-    count += 1;
+    batch.push(values);
+    if (batch.length >= 200) await flush();
   }
+  await flush();
   return count;
 }
 
