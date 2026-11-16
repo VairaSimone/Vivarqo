@@ -109,7 +109,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </button>
         <div className="dashboard-task-meta"><span className="dashboard-task-category"><Icon name={categoryIcon} size={13} />{categoryLabel[category] ?? categoryLabel.custom}</span>
           {animal && <button className="dashboard-task-animal" onClick={() => navigate(`/animals/${encodeURIComponent(getString(animal, "id"))}`)}>{getString(animal, "name")}</button>}
-          {task.recurrence?.enabled && <span className="dashboard-task-recurrence" title={locale === "it" ? `Ricorrente ogni ${task.recurrence.intervalDays} giorni` : `Repeats every ${task.recurrence.intervalDays} days`}>{locale === "it" ? `Ricorrente · prossima ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}` : `Repeats · next ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}`}</span>}
+          {task.recurrence?.enabled && <span className="dashboard-task-recurrence" title={locale === "it" ? `Ricorrente ogni ${task.recurrence.intervalDays} giorni` : `Repeats every ${task.recurrence.intervalDays} days`}>{isComplete ? (locale === "it" ? `Prossima scadenza: ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}` : `Next due: ${formatDateTime(task.recurrence.nextDueAt, locale, timezone)}`) : (locale === "it" ? `Ricorrente ogni ${task.recurrence.intervalDays} gg` : `Repeats every ${task.recurrence.intervalDays} days`)}</span>}
         </div>
       </div>
       {late && <Badge tone="danger">{t("overdue")}</Badge>}
