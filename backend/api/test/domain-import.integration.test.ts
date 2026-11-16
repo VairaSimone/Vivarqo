@@ -264,7 +264,7 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     const owner = await account();
     const template = await owner.agent.get("/api/v1/imports/templates/inventory").expect(200);
     expect(template.headers["content-type"]).toContain("text/csv");
-    expect(template.text).toContain("name,category,unit");
+    expect(template.text).toContain('"name","category","unit"');
     const csv = "entryType,occurredOn,amountEUR,currency,category,description\n" +
       "expense,2026-10-02,19.99,EUR,food,Duplicate receipt\n" +
       "expense,2026-10-02,19.99,EUR,food,Duplicate receipt\n";
