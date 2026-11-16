@@ -31,6 +31,7 @@ export function createHomeCalendarRouter() {
       completedTodayCount,
       upcomingTaskCount,
       imminentReminderCount,
+      feedingAlerts,
     ] = await Promise.all([
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { gte: now, lt: bounds.end } },
