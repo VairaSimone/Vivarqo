@@ -82,7 +82,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
 
     <div className="dashboard-grid">
       <div className="dashboard-side"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? "Chiudi" : "Configura"}</Button>} />{widgetSettingsOpen && <div>{([["priorities", "Attività e priorità"], ["plan", "Piano e utilizzo"], ["quickActions", "Azioni rapide"], ["feedingAlerts", "Avvisi alimentazione"], ["reminders", "Promemoria"], ["recent", "Attività recenti"], ["summary", "Riepilogo"]] as const).map(([key, label]) => <label key={key} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 0"}}><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{label}</label>)}</div>}</Panel></div>
-      {widgetVisibility.priorities && {widgetVisibility.priorities && <Panel className="dashboard-tasks dashboard-priorities">
+      {widgetVisibility.priorities && <Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section">
           <PanelHeader title={t("overdue")} action={overdue.length > 0 ? <Badge tone="danger">{counts?.overdue ?? overdue.length}</Badge> : undefined} />
           {overdue.length
