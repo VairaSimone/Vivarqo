@@ -19,6 +19,7 @@ type Report = {
   entityType: Entity; fileType: "csv" | "xlsx"; headers: string[]; selectedSheet: string | null; sheets: string[];
   mappedHeaders: Record<string, string>; missingFields: string[][];
   validRows: Row[]; errors: Array<{ row: number; column: string; reason: string }>;
+  possibleDuplicates?: Array<{ row: number; duplicateOf: number }>;
 };
 
 const aliases: Record<string, string> = {
@@ -457,10 +458,18 @@ export function createDomainImportRouter() {
       }
       if (!badDate) validRows.push({ rowNumber: row.rowNumber, record: data });
     }
+    const seenRows = new Map<string, number>();
+    const possibleDuplicates: Array<{ row: number; duplicateOf: number }> = [];
+    for (const row of validRows) {
+      const signature = JSON.stringify(row.record);
+      const firstRow = seenRows.get(signature);
+      if (firstRow !== undefined) possibleDuplicates.push({ row: row.rowNumber, duplicateOf: firstRow });
+      else seenRows.set(signature, row.rowNumber);
+    }
     const report: Report = {
       entityType: entity as Entity, fileType: file.fileType, headers: file.headers,
       selectedSheet: file.selectedSheet, sheets: file.sheets, mappedHeaders: map,
-      missingFields: missing, validRows, errors,
+      missingFields: missing, validRows, errors, possibleDuplicates,
     };
     const job = await prisma.importJob.create({
       data: { userId: auth.userId, entityType: entity, storageKey: "database-preview-report", status: "preview",
@@ -472,11 +481,13 @@ export function createDomainImportRouter() {
       unmappedHeaders, mappedHeaders: report.mappedHeaders, availableFields: availableFields[entity as Entity],
       requiredFields: required[entity as Entity], missingFields: report.missingFields,
       sheets: file.sheets, selectedSheet: file.selectedSheet, totalRows: file.rows.length, validRows: validRows.length,
-      invalidRows: errors.length, errors, preview: validRows.slice(0, 20), expiresAt: job.expiresAt });
+      invalidRows: errors.length, errors, possibleDuplicates, preview: validRows.slice(0, 20), expiresAt: job.expiresAt });
   });
 
   router.post("/:id/confirm", requireSession, persistentRateLimit(30, "import-confirm"), async (req, res, next) => {
     const auth = res.locals.auth as AuthContext;
+    const body = z.object({ allowPossibleDuplicates: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
+    if (!body.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
     const jobId = id(req.params.id);
     const current = await prisma.importJob.findFirst({ where: { id: jobId, userId: auth.userId } });
     if (!current) throw new AppError(404, "IMPORT_NOT_FOUND", "Import not found");
@@ -490,10 +501,15 @@ export function createDomainImportRouter() {
         missingFields: report.missingFields,
       });
     }
+    if (report.possibleDuplicates?.length && !body.data.allowPossibleDuplicates) {
+      throw new AppError(409, "IMPORT_DUPLICATES_REQUIRE_CONFIRMATION", "Exact duplicate rows in this file require explicit confirmation", {
+        possibleDuplicates: report.possibleDuplicates,
+      });
+    }
     const queued = await prisma.importJob.updateMany({
       where: { id: jobId, userId: auth.userId, entityType: current.entityType, status: "preview", expiresAt: { gt: new Date() } },
       data: {
-        status: "queued", attempts: 0, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
+        status: "queued", allowPossibleDuplicates: body.data.allowPossibleDuplicates, attempts: 0, processingStartedAt: null, leaseToken: null, lastErrorCode: null,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
