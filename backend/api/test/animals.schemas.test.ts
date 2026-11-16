@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAnimalSchema, patchAnimalSchema, feedingEntrySchema, patchFeedingEntrySchema } from "../src/modules/animals/animals.schemas.js";
+import { createAnimalSchema, patchAnimalSchema, feedingEntrySchema, patchFeedingEntrySchema, bulkCareRecordsSchema } from "../src/modules/animals/animals.schemas.js";
 
 describe("animal calendar date validation", () => {
   it("rejects impossible calendar dates on create and patch", () => {
@@ -49,5 +49,34 @@ describe("feeding prey validation", () => {
     expect(patchAnimalSchema.safeParse({ feedingIntervalDays: 0 }).success).toBe(false);
     expect(patchAnimalSchema.safeParse({ feedingIntervalDays: 365 }).success).toBe(true);
     expect(patchAnimalSchema.safeParse({ feedingIntervalDays: null }).success).toBe(true);
+  });
+});
+
+describe("atomic bulk care record validation", () => {
+  const ids = [
+    "00000000-0000-4000-8000-000000000001",
+    "00000000-0000-4000-8000-000000000002",
+  ];
+
+  it("accepts bulk weights and shed records", () => {
+    expect(bulkCareRecordsSchema.safeParse({
+      kind: "weight", animalIds: ids, measuredAt: "2026-11-16T12:00:00.000Z", weightG: 1250,
+    }).success).toBe(true);
+    expect(bulkCareRecordsSchema.safeParse({
+      kind: "shed", animalIds: ids, occurredAt: "2026-11-16T12:00:00.000Z", outcome: "partial",
+    }).success).toBe(true);
+  });
+
+  it("rejects duplicate animals, unsupported outcomes and oversized batches", () => {
+    expect(bulkCareRecordsSchema.safeParse({
+      kind: "weight", animalIds: [ids[0], ids[0]], measuredAt: "2026-11-16T12:00:00.000Z", weightG: 1250,
+    }).success).toBe(false);
+    expect(bulkCareRecordsSchema.safeParse({
+      kind: "shed", animalIds: ids, occurredAt: "2026-11-16T12:00:00.000Z", outcome: "incomplete",
+    }).success).toBe(false);
+    expect(bulkCareRecordsSchema.safeParse({
+      kind: "weight", animalIds: Array.from({ length: 501 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`),
+      measuredAt: "2026-11-16T12:00:00.000Z", weightG: 1250,
+    }).success).toBe(false);
   });
 });
