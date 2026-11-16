@@ -18,6 +18,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const [feedingWidgetVisible, setFeedingWidgetVisible] = useState(() => {
     try { return window.localStorage.getItem("vivarqo.dashboard.feeding-alerts") !== "hidden"; } catch { return true; }
   });
+  const [widgetVisibility, setWidgetVisibility] = useState<Record<string, boolean>>(() => {
+    const defaults = { priorities: true, plan: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true };
+    try { const saved = JSON.parse(window.localStorage.getItem("vivarqo.dashboard.widgets") || "{}") as Record<string, unknown>; return Object.fromEntries(Object.entries(defaults).map(([key, value]) => [key, typeof saved[key] === "boolean" ? saved[key] : value])); } catch { return defaults; }
+  });
+  const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
+  function toggleWidget(key: string, visible: boolean) { setWidgetVisibility((current) => { const next = { ...current, [key]: visible }; try { window.localStorage.setItem("vivarqo.dashboard.widgets", JSON.stringify(next)); } catch { /* Session-only preference. */ } return next; }); }
   const data = resource.data;
   const due = data?.tasks.dueToday ?? [];
   const overdue = data?.tasks.overdue ?? [];
@@ -74,8 +80,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
 
     <OnboardingChecklist locale={locale} onNavigate={navigate} />
 
-    <div className="dashboard-grid">
-      <Panel className="dashboard-tasks dashboard-priorities">
+    <div className="dashboard-grid">\n      <div className="dashboard-side"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? "Chiudi" : "Configura"}</Button>} />{widgetSettingsOpen && <div>{([["priorities", "Attività e priorità"], ["plan", "Piano e utilizzo"], ["quickActions", "Azioni rapide"], ["feedingAlerts", "Avvisi alimentazione"], ["reminders", "Promemoria"], ["recent", "Attività recenti"], ["summary", "Riepilogo"]] as const).map(([key, label]) => <label key={key} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 0"}}><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{label}</label>)}</div>}</Panel></div>
+      {widgetVisibility.priorities && <Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section">
           <PanelHeader title={t("overdue")} action={overdue.length > 0 ? <Badge tone="danger">{counts?.overdue ?? overdue.length}</Badge> : undefined} />
           {overdue.length
