@@ -43,7 +43,7 @@ const dashboardTaskSchema = z.object({
 }).passthrough();
 const dashboardReminderSchema = z.object({ id: z.string(), title: z.string(), nextDueAt: z.string() }).passthrough();
 const dashboardRecentEventSchema = z.object({
-  type: z.enum(["feeding", "weight", "shed", "note", "reproduction"]),
+  type: z.enum(["feeding", "weight", "shed", "note", "reproduction", "birth", "incubation", "animal_update"]),
   occurredAt: z.string(), title: z.string(), targetPath: z.string(),
 }).passthrough();
 
@@ -63,7 +63,16 @@ export const dashboardTodayResponseSchema = z.object({
     completedToday: z.number().int().nonnegative(),
     upcoming: z.number().int().nonnegative().default(0),
     imminentReminders: z.number().int().nonnegative(),
+    activeAnimals: z.number().int().nonnegative().optional(),
+    feedingsToday: z.number().int().nonnegative().optional(),
+    lowStock: z.number().int().nonnegative().optional(),
   }),
+  overview: z.object({
+    activeAnimals: z.number().int().nonnegative(),
+    feedingsToday: z.number().int().nonnegative(),
+    lowStockItems: z.array(z.object({ id: z.string(), name: z.string(), quantityOnHand: z.string(), minimumQuantity: z.string(), unit: z.string() })),
+  }).optional(),
+  smartSuggestions: z.array(z.object({ id: z.string(), type: z.string(), title: z.string(), dueAt: z.string().nullable(), targetPath: z.string() })).optional(),
   truncated: z.object({
     dueToday: z.boolean(), overdue: z.boolean(),
     completedToday: z.boolean(), upcoming: z.boolean().default(false), imminentReminders: z.boolean(),
