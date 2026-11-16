@@ -30,8 +30,8 @@ function crc32(bytes: Buffer): number {
 }
 
 function safeArchiveName(name: string): boolean {
-  const parts = name.replace(/\\\\/g, "/").split("/");
-  return Boolean(name) && !name.startsWith("/") && !name.includes("\\0") &&
+  const parts = name.replace(/\\/g, "/").split("/");
+  return Boolean(name) && !name.startsWith("/") && !name.includes("\0") &&
     !parts.some((part) => !part || part === "." || part === "..");
 }
 
@@ -119,8 +119,8 @@ function readBackupZip(archive: Buffer): ArchiveEntry[] {
 }
 
 function parseCsv(bytes: Buffer): CsvRow[] {
-  let source = bytes.toString("utf8").replace(/^\\uFEFF/, "");
-  if (source.includes("\\0")) fail("BACKUP_CSV_INVALID", "CSV contains invalid null characters");
+  let source = bytes.toString("utf8").replace(/^\uFEFF/, "");
+  if (source.includes("\0")) fail("BACKUP_CSV_INVALID", "CSV contains invalid null characters");
   const matrix: string[][] = [];
   let row: string[] = [], cell = "", quoted = false;
   for (let i = 0; i < source.length; i += 1) {
@@ -131,8 +131,7 @@ function parseCsv(bytes: Buffer): CsvRow[] {
       else cell += char;
     } else if (char === '"' && cell.length === 0) quoted = true;
     else if (char === ",") { row.push(cell); cell = ""; }
-    else if (char === "\
-") { row.push(cell.replace(/\\r$/, "")); matrix.push(row); row = []; cell = ""; }
+    else if (char === "\n") { row.push(cell.replace(/\r$/, "")); matrix.push(row); row = []; cell = ""; }
     else cell += char;
   }
   if (quoted) fail("BACKUP_CSV_INVALID", "CSV contains an unterminated quoted field");
