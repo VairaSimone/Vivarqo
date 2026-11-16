@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DashboardTaskDto, DashboardTodayDto } from "@vivarqo/contracts/operations";
-import { parseDashboardTodayResponse } from "@vivarqo/contracts/operations";
+import type { DashboardTaskDto } from "@vivarqo/contracts/operations";
 import { api, ApiError } from "../lib/api";
 import { formatDateTime, getString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
@@ -12,7 +11,11 @@ import { Badge, Button, EmptyState, ErrorState, Icon, PageHeader, Panel, PanelHe
 
 export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
-  const resource = useResource<DashboardTodayDto>("/home/today", parseDashboardTodayResponse);
+  const tasksResource = useResource<{ tasks: { dueToday: DashboardTaskDto[]; overdue: DashboardTaskDto[]; completedToday: DashboardTaskDto[]; upcoming: DashboardTaskDto[] }; counts: { dueToday: number; overdue: number; completedToday: number; upcoming: number }; truncated: { dueToday: boolean; overdue: boolean; completedToday: boolean; upcoming: boolean } }>("/home/today/tasks");
+  const remindersResource = useResource<{ items: Array<Record<string, unknown>>; count: number; truncated: boolean }>("/home/today/reminders");
+  const feedingAlertsResource = useResource<{ items: Array<{ id: string; name: string; species: string; photoUrl?: string | null; lastMealAt: string | null; daysSinceLastMeal: number; feedingIntervalDays: number; feedingStatus: "no_history" | "overdue" | "due_soon" }> }>("/home/today/feeding-alerts");
+  const overviewResource = useResource<{ activeAnimals: number; feedingsToday: number; lowStockItems: Array<{ id: string; name: string; quantityOnHand: string; minimumQuantity: string; unit: string }>; lowStockCount: number }>("/home/today/overview");
+  const recentResource = useResource<{ events: Array<{ type: string; occurredAt: string; title: string; targetPath: string }>; smartSuggestions: Array<{ id: string; type: string; title: string; dueAt: string | null; targetPath: string }> }>("/home/today/recent");
   const { toast, show } = useToast();
   const accountPreferences = useResource<{ preferences: { dashboardLayout?: { order?: string[]; visibility?: Record<string, boolean> } } }>("/account/preferences");
   const [layoutReady, setLayoutReady] = useState(false);
@@ -73,22 +76,22 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   function toggleWidget(key: WidgetKey, visible: boolean) {
     setWidgetVisibility((current) => ({ ...current, [key]: visible }));
   }
-  const data = resource.data;
-  const due = data?.tasks.dueToday ?? [];
-  const overdue = data?.tasks.overdue ?? [];
-  const upcoming = data?.tasks.upcoming ?? [];
+  const taskData = tasksResource.data;
+  const due = taskData?.tasks.dueToday ?? [];
+  const overdue = taskData?.tasks.overdue ?? [];
+  const upcoming = taskData?.tasks.upcoming ?? [];
   const taskLookup = [...overdue, ...due, ...upcoming];
-  const completed = [...(data?.tasks.completedToday ?? []), ...taskLookup.filter((task) => optimisticallyCompleted.includes(task.id) && !(data?.tasks.completedToday ?? []).some((done) => done.id === task.id))];
+  const completed = [...(taskData?.tasks.completedToday ?? []), ...taskLookup.filter((task) => optimisticallyCompleted.includes(task.id) && !(taskData?.tasks.completedToday ?? []).some((done) => done.id === task.id))];
   const visibleOverdue = overdue.filter((task) => !optimisticallyCompleted.includes(task.id));
   const visibleDue = due.filter((task) => !optimisticallyCompleted.includes(task.id));
   const visibleUpcoming = upcoming.filter((task) => !optimisticallyCompleted.includes(task.id));
-  const reminders = data?.imminentReminders ?? [];
-  const feedingAlerts = data?.feedingAlerts ?? [];
-  const recent = data?.recentEvents ?? [];
-  const counts = data?.counts;
-  const overview = data?.overview;
-  const smartSuggestions = data?.smartSuggestions ?? [];
-  const truncated = data?.truncated;
+  const reminders = remindersResource.data?.items ?? [];
+  const feedingAlerts = feedingAlertsResource.data?.items ?? [];
+  const recent = recentResource.data?.events ?? [];
+  const counts = taskData?.counts;
+  const overview = overviewResource.data;
+  const smartSuggestions = recentResource.data?.smartSuggestions ?? [];
+  const truncated = taskData?.truncated;
   const dashboardTone = visibleOverdue.length > 0 ? "critical" : visibleDue.length > 0 ? "attention" : "normal";
   const greeting = getGreeting(timezone, locale);
   const dayStatus = visibleOverdue.length > 0
@@ -105,7 +108,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       show(result.nextDueAt
         ? (locale === "it" ? `Attività completata. Prossima scadenza: ${formatDateTime(result.nextDueAt, locale, timezone)}` : `Task completed. Next due: ${formatDateTime(result.nextDueAt, locale, timezone)}`)
         : t("taskCompleted"));
-      resource.reload();
+      tasksResource.reload();
     } catch (error) {
       setOptimisticallyCompleted((current) => current.filter((taskId) => taskId !== id));
       show(error instanceof ApiError ? error.message : t("operationFailed"));
@@ -151,7 +154,6 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       <div className="intro-mark"><Icon name="leaf" size={34} /></div>
     </div>
 
-    {resource.error && <ErrorState message={resource.error.message} retry={resource.reload} />}
     <div className="dashboard-mobile-actions" aria-label={locale === "it" ? "Azioni principali" : "Main actions"}>
       <Button onClick={() => navigate("/feeding?bulk=1")}><Icon name="feed" size={15} />{locale === "it" ? "Registra pasti" : "Record feedings"}</Button>
       <Button variant="secondary" onClick={() => navigate("/tasks?create=1")}><Icon name="calendar" size={15} />{t("addTask")}</Button>
@@ -160,7 +162,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "01 — SITUAZIONE OPERATIVA" : "01 — DAILY OVERVIEW"}</span><p>{locale === "it" ? "Prima le scadenze, poi il resto." : "Deadlines first, everything else after."}</p></div>
     <div className="dashboard-grid">
       <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} su` : `Move ${widgetLabels[key]} up`}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} giù` : `Move ${widgetLabels[key]} down`}>↓</Button></span></div>)}</div>}</Panel></div>
-      {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}>{resource.loading && !data ? <Panel><Skeleton rows={7} /></Panel> : <Panel className="dashboard-tasks dashboard-priorities">
+      {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}>{tasksResource.loading && !taskData ? <Panel><Skeleton rows={7} /></Panel> : tasksResource.error ? <Panel><ErrorState message={tasksResource.error.message} retry={tasksResource.reload} /></Panel> : <Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section" style={{ display: taskFilter === "all" || taskFilter === "overdue" ? undefined : "none" }}>
           <PanelHeader title={t("overdue")} action={visibleOverdue.length > 0 ? <Badge tone="danger">{visibleOverdue.length}</Badge> : undefined} />
           <div className="dashboard-task-filters" role="group" aria-label={locale === "it" ? "Filtra attività" : "Filter tasks"}>
@@ -221,7 +223,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       {widgetVisibility.feedingAlerts && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("feedingAlerts") }}><Panel>
           <PanelHeader title={locale === "it" ? "Animali da controllare" : "Animals to check"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
           <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
-          {resource.loading && !data ? <Skeleton rows={4} /> : feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => {
+          {feedingAlertsResource.loading && !feedingAlertsResource.data ? <Skeleton rows={4} /> : feedingAlertsResource.error ? <ErrorState message={feedingAlertsResource.error.message} retry={feedingAlertsResource.reload} /> : feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => {
             const noHistory = animal.feedingStatus === "no_history";
             const overdueMeal = animal.feedingStatus === "overdue";
             const nearDue = animal.feedingStatus === "due_soon";
@@ -236,7 +238,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </Panel></div>}
       {widgetVisibility.reminders && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("reminders") }}><Panel>
           <PanelHeader title={t("upcomingReminders")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks?tab=reminders")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
-          {resource.loading && !data ? <Skeleton rows={4} /> : reminders.length
+          {remindersResource.loading && !remindersResource.data ? <Skeleton rows={4} /> : remindersResource.error ? <ErrorState message={remindersResource.error.message} retry={remindersResource.reload} /> : reminders.length
             ? reminders.slice(0, 5).map((rule) => {
                 const reminderOverdue = Date.parse(getString(rule, "nextDueAt")) < Date.now();
                 return <button className={`simple-row dashboard-reminder-row${reminderOverdue ? " dashboard-reminder-overdue" : ""}`} key={getString(rule, "id")} onClick={() => navigate("/tasks?tab=reminders")}>
@@ -247,13 +249,13 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
                 </button>;
               })
             : <EmptyState title={t("remindersEmpty")} description={t("remindersEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/tasks?tab=reminders&create=1")}>{t("createReminder")}</Button>} />}
-          {Boolean(truncated?.imminentReminders) && <p className="muted-note">{t("truncatedNotice")}</p>}
+          {Boolean(remindersResource.data?.truncated) && <p className="muted-note">{t("truncatedNotice")}</p>}
       </Panel></div>}
 
       <div className="dashboard-section-heading dashboard-section-heading-secondary"><span className="eyebrow">{locale === "it" ? "03 — MONITORAGGIO" : "03 — MONITORING"}</span><p>{locale === "it" ? "Controlli e andamento dell’allevamento." : "Checks and collection activity."}</p></div>
       {widgetVisibility.recent && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("recent") }}><Panel className="dashboard-recent">
         <PanelHeader title={t("recentActivity")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/animals")}>{t("viewAll")}</Button>} />
-        {resource.loading && !data ? <Skeleton rows={5} /> : recent.length
+        {recentResource.loading && !recentResource.data ? <Skeleton rows={5} /> : recentResource.error ? <ErrorState message={recentResource.error.message} retry={recentResource.reload} /> : recent.length
           ? <div className="activity-list">{recent.slice(0, 8).map((event, index) => {
               const target = getString(event, "targetPath");
               const eventType = getString(event, "type");
@@ -275,7 +277,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           : <EmptyState title={t("noRecentActivity")} description={t("recentActivityEmptyHint")} action={<Button size="sm" variant="secondary" onClick={() => navigate("/animals")}>{t("navAnimals")}</Button>} />}
       </Panel></div>}
 
-      {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}>{resource.loading && !data ? <Panel><Skeleton rows={5} /></Panel> : <Panel className="dashboard-summary">
+      {widgetVisibility.summary && <div className="dashboard-widget dashboard-widget-summary" style={{ order: widgetOrder.indexOf("summary") }}>{overviewResource.loading && !overview ? <Panel><Skeleton rows={5} /></Panel> : overviewResource.error ? <Panel><ErrorState message={overviewResource.error.message} retry={overviewResource.reload} /></Panel> : <Panel className="dashboard-summary">
       <PanelHeader title={locale === "it" ? "Stato dell'allevamento" : "Collection overview"} />
       <div className="dashboard-overview-grid" aria-label={locale === "it" ? "Indicatori dell'allevamento" : "Collection indicators"}>
         <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=active")}>
