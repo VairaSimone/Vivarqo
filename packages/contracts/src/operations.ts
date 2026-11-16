@@ -37,8 +37,9 @@ export interface CalendarItemDto {
 
 
 const dashboardTaskSchema = z.object({
-  id: z.string(), title: z.string(), dueAt: z.string(), status: z.string(),
-  animal: z.object({ id: z.string(), name: z.string() }).passthrough().nullable().optional(),
+  id: z.string(), title: z.string(), category: z.string(), dueAt: z.string(), status: z.string(),
+  animal: z.object({ id: z.string(), name: z.string(), species: z.string().optional(), photoUrl: z.string().nullable().optional() }).passthrough().nullable().optional(),
+  recurrence: z.object({ ruleId: z.string(), intervalDays: z.number().int().positive(), nextDueAt: z.string(), enabled: z.boolean() }).nullable().optional(),
 }).passthrough();
 const dashboardReminderSchema = z.object({ id: z.string(), title: z.string(), nextDueAt: z.string() }).passthrough();
 const dashboardRecentEventSchema = z.object({
@@ -68,7 +69,7 @@ export const dashboardTodayResponseSchema = z.object({
     completedToday: z.boolean(), upcoming: z.boolean().default(false), imminentReminders: z.boolean(),
   }),
   imminentReminders: z.array(dashboardReminderSchema),
-  feedingAlerts: z.array(z.object({ id: z.string(), name: z.string(), species: z.string(), lastMealAt: z.string().nullable(), daysSinceLastMeal: z.number().int().nonnegative(), feedingIntervalDays: z.number().int().positive() }).passthrough()).default([]),
+  feedingAlerts: z.array(z.object({ id: z.string(), name: z.string(), species: z.string(), photoUrl: z.string().nullable().optional(), lastMealAt: z.string().nullable(), daysSinceLastMeal: z.number().int().nonnegative(), feedingIntervalDays: z.number().int().positive(), feedingStatus: z.enum(["no_history", "overdue", "due_soon"]) }).passthrough()).default([]),
   quickActions: z.array(z.object({ key: z.string(), label: z.string(), targetPath: z.string() })).optional(),
   recentEvents: z.array(dashboardRecentEventSchema),
 }).passthrough();
