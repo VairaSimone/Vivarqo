@@ -184,8 +184,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
             <QuickAction icon="feed" label={t("newFeeding")} onClick={() => navigate("/feeding?create=1")} />
-            <QuickAction icon="weight" label={t("addWeight")} onClick={() => navigate("/animals")} />
-            <QuickAction icon="leaf" label={locale === "it" ? "Registra muta" : "Record shed"} onClick={() => navigate("/animals")} />
+            <QuickAction icon="weight" label={locale === "it" ? "Registra pesi" : "Record weights"} onClick={() => navigate("/animals")} />
+            <QuickAction icon="leaf" label={locale === "it" ? "Registra mute" : "Record sheds"} onClick={() => navigate("/animals")} />
             <QuickAction icon="egg" label={locale === "it" ? "Riproduzione" : "Reproduction"} onClick={() => navigate("/reproduction-cycles")} />
             <QuickAction icon="calendar" label={t("addTask")} onClick={() => navigate("/tasks?create=1")} />
             <QuickAction icon="snake" label={t("addAnimal")} onClick={() => navigate("/animals?create=1")} />
