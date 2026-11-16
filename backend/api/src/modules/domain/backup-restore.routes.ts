@@ -135,7 +135,7 @@ function parseCsv(bytes: Buffer): CsvRow[] {
     else cell += char;
   }
   if (quoted) fail("BACKUP_CSV_INVALID", "CSV contains an unterminated quoted field");
-  if (cell.length || row.length) { row.push(cell.replace(/\\r$/, "")); matrix.push(row); }
+  if (cell.length || row.length) { row.push(cell.replace(/\r$/, "")); matrix.push(row); }
   while (matrix.length && matrix[matrix.length - 1]!.every((value) => value === "")) matrix.pop();
   if (!matrix.length) return [];
   const headers = matrix[0]!;
@@ -420,20 +420,23 @@ export function createBackupRestoreRouter() {
         }
         let restored = 0;
         for (const spec of TABLES) {
-          if (spec.table === "documents") continue;
+          if (spec.table === "documents") {
+          for (const row of parsedTables.get("documents") ?? []) {
+            const archivePath = row.archivePath;
+            const storageKey = archivePath ? attachmentKeys.get(archivePath) : undefined;
+            if (!storageKey) fail("BACKUP_ATTACHMENT_MISSING", "Backup document attachment is missing");
+            const values = [row.id, auth.userId, row.animalId || null, row.cycleId || null, row.originalFilename,
+              storageKey, row.mimeType, row.sizeBytes, row.category, row.note || null, row.createdAt || new Date().toISOString()];
+            await tx.$executeRawUnsafe(
+              "INSERT INTO documents (id, user_id, animal_id, cycle_id, original_filename, storage_key, mime_type, size_bytes, category, note, created_at) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8::bigint,$9,$10,$11::timestamptz)",
+              ...values as never[],
+            );
+            restored += 1;
+          }
+  
+            continue;
+          }
           restored += await insertRows(tx, spec, parsedTables.get(spec.table) ?? [], auth.userId, manifest.accountId as string, columnsByTable, attachmentKeys);
-        }
-        for (const row of parsedTables.get("documents") ?? []) {
-          const archivePath = row.archivePath;
-          const storageKey = archivePath ? attachmentKeys.get(archivePath) : undefined;
-          if (!storageKey) fail("BACKUP_ATTACHMENT_MISSING", "Backup document attachment is missing");
-          const values = [row.id, auth.userId, row.animalId || null, row.cycleId || null, row.originalFilename,
-            storageKey, row.mimeType, row.sizeBytes, row.category, row.note || null, row.createdAt || new Date().toISOString()];
-          await tx.$executeRawUnsafe(
-            "INSERT INTO documents (id, user_id, animal_id, cycle_id, original_filename, storage_key, mime_type, size_bytes, category, note, created_at) VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8::bigint,$9,$10,$11::timestamptz)",
-            ...values as never[],
-          );
-          restored += 1;
         }
         for (const spec of TABLES.filter((entry) => entry.deferred?.length)) {
           for (const row of parsedTables.get(spec.table) ?? []) {
