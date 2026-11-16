@@ -25,6 +25,8 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
   const [pair, setPair] = useState({ motherAnimalId: "", fatherAnimalId: "" });
   const [selectedLocusIds, setSelectedLocusIds] = useState<string[]>([]);
   const [calculation, setCalculation] = useState<unknown>(null);
+  const [manualInput, setManualInput] = useState({ locusId: "", motherGenotype: "", fatherGenotype: "" });
+  const [manualCalculation, setManualCalculation] = useState<unknown>(null);
   const [inbreeding, setInbreeding] = useState<Record<string, unknown> | null>(null);
   const [history, setHistory] = useState<Array<{ id: string; changedAt: string; snapshot: Record<string, unknown> }>>([]);
   const [pedigree, setPedigree] = useState<{ nodes: Array<{ id: string; name: string; species: string; generation: number }>; edges: Array<{ childId: string; parentId: string; role: "mother" | "father" }>; missingParents: Array<{ childId: string; role: string; description: string | null }> } | null>(null);
@@ -68,6 +70,7 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       const locus = catalogResult.genes.flatMap((gene) => gene.loci)[0];
       if (locus) {
         setSelectedLocusIds((v) => v.length ? v : [locus.id]); setTraitForm((v) => ({ ...v, locusId: locus.id })); setAlleleForm((v) => ({ ...v, locusId: locus.id }));
+        setManualInput((v) => ({ ...v, locusId: v.locusId || locus.id }));
       }
     }).catch((reason: unknown) => setError(reason instanceof ApiError ? reason.message : text("Impossibile caricare i dati genetici.", "Could not load genetics data."))).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -113,6 +116,14 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
     await run(() => api.delete(`/genetics/alleles/${allele.id}`));
   }
   async function calculate(event: FormEvent) { event.preventDefault(); await run(async () => { const result = await api.post<{ calculation: unknown }>("/genetics/calculate-pairing", { motherAnimalId: pair.motherAnimalId, fatherAnimalId: pair.fatherAnimalId, locusIds: selectedLocusIds }); setCalculation(result.calculation); }); }
+  async function calculateManual(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError(""); setManualCalculation(null);
+    try {
+      const result = await api.post<{ calculation: unknown }>("/genetics/calculate", { loci: [{ locusId: manualInput.locusId, motherGenotype: manualInput.motherGenotype.trim(), fatherGenotype: manualInput.fatherGenotype.trim() }] });
+      setManualCalculation(result.calculation);
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : text("Calcolo genetico non riuscito.", "Genetics calculation failed.")); }
+    finally { setBusy(false); }
+  }
   if (loading) return <LoadingState />;
   return <div className="page-stack">
     <PageHeader title={text("Genetica", "Genetics")} description={text("Catalogo di geni, loci e alleli; schede genetiche, incroci e genealogia.", "Gene, locus and allele catalog; animal records, pairings and pedigree.")} />
@@ -165,5 +176,11 @@ export function GeneticsPage({ locale }: { locale: Locale }) {
       <fieldset className="form-fieldset"><legend>{text("Loci da calcolare", "Loci to calculate")}</legend>{loci.map((locus) => <label className="checkbox-field" key={locus.id}><input type="checkbox" checked={selectedLocusIds.includes(locus.id)} onChange={(e) => setSelectedLocusIds((current) => e.target.checked ? [...current, locus.id] : current.filter((id) => id !== locus.id))} />{locus.geneName} / {locus.name}</label>)}</fieldset>
       <Button type="submit" disabled={busy || !selectedLocusIds.length || !pair.motherAnimalId || !pair.fatherAnimalId || pair.motherAnimalId === pair.fatherAnimalId}>{text("Calcola probabilità", "Calculate probabilities")}</Button>
     </form><p>{text("Il calcolo usa i genotipi confermati o teorici salvati nelle schede dei genitori. Se mancano, il risultato segnala il locus come incompleto.", "The calculation uses confirmed or theoretical genotypes stored on the parents. Missing values are reported as incomplete.")}</p>{calculation !== null && calculation !== undefined && <pre className="genetics-result">{JSON.stringify(calculation, null, 2)}</pre>}</Panel>
+    <Panel><h2>{text("Calcolo manuale di un singolo locus", "Manual single-locus calculator")}</h2><p className="muted-note">{text("Inserisci direttamente i genotipi dei due genitori. Il calcolo non modifica le schede degli animali.", "Enter both parent genotypes directly. This calculation does not modify animal records.")}</p><form className="form-grid" onSubmit={(e) => void calculateManual(e)}>
+      <label>{text("Locus", "Locus")}<select required value={manualInput.locusId} onChange={(e) => setManualInput({ ...manualInput, locusId: e.target.value })}><option value="">—</option>{loci.map((locus) => <option key={locus.id} value={locus.id}>{locus.species} · {locus.geneName} / {locus.name}</option>)}</select></label>
+      <label>{text("Genotipo madre", "Mother genotype")}<input required maxLength={64} placeholder="A|a" value={manualInput.motherGenotype} onChange={(e) => setManualInput({ ...manualInput, motherGenotype: e.target.value })} /></label>
+      <label>{text("Genotipo padre", "Father genotype")}<input required maxLength={64} placeholder="A|a" value={manualInput.fatherGenotype} onChange={(e) => setManualInput({ ...manualInput, fatherGenotype: e.target.value })} /></label>
+      <Button type="submit" disabled={busy || !manualInput.locusId || !manualInput.motherGenotype.trim() || !manualInput.fatherGenotype.trim()}>{text("Calcola singolo locus", "Calculate single locus")}</Button>
+    </form>{manualCalculation !== null && manualCalculation !== undefined && <pre className="genetics-result">{JSON.stringify(manualCalculation, null, 2)}</pre>}</Panel>
   </div>;
 }
