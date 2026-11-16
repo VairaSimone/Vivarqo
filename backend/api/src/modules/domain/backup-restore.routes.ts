@@ -219,7 +219,7 @@ async function insertRows(
   documentKeys: Map<string, string>,
 ): Promise<number> {
   const columns = columnsByTable.get(spec.table) ?? [];
-  const columnByName = new Map(columns.map((column) => [column.column_name, column]));
+  const columnByName = new Map(columns.map((column) => [column.column_name, column] as const));
   let count = 0;
   for (const row of rows) {
     const id = row.id;
@@ -273,7 +273,7 @@ export function createBackupRestoreRouter() {
     const auth = res.locals.auth as AuthContext;
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) fail("BACKUP_REQUIRED", "Upload a Vivarqo backup ZIP");
     const archive = readBackupZip(req.body);
-    const byName = new Map(archive.map((entry) => [entry.name, entry.bytes]));
+    const byName = new Map(archive.map((entry) => [entry.name, entry.bytes] as const));
     const manifestBytes = byName.get("manifest.json");
     if (!manifestBytes) fail("BACKUP_MANIFEST_MISSING", "Backup manifest is missing");
     let manifest: { format?: unknown; formatVersion?: unknown; accountId?: unknown; modules?: unknown; checksums?: unknown; includeDocuments?: unknown };
@@ -345,7 +345,7 @@ export function createBackupRestoreRouter() {
         uploadedObjects.push(key);
         attachmentKeys.set(name, key);
       }
-      const documentRows = new Map(documents.filter((row) => row.archivePath).map((row) => [row.archivePath, row]));
+      const documentRows = new Map(documents.filter((row) => row.archivePath).map((row) => [row.archivePath!, row] as const));
       for (const row of documents) {
         if (!row.archivePath) fail("BACKUP_ATTACHMENT_MISSING", "This backup does not contain all document attachments");
       }
