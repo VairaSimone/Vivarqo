@@ -165,6 +165,10 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
       })),
     },
     {
+      name: "animal_locations.csv", emptyHeaders: EMPTY_HEADERS["animal_locations.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalLocation.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
       name: "animals.csv", emptyHeaders: EMPTY_HEADERS["animals.csv"]!,
       rows: () => mapRows(
         paginateRows((cursor, take) => prisma.animal.findMany({ where: { userId }, ...page(cursor, take) })),
@@ -174,6 +178,30 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
           photoKey: null,
         }),
       ),
+    },
+    {
+      name: "animal_location_moves.csv", emptyHeaders: EMPTY_HEADERS["animal_location_moves.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalLocationMove.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "animal_transfers.csv", emptyHeaders: EMPTY_HEADERS["animal_transfers.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalTransfer.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "saved_animal_filters.csv", emptyHeaders: EMPTY_HEADERS["saved_animal_filters.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.savedAnimalFilter.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "user_preferences.csv", emptyHeaders: EMPTY_HEADERS["user_preferences.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.userPreference.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "health_records.csv", emptyHeaders: EMPTY_HEADERS["health_records.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.healthRecord.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "hatchling_care.csv", emptyHeaders: EMPTY_HEADERS["hatchling_care.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.hatchlingCare.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
     },
     {
       name: "feeding_sessions.csv", emptyHeaders: EMPTY_HEADERS["feeding_sessions.csv"]!,
@@ -198,6 +226,26 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
       rows: () => paginateRows((cursor, take) => prisma.animalNote.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
     },
     {
+      name: "genetic_genes.csv", emptyHeaders: EMPTY_HEADERS["genetic_genes.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.geneticGene.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "genetic_loci.csv", emptyHeaders: EMPTY_HEADERS["genetic_loci.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.geneticLocus.findMany({ where: { gene: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "genetic_alleles.csv", emptyHeaders: EMPTY_HEADERS["genetic_alleles.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.geneticAllele.findMany({ where: { locus: { is: { gene: { is: { userId } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "incubators.csv", emptyHeaders: EMPTY_HEADERS["incubators.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.incubator.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "incubator_maintenance.csv", emptyHeaders: EMPTY_HEADERS["incubator_maintenance.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.incubatorMaintenance.findMany({ where: { incubator: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
       name: "reproduction_cycles.csv", emptyHeaders: EMPTY_HEADERS["reproduction_cycles.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.reproductionCycle.findMany({ where: { userId }, ...page(cursor, take) })),
     },
@@ -219,6 +267,22 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
           photoKey: null,
         }),
       ),
+    },
+    {
+      name: "clutch_history.csv", emptyHeaders: EMPTY_HEADERS["clutch_history.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.clutchHistory.findMany({ where: { clutch: { is: { cycle: { is: { userId } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "egg_history.csv", emptyHeaders: EMPTY_HEADERS["egg_history.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.eggHistory.findMany({ where: { egg: { is: { clutch: { is: { cycle: { is: { userId } } } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "egg_measurements.csv", emptyHeaders: EMPTY_HEADERS["egg_measurements.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.eggMeasurement.findMany({ where: { egg: { is: { clutch: { is: { cycle: { is: { userId } } } } } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "egg_incubator_transfers.csv", emptyHeaders: EMPTY_HEADERS["egg_incubator_transfers.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.eggIncubatorTransfer.findMany({ where: { egg: { is: { clutch: { is: { cycle: { is: { userId } } } } } } }, ...page(cursor, take) })),
     },
     {
       name: "incubation_logs.csv", emptyHeaders: EMPTY_HEADERS["incubation_logs.csv"]!,
@@ -271,6 +335,10 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
     {
       name: "animal_genetic_traits.csv", emptyHeaders: EMPTY_HEADERS["animal_genetic_traits.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.animalGeneticTrait.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
+      name: "animal_genetic_trait_history.csv", emptyHeaders: EMPTY_HEADERS["animal_genetic_trait_history.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.animalGeneticTraitHistory.findMany({ where: { animal: { is: { userId } } }, ...page(cursor, take) })),
     },
     {
       name: "public_shares.csv", emptyHeaders: EMPTY_HEADERS["public_shares.csv"]!,
