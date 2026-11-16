@@ -146,7 +146,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </>}
       </Panel></div>}
 
-      {widgetVisibility.plan && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}}
+      {widgetVisibility.plan && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
       {widgetVisibility.quickActions && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("quickActions") }}><Panel>
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
@@ -166,7 +166,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
             <Icon name="chevron" size={15} />
           </button>) : <EmptyState title={locale === "it" ? "Nessun animale in ritardo" : "No animals overdue"} description={locale === "it" ? "Gli animali con intervallo di alimentazione configurato sono in regola." : "Animals with a configured feeding interval are up to date."} />}
           <Button size="sm" variant="ghost" onClick={() => toggleWidget("feedingAlerts", false)}>{locale === "it" ? "Nascondi widget" : "Hide widget"}</Button>
-        </Panel>}
+        </Panel></div>}
       {widgetVisibility.reminders && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("reminders") }}><Panel>
           <PanelHeader title={t("upcomingReminders")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks?tab=reminders")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
           {reminders.length
