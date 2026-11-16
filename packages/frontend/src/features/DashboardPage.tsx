@@ -92,9 +92,13 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const overview = overviewResource.data;
   const smartSuggestions = recentResource.data?.smartSuggestions ?? [];
   const truncated = taskData?.truncated;
-  const dashboardTone = visibleOverdue.length > 0 ? "critical" : visibleDue.length > 0 ? "attention" : "normal";
+  const dashboardTone = tasksResource.error || (tasksResource.loading && !taskData) || visibleDue.length > 0 ? "attention" : visibleOverdue.length > 0 ? "critical" : "normal";
   const greeting = getGreeting(timezone, locale);
-  const dayStatus = visibleOverdue.length > 0
+  const dayStatus = tasksResource.error
+    ? (locale === "it" ? "Impossibile caricare le priorità. Riprova dal widget attività." : "Could not load priorities. Retry from the tasks widget.")
+    : tasksResource.loading && !taskData
+      ? (locale === "it" ? "Caricamento delle attività della giornata..." : "Loading today’s tasks...")
+      : visibleOverdue.length > 0
     ? (locale === "it" ? `${visibleOverdue.length} ${visibleOverdue.length === 1 ? "attività in ritardo" : "attività in ritardo"} da verificare` : `${visibleOverdue.length} overdue ${visibleOverdue.length === 1 ? "task" : "tasks"} to review`)
     : visibleDue.length > 0
       ? (locale === "it" ? `${visibleDue.length} attività da gestire oggi` : `${visibleDue.length} tasks to handle today`)
