@@ -209,7 +209,7 @@ export function createHomeCalendarRouter() {
       ...recentNotes.map((item) => ({ type: "note" as const, occurredAt: item.occurredAt, title: item.title ?? "Animal note", targetPath: `/animals/${item.animalId}`, record: item })),
       ...recentReproductionEvents.map((item) => ({ type: "reproduction" as const, occurredAt: item.occurredAt, title: item.eventType, targetPath: `/reproduction-cycles/${item.cycleId}`, record: item })),
       ...recentOffspringBatches.map((item) => ({ type: "birth" as const, occurredAt: item.bornOn, title: `Nascita: ${item.count} piccoli`, targetPath: `/reproduction-cycles/${item.cycleId}`, record: item })),
-      ...recentIncubatorMaintenance.map((item) => ({ type: "incubation" as const, occurredAt: item.occurredAt, title: `Controllo incubatrice: ${item.incubator.name}`, targetPath: "/reproduction-cycles", record: item })),
+      ...recentIncubatorMaintenance.map((item) => ({ type: "incubation" as const, occurredAt: item.occurredAt, title: `Manutenzione incubatrice: ${item.incubator.name}`, targetPath: "/reproduction-cycles", record: item })),
       ...recentAnimalUpdates.map((item) => ({ type: "animal_update" as const, occurredAt: item.updatedAt, title: `Scheda aggiornata: ${item.name}`, targetPath: `/animals/${item.id}`, record: item })),
     ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, 20);
 
