@@ -244,10 +244,7 @@ async function insertRows(
     const names: string[] = [], values: unknown[] = [];
     for (const [field, rawValue] of Object.entries(row)) {
       if (field === "archivePath" || field === "photoArchivePath" || (spec.deferred ?? []).includes(field)) continue;
-      if (field === "locationId" || field === "incubatorId" || field === "locusId" || field === "healthRecordId" || field === "sourceTransferId") {
-        if (rawValue) fail("BACKUP_RELATION_UNSUPPORTED", "This backup contains relationships to data not included in its archive");
-        continue;
-      }
+      if (field === "changedBy" && rawValue !== sourceOwnerId) fail("BACKUP_OWNER_MISMATCH", "Genetic history references a user outside the source account");
       if (field === "photoKey") {
         if (rawValue) fail("BACKUP_ATTACHMENT_MISSING", "Backup references a photo without an archived photo file");
         continue;
@@ -395,13 +392,23 @@ export function createBackupRestoreRouter() {
       const importedIds = new Map<string, Set<string>>();
       for (const spec of TABLES) importedIds.set(spec.table, new Set((parsedTables.get(spec.table) ?? []).map((row) => row.id).filter((id): id is string => typeof id === "string" && id.length > 0)));
       const references: Array<[string, string, string]> = [
+        ["animals", "locationId", "animal_locations"], ["animal_locations", "parentId", "animal_locations"],
+        ["animal_location_moves", "animalId", "animals"], ["animal_location_moves", "fromLocationId", "animal_locations"],
+        ["animal_location_moves", "toLocationId", "animal_locations"], ["animal_transfers", "animalId", "animals"],
         ["feeding_entries", "sessionId", "feeding_sessions"], ["feeding_entries", "animalId", "animals"],
         ["weight_measurements", "animalId", "animals"], ["shed_records", "animalId", "animals"], ["animal_notes", "animalId", "animals"],
+        ["health_records", "animalId", "animals"], ["hatchling_care", "animalId", "animals"],
         ["reproduction_cycles", "parentAAnimalId", "animals"], ["reproduction_cycles", "parentBAnimalId", "animals"],
         ["animals", "motherAnimalId", "animals"], ["animals", "fatherAnimalId", "animals"],
         ["animals", "originClutchId", "clutches"], ["animals", "originOffspringBatchId", "offspring_batches"],
         ["reproductive_events", "cycleId", "reproduction_cycles"], ["reproductive_events", "animalId", "animals"],
-        ["clutches", "cycleId", "reproduction_cycles"], ["eggs", "clutchId", "clutches"], ["eggs", "offspringAnimalId", "animals"],
+        ["clutches", "cycleId", "reproduction_cycles"], ["clutches", "incubatorId", "incubators"],
+        ["clutch_history", "clutchId", "clutches"], ["eggs", "clutchId", "clutches"],
+        ["eggs", "offspringAnimalId", "animals"], ["eggs", "incubatorId", "incubators"],
+        ["egg_history", "eggId", "eggs"], ["egg_measurements", "eggId", "eggs"],
+        ["egg_incubator_transfers", "eggId", "eggs"], ["egg_incubator_transfers", "fromIncubatorId", "incubators"],
+        ["egg_incubator_transfers", "toIncubatorId", "incubators"],
+        ["incubator_maintenance", "incubatorId", "incubators"],
         ["incubation_logs", "clutchId", "clutches"], ["offspring_batches", "cycleId", "reproduction_cycles"],
         ["offspring_batches", "clutchId", "clutches"], ["inventory_lots", "itemId", "inventory_items"],
         ["inventory_lots", "supplierId", "inventory_suppliers"], ["stock_movements", "itemId", "inventory_items"],
@@ -410,10 +417,14 @@ export function createBackupRestoreRouter() {
         ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
         ["finance_entries", "clutchId", "clutches"], ["finance_entries", "offspringBatchId", "offspring_batches"],
         ["finance_entries", "recurrenceId", "finance_recurrences"], ["finance_entries", "sourceStockMovementId", "stock_movements"],
+        ["finance_entries", "sourceTransferId", "animal_transfers"],
         ["finance_recurrences", "animalId", "animals"], ["finance_recurrences", "documentId", "documents"], ["feeding_entries", "inventoryItemId", "inventory_items"],
-        ["tasks", "animalId", "animals"], ["tasks", "reminderRuleId", "reminder_rules"],
+        ["tasks", "animalId", "animals"], ["tasks", "reminderRuleId", "reminder_rules"], ["tasks", "healthRecordId", "health_records"],
         ["reminder_rules", "animalId", "animals"], ["animal_genetic_traits", "animalId", "animals"],
-        ["animal_genetic_traits", "sourceAnimalId", "animals"], ["public_shares", "animalId", "animals"],
+        ["animal_genetic_traits", "sourceAnimalId", "animals"], ["animal_genetic_traits", "locusId", "genetic_loci"],
+        ["genetic_loci", "geneId", "genetic_genes"], ["genetic_alleles", "locusId", "genetic_loci"],
+        ["animal_genetic_trait_history", "traitId", "animal_genetic_traits"], ["animal_genetic_trait_history", "animalId", "animals"],
+        ["public_shares", "animalId", "animals"],
       ];
       for (const [table, field, target] of references) {
         for (const row of parsedTables.get(table) ?? []) {
