@@ -181,7 +181,8 @@ const TABLES: readonly TableSpec[] = [
   { file: "egg_history.csv", table: "egg_history" },
   { file: "egg_measurements.csv", table: "egg_measurements" },
   { file: "egg_incubator_transfers.csv", table: "egg_incubator_transfers" },
-  { file: "incubation_logs.csv", table: "incubation_logs" },\n  { file: "incubator_maintenance.csv", table: "incubator_maintenance" },
+  { file: "incubation_logs.csv", table: "incubation_logs" },
+  { file: "incubator_maintenance.csv", table: "incubator_maintenance" },
   { file: "offspring_batches.csv", table: "offspring_batches" },
   { file: "inventory_lots.csv", table: "inventory_lots" },
   { file: "stock_movements.csv", table: "stock_movements" },
@@ -436,6 +437,11 @@ export function createBackupRestoreRouter() {
         const existing = await tx.$queryRaw<Array<{ count: bigint }>>`
           SELECT (
             (SELECT count(*) FROM animals WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM animal_locations WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM incubators WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM genetic_genes WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM saved_animal_filters WHERE user_id = ${auth.userId}::uuid) +
+            (SELECT count(*) FROM user_preferences WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM feeding_sessions WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM reproduction_cycles WHERE user_id = ${auth.userId}::uuid) +
             (SELECT count(*) FROM inventory_items WHERE user_id = ${auth.userId}::uuid) +
