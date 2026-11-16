@@ -227,7 +227,7 @@ async function insertRows(
         if (rawValue) fail("BACKUP_RELATION_UNSUPPORTED", "This backup contains relationships to data not included in its archive");
         continue;
       }
-      if (field === "photoKey") continue;
+      if (field === "photoKey") {\n        if (rawValue) fail("BACKUP_ATTACHMENT_MISSING", "Backup references a photo without an archived photo file");\n        continue;\n      }
       const columnName = snakeCase(field);
       const column = columnByName.get(columnName);
       if (!column) fail("BACKUP_SCHEMA_MISMATCH", "Backup contains a field that is not supported by this database schema");
