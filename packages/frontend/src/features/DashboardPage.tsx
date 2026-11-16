@@ -15,12 +15,16 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const resource = useResource<DashboardTodayDto>("/home/today", parseDashboardTodayResponse);
   const { toast, show } = useToast();
   const [completing, setCompleting] = useState<string | null>(null);
+  const [feedingWidgetVisible, setFeedingWidgetVisible] = useState(() => {
+    try { return window.localStorage.getItem("vivarqo.dashboard.feeding-alerts") !== "hidden"; } catch { return true; }
+  });
   const data = resource.data;
   const due = data?.tasks.dueToday ?? [];
   const overdue = data?.tasks.overdue ?? [];
   const upcoming = data?.tasks.upcoming ?? [];
   const completed = data?.tasks.completedToday ?? [];
   const reminders = data?.imminentReminders ?? [];
+  const feedingAlerts = data?.feedingAlerts ?? [];
   const recent = data?.recentEvents ?? [];
   const counts = data?.counts;
   const truncated = data?.truncated;
@@ -120,6 +124,23 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
           </div>
         </Panel>
 
+        {feedingWidgetVisible && <Panel>
+          <PanelHeader title={locale === "it" ? "Animali senza pasto" : "Animals overdue for a meal"} action={<Badge tone={feedingAlerts.length ? "danger" : "success"}>{feedingAlerts.length}</Badge>} />
+          <p className="muted-note">{locale === "it" ? "Avvisi basati sull'intervallo di alimentazione configurato per ciascun animale." : "Alerts use each animal's configured feeding interval."}</p>
+          {feedingAlerts.length ? feedingAlerts.slice(0, 8).map((animal) => <button className="simple-row dashboard-reminder-row dashboard-reminder-overdue" key={animal.id} onClick={() => navigate(`/animals/${encodeURIComponent(animal.id)}`)}>
+            <span className="simple-row-icon"><Icon name="alert" size={16} /></span>
+            <span className="dashboard-reminder-copy"><strong>{animal.name}</strong><small>{animal.species} · {locale === "it" ? `${animal.daysSinceLastMeal} giorni senza pasto (intervallo ${animal.feedingIntervalDays} gg)` : `${animal.daysSinceLastMeal} days without a meal (interval ${animal.feedingIntervalDays} days)`}</small></span>
+            <Icon name="chevron" size={15} />
+          </button>) : <EmptyState title={locale === "it" ? "Nessun animale in ritardo" : "No animals overdue"} description={locale === "it" ? "Gli animali con intervallo di alimentazione configurato sono in regola." : "Animals with a configured feeding interval are up to date."} />}
+          <Button size="sm" variant="ghost" onClick={() => {
+            setFeedingWidgetVisible(false);
+            try { window.localStorage.setItem("vivarqo.dashboard.feeding-alerts", "hidden"); } catch { /* Storage can be unavailable in private browsing. */ }
+          }}>{locale === "it" ? "Nascondi widget" : "Hide widget"}</Button>
+        </Panel>}
+        {!feedingWidgetVisible && <Button size="sm" variant="secondary" onClick={() => {
+          setFeedingWidgetVisible(true);
+          try { window.localStorage.setItem("vivarqo.dashboard.feeding-alerts", "visible"); } catch { /* Storage can be unavailable in private browsing. */ }
+        }}>{locale === "it" ? "Mostra widget alimentazioni" : "Show feeding alerts widget"}</Button>}
         <Panel>
           <PanelHeader title={t("upcomingReminders")} action={<Button variant="ghost" size="sm" onClick={() => navigate("/tasks?tab=reminders")}>{t("viewAll")} <Icon name="arrow" size={14} /></Button>} />
           {reminders.length
