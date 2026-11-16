@@ -95,7 +95,7 @@ async function* csvChunks(
 const EMPTY_HEADERS: Record<string, string[]> = {
         "account.csv": ["id", "email", "displayName", "locale", "timezone", "emailVerifiedAt", "createdAt"],
         "subscriptions.csv": ["id", "userId", "stripeCustomerId", "stripeSubscriptionId", "stripePriceId", "status", "currentPeriodStart", "currentPeriodEnd", "cancelAtPeriodEnd", "createdAt", "updatedAt"],
-        "animals.csv": ["id", "userId", "name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes", "photoKey", "originClutchId", "originOffspringBatchId", "archivedAt", "createdAt", "updatedAt"],
+        "animals.csv": ["id", "userId", "name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes", "photoKey", "photoArchivePath", "originClutchId", "originOffspringBatchId", "archivedAt", "createdAt", "updatedAt"],
         "feeding_sessions.csv": ["id", "userId", "performedAt", "notes", "createdAt", "updatedAt"],
         "feeding_entries.csv": ["id", "sessionId", "animalId", "outcome", "foodType", "foodSize", "foodWeightG", "notes", "createdAt", "updatedAt"],
         "weights.csv": ["id", "animalId", "measuredAt", "weightG", "notes", "createdAt", "updatedAt"],
@@ -104,7 +104,7 @@ const EMPTY_HEADERS: Record<string, string[]> = {
         "reproduction_cycles.csv": ["id", "userId", "parentAAnimalId", "parentBAnimalId", "name", "startedOn", "endedOn", "status", "notes", "createdAt", "updatedAt"],
         "reproductive_events.csv": ["id", "cycleId", "eventType", "occurredAt", "animalId", "details", "temperatureC", "humidityPct", "createdAt", "updatedAt"],
         "clutches.csv": ["id", "cycleId", "laidOn", "eggCount", "status", "incubatorLabel", "incubationStartedAt", "notes", "createdAt", "updatedAt"],
-        "eggs.csv": ["id", "clutchId", "code", "status", "notes", "createdAt", "updatedAt"],
+        "eggs.csv": ["id", "clutchId", "code", "status", "notes", "createdAt", "updatedAt", "photoArchivePath"],
         "incubation_logs.csv": ["id", "clutchId", "recordedAt", "temperatureC", "humidityPct", "eventType", "notes", "createdAt", "updatedAt"],
         "offspring_batches.csv": ["id", "cycleId", "clutchId", "bornOn", "count", "notes", "createdAt", "updatedAt"],
         "inventory_items.csv": ["id", "userId", "name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive", "createdAt", "updatedAt"],
@@ -149,7 +149,14 @@ function exportTables(userId: string, includeDocuments: boolean, modules: string
     },
     {
       name: "animals.csv", emptyHeaders: EMPTY_HEADERS["animals.csv"]!,
-      rows: () => paginateRows((cursor, take) => prisma.animal.findMany({ where: { userId }, ...page(cursor, take) })),
+      rows: () => mapRows(
+        paginateRows((cursor, take) => prisma.animal.findMany({ where: { userId }, ...page(cursor, take) })),
+        (animal) => ({
+          ...animal,
+          photoArchivePath: animal.photoKey ? `animal-photos/${animal.id}.${String(animal.photoKey).split(".").pop()}` : null,
+          photoKey: null,
+        }),
+      ),
     },
     {
       name: "feeding_sessions.csv", emptyHeaders: EMPTY_HEADERS["feeding_sessions.csv"]!,
@@ -314,6 +321,52 @@ async function* exportEntries(
       checksums[table.name] = digest.digest("hex");
     })();
     yield { name: table.name, chunks };
+  }
+
+  if (modules.includes("animals")) {
+    const animals = paginateRows((cursor, take) => prisma.animal.findMany({
+      where: { userId, photoKey: { not: null } }, select: { id: true, photoKey: true }, ...{
+        take, orderBy: { id: "asc" as const }, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      },
+    }));
+    for await (const animal of animals) {
+      const key = String(animal.photoKey);
+      const extension = key.split(".").pop() || "jpg";
+      const archiveName = `animal-photos/${animal.id}.${extension}`;
+      const stored = await openPrivateObjectStream(key, 5 * 1024 * 1024);
+      const digest = createHash("sha256");
+      const chunks = (async function* () {
+        for await (const raw of stored.stream) {
+          const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+          digest.update(chunk); yield chunk;
+        }
+        checksums[archiveName] = digest.digest("hex");
+      })();
+      yield { name: archiveName, chunks };
+    }
+  }
+  if (modules.includes("reproduction")) {
+    const eggs = paginateRows((cursor, take) => prisma.egg.findMany({
+      where: { clutch: { is: { cycle: { is: { userId } } } }, photoKey: { not: null } },
+      select: { id: true, photoKey: true }, ...{
+        take, orderBy: { id: "asc" as const }, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      },
+    }));
+    for await (const egg of eggs) {
+      const key = String(egg.photoKey);
+      const extension = key.split(".").pop() || "jpg";
+      const archiveName = `egg-photos/${egg.id}.${extension}`;
+      const stored = await openPrivateObjectStream(key, 5 * 1024 * 1024);
+      const digest = createHash("sha256");
+      const chunks = (async function* () {
+        for await (const raw of stored.stream) {
+          const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+          digest.update(chunk); yield chunk;
+        }
+        checksums[archiveName] = digest.digest("hex");
+      })();
+      yield { name: archiveName, chunks };
+    }
   }
 
   if (!includeDocuments || (!modules.includes("animals") && !modules.includes("reproduction"))) {
