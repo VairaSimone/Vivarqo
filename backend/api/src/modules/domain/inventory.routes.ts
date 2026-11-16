@@ -420,5 +420,115 @@ export function createInventoryRouter() {
     });
   });
 
+
+  const supplierPatchSchema = z.object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email().max(254).nullable().optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
+    website: z.string().trim().url().max(255).nullable().optional(),
+    notes: z.string().trim().max(5000).nullable().optional(),
+  }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+  router.patch("/inventory/suppliers/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id);
+    const input = parseBody(supplierPatchSchema, req.body);
+    const existing = await prisma.inventorySupplier.findFirst({ where: { id, userId: auth.userId }, select: { id: true } });
+    if (!existing) throw new AppError(404, "INVENTORY_SUPPLIER_NOT_FOUND", "Supplier not found");
+    res.status(200).json({ supplier: await prisma.inventorySupplier.update({ where: { id }, data: input }) });
+  });
+  router.delete("/inventory/suppliers/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id);
+    const deleted = await prisma.inventorySupplier.deleteMany({ where: { id, userId: auth.userId } });
+    if (!deleted.count) throw new AppError(404, "INVENTORY_SUPPLIER_NOT_FOUND", "Supplier not found");
+    res.status(204).send();
+  });
+
+  const lotPatchSchema = z.object({
+    supplierId: z.string().uuid().nullable().optional(), lotCode: z.string().trim().max(120).nullable().optional(),
+    unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
+    purchasedAt: z.string().datetime({ offset: true }).optional(),
+    expiresAt: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional(),
+    notes: z.string().trim().max(5000).nullable().optional(),
+  }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+  router.patch("/inventory/items/:id/lots/:lotId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id), lotId = routeUuid(req.params.lotId);
+    const input = parseBody(lotPatchSchema, req.body);
+    const lot = await prisma.inventoryLot.findFirst({ where: { id: lotId, itemId: id, item: { userId: auth.userId } } });
+    if (!lot) throw new AppError(404, "INVENTORY_LOT_NOT_FOUND", "Inventory lot not found");
+    if (input.supplierId) {
+      const supplier = await prisma.inventorySupplier.findFirst({ where: { id: input.supplierId, userId: auth.userId }, select: { id: true } });
+      if (!supplier) throw new AppError(404, "INVENTORY_SUPPLIER_NOT_FOUND", "Supplier not found");
+    }
+    const updated = await prisma.inventoryLot.update({ where: { id: lotId }, data: {
+      ...(input.supplierId !== undefined ? { supplierId: input.supplierId } : {}),
+      ...(input.lotCode !== undefined ? { lotCode: input.lotCode } : {}),
+      ...(input.unitCostCents !== undefined ? { unitCostCents: input.unitCostCents } : {}),
+      ...(input.purchasedAt !== undefined ? { purchasedAt: new Date(input.purchasedAt) } : {}),
+      ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt ? new Date(input.expiresAt + "T00:00:00.000Z") : null } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+    } });
+    res.status(200).json({ lot: updated });
+  });
+  router.delete("/inventory/items/:id/lots/:lotId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id), lotId = routeUuid(req.params.lotId);
+    await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ quantity_received: string; quantity_remaining: string }>>`
+        SELECT l.quantity_received::text, l.quantity_remaining::text FROM inventory_lots l
+        JOIN inventory_items i ON i.id = l.item_id
+        WHERE l.id = ${lotId}::uuid AND l.item_id = ${id}::uuid AND i.user_id = ${auth.userId}::uuid
+        FOR UPDATE OF l, i
+      `;
+      const lot = rows[0];
+      if (!lot) throw new AppError(404, "INVENTORY_LOT_NOT_FOUND", "Inventory lot not found");
+      const used = await tx.stockMovement.count({ where: { lotId, movementType: { not: "in" } } });
+      if (used || asMilli(lot.quantity_received) !== asMilli(lot.quantity_remaining)) {
+        throw new AppError(409, "INVENTORY_LOT_HAS_HISTORY", "A lot with consumption or adjustments cannot be deleted");
+      }
+      const movements = await tx.stockMovement.findMany({ where: { lotId }, select: { id: true } });
+      const movementIds = movements.map((movement) => movement.id);
+      if (movementIds.length) {
+        await tx.financeEntry.deleteMany({ where: { sourceStockMovementId: { in: movementIds } } });
+        await tx.stockMovement.deleteMany({ where: { id: { in: movementIds } } });
+      }
+      await tx.inventoryItem.update({ where: { id }, data: { quantityOnHand: { decrement: Number(lot.quantity_remaining) } } });
+      await tx.inventoryLot.delete({ where: { id: lotId } });
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "inventory.lot.deleted", entityType: "inventory_lot", entityId: lotId } });
+    });
+    res.status(204).send();
+  });
+
+  const physicalCountSchema = z.object({
+    countedQuantity: quantity, occurredAt: z.string().datetime({ offset: true }),
+    notes: z.string().trim().max(5000).nullable().optional(),
+  }).strict();
+  router.post("/inventory/items/:id/lots/:lotId/count", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext, id = routeUuid(req.params.id), lotId = routeUuid(req.params.lotId);
+    const input = parseBody(physicalCountSchema, req.body);
+    const result = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ quantity_remaining: string; item_quantity: string }>>`
+        SELECT l.quantity_remaining::text, i.quantity_on_hand::text AS item_quantity
+        FROM inventory_lots l JOIN inventory_items i ON i.id = l.item_id
+        WHERE l.id = ${lotId}::uuid AND l.item_id = ${id}::uuid AND i.user_id = ${auth.userId}::uuid
+        FOR UPDATE OF l, i
+      `;
+      const current = rows[0];
+      if (!current) throw new AppError(404, "INVENTORY_LOT_NOT_FOUND", "Inventory lot not found");
+      const previous = asMilli(current.quantity_remaining), counted = asMilli(input.countedQuantity), delta = counted - previous;
+      if (delta !== 0) {
+        await tx.inventoryLot.update({ where: { id: lotId }, data: { quantityRemaining: counted / scale } });
+        await tx.stockMovement.create({ data: {
+          itemId: id, lotId, movementType: "adjustment", quantity: Math.abs(delta) / scale,
+          occurredAt: new Date(input.occurredAt), reference: "Physical inventory count",
+          notes: input.notes ?? ("Physical count: " + previous / scale + " -> " + counted / scale),
+        } });
+        const total = asMilli(current.item_quantity) + delta;
+        if (total < 0) throw new AppError(409, "INVENTORY_COUNT_INVALID", "Physical count would make total stock negative");
+        await tx.inventoryItem.update({ where: { id }, data: { quantityOnHand: total / scale } });
+      }
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "inventory.physical_count", entityType: "inventory_lot", entityId: lotId, metadata: { previousQuantity: previous / scale, countedQuantity: counted / scale, delta: delta / scale } } });
+      return { lot: await tx.inventoryLot.findUniqueOrThrow({ where: { id: lotId } }), delta: delta / scale };
+    });
+    res.status(200).json(result);
+  });
+
   return router;
 }
