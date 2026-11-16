@@ -321,7 +321,7 @@ export function createInventoryRouter() {
       quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((v) => hasMaximumDecimalPlaces(v, 3)),
       unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
       purchasedAt: z.string().datetime({ offset: true }),
-      expiresAt: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional(),
+      expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       notes: z.string().trim().max(5000).nullable().optional(),
     }).strict(), req.body);
     const result = await prisma.$transaction(async (tx) => {
