@@ -523,6 +523,8 @@ tbody tr:hover { background: var(--surface-soft); }
   .collapse-button { display: none; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .dashboard-tasks { grid-row: auto; }
+  .dashboard-widget-priorities { grid-row: auto; }
+  .dashboard-widget-summary, .dashboard-widget-settings-panel { grid-column: 1; }
   .dashboard-recent { grid-column: auto; }
   .finance-grid { grid-template-columns: 1fr; }
 }
