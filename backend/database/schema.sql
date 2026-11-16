@@ -1204,14 +1204,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS finance_entries_source_stock_movement_unique
   ON finance_entries(source_stock_movement_id) WHERE source_stock_movement_id IS NOT NULL;
 
 
-DO $ BEGIN
+DO $schema$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'export_jobs_modules_valid') THEN
     ALTER TABLE export_jobs ADD CONSTRAINT export_jobs_modules_valid CHECK (
       cardinality(modules) BETWEEN 1 AND 5
       AND modules <@ ARRAY['animals', 'feedings', 'reproduction', 'finance', 'inventory']::TEXT[]
     );
   END IF;
-END $;
+END $schema$;
 
 COMMIT;
 
