@@ -251,7 +251,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         <button className="dashboard-overview-card" onClick={() => navigate("/feeding")}>
           <span>{locale === "it" ? "Alimentazioni oggi" : "Feedings today"}</span><strong>{overview?.feedingsToday ?? 0}</strong><small>{locale === "it" ? "Registrate" : "Recorded"}</small>
         </button>
-        <button className="dashboard-overview-card" onClick={() => navigate("/inventory?filter=low-stock")}>
+        <button className="dashboard-overview-card" onClick={() => navigate("/inventory?lowStock=true")}>
           <span>{locale === "it" ? "Scorte basse" : "Low stock"}</span><strong>{overview?.lowStockItems.length ?? 0}</strong><small>{locale === "it" ? "Articoli sotto soglia" : "Items below threshold"}</small>
         </button>
       </div>
