@@ -239,7 +239,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
                 : eventType === "shed" ? (locale === "it" ? "Muta registrata" : "Shed recorded")
                 : eventType === "reproduction" ? ({ mating: locale === "it" ? "Accoppiamento registrato" : "Mating recorded", laying: locale === "it" ? "Deposizione registrata" : "Egg laying recorded" } as Record<string, string>)[rawTitle] ?? rawTitle
                 : eventType === "birth" ? (locale === "it" ? rawTitle.replace("Nascita:", "Nascita registrata:") : rawTitle.replace("Nascita:", "Birth recorded:"))
-                : eventType === "incubation" ? (locale === "it" ? rawTitle : rawTitle.replace("Controllo incubatrice:", "Incubator check:"))
+                : eventType === "incubation" ? (locale === "it" ? rawTitle : rawTitle.replace("Manutenzione incubatrice:", "Incubator maintenance:"))
                 : eventType === "animal_update" ? (locale === "it" ? rawTitle : rawTitle.replace("Scheda aggiornata:", "Animal profile updated:"))
                 : rawTitle;
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
