@@ -1410,7 +1410,7 @@ CREATE INDEX IF NOT EXISTS workspace_invitations_email_expires_idx
 
 -- Inventory lots and supplier tracking (2026-11).
 -- Inventory lots, suppliers and expiry tracking.
-CREATE TABLE inventory_suppliers (
+CREATE TABLE IF NOT EXISTS inventory_suppliers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(160) NOT NULL,
@@ -1422,9 +1422,9 @@ CREATE TABLE inventory_suppliers (
   updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
   CONSTRAINT inventory_suppliers_id_user_id_unique UNIQUE (id, user_id)
 );
-CREATE INDEX inventory_suppliers_user_name_idx ON inventory_suppliers(user_id, name);
+CREATE INDEX IF NOT EXISTS inventory_suppliers_user_name_idx ON inventory_suppliers(user_id, name);
 
-CREATE TABLE inventory_lots (
+CREATE TABLE IF NOT EXISTS inventory_lots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   item_id UUID NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
   supplier_id UUID REFERENCES inventory_suppliers(id) ON DELETE SET NULL,
@@ -1437,7 +1437,7 @@ CREATE TABLE inventory_lots (
   notes TEXT,
   created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
 );
-CREATE INDEX inventory_lots_item_expiry_idx ON inventory_lots(item_id, expires_at);
-CREATE INDEX inventory_lots_supplier_purchased_idx ON inventory_lots(supplier_id, purchased_at DESC);
-ALTER TABLE stock_movements ADD COLUMN lot_id UUID REFERENCES inventory_lots(id) ON DELETE SET NULL;
-CREATE INDEX stock_movements_lot_idx ON stock_movements(lot_id);
+CREATE INDEX IF NOT EXISTS inventory_lots_item_expiry_idx ON inventory_lots(item_id, expires_at);
+CREATE INDEX IF NOT EXISTS inventory_lots_supplier_purchased_idx ON inventory_lots(supplier_id, purchased_at DESC);
+ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS lot_id UUID REFERENCES inventory_lots(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS stock_movements_lot_idx ON stock_movements(lot_id);
