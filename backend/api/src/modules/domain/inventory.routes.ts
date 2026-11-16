@@ -278,5 +278,123 @@ export function createInventoryRouter() {
     res.status(200).json({ item: result });
   });
 
+
+  // Suppliers are account-scoped; supplier records never expose another workspace's data.
+  router.get("/inventory/suppliers", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const suppliers = await prisma.inventorySupplier.findMany({ where: { userId: auth.userId }, orderBy: { name: "asc" } });
+    res.status(200).json({ suppliers });
+  });
+
+  router.post("/inventory/suppliers", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const input = parseBody(z.object({
+      name: z.string().trim().min(1).max(160),
+      email: z.string().trim().email().max(254).nullable().optional(),
+      phone: z.string().trim().max(40).nullable().optional(),
+      website: z.string().trim().url().max(255).nullable().optional(),
+      notes: z.string().trim().max(5000).nullable().optional(),
+    }).strict(), req.body);
+    const supplier = await prisma.inventorySupplier.create({ data: { userId: auth.userId, ...input } });
+    res.status(201).json({ supplier });
+  });
+
+  router.get("/inventory/items/:id/lots", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id);
+    const item = await prisma.inventoryItem.findFirst({ where: { id, userId: auth.userId }, select: { id: true } });
+    if (!item) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Inventory item not found");
+    const lots = await prisma.inventoryLot.findMany({
+      where: { itemId: id },
+      include: { supplier: { select: { id: true, name: true } } },
+      orderBy: [{ expiresAt: "asc" }, { purchasedAt: "asc" }],
+    });
+    res.status(200).json({ lots });
+  });
+
+  router.post("/inventory/items/:id/lots", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const id = routeUuid(req.params.id);
+    const input = parseBody(z.object({
+      supplierId: z.string().uuid().nullable().optional(),
+      lotCode: z.string().trim().max(120).nullable().optional(),
+      quantity: z.coerce.number().finite().positive().max(999_999_999.999).refine((v) => hasMaximumDecimalPlaces(v, 3)),
+      unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
+      purchasedAt: z.string().datetime({ offset: true }),
+      expiresAt: z.string().date().nullable().optional(),
+      notes: z.string().trim().max(5000).nullable().optional(),
+    }).strict(), req.body);
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string; is_active: boolean }>>`
+        SELECT id::text, is_active FROM inventory_items
+        WHERE id = ${id}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE
+      `;
+      if (!locked[0]) throw new AppError(404, "INVENTORY_ITEM_NOT_FOUND", "Inventory item not found");
+      if (!locked[0].is_active) throw new AppError(409, "INVENTORY_ITEM_ARCHIVED", "Archived inventory items cannot receive stock");
+      if (input.supplierId) {
+        const supplier = await tx.inventorySupplier.findFirst({ where: { id: input.supplierId, userId: auth.userId }, select: { id: true } });
+        if (!supplier) throw new AppError(404, "INVENTORY_SUPPLIER_NOT_FOUND", "Supplier not found");
+      }
+      const lot = await tx.inventoryLot.create({ data: {
+        itemId: id, supplierId: input.supplierId ?? null, lotCode: input.lotCode ?? null,
+        quantityReceived: input.quantity, quantityRemaining: input.quantity,
+        unitCostCents: input.unitCostCents ?? null, purchasedAt: new Date(input.purchasedAt),
+        expiresAt: input.expiresAt ? new Date(input.expiresAt + "T00:00:00.000Z") : null,
+        notes: input.notes ?? null,
+      } });
+      const movement = await tx.stockMovement.create({ data: {
+        itemId: id, lotId: lot.id, movementType: "in", quantity: input.quantity,
+        unitCostCents: input.unitCostCents ?? null, occurredAt: new Date(input.purchasedAt),
+        reference: input.lotCode ?? "Lot purchase", notes: input.notes ?? null,
+      } });
+      const item = await tx.inventoryItem.update({ where: { id }, data: { quantityOnHand: { increment: input.quantity } } });
+      if (input.unitCostCents != null) {
+        const cents = BigInt(input.unitCostCents) * BigInt(asMilli(input.quantity)) / 1000n;
+        if (cents > 0n) await tx.financeEntry.create({ data: {
+          userId: auth.userId, entryType: "expense", occurredOn: new Date(input.purchasedAt.slice(0, 10) + "T00:00:00.000Z"),
+          amountCents: cents, currency: "EUR", category: "Inventario",
+          description: "Acquisto inventario: " + item.name, sourceStockMovementId: movement.id,
+        } });
+      }
+      await tx.auditEvent.create({ data: { userId: auth.userId, action: "inventory.lot.created", entityType: "inventory_lot", entityId: lot.id } });
+      return { lot, item, movement };
+    });
+    res.status(201).json(result);
+  });
+
+  router.get("/inventory/summary", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const days = parseBody(z.coerce.number().int().min(7).max(180).default(30), req.query.days);
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const [lowStock, expiredLots, expiringLots, usage] = await Promise.all([
+      prisma.inventoryItem.findMany({ where: { userId: auth.userId, isActive: true, minimumQuantity: { not: null }, quantityOnHand: { lte: prisma.inventoryItem.fields.minimumQuantity } } as never, select: { id: true, name: true, quantityOnHand: true, minimumQuantity: true, unit: true } }),
+      prisma.inventoryLot.findMany({ where: { item: { userId: auth.userId }, quantityRemaining: { gt: 0 }, expiresAt: { lt: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z") } }, include: { item: { select: { id: true, name: true, unit: true } } }, orderBy: { expiresAt: "asc" } }),
+      prisma.inventoryLot.findMany({ where: { item: { userId: auth.userId }, quantityRemaining: { gt: 0 }, expiresAt: { gte: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z"), lte: horizon } }, include: { item: { select: { id: true, name: true, unit: true } } }, orderBy: { expiresAt: "asc" } }),
+      prisma.$queryRaw<Array<{ item_id: string; consumed: string }>>`
+        SELECT item_id::text, COALESCE(SUM(quantity), 0)::text AS consumed
+        FROM stock_movements
+        WHERE movement_type = 'out' AND occurred_at >= ${since}
+          AND item_id IN (SELECT id FROM inventory_items WHERE user_id = ${auth.userId}::uuid)
+        GROUP BY item_id
+      `,
+    ]);
+    const consumption = usage.map((row) => {
+      const averageDaily = Number(row.consumed) / days;
+      return { itemId: row.item_id, averageDailyConsumption: averageDaily, forecastDaysRemaining: averageDaily > 0 ? null : null };
+    });
+    const items = await prisma.inventoryItem.findMany({ where: { userId: auth.userId, id: { in: consumption.map((x) => x.itemId) } }, select: { id: true, quantityOnHand: true, unit: true } });
+    const balances = new Map(items.map((item) => [item.id, item]));
+    res.status(200).json({
+      periodDays: days, lowStock, expiredLots, expiringLots,
+      consumption: consumption.map((row) => {
+        const item = balances.get(row.itemId);
+        const forecast = row.averageDailyConsumption > 0 && item ? Number(item.quantityOnHand) / row.averageDailyConsumption : null;
+        return { ...row, forecastDaysRemaining: forecast, unit: item?.unit ?? null };
+      }),
+    });
+  });
+
   return router;
 }
