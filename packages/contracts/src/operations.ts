@@ -71,6 +71,7 @@ export const dashboardTodayResponseSchema = z.object({
     activeAnimals: z.number().int().nonnegative(),
     feedingsToday: z.number().int().nonnegative(),
     lowStockItems: z.array(z.object({ id: z.string(), name: z.string(), quantityOnHand: z.string(), minimumQuantity: z.string(), unit: z.string() })),
+    lowStockCount: z.number().int().nonnegative(),
   }).optional(),
   smartSuggestions: z.array(z.object({ id: z.string(), type: z.string(), title: z.string(), dueAt: z.string().nullable(), targetPath: z.string() })).optional(),
   truncated: z.object({
