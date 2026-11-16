@@ -7,6 +7,7 @@ import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
 import { deletePrivateObject } from "../src/modules/domain/private-storage.js";
 import { dispatchDocumentDeletionJob, dispatchExportJob, dispatchImportJob } from "../src/modules/domain/data-jobs-worker.js";
+import { dispatchInventoryNotifications } from "../src/modules/domain/notification-worker.js";
 
 const enabled = process.env.RUN_DB_INTEGRATION === "true";
 const origin = "http://localhost:5173";
@@ -45,7 +46,9 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.document.deleteMany({ where: { userId: ids } });
     await prisma.publicShare.deleteMany({ where: { userId: ids } });
     await prisma.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } });
+    await prisma.inventoryLot.deleteMany({ where: { itemId: { in: itemIds } } });
     await prisma.inventoryItem.deleteMany({ where: { userId: ids } });
+    await prisma.inventorySupplier.deleteMany({ where: { userId: ids } });
     await prisma.incubationLog.deleteMany({ where: { clutchId: { in: clutchIds } } });
     await prisma.egg.deleteMany({ where: { clutchId: { in: clutchIds } } });
     await prisma.offspringBatch.deleteMany({ where: { cycleId: { in: cycleIds } } });
@@ -655,6 +658,97 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
     const traitsAfterDelete = await owner.agent.get(`/api/v1/animals/${animal.id}/genetic-traits`).expect(200);
     expect(traitsAfterDelete.body.traits).toHaveLength(0);
+  });
+
+
+  it("tracks supplier purchases, consumes dated lots FEFO, counts physical stock and rolls back failed feedings", async () => {
+    const owner = await account();
+    const other = await account();
+    const supplier = await owner.agent.post("/api/v1/inventory/suppliers")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Frozen Prey Ltd", email: "sales@example.com" }).expect(201);
+    const supplierId = supplier.body.supplier.id as string;
+    await owner.agent.patch("/api/v1/inventory/suppliers/" + supplierId)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ phone: "+390000000" }).expect(200);
+    await other.agent.patch("/api/v1/inventory/suppliers/" + supplierId)
+      .set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ name: "cross-account" }).expect(404);
+
+    const itemResponse = await owner.agent.post("/api/v1/inventory/items")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Frozen mice FEFO", category: "food", unit: "pcs", quantityOnHand: 0, minimumQuantity: 1 })
+      .expect(201);
+    const itemId = itemResponse.body.item.id as string;
+    const purchase = async (lotCode: string, quantity: number, expiresAt: string) => {
+      const response = await owner.agent.post(`/api/v1/inventory/items/${itemId}/lots`)
+        .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+        .send({ supplierId, lotCode, quantity, unitCostCents: 125, purchasedAt: "2026-11-01T10:00:00.000Z", expiresAt })
+        .expect(201);
+      return response.body.lot.id as string;
+    };
+    const firstLot = await purchase("EARLIEST", 2, "2026-12-01");
+    const secondLot = await purchase("LATER", 4, "2027-01-01");
+    expect(Number((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantityOnHand)).toBe(6);
+
+    const animal = await prisma.animal.create({ data: { userId: owner.userId, name: "FEFO animal", species: "Python regius" } });
+    const feed = await owner.agent.post("/api/v1/feeding-sessions")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ performedAt: "2026-11-10T10:00:00.000Z", entries: [{ animalId: animal.id, outcome: "ate", preyState: "thawed", inventoryItemId: itemId, inventoryQuantity: 3 }] })
+      .expect(201);
+    expect(feed.body.session).toBeDefined();
+    const first = await prisma.inventoryLot.findUniqueOrThrow({ where: { id: firstLot } });
+    const second = await prisma.inventoryLot.findUniqueOrThrow({ where: { id: secondLot } });
+    expect(Number(first.quantityRemaining)).toBe(0);
+    expect(Number(second.quantityRemaining)).toBe(3);
+    const lotMovements = await prisma.stockMovement.findMany({ where: { itemId, movementType: "out" } });
+    expect(lotMovements.map((movement) => movement.lotId).sort()).toEqual([firstLot, secondLot].sort());
+
+    const sessionsBeforeFailure = await prisma.feedingSession.count({ where: { userId: owner.userId } });
+    await owner.agent.post("/api/v1/feeding-sessions")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ performedAt: "2026-11-11T10:00:00.000Z", entries: [{ animalId: animal.id, outcome: "ate", inventoryItemId: itemId, inventoryQuantity: 99 }] })
+      .expect(409);
+    expect(await prisma.feedingSession.count({ where: { userId: owner.userId } })).toBe(sessionsBeforeFailure);
+    expect(Number((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantityOnHand)).toBe(3);
+    expect(Number((await prisma.inventoryLot.findUniqueOrThrow({ where: { id: secondLot } })).quantityRemaining)).toBe(3);
+
+    await owner.agent.patch(`/api/v1/inventory/items/${itemId}/lots/${secondLot}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ lotCode: "LATER-EDITED", expiresAt: "2027-02-01" }).expect(200);
+    await owner.agent.post(`/api/v1/inventory/items/${itemId}/lots/${secondLot}/count`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ countedQuantity: 2.5, occurredAt: "2026-11-12T10:00:00.000Z", notes: "Physical count" }).expect(200);
+    expect(Number((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantityOnHand)).toBe(2.5);
+    expect(await prisma.stockMovement.count({ where: { itemId, lotId: secondLot, movementType: "adjustment" } })).toBe(1);
+    await owner.agent.delete(`/api/v1/inventory/items/${itemId}/lots/${secondLot}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(409);
+
+    const emptyLot = await purchase("UNUSED", 1, "2027-03-01");
+    await owner.agent.delete(`/api/v1/inventory/items/${itemId}/lots/${emptyLot}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    expect(Number((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantityOnHand)).toBe(2.5);
+    await owner.agent.delete("/api/v1/inventory/suppliers/" + supplierId)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    expect((await prisma.inventoryLot.findUniqueOrThrow({ where: { id: secondLot } })).supplierId).toBeNull();
+  });
+
+  it("creates persistent idempotent inventory notifications for low stock and expiry", async () => {
+    const owner = await account();
+    const item = await prisma.inventoryItem.create({
+      data: { userId: owner.userId, name: "Notification food", category: "food", unit: "pcs", quantityOnHand: 0, minimumQuantity: 2 },
+    });
+    const lot = await prisma.inventoryLot.create({
+      data: { itemId: item.id, lotCode: "EXPIRING", quantityReceived: 2, quantityRemaining: 2, purchasedAt: new Date("2026-11-01T00:00:00.000Z"), expiresAt: new Date("2026-11-20T00:00:00.000Z") },
+    });
+    const now = new Date("2026-11-16T12:00:00.000Z");
+    const first = await dispatchInventoryNotifications(now);
+    expect(first.created).toBeGreaterThanOrEqual(2);
+    const count = await prisma.notification.count({ where: { userId: owner.userId, category: "inventory" } });
+    const second = await dispatchInventoryNotifications(now);
+    expect(second.created).toBe(0);
+    expect(await prisma.notification.count({ where: { userId: owner.userId, category: "inventory" } })).toBe(count);
+    expect(await prisma.notification.findFirst({ where: { userId: owner.userId, category: "inventory", targetPath: { contains: lot.id } } })).not.toBeNull();
   });
 
 });
