@@ -107,6 +107,8 @@ const EMPTY_HEADERS: Record<string, string[]> = {
         "incubation_logs.csv": ["id", "clutchId", "recordedAt", "temperatureC", "humidityPct", "eventType", "notes", "createdAt", "updatedAt"],
         "offspring_batches.csv": ["id", "cycleId", "clutchId", "bornOn", "count", "notes", "createdAt", "updatedAt"],
         "inventory_items.csv": ["id", "userId", "name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive", "createdAt", "updatedAt"],
+        "inventory_suppliers.csv": ["id", "userId", "name", "email", "phone", "website", "notes", "createdAt", "updatedAt"],
+        "inventory_lots.csv": ["id", "itemId", "supplierId", "lotCode", "quantityReceived", "quantityRemaining", "unitCostCents", "purchasedAt", "expiresAt", "notes", "createdAt"],
         "stock_movements.csv": ["id", "itemId", "movementType", "quantity", "unitCostCents", "occurredAt", "reference", "notes", "createdAt"],
         "finance_entries.csv": ["id", "userId", "animalId", "documentId", "reproductionCycleId", "clutchId", "offspringBatchId", "recurrenceId", "entryType", "occurredOn", "amountCents", "currency", "category", "description", "createdAt", "updatedAt"],
         "finance_budgets.csv": ["id", "userId", "period", "periodStart", "category", "amountCents", "currency", "createdAt", "updatedAt"],
@@ -120,7 +122,7 @@ const EMPTY_HEADERS: Record<string, string[]> = {
         "documents.csv": ["id", "animalId", "cycleId", "originalFilename", "mimeType", "sizeBytes", "category", "note", "createdAt", "archivePath"],
 };
 
-function exportTables(userId: string, includeDocuments: boolean): ExportTable[] {
+function exportTables(userId: string, includeDocuments: boolean, modules: string[]): ExportTable[] {
   const page = (cursor: string | undefined, take: number) => ({
     take,
     orderBy: { id: "asc" as const },
@@ -199,6 +201,14 @@ function exportTables(userId: string, includeDocuments: boolean): ExportTable[] 
       rows: () => paginateRows((cursor, take) => prisma.inventoryItem.findMany({ where: { userId }, ...page(cursor, take) })),
     },
     {
+      name: "inventory_suppliers.csv", emptyHeaders: EMPTY_HEADERS["inventory_suppliers.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.inventorySupplier.findMany({ where: { userId }, ...page(cursor, take) })),
+    },
+    {
+      name: "inventory_lots.csv", emptyHeaders: EMPTY_HEADERS["inventory_lots.csv"]!,
+      rows: () => paginateRows((cursor, take) => prisma.inventoryLot.findMany({ where: { item: { is: { userId } } }, ...page(cursor, take) })),
+    },
+    {
       name: "stock_movements.csv", emptyHeaders: EMPTY_HEADERS["stock_movements.csv"]!,
       rows: () => paginateRows((cursor, take) => prisma.stockMovement.findMany({ where: { item: { is: { userId } } }, ...page(cursor, take) })),
     },
@@ -259,12 +269,31 @@ function exportTables(userId: string, includeDocuments: boolean): ExportTable[] 
         },
       ),
     },
+
   ];
+  const fullBackup = ["animals", "feedings", "reproduction", "finance", "inventory"].every((module) => modules.includes(module));
+  const moduleByFile: Record<string, string> = {
+    "animals.csv": "animals", "animal_genetic_traits.csv": "animals", "public_shares.csv": "animals",
+    "feeding_sessions.csv": "feedings", "feeding_entries.csv": "feedings", "weights.csv": "feedings",
+    "sheds.csv": "feedings", "animal_notes.csv": "feedings", "tasks.csv": "feedings",
+    "reminder_rules.csv": "feedings", "notifications.csv": "feedings", "notification_preferences.csv": "feedings",
+    "reproduction_cycles.csv": "reproduction", "reproductive_events.csv": "reproduction", "clutches.csv": "reproduction",
+    "eggs.csv": "reproduction", "incubation_logs.csv": "reproduction", "offspring_batches.csv": "reproduction",
+    "finance_entries.csv": "finance", "finance_budgets.csv": "finance", "finance_recurrences.csv": "finance",
+    "inventory_items.csv": "inventory", "inventory_suppliers.csv": "inventory", "inventory_lots.csv": "inventory",
+    "stock_movements.csv": "inventory",
+  };
+  return tables.filter((table) => {
+    if (table.name === "account.csv" || table.name === "subscriptions.csv") return fullBackup;
+    if (table.name === "documents.csv") return modules.includes("animals") || modules.includes("reproduction");
+    return modules.includes(moduleByFile[table.name] ?? "");
+  });
 }
 
 async function* exportEntries(
   userId: string,
   includeDocuments: boolean,
+  modules: string[],
   createdAt: Date,
 ): AsyncGenerator<StreamingZipEntry> {
   const readme = Buffer.from(
@@ -273,7 +302,7 @@ async function* exportEntries(
   );
   yield { name: "README.txt", chunks: singleBufferChunk(readme) };
 
-  for (const table of exportTables(userId, includeDocuments)) {
+  for (const table of exportTables(userId, includeDocuments, modules)) {
     yield { name: table.name, chunks: csvChunks(table.rows(), table.emptyHeaders) };
   }
 
@@ -300,7 +329,7 @@ async function* exportEntries(
 export async function processQueuedExportJob(jobId: string, userId: string, leaseToken: string): Promise<void> {
   const job = await prisma.exportJob.findFirst({
     where: { id: jobId, userId, status: "processing", leaseToken },
-    select: { id: true, userId: true, createdAt: true, includeDocuments: true },
+    select: { id: true, userId: true, createdAt: true, includeDocuments: true, modules: true },
   });
   if (!job) return;
 
@@ -309,7 +338,7 @@ export async function processQueuedExportJob(jobId: string, userId: string, leas
   try {
     temporaryDirectory = await mkdtemp(join(tmpdir(), "vivarqo-export-"));
     const archivePath = join(temporaryDirectory, "export.zip");
-    await writeStreamingZip(archivePath, exportEntries(job.userId, job.includeDocuments, job.createdAt));
+    await writeStreamingZip(archivePath, exportEntries(job.userId, job.includeDocuments, job.modules, job.createdAt));
     storageKey = await storePrivateObjectFromFile("exports", "zip", archivePath);
     await prisma.$transaction(async (tx) => {
       const completed = await tx.exportJob.updateMany({
@@ -334,7 +363,10 @@ export function createExportRouter() {
   const router = Router();
   router.post("/", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const input = z.object({ includeDocuments: z.boolean().optional().default(false) }).strict().safeParse(req.body ?? {});
+    const input = z.object({
+      includeDocuments: z.boolean().optional().default(false),
+      modules: z.array(z.enum(["animals", "feedings", "reproduction", "finance", "inventory"])).min(1).max(5).default(["animals", "feedings", "reproduction", "finance", "inventory"]),
+    }).strict().safeParse(req.body ?? {});
     if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed");
 
     const job = await prisma.$transaction(async (tx) => {
@@ -349,16 +381,17 @@ export function createExportRouter() {
       const createdAt = new Date();
       return tx.exportJob.create({
         data: {
-          userId: auth.userId, status: "pending", includeDocuments: input.data.includeDocuments,
+          userId: auth.userId, status: "pending", includeDocuments: input.data.includeDocuments, modules: [...new Set(input.data.modules)],
           expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
         },
-        select: { id: true, status: true, expiresAt: true, createdAt: true, includeDocuments: true },
+        select: { id: true, status: true, expiresAt: true, createdAt: true, includeDocuments: true, modules: true },
       });
     });
     res.status(202).json({
       export: job, ready: false,
       downloadPath: `/api/v1/exports/${job.id}/download`,
       includeDocuments: job.includeDocuments,
+      modules: job.modules,
     });
   });
 
@@ -367,7 +400,7 @@ export function createExportRouter() {
     const id = routeId(req.params.id);
     const job = await prisma.exportJob.findFirst({
       where: { id, userId: auth.userId },
-      select: { id: true, status: true, expiresAt: true, createdAt: true, includeDocuments: true, attempts: true, lastErrorCode: true },
+      select: { id: true, status: true, expiresAt: true, createdAt: true, includeDocuments: true, modules: true, attempts: true, lastErrorCode: true },
     });
     if (!job) throw new AppError(404, "EXPORT_NOT_FOUND", "Export not found");
     res.status(200).json({ export: job, ready: job.status === "completed" && job.expiresAt > new Date() });
