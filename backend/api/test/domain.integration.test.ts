@@ -47,6 +47,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.publicShare.deleteMany({ where: { userId: ids } });
     await prisma.stockMovement.deleteMany({ where: { itemId: { in: itemIds } } });
     await prisma.inventoryLot.deleteMany({ where: { itemId: { in: itemIds } } });
+    await prisma.feedingEntry.deleteMany({ where: { animalId: { in: animalIds } } });
     await prisma.inventoryItem.deleteMany({ where: { userId: ids } });
     await prisma.inventorySupplier.deleteMany({ where: { userId: ids } });
     await prisma.incubationLog.deleteMany({ where: { clutchId: { in: clutchIds } } });
