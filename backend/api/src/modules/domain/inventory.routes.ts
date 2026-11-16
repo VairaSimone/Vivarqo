@@ -448,7 +448,7 @@ export function createInventoryRouter() {
     supplierId: z.string().uuid().nullable().optional(), lotCode: z.string().trim().max(120).nullable().optional(),
     unitCostCents: z.coerce.number().int().min(0).max(2_000_000_000).nullable().optional(),
     purchasedAt: z.string().datetime({ offset: true }).optional(),
-    expiresAt: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional(),
+    expiresAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
     notes: z.string().trim().max(5000).nullable().optional(),
   }).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
   router.patch("/inventory/items/:id/lots/:lotId", requireSession, async (req, res) => {
