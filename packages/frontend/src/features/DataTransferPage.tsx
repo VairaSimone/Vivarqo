@@ -319,6 +319,7 @@ function ImportPage({ locale }: { locale: Locale }) {
 function ExportPage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
   const [includeDocuments, setIncludeDocuments] = useState(false);
+  const [modules, setModules] = useState<string[]>(["animals", "feedings", "reproduction", "finance", "inventory"]);
   const [exportId, setExportId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -338,7 +339,7 @@ function ExportPage({ locale }: { locale: Locale }) {
   async function start() {
     setBusy(true); setError("");
     try {
-      const result = await api.post<{ export: Item }>("/exports", { includeDocuments });
+      const result = await api.post<{ export: Item }>("/exports", { includeDocuments, modules });
       setExportId(getString(result.export, "id"));
       show(t("queued"));
     } catch (reason) {
@@ -350,9 +351,23 @@ function ExportPage({ locale }: { locale: Locale }) {
     <PageHeader eyebrow={t("navAdmin")} title={t("exportTitle")} description={locale === "it" ? "L'archivio viene preparato in background. Puoi continuare a usare Vivarqo." : "The archive is generated in the background, so you can keep using Vivarqo."} />
     <Panel>
       <div className="export-intro"><span className="export-symbol"><Icon name="download" size={25} /></span><div><h2>{t("exportTitle")}</h2><p>{locale === "it" ? "Richiedi una copia dei dati associati al tuo account." : "Request a copy of the data associated with your account."}</p></div></div>
+      <fieldset className="form-stack" style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend><strong>{locale === "it" ? "Sezioni da esportare" : "Data sections to export"}</strong></legend>
+        {([
+          ["animals", locale === "it" ? "Animali e schede" : "Animals and profiles"],
+          ["feedings", locale === "it" ? "Alimentazioni e registri di cura" : "Feedings and care records"],
+          ["reproduction", locale === "it" ? "Riproduzione, covate e piccoli" : "Reproduction, clutches and offspring"],
+          ["finance", locale === "it" ? "Finanze" : "Finances"],
+          ["inventory", locale === "it" ? "Inventario, fornitori e lotti" : "Inventory, suppliers and lots"],
+        ] as const).map(([key, label]) => <label className="checkbox-field" key={key}>
+          <input type="checkbox" checked={modules.includes(key)} onChange={(event) => setModules((current) => event.target.checked ? [...current, key] : current.filter((value) => value !== key))} />
+          {label}
+        </label>)}
+      </fieldset>
       <label className="checkbox-field"><input type="checkbox" checked={includeDocuments} onChange={(e) => setIncludeDocuments(e.target.checked)} />{t("includeDocuments")}</label>
+      <p className="muted-note">{locale === "it" ? "Selezionando tutte le sezioni ottieni un backup completo dei dati CSV. I file allegati sono inclusi solo se attivi l'opzione dedicata." : "Select every section for a complete CSV data backup. File attachments are included only when the dedicated option is enabled."}</p>
       {error && <Alert tone="danger">{error}</Alert>}
-      <Button onClick={() => void start()} disabled={busy}><Icon name="download" />{busy ? t("loading") : t("startExport")}</Button>
+      <Button onClick={() => void start()} disabled={busy || modules.length === 0}><Icon name="download" />{busy ? t("loading") : t("startExport")}</Button>
     </Panel>
     {exportId && <Panel>
       <PanelHeader title={t("exportTitle")} action={<Button variant="ghost" size="sm" onClick={resource.reload}><Icon name="refresh" />{t("refresh")}</Button>} />
