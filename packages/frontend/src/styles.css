@@ -2954,3 +2954,9 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .feeding-group-filters > label { display:grid; gap:5px; min-width:0; color:var(--muted); font-size:12px; font-weight:650; }
 .feeding-group-filters .control { min-width:0; }
 @media(max-width:640px) { .feeding-group-filters { grid-template-columns:1fr; } .feeding-group-filters > .btn { width:100%; } }
+
+
+.dashboard-bulk-feeding-widget .panel { display:grid; gap:10px; }
+.dashboard-bulk-feeding-widget .muted-note { margin:0; max-width:760px; line-height:1.5; }
+.dashboard-bulk-feeding-widget .btn { justify-self:start; }
+@media(max-width:640px) { .dashboard-bulk-feeding-widget .btn { width:100%; } }
