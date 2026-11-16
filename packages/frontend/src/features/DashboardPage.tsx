@@ -182,10 +182,15 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
 
       <div className="dashboard-section-heading dashboard-section-heading-secondary"><span className="eyebrow">{locale === "it" ? "02 — OPERAZIONI" : "02 — OPERATIONS"}</span><p>{locale === "it" ? "Registra le attività di cura." : "Record routine care."}</p></div>
       {widgetVisibility.plan && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
+      <div className="dashboard-widget dashboard-bulk-feeding-widget"><Panel>
+        <PanelHeader title={locale === "it" ? "Registrazione multipla delle alimentazioni" : "Bulk feeding registration"} />
+        <p className="muted-note">{locale === "it" ? "Seleziona più animali, filtra per specie o rack, imposta data, alimento ed esito e registra tutto con un'unica operazione." : "Select multiple animals, filter by species or rack, set the date, food and outcome, then save everything in one operation."}</p>
+        <Button onClick={() => navigate("/feeding?bulk=1")}><Icon name="feed" size={15} />{t("bulkFeeding")}</Button>
+      </Panel></div>
       {widgetVisibility.quickActions && <div className="dashboard-widget" style={{ order: widgetOrder.indexOf("quickActions") }}><Panel>
           <PanelHeader title={t("quickActions")} />
           <div className="quick-action-grid">
-            <QuickAction icon="feed" label={t("bulkFeeding")} onClick={() => navigate("/feeding?bulk=1")} />
+            
             <QuickAction icon="weight" label={locale === "it" ? "Registra pesi" : "Record weights"} onClick={() => navigate("/animals")} />
             <QuickAction icon="leaf" label={locale === "it" ? "Registra mute" : "Record sheds"} onClick={() => navigate("/animals")} />
             <QuickAction icon="egg" label={locale === "it" ? "Riproduzione" : "Reproduction"} onClick={() => navigate("/reproduction-cycles")} />
