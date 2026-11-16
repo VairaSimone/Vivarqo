@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import type { DashboardTaskDto, DashboardTodayDto } from "@vivarqo/contracts/operations";
 import { parseDashboardTodayResponse } from "@vivarqo/contracts/operations";
 import { api, ApiError } from "../lib/api";
-import { formatDateTime, getNumber, getString } from "../lib/domain";
+import { formatDateTime, getString } from "../lib/domain";
 import type { Locale } from "../lib/domain";
 import { translate } from "../lib/i18n";
 import { useResource } from "../hooks/useResource";
 import { OnboardingChecklist } from "../components/OnboardingChecklist";
 import { PlanUsageSummary } from "../components/PlanUsageSummary";
-import { Badge, Button, EmptyState, ErrorState, Icon, LoadingState, PageHeader, Panel, PanelHeader, Skeleton, useToast } from "../components/ui";
+import { Badge, Button, EmptyState, ErrorState, Icon, PageHeader, Panel, PanelHeader, Skeleton, useToast } from "../components/ui";
 
 export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
@@ -121,7 +121,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     const categoryIcon = category === "feeding" ? "feed" : category === "weighing" ? "weight" : category === "shed_check" ? "leaf" : category === "reproduction" || category === "incubation" ? "egg" : category === "inventory" ? "box" : category === "document" ? "file" : "calendar";
     const categoryLabel: Record<string, string> = { feeding: locale === "it" ? "Alimentazione" : "Feeding", weighing: locale === "it" ? "Peso" : "Weight", shed_check: locale === "it" ? "Muta" : "Shed", cleaning: locale === "it" ? "Pulizia" : "Cleaning", reproduction: locale === "it" ? "Riproduzione" : "Reproduction", incubation: locale === "it" ? "Incubazione" : "Incubation", document: locale === "it" ? "Documento" : "Document", inventory: locale === "it" ? "Scorte" : "Inventory", custom: locale === "it" ? "Personalizzata" : "Custom" };
     return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}${isComplete ? " is-complete" : ""}`} key={id}>
-      <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={t("completeTask")} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
+      <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={`${t("completeTask")}: ${task.title}`} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
       <div className="dashboard-task-content">
         <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
           <strong>{task.title}</strong>
@@ -152,9 +152,14 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     </div>
 
     {resource.error && <ErrorState message={resource.error.message} retry={resource.reload} />}
+    <div className="dashboard-mobile-actions" aria-label={locale === "it" ? "Azioni principali" : "Main actions"}>
+      <Button onClick={() => navigate("/feeding?bulk=1")}><Icon name="feed" size={15} />{locale === "it" ? "Registra pasti" : "Record feedings"}</Button>
+      <Button variant="secondary" onClick={() => navigate("/tasks?create=1")}><Icon name="calendar" size={15} />{t("addTask")}</Button>
+      <Button variant="secondary" onClick={() => navigate("/animals?create=1")}><Icon name="snake" size={15} />{t("addAnimal")}</Button>
+    </div>
     <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "01 — SITUAZIONE OPERATIVA" : "01 — DAILY OVERVIEW"}</span><p>{locale === "it" ? "Prima le scadenze, poi il resto." : "Deadlines first, everything else after."}</p></div>
     <div className="dashboard-grid">
-      <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? "Sposta su" : "Move up"}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? "Sposta giù" : "Move down"}>↓</Button></span></div>)}</div>}</Panel></div>
+      <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} su` : `Move ${widgetLabels[key]} up`}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} giù` : `Move ${widgetLabels[key]} down`}>↓</Button></span></div>)}</div>}</Panel></div>
       {widgetVisibility.priorities && <div className="dashboard-widget dashboard-widget-priorities" style={{ order: widgetOrder.indexOf("priorities") }}>{resource.loading && !data ? <Panel><Skeleton rows={7} /></Panel> : <Panel className="dashboard-tasks dashboard-priorities">
         <section className="dashboard-task-section dashboard-overdue-section" style={{ display: taskFilter === "all" || taskFilter === "overdue" ? undefined : "none" }}>
           <PanelHeader title={t("overdue")} action={visibleOverdue.length > 0 ? <Badge tone="danger">{visibleOverdue.length}</Badge> : undefined} />
@@ -299,8 +304,8 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     </div>
     <div className="dashboard-account-widgets">
       <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "04 — ACCOUNT E PRIMI PASSI" : "04 — ACCOUNT AND GETTING STARTED"}</span><p>{locale === "it" ? "Informazioni non operative, separate dalle attività." : "Non-operational information, separate from daily tasks."}</p></div>
-      {widgetVisibility.onboarding && <div className="dashboard-account-widget"><OnboardingChecklist locale={locale} onNavigate={navigate} /></div>}
-      {widgetVisibility.plan && <div className="dashboard-account-widget"><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
+      {widgetVisibility.onboarding && <div className="dashboard-account-widget" style={{ order: widgetOrder.indexOf("onboarding") }}><OnboardingChecklist locale={locale} onNavigate={navigate} /></div>}
+      {widgetVisibility.plan && <div className="dashboard-account-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
     </div>
     {toast}
   </div>;
