@@ -160,6 +160,11 @@ export function InventoryPage({ locale }: { locale: Locale }) {
         {summary.data.expiredLots.length > 0 && <Alert tone="danger">{locale === "it" ? `${summary.data.expiredLots.length} lotti con scorte disponibili sono scaduti.` : `${summary.data.expiredLots.length} lots with remaining stock have expired.`}</Alert>}
         {summary.data.expiringLots.length > 0 && <Alert tone="warning">{locale === "it" ? `${summary.data.expiringLots.length} lotti scadono entro 30 giorni.` : `${summary.data.expiringLots.length} lots expire within 30 days.`}</Alert>}
         {summary.data.lowStock.length > 0 && <Alert tone="warning">{locale === "it" ? `${summary.data.lowStock.length} articoli sotto la soglia minima.` : `${summary.data.lowStock.length} items are at or below minimum stock.`}</Alert>}
+        <DataTable headers={[t("itemName"), locale === "it" ? "Quantità" : "Quantity", locale === "it" ? "Avviso" : "Alert", locale === "it" ? "Scadenza" : "Expiry"]} rows={[
+          ...summary.data.expiredLots.map((lot) => [lot.item.name, `${formatNumber(getString(lot, "quantityRemaining"), locale, 3)} ${lot.item.unit}`, locale === "it" ? "Scaduto" : "Expired", lot.expiresAt ? formatDate(lot.expiresAt, locale) : "—"]),
+          ...summary.data.expiringLots.map((lot) => [lot.item.name, `${formatNumber(getString(lot, "quantityRemaining"), locale, 3)} ${lot.item.unit}`, locale === "it" ? "In scadenza" : "Expiring soon", lot.expiresAt ? formatDate(lot.expiresAt, locale) : "—"]),
+          ...summary.data.lowStock.map((item) => [item.name, `${formatNumber(getString(item, "quantityOnHand"), locale, 3)} ${item.unit}`, locale === "it" ? "Scorta bassa" : "Low stock", "—"]),
+        ]} empty={locale === "it" ? "Nessun avviso: scadenze e scorte sono sotto controllo." : "No alerts: expiry dates and stock levels are under control."} mobileLayout="scroll" />
         <DataTable headers={[locale === "it" ? "Consumo medio / giorno" : "Average daily use", locale === "it" ? "Autonomia stimata" : "Estimated coverage"]} rows={summary.data.consumption.map((entry) => {
           const item = resource.data?.items.find((candidate) => getString(candidate, "id") === entry.itemId);
           return [
