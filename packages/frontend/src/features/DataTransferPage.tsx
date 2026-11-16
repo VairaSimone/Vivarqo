@@ -419,7 +419,7 @@ function ExportPage({ locale }: { locale: Locale }) {
       </Field>
       {restoreError && <Alert tone="danger">{restoreError}</Alert>}
       <Button variant="secondary" onClick={() => void restoreBackup()} disabled={!restoreFile || restoreBusy}>
-        <Icon name="database-backup" />{restoreBusy ? t("loading") : (locale === "it" ? "Verifica e ripristina" : "Verify and restore")}
+        <Icon name="database" />{restoreBusy ? t("loading") : (locale === "it" ? "Verifica e ripristina" : "Verify and restore")}
       </Button>
     </Panel>
     {exportId && <Panel>
