@@ -246,7 +246,8 @@ export function createImportRouter() {
     offspringBatches: ["cycleId", "clutchId", "bornOn", "count", "notes"],
   };
   router.get("/templates/:entity", requireSession, async (req, res) => {
-    const entity = req.params.entity;
+    const entity = Array.isArray(req.params.entity) ? req.params.entity[0] : req.params.entity;
+    if (!entity) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
     const headers = templateHeaders[entity];
     if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
     const csv = "\uFEFF" + headers.map((header) => `"${header}"`).join(",") + "\r\n";
