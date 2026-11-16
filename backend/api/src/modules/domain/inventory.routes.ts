@@ -422,7 +422,7 @@ export function createInventoryRouter() {
 
 
   const supplierPatchSchema = z.object({
-    name: z.string().trim().min(1).max(160),
+    name: z.string().trim().min(1).max(160).optional(),
     email: z.string().trim().email().max(254).nullable().optional(),
     phone: z.string().trim().max(40).nullable().optional(),
     website: z.string().trim().url().max(255).nullable().optional(),
