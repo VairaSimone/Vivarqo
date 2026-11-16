@@ -303,4 +303,18 @@ describe.skipIf(!enabled)("Domain CSV/XLSX import integration", () => {
     expect((await owner.agent.get("/api/v1/imports/" + preview.body.importId).expect(200)).body.status).toBe("rolled_back");
   });
 
+
+  it("queues modular exports and rejects an empty selection", async () => {
+    const owner = await account();
+    await owner.agent.post("/api/v1/exports")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ modules: [] }).expect(400);
+    const response = await owner.agent.post("/api/v1/exports")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ modules: ["inventory", "finance"], includeDocuments: false }).expect(202);
+    expect(response.body.modules).toEqual(["inventory", "finance"]);
+    const job = await prisma.exportJob.findUniqueOrThrow({ where: { id: response.body.export.id } });
+    expect(job.modules).toEqual(["inventory", "finance"]);
+  });
+
 });
