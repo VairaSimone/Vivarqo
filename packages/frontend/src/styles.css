@@ -3148,3 +3148,20 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .dashboard-task-row,.dashboard-intro { transition:none; }
   .dashboard-task-row.is-complete { animation:none; }
 }
+
+/* Dashboard account widgets are deliberately separated from daily operations. */
+.dashboard-account-widgets { display:grid; gap:18px; margin-top:8px; }
+.dashboard-account-widget { min-width:0; }
+.dashboard-account-widget .plan-usage-panel { max-width:760px; margin-left:auto; }
+.dashboard-widget-setting label { display:flex; align-items:center; gap:9px; min-height:42px; cursor:pointer; }
+.dashboard-widget-setting input[type="checkbox"] { width:18px; height:18px; accent-color:var(--forest-2); }
+.dashboard-widget-setting button { min-width:38px; min-height:38px; }
+.dashboard-widget-skeleton { min-height:150px; }
+.dashboard-page .error-state { margin:0; }
+@media(max-width:760px) {
+  .dashboard-account-widgets { gap:14px; }
+  .dashboard-widget-settings .dashboard-widget-setting { min-height:48px; }
+  .dashboard-widget-setting > span { display:flex; gap:5px; }
+  .dashboard-page .quick-action { min-height:58px; }
+  .dashboard-page .quick-action-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
