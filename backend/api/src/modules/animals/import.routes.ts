@@ -249,7 +249,7 @@ export function createImportRouter() {
     const entity = req.params.entity;
     const headers = templateHeaders[entity];
     if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
-    const csv = "\\uFEFF" + headers.map((header) => `"${header}"`).join(",") + "\\r\\n";
+    const csv = "\uFEFF" + headers.map((header) => `"${header}"`).join(",") + "\r\n";
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="vivarqo-${entity}-template.csv"`);
     res.setHeader("Cache-Control", "private, no-store");
