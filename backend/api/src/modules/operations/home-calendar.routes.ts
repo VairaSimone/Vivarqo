@@ -99,6 +99,27 @@ export function createHomeCalendarRouter() {
       prisma.task.count({ where: { userId: auth.userId, status: "completed", completedAt: { gte: bounds.start, lt: bounds.end } } }),
       prisma.task.count({ where: { userId: auth.userId, status: "open", dueAt: { gte: bounds.end, lt: nextWeekLimit } } }),
       prisma.reminderRule.count({ where: { userId: auth.userId, isEnabled: true, nextDueAt: { lt: nextWeekLimit } } }),
+      prisma.$queryRaw<Array<{ id: string; name: string; identifier: string | null; species: string; lastMealAt: Date | null; daysSinceLastMeal: number; feedingIntervalDays: number }>>`
+        SELECT a.id, a.name, a.identifier, a.species,
+          last_meal.performed_at AS "lastMealAt",
+          FLOOR(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_meal.performed_at, a.created_at))) / 86400)::int AS "daysSinceLastMeal",
+          a.feeding_interval_days AS "feedingIntervalDays"
+        FROM animals a
+        LEFT JOIN LATERAL (
+          SELECT fs.performed_at
+          FROM feeding_entries fe
+          INNER JOIN feeding_sessions fs ON fs.id = fe.session_id
+          WHERE fe.animal_id = a.id AND fe.outcome = 'ate'
+          ORDER BY fs.performed_at DESC
+          LIMIT 1
+        ) last_meal ON TRUE
+        WHERE a.user_id = ${auth.userId}::uuid
+          AND a.status = 'active'
+          AND a.feeding_interval_days IS NOT NULL
+          AND COALESCE(last_meal.performed_at, a.created_at) < NOW() - (a.feeding_interval_days * INTERVAL '1 day')
+        ORDER BY COALESCE(last_meal.performed_at, a.created_at) ASC
+        LIMIT 100
+      `,
     ]);
 
     const recentEvents = [
@@ -128,6 +149,7 @@ export function createHomeCalendarRouter() {
         imminentReminders: imminentReminderCount > reminders.length,
       },
       imminentReminders: reminders,
+      feedingAlerts,
       quickActions: [{ key: "bulk-feeding", label: "Register multiple feedings", targetPath: "/feeding/bulk" }],
       recentEvents,
     });
