@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { OffspringBatchDto, ReproductionCycleSummaryDto } from "@vivarqo/contracts/reproduction";
 import { cycleStatuses } from "./types";
 import { OffspringConversionModal, type OffspringAnimalDraft } from "./OffspringConversionModal";
@@ -13,6 +13,7 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
   const t = (key: string) => translate(locale, key);
   const params = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
   const tab = params.get("tab") === "offspring" ? "offspring" : "cycles";
+  const createRequested = params.get("create") === "1";
   const [page, setPage] = useState(1);
   const [batchPage, setBatchPage] = useState(1);
   const [status, setStatus] = useState("all");
@@ -49,6 +50,8 @@ export function CycleList({ locale, path, navigate }: { locale: Locale; path: st
     });
     setError(""); setModal(true);
   }
+  useEffect(() => { if (createRequested && tab === "cycles") openCycle(); }, [createRequested, tab]);
+
   async function saveCycle(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError("");
     const body = { name: cycleForm.name || null, startedOn: cycleForm.startedOn, endedOn: cycleForm.endedOn || null, status: cycleForm.status, parentAAnimalId: cycleForm.parentAAnimalId || null, parentBAnimalId: cycleForm.parentBAnimalId || null, notes: cycleForm.notes || null };
