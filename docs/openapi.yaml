@@ -1838,6 +1838,220 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InventoryItemEnvelopeResponse'
+  /api/v1/inventory/suppliers:
+    get:
+      operationId: getInventorySuppliers
+      tags: [Inventory]
+      summary: Elenca i fornitori dell'account
+      responses:
+        '200':
+          description: Elenco dei fornitori.
+          content:
+            application/json:
+              schema: { type: object, required: [suppliers], properties: { suppliers: { type: array, items: { type: object } } } }
+    post:
+      operationId: createInventorySuppliers
+      tags: [Inventory]
+      summary: Crea un fornitore
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/inventory.routes.ts
+          symbol: supplierCreateSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 160 }
+                email: { type: [string, 'null'], format: email }
+                phone: { type: [string, 'null'], maxLength: 40 }
+                website: { type: [string, 'null'], format: uri }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Fornitore creato.
+          content:
+            application/json:
+              schema: { type: object, required: [supplier], properties: { supplier: { type: object } } }
+  /api/v1/inventory/suppliers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateInventorySuppliersById
+      tags: [Inventory]
+      summary: Modifica un fornitore
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/inventory.routes.ts
+          symbol: supplierPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 160 }
+                email: { type: [string, 'null'], format: email }
+                phone: { type: [string, 'null'], maxLength: 40 }
+                website: { type: [string, 'null'], format: uri }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200':
+          description: Fornitore aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [supplier], properties: { supplier: { type: object } } }
+    delete:
+      operationId: deleteInventorySuppliersById
+      tags: [Inventory]
+      summary: Elimina un fornitore
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Fornitore eliminato; i lotti mantengono il riferimento nullo. }
+  /api/v1/inventory/items/{id}/lots:
+    get:
+      operationId: getInventoryItemsByIdLots
+      tags: [Inventory]
+      summary: Elenca lotti, fornitori e scadenze di un articolo
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Lotti ordinati per scadenza e data di acquisto.
+          content:
+            application/json:
+              schema: { type: object, required: [lots], properties: { lots: { type: array, items: { type: object } } } }
+    post:
+      operationId: createInventoryItemsByIdLots
+      tags: [Inventory]
+      summary: Registra un acquisto come nuovo lotto
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/inventory.routes.ts
+          symbol: lotCreateSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity, purchasedAt]
+              properties:
+                supplierId: { type: [string, 'null'], format: uuid }
+                lotCode: { type: [string, 'null'], maxLength: 120 }
+                quantity: { type: number, exclusiveMinimum: 0, maximum: 999999999.999 }
+                unitCostCents: { type: [integer, 'null'], minimum: 0, maximum: 2000000000 }
+                purchasedAt: { type: string, format: date-time }
+                expiresAt: { type: [string, 'null'], format: date }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Lotto, movimento di carico e articolo aggiornati atomicamente.
+          content:
+            application/json:
+              schema: { type: object, required: [lot, item, movement], properties: { lot: { type: object }, item: { type: object }, movement: { type: object } } }
+  /api/v1/inventory/items/{id}/lots/{lotId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: lotId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateInventoryItemsByIdLotsByLotId
+      tags: [Inventory]
+      summary: Modifica i metadati di un lotto
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/inventory.routes.ts
+          symbol: lotPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                supplierId: { type: [string, 'null'], format: uuid }
+                lotCode: { type: [string, 'null'], maxLength: 120 }
+                unitCostCents: { type: [integer, 'null'], minimum: 0, maximum: 2000000000 }
+                purchasedAt: { type: string, format: date-time }
+                expiresAt: { type: [string, 'null'], format: date }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200':
+          description: Lotto aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [lot], properties: { lot: { type: object } } }
+    delete:
+      operationId: deleteInventoryItemsByIdLotsByLotId
+      tags: [Inventory]
+      summary: Elimina un lotto senza consumi o rettifiche
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Lotto eliminato e giacenza aggiornata. }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/inventory/items/{id}/lots/{lotId}/count:
+    post:
+      operationId: createInventoryItemsByIdLotsByLotIdCount
+      tags: [Inventory]
+      summary: Registra il conteggio fisico di un singolo lotto
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: lotId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/inventory.routes.ts
+          symbol: physicalCountSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [countedQuantity, occurredAt]
+              properties:
+                countedQuantity: { type: number, minimum: 0, maximum: 999999999.999 }
+                occurredAt: { type: string, format: date-time }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200':
+          description: Conteggio, rettifica e saldo aggiornati atomicamente.
+          content:
+            application/json:
+              schema: { type: object, required: [lot, delta], properties: { lot: { type: object }, delta: { type: number } } }
+  /api/v1/inventory/summary:
+    get:
+      operationId: getInventorySummary
+      tags: [Inventory]
+      summary: Riepilogo scorte basse, scadenze e previsioni di consumo
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 7, maximum: 180, default: 30 }
+      responses:
+        '200':
+          description: Avvisi e consumo medio per articolo.
+          content:
+            application/json:
+              schema: { type: object, properties: { lowStock: { type: array, items: { type: object } }, expiredLots: { type: array, items: { type: object } }, expiringLots: { type: array, items: { type: object } }, consumption: { type: array, items: { type: object } } } }
   /api/v1/documents:
     get:
       operationId: getDocuments
@@ -2943,6 +3157,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ImportQueuedResponse'
+  /api/v1/imports/templates/{entity}:
+    get:
+      operationId: getImportsTemplatesByEntity
+      tags: [Imports]
+      summary: Scarica un modello CSV compatibile con Excel per l'entità indicata
+      parameters:
+        - name: entity
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Modello CSV UTF-8 con intestazioni precompilate.
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/imports/{id}/undo:
+    post:
+      operationId: createImportsByIdUndo
+      tags: [Imports]
+      summary: Annulla un'importazione in attesa o esegue il rollback di un'importazione completata
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Importazione annullata o record creati rimossi.
+          content:
+            application/json:
+              schema: { type: object, required: [importId, status, deletedCount], properties: { importId: { type: string, format: uuid }, status: { type: string, enum: [cancelled, rolled_back] }, deletedCount: { type: integer } } }
+        '409':
+          $ref: '#/components/responses/Error'
   /api/v1/account/export/{id}:
     get:
       operationId: getCompatibilityExport
@@ -3023,6 +3271,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExportQueuedResponse'
         '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/exports/restore:
+    post:
+      operationId: restoreExportsBackup
+      tags: [Exports]
+      summary: Verifica e ripristina un backup ZIP completo su un account vuoto
+      description: Ripristino transazionale; preserva gli ID e rimappa l'account proprietario. Non sovrascrive account con dati gestionali esistenti.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: Ripristino completato.
+          content:
+            application/json:
+              schema: { type: object, required: [status, restoredRecords, sourceAccountId], properties: { status: { type: string, const: restored }, restoredRecords: { type: integer }, sourceAccountId: { type: string, format: uuid } } }
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
           $ref: '#/components/responses/Error'
   /api/v1/exports/{id}:
     get:
