@@ -230,6 +230,32 @@ export async function processQueuedAnimalImport(jobId: string, userId: string, l
 export function createImportRouter() {
   const router = Router();
 
+  const templateHeaders: Record<string, string[]> = {
+    animals: ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"],
+    weights: ["animalIdentifier", "measuredAt", "weightG", "notes"],
+    sheds: ["animalIdentifier", "occurredAt", "outcome", "notes"],
+    notes: ["animalIdentifier", "occurredAt", "title", "category", "body"],
+    feedings: ["animalIdentifier", "performedAt", "outcome", "foodType", "foodSize", "foodWeightG", "notes"],
+    finance: ["entryType", "occurredOn", "amountEUR", "currency", "category", "description", "animalIdentifier"],
+    inventory: ["name", "category", "unit", "quantityOnHand", "minimumQuantity", "notes", "isActive"],
+    reproductionCycles: ["name", "startedOn", "endedOn", "status", "parentAAnimalIdentifier", "parentBAnimalIdentifier", "notes"],
+    reproductiveEvents: ["cycleId", "eventType", "occurredAt", "animalIdentifier", "details", "temperatureC", "humidityPct"],
+    clutches: ["cycleId", "laidOn", "eggCount", "status", "incubatorLabel", "incubationStartedAt", "notes"],
+    eggs: ["clutchId", "code", "status", "notes"],
+    incubationLogs: ["clutchId", "recordedAt", "temperatureC", "humidityPct", "eventType", "notes"],
+    offspringBatches: ["cycleId", "clutchId", "bornOn", "count", "notes"],
+  };
+  router.get("/templates/:entity", requireSession, async (req, res) => {
+    const entity = req.params.entity;
+    const headers = templateHeaders[entity];
+    if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
+    const csv = "\\uFEFF" + headers.map((header) => `"${header}"`).join(",") + "\\r\\n";
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="vivarqo-${entity}-template.csv"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).send(csv);
+  });
+
   router.post("/", requireSession, persistentRateLimit(10, "import-create"), fileBody, async (req, res, next: NextFunction) => {
     const entity = typeof req.query.entity === "string" ? req.query.entity : "animals";
     if (entity !== "animals") { next(); return; }
