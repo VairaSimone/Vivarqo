@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -297,16 +298,32 @@ async function* exportEntries(
   createdAt: Date,
 ): AsyncGenerator<StreamingZipEntry> {
   const readme = Buffer.from(
-    `Vivarqo export\nCreated: ${createdAt.toISOString()}\nAccount ID: ${userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\n`,
+    `Vivarqo export\nCreated: ${createdAt.toISOString()}\nAccount ID: ${userId}\n\nCSV files include stable IDs and foreign keys. Monetary amounts are in integer cents. Files are UTF-8 with BOM and CRLF line endings.\nThe archive contains manifest.json with SHA-256 checksums for every exported CSV and attachment. Verify these checksums before restoring data.\n`,
     "utf8",
   );
   yield { name: "README.txt", chunks: singleBufferChunk(readme) };
 
+  const checksums: Record<string, string> = {};
   for (const table of exportTables(userId, includeDocuments, modules)) {
-    yield { name: table.name, chunks: csvChunks(table.rows(), table.emptyHeaders) };
+    const digest = createHash("sha256");
+    const chunks = (async function* () {
+      for await (const chunk of csvChunks(table.rows(), table.emptyHeaders)) {
+        digest.update(chunk);
+        yield chunk;
+      }
+      checksums[table.name] = digest.digest("hex");
+    })();
+    yield { name: table.name, chunks };
   }
 
-  if (!includeDocuments) return;
+  if (!includeDocuments) {
+    const manifest = {
+      format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
+      accountId: userId, modules, includeDocuments: false, checksums,
+    };
+    yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\\n", "utf8")) };
+    return;
+  }
   const documents = paginateRows((cursor, take) => prisma.document.findMany({
     where: { userId, deletedAt: null },
     select: { id: true, originalFilename: true, storageKey: true },
@@ -319,8 +336,23 @@ async function* exportEntries(
   for await (const document of documents) {
     const fileName = basename(String(document.originalFilename)).replace(/[^A-Za-z0-9 ._()-]/g, "_").slice(0, 160) || "document";
     const stored = await openPrivateObjectStream(String(document.storageKey), 10 * 1024 * 1024);
-    yield { name: `documents/${document.id}_${fileName}`, chunks: stored.stream };
+    const archiveName = `documents/${document.id}_${fileName}`;
+    const digest = createHash("sha256");
+    const chunks = (async function* () {
+      for await (const raw of stored.stream) {
+        const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+        digest.update(chunk);
+        yield chunk;
+      }
+      checksums[archiveName] = digest.digest("hex");
+    })();
+    yield { name: archiveName, chunks };
   }
+  const manifest = {
+    format: "vivarqo-account-backup", formatVersion: 1, createdAt: createdAt.toISOString(),
+    accountId: userId, modules, includeDocuments: true, checksums,
+  };
+  yield { name: "manifest.json", chunks: singleBufferChunk(Buffer.from(JSON.stringify(manifest, null, 2) + "\\n", "utf8")) };
 }
 
 /**
