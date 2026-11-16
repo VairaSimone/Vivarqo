@@ -289,9 +289,9 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </button>)}
       </div>}
       <div className="dashboard-daily-pulse" aria-label={t("dashboardSummary")}>
-        <button onClick={() => navigate("/tasks?status=overdue")} className="dashboard-pulse-item pulse-critical"><span>{Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)}</span><small>{t("overdue")}</small></button>
-        <button onClick={() => navigate("/tasks?due=today")} className="dashboard-pulse-item"><span>{Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)}</span><small>{t("dueToday")}</small></button>
-        <button onClick={() => navigate("/tasks?status=completed")} className="dashboard-pulse-item pulse-positive"><span>{getNumber(counts, "completedToday") + optimisticallyCompleted.filter((id) => taskLookup.some((task) => task.id === id)).length}</span><small>{t("completedToday")}</small></button>
+        <button onClick={() => navigate("/tasks")} className="dashboard-pulse-item pulse-critical"><span>{Math.max(0, getNumber(counts, "overdue") - optimisticallyCompleted.filter((id) => overdue.some((task) => task.id === id)).length)}</span><small>{t("overdue")}</small></button>
+        <button onClick={() => navigate("/tasks")} className="dashboard-pulse-item"><span>{Math.max(0, getNumber(counts, "dueToday") - optimisticallyCompleted.filter((id) => due.some((task) => task.id === id)).length)}</span><small>{t("dueToday")}</small></button>
+        <button onClick={() => navigate("/tasks")} className="dashboard-pulse-item pulse-positive"><span>{getNumber(counts, "completedToday") + optimisticallyCompleted.filter((id) => taskLookup.some((task) => task.id === id)).length}</span><small>{t("completedToday")}</small></button>
         <button onClick={() => navigate("/tasks")} className="dashboard-pulse-item"><span>{getNumber(counts, "imminentReminders")}</span><small>{t("upcomingReminders")}</small></button>
       </div>
       </Panel></div>}
