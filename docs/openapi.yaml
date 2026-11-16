@@ -1257,6 +1257,91 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HomeTodayResponse'
+  /api/v1/home/today/tasks:
+    get:
+      operationId: getHomeTodayTasks
+      tags: [Operations]
+      summary: Carica le attività e le priorità della dashboard
+      responses:
+        '200':
+          description: Attività e conteggi per il widget delle priorità.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  timezone: { type: string }
+                  tasks: { type: object, additionalProperties: true }
+                  counts: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+                  truncated: { type: object, additionalProperties: { type: boolean } }
+                required: [date, timezone, tasks, counts, truncated]
+  /api/v1/home/today/reminders:
+    get:
+      operationId: getHomeTodayReminders
+      tags: [Operations]
+      summary: Carica i promemoria della dashboard
+      responses:
+        '200':
+          description: Promemoria imminenti e indicatore di troncamento.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer, minimum: 0 }
+                  truncated: { type: boolean }
+                required: [items, count, truncated]
+  /api/v1/home/today/feeding-alerts:
+    get:
+      operationId: getHomeTodayFeedingAlerts
+      tags: [Operations]
+      summary: Carica gli avvisi di alimentazione degli animali
+      responses:
+        '200':
+          description: Animali prossimi o oltre l'intervallo di alimentazione.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+                required: [items]
+  /api/v1/home/today/overview:
+    get:
+      operationId: getHomeTodayOverview
+      tags: [Operations]
+      summary: Carica gli indicatori generali e le scorte
+      responses:
+        '200':
+          description: Conteggi e materiali sotto la soglia minima.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activeAnimals: { type: integer, minimum: 0 }
+                  feedingsToday: { type: integer, minimum: 0 }
+                  lowStockItems: { type: array, items: { type: object, additionalProperties: true } }
+                  lowStockCount: { type: integer, minimum: 0 }
+                required: [activeAnimals, feedingsToday, lowStockItems, lowStockCount]
+  /api/v1/home/today/recent:
+    get:
+      operationId: getHomeTodayRecent
+      tags: [Operations]
+      summary: Carica la cronologia e i suggerimenti della dashboard
+      responses:
+        '200':
+          description: Eventi recenti e suggerimenti operativi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: array, items: { type: object, additionalProperties: true } }
+                  smartSuggestions: { type: array, items: { type: object, additionalProperties: true } }
+                required: [events, smartSuggestions]
   /api/v1/calendar:
     get:
       operationId: getCalendar
