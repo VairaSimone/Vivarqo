@@ -3165,3 +3165,15 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .dashboard-page .quick-action { min-height:58px; }
   .dashboard-page .quick-action-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+.dashboard-account-widgets { display:flex; flex-direction:column; }
+.dashboard-mobile-actions { display:none; }
+@media(max-width:760px) {
+  .dashboard-mobile-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .dashboard-mobile-actions .btn { min-width:0; min-height:46px; padding:7px 6px; justify-content:center; gap:5px; font-size:11px; line-height:1.2; white-space:normal; }
+  .dashboard-mobile-actions .btn svg { flex:0 0 auto; }
+}
+@media(max-width:360px) {
+  .dashboard-mobile-actions { grid-template-columns:1fr; }
+  .dashboard-mobile-actions .btn { justify-content:flex-start; min-height:44px; padding-inline:12px; font-size:13px; }
+}
