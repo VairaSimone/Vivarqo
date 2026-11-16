@@ -137,6 +137,20 @@ describe.skipIf(!enabled)("Full account ZIP backup restore integration", () => {
       }).expect(200);
     const archive = downloaded.body as Buffer;
 
+    // A UUID primary key cannot be duplicated while the original source rows still exist.
+    // Simulate restoring onto a clean database by removing the source account after exporting.
+    await prisma.financeEntry.deleteMany({ where: { userId: source.userId } });
+    await prisma.stockMovement.deleteMany({ where: { itemId: item.id } });
+    await prisma.inventoryLot.deleteMany({ where: { itemId: item.id } });
+    await prisma.feedingEntry.deleteMany({ where: { sessionId: session.id } });
+    await prisma.feedingSession.deleteMany({ where: { userId: source.userId } });
+    await prisma.clutch.deleteMany({ where: { id: clutch.id } });
+    await prisma.reproductionCycle.deleteMany({ where: { userId: source.userId } });
+    await prisma.inventoryItem.deleteMany({ where: { userId: source.userId } });
+    await prisma.inventorySupplier.deleteMany({ where: { userId: source.userId } });
+    await prisma.animal.deleteMany({ where: { userId: source.userId } });
+    await prisma.user.delete({ where: { id: source.userId } });
+
     const restored = await target.agent.post("/api/v1/exports/restore")
       .set("Origin", origin).set("X-CSRF-Token", target.csrf)
       .set("Content-Type", "application/zip").send(archive).expect(200);
