@@ -154,7 +154,14 @@ function snakeCase(value: string): string { return value.replace(/[A-Z]/g, (lett
 type TableSpec = { file: string; table: string; user?: boolean; deferred?: readonly string[] };
 
 const TABLES: readonly TableSpec[] = [
+  { file: "animal_locations.csv", table: "animal_locations", deferred: ["parentId"], user: true },
+  { file: "incubators.csv", table: "incubators", user: true },
+  { file: "genetic_genes.csv", table: "genetic_genes", user: true },
   { file: "animals.csv", table: "animals", deferred: ["motherAnimalId", "fatherAnimalId", "originClutchId", "originOffspringBatchId"], user: true },
+  { file: "animal_location_moves.csv", table: "animal_location_moves", user: true },
+  { file: "animal_transfers.csv", table: "animal_transfers", user: true },
+  { file: "saved_animal_filters.csv", table: "saved_animal_filters", user: true },
+  { file: "user_preferences.csv", table: "user_preferences", user: true },
   { file: "feeding_sessions.csv", table: "feeding_sessions", user: true },
   { file: "reproduction_cycles.csv", table: "reproduction_cycles", user: true },
   { file: "inventory_suppliers.csv", table: "inventory_suppliers", user: true },
@@ -163,10 +170,18 @@ const TABLES: readonly TableSpec[] = [
   { file: "weights.csv", table: "weight_measurements" },
   { file: "sheds.csv", table: "shed_records" },
   { file: "animal_notes.csv", table: "animal_notes" },
+  { file: "health_records.csv", table: "health_records" },
+  { file: "hatchling_care.csv", table: "hatchling_care" },
+  { file: "genetic_loci.csv", table: "genetic_loci" },
+  { file: "genetic_alleles.csv", table: "genetic_alleles" },
   { file: "reproductive_events.csv", table: "reproductive_events" },
   { file: "clutches.csv", table: "clutches" },
+  { file: "clutch_history.csv", table: "clutch_history" },
   { file: "eggs.csv", table: "eggs" },
-  { file: "incubation_logs.csv", table: "incubation_logs" },
+  { file: "egg_history.csv", table: "egg_history" },
+  { file: "egg_measurements.csv", table: "egg_measurements" },
+  { file: "egg_incubator_transfers.csv", table: "egg_incubator_transfers" },
+  { file: "incubation_logs.csv", table: "incubation_logs" },\n  { file: "incubator_maintenance.csv", table: "incubator_maintenance" },
   { file: "offspring_batches.csv", table: "offspring_batches" },
   { file: "inventory_lots.csv", table: "inventory_lots" },
   { file: "stock_movements.csv", table: "stock_movements" },
@@ -178,6 +193,7 @@ const TABLES: readonly TableSpec[] = [
   { file: "tasks.csv", table: "tasks", user: true },
   { file: "notifications.csv", table: "notifications", user: true },
   { file: "animal_genetic_traits.csv", table: "animal_genetic_traits" },
+  { file: "animal_genetic_trait_history.csv", table: "animal_genetic_trait_history" },
   { file: "public_shares.csv", table: "public_shares", user: true },
   { file: "notification_preferences.csv", table: "notification_preferences", user: true },
 ];
@@ -240,7 +256,7 @@ async function insertRows(
       const column = columnByName.get(columnName);
       if (!column) fail("BACKUP_SCHEMA_MISMATCH", "Backup contains a field that is not supported by this database schema");
       names.push(columnName);
-      if (field === "userId") values.push(ownerId);
+      if (field === "userId" || field === "changedBy") values.push(ownerId);
       else values.push(normalizeCell(rawValue, column));
     }
     if (row.photoArchivePath) {
@@ -460,7 +476,7 @@ export function createBackupRestoreRouter() {
               const value = row[field];
               if (!value) continue;
               const column = snakeCase(field);
-              await tx.$executeRawUnsafe(`UPDATE animals SET "${column}" = $1::uuid WHERE id = $2::uuid`, value, row.id);
+              await tx.$executeRawUnsafe(`UPDATE "${spec.table}" SET "${column}" = $1::uuid WHERE id = $2::uuid`, value, row.id);
             }
           }
         }
