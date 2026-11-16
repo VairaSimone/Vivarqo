@@ -340,7 +340,10 @@ function ImportPage({ locale }: { locale: Locale }) {
 
 function ExportPage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
-  const [includeDocuments, setIncludeDocuments] = useState(false);
+  const [includeDocuments, setIncludeDocuments] = useState(true);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
   const [modules, setModules] = useState<string[]>(["animals", "feedings", "reproduction", "finance", "inventory"]);
   const [exportId, setExportId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -358,6 +361,21 @@ function ExportPage({ locale }: { locale: Locale }) {
     return () => window.clearInterval(timer);
   }, [status, resource.reload]);
 
+  async function restoreBackup() {
+    if (!restoreFile) return;
+    const confirmed = window.confirm(locale === "it"
+      ? "Il ripristino è consentito solo su un account senza dati gestionali. I dati del backup verranno associati a questo account. Continuare?"
+      : "Restore is allowed only on an account with no existing business data. Backup records will be assigned to this account. Continue?");
+    if (!confirmed) return;
+    setRestoreBusy(true); setRestoreError("");
+    try {
+      const result = await api.upload<{ restoredRecords: number }>("/exports/restore", restoreFile, { "Content-Type": "application/zip" });
+      show(locale === "it" ? `Ripristino completato: ${result.restoredRecords} record.` : `Restore completed: ${result.restoredRecords} records.`);
+      setRestoreFile(null);
+    } catch (reason) {
+      setRestoreError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+    } finally { setRestoreBusy(false); }
+  }
   async function start() {
     setBusy(true); setError("");
     try {
@@ -387,9 +405,22 @@ function ExportPage({ locale }: { locale: Locale }) {
         </label>)}
       </fieldset>
       <label className="checkbox-field"><input type="checkbox" checked={includeDocuments} onChange={(e) => setIncludeDocuments(e.target.checked)} />{t("includeDocuments")}</label>
-      <p className="muted-note">{locale === "it" ? "Selezionando tutte le sezioni ottieni un backup completo dei dati CSV. I file allegati sono inclusi solo se attivi l'opzione dedicata." : "Select every section for a complete CSV data backup. File attachments are included only when the dedicated option is enabled."}</p>
+      <p className="muted-note">{locale === "it" ? "Selezionando tutte le sezioni ottieni un backup completo dei dati CSV. Per poter ripristinare anche documenti e immagini, lascia attiva l'opzione allegati." : "Select every section for a complete CSV data backup. Keep attachments enabled to restore documents and images too."}</p>
       {error && <Alert tone="danger">{error}</Alert>}
       <Button onClick={() => void start()} disabled={busy || modules.length === 0}><Icon name="download" />{busy ? t("loading") : t("startExport")}</Button>
+    </Panel>
+    <Panel>
+      <PanelHeader title={locale === "it" ? "Ripristina da backup ZIP" : "Restore from ZIP backup"} />
+      <p className="muted-note">{locale === "it"
+        ? "Carica un backup Vivarqo completo, con tutte le sezioni e gli allegati. Per sicurezza il ripristino è consentito solo su un account senza dati gestionali: non sovrascrive né unisce dati esistenti."
+        : "Upload a complete Vivarqo backup with all sections and attachments. For safety, restore is allowed only on an account without existing business data; it never overwrites or merges existing records."}</p>
+      <Field label={locale === "it" ? "Archivio ZIP" : "ZIP archive"}>
+        <input type="file" accept=".zip,application/zip" onChange={(event) => { setRestoreFile(event.target.files?.[0] ?? null); setRestoreError(""); }} />
+      </Field>
+      {restoreError && <Alert tone="danger">{restoreError}</Alert>}
+      <Button variant="secondary" onClick={() => void restoreBackup()} disabled={!restoreFile || restoreBusy}>
+        <Icon name="database-backup" />{restoreBusy ? t("loading") : (locale === "it" ? "Verifica e ripristina" : "Verify and restore")}
+      </Button>
     </Panel>
     {exportId && <Panel>
       <PanelHeader title={t("exportTitle")} action={<Button variant="ghost" size="sm" onClick={resource.reload}><Icon name="refresh" />{t("refresh")}</Button>} />
