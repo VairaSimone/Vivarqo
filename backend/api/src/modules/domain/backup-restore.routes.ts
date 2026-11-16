@@ -185,6 +185,11 @@ type ColumnInfo = { column_name: string; data_type: string; udt_name: string };
 
 function normalizeCell(value: string, column: ColumnInfo): unknown {
   if (value === "") return null;
+  if (column.data_type === "time without time zone" || column.data_type === "time with time zone") {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) fail("BACKUP_VALUE_INVALID", "Backup contains an invalid time value");
+    return parsed.toISOString().slice(11, 23);
+  }
   if (column.data_type === "boolean") {
     if (value === "true" || value === "t" || value === "1") return true;
     if (value === "false" || value === "f" || value === "0") return false;
@@ -367,7 +372,7 @@ export function createBackupRestoreRouter() {
         ["offspring_batches", "clutchId", "clutches"], ["inventory_lots", "itemId", "inventory_items"],
         ["inventory_lots", "supplierId", "inventory_suppliers"], ["stock_movements", "itemId", "inventory_items"],
         ["stock_movements", "lotId", "inventory_lots"], ["finance_entries", "animalId", "animals"],
-        ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
+        ["documents", "animalId", "animals"], ["documents", "cycleId", "reproduction_cycles"],\n        ["finance_entries", "documentId", "documents"], ["finance_entries", "reproductionCycleId", "reproduction_cycles"],
         ["finance_entries", "clutchId", "clutches"], ["finance_entries", "offspringBatchId", "offspring_batches"],
         ["finance_entries", "recurrenceId", "finance_recurrences"], ["finance_entries", "sourceStockMovementId", "stock_movements"],\n        ["finance_recurrences", "animalId", "animals"], ["finance_recurrences", "documentId", "documents"], ["feeding_entries", "inventoryItemId", "inventory_items"],
         ["tasks", "animalId", "animals"], ["tasks", "reminderRuleId", "reminder_rules"],
