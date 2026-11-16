@@ -8,6 +8,17 @@ import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+type InventorySummaryDto = {
+  periodDays: number;
+  lowStock: Array<{ id: string; name: string; quantityOnHand: number | string; minimumQuantity: number | string; unit: string }>;
+  expiredLots: Array<{ id: string; lotCode: string | null; quantityRemaining: number | string; expiresAt: string | null; item: { name: string; unit: string } }>;
+  expiringLots: Array<{ id: string; lotCode: string | null; quantityRemaining: number | string; expiresAt: string | null; item: { name: string; unit: string } }>;
+  consumption: Array<{ itemId: string; averageDailyConsumption: number; forecastDaysRemaining: number | null; unit: string | null }>;
+};
+function parseInventorySummary(value: unknown): InventorySummaryDto {
+  if (typeof value !== "object" || value === null) throw new Error("Invalid inventory summary");
+  return value as InventorySummaryDto;
+}
 const inventoryCategories = ["food", "substrate", "material", "equipment", "other"] as const;
 
 export function InventoryPage({ locale }: { locale: Locale }) {
@@ -32,6 +43,7 @@ export function InventoryPage({ locale }: { locale: Locale }) {
   const { toast, show } = useToast();
   const url = "/inventory/items" + queryString({ page, pageSize: 25, active, q, category, lowStock: lowStock ? "true" : null });
   const resource = useResource<InventoryItemsResponseDto>(url, parseInventoryItemsResponse);
+  const summary = useResource<InventorySummaryDto>("/inventory/summary?days=30", parseInventorySummary);
   const movements = useResource<InventoryMovementsResponseDto>(movementItem ? `/inventory/items/${getString(movementItem, "id")}/movements?page=1&pageSize=100` : null, parseInventoryMovementsResponse);
 
   function openItem(item?: InventoryItemDto) {
@@ -142,6 +154,21 @@ export function InventoryPage({ locale }: { locale: Locale }) {
 
   return <div className="page-stack">
     <PageHeader eyebrow={t("navResources")} title={t("inventoryTitle")} description={t("inventorySubtitle")} action={<Button onClick={() => openItem()}><Icon name="plus" />{t("addItem")}</Button>} />
+    <Panel>
+      <PanelHeader title={locale === "it" ? "Stato delle scorte" : "Stock overview"} />
+      {summary.loading && !summary.data ? <LoadingState /> : summary.error ? <ErrorState message={summary.error.message} retry={summary.reload} /> : summary.data && <>
+        {summary.data.expiredLots.length > 0 && <Alert tone="danger">{locale === "it" ? `${summary.data.expiredLots.length} lotti con scorte disponibili sono scaduti.` : `${summary.data.expiredLots.length} lots with remaining stock have expired.`}</Alert>}
+        {summary.data.expiringLots.length > 0 && <Alert tone="warning">{locale === "it" ? `${summary.data.expiringLots.length} lotti scadono entro 30 giorni.` : `${summary.data.expiringLots.length} lots expire within 30 days.`}</Alert>}
+        {summary.data.lowStock.length > 0 && <Alert tone="warning">{locale === "it" ? `${summary.data.lowStock.length} articoli sotto la soglia minima.` : `${summary.data.lowStock.length} items are at or below minimum stock.`}</Alert>}
+        <DataTable headers={[locale === "it" ? "Consumo medio / giorno" : "Average daily use", locale === "it" ? "Autonomia stimata" : "Estimated coverage"]} rows={summary.data.consumption.map((entry) => {
+          const item = resource.data?.items.find((candidate) => getString(candidate, "id") === entry.itemId);
+          return [
+            item ? `${getString(item, "name")} · ${formatNumber(entry.averageDailyConsumption, locale, 3)} ${entry.unit ?? ""}` : entry.itemId,
+            entry.forecastDaysRemaining === null ? "—" : (locale === "it" ? `${Math.floor(entry.forecastDaysRemaining)} giorni` : `${Math.floor(entry.forecastDaysRemaining)} days`),
+          ];
+        })} empty={locale === "it" ? "Consumo medio non ancora disponibile: servono movimenti di scarico negli ultimi 30 giorni." : "Average use is not available yet; stock-out movements are needed in the last 30 days."} />}
+      </>}
+    </Panel>
     <Panel>
       <ListToolbar searchValue={q} onSearchChange={(value) => { setQ(value); setPage(1); }} searchPlaceholder={t("search")}
         filters={<><Select aria-label={t("active")} value={active} onChange={(e) => { setActive(e.target.value); setPage(1); }}><option value="true">{t("active")}</option><option value="all">{t("all")}</option><option value="false">{t("archived")}</option></Select>
