@@ -431,7 +431,7 @@ export function createBackupRestoreRouter() {
             const conflicts = await tx.$queryRawUnsafe<Array<{ id: string }>>(
               `SELECT id::text AS id FROM "${spec.table}" WHERE id = ANY($1::uuid[]) LIMIT 1`, ids,
             );
-            if (conflicts.length) fail("BACKUP_ID_CONFLICT", "A record ID from the backup already exists in this database", 409);
+            if (conflicts.length) fail("BACKUP_ID_CONFLICT", "A record ID from the backup already exists in this database. Remove the original source records or restore into a separate clean database.", 409);
           }
         }
         let restored = 0;
