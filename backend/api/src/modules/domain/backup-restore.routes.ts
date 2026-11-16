@@ -278,7 +278,7 @@ export function createBackupRestoreRouter() {
     catch { return fail("BACKUP_MANIFEST_INVALID", "Backup manifest is not valid JSON"); }
     if (manifest.format !== "vivarqo-account-backup" || manifest.formatVersion !== 1 ||
         typeof manifest.accountId !== "string" || !z.string().uuid().safeParse(manifest.accountId).success ||
-        !Array.isArray(manifest.modules) || !FULL_MODULES.every((module) => manifest.modules!.includes(module)) ||
+        !Array.isArray(manifest.modules) || !FULL_MODULES.every((module) => manifest.modules!.includes(module)) || manifest.includeDocuments !== true ||
         typeof manifest.checksums !== "object" || manifest.checksums === null || Array.isArray(manifest.checksums)) {
       fail("BACKUP_FORMAT_UNSUPPORTED", "Only complete Vivarqo account backups can be restored");
     }
@@ -319,13 +319,25 @@ export function createBackupRestoreRouter() {
       for (const row of documents) {
         if (!row.archivePath) fail("BACKUP_ATTACHMENT_MISSING", "This backup does not contain all document attachments");
       }
-      for (const [archivePath, key] of attachmentKeys) {
+      for (const [archivePath] of attachmentKeys) {
+        if (!archivePath.startsWith("documents/")) continue;
         const row = documentRows.get(archivePath);
         if (!row) fail("BACKUP_ATTACHMENT_UNREFERENCED", "Backup contains an attachment with no document record");
         const fileBytes = byName.get(archivePath)!;
         if (Number(row.sizeBytes) !== fileBytes.length) fail("BACKUP_ATTACHMENT_INVALID", "A document attachment has an unexpected size");
       }
-      const ownerScoped = TABLES.filter((spec) => spec.user);
+      const expectedPhotos = new Set([
+        ...(parsedTables.get("animals") ?? []).map((row) => row.photoArchivePath).filter(Boolean),
+        ...(parsedTables.get("eggs") ?? []).map((row) => row.photoArchivePath).filter(Boolean),
+      ]);
+      for (const photoPath of expectedPhotos) {
+        if (!attachmentKeys.has(photoPath)) fail("BACKUP_ATTACHMENT_MISSING", "A referenced animal or egg photo is missing from the backup");
+      }
+      for (const photoPath of attachmentKeys.keys()) {
+        if ((photoPath.startsWith("animal-photos/") || photoPath.startsWith("egg-photos/")) && !expectedPhotos.has(photoPath)) {
+          fail("BACKUP_ATTACHMENT_UNREFERENCED", "Backup contains a photo with no animal or egg record");
+        }
+      }
       const columnsByTable = new Map<string, ColumnInfo[]>();
       for (const spec of TABLES) {
         const columns = await prisma.$queryRaw<ColumnInfo[]>`SELECT column_name, data_type, udt_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ${spec.table}`;
