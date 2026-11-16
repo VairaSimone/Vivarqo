@@ -53,10 +53,9 @@ describe("feeding prey validation", () => {
 });
 
 describe("atomic bulk care record validation", () => {
-  const ids = [
-    "00000000-0000-4000-8000-000000000001",
-    "00000000-0000-4000-8000-000000000002",
-  ];
+  const firstId = "00000000-0000-4000-8000-000000000001";
+  const secondId = "00000000-0000-4000-8000-000000000002";
+  const ids = [firstId, secondId];
 
   it("accepts bulk weights and shed records", () => {
     expect(bulkCareRecordsSchema.safeParse({
@@ -69,7 +68,7 @@ describe("atomic bulk care record validation", () => {
 
   it("rejects duplicate animals, unsupported outcomes and oversized batches", () => {
     expect(bulkCareRecordsSchema.safeParse({
-      kind: "weight", animalIds: [ids[0], ids[0]], measuredAt: "2026-11-16T12:00:00.000Z", weightG: 1250,
+      kind: "weight", animalIds: [firstId, firstId], measuredAt: "2026-11-16T12:00:00.000Z", weightG: 1250,
     }).success).toBe(false);
     expect(bulkCareRecordsSchema.safeParse({
       kind: "shed", animalIds: ids, occurredAt: "2026-11-16T12:00:00.000Z", outcome: "incomplete",
