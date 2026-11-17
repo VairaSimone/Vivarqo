@@ -243,7 +243,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
     <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to main content" : "Vai al contenuto principale"}</a>
     <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={locale === "it" ? "Navigazione principale" : "Main navigation"} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
       <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Snakebee home">
-        <span className="brand-mark"><Icon name="leaf" size={21} /></span>
+        <span className="brand-mark"><Icon name="brand" size={23} /></span>
         <span className="brand-copy"><strong>SnakeBee</strong><small>{t("brandTagline")}</small></span>
       </button>
       <div className="nav-scroll">
