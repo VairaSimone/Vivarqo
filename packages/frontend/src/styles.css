@@ -3177,3 +3177,32 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   .dashboard-mobile-actions { grid-template-columns:1fr; }
   .dashboard-mobile-actions .btn { justify-content:flex-start; min-height:44px; padding-inline:12px; font-size:13px; }
 }
+
+
+/* Brand identity refinement: flat burgundy, restrained dusty-rose states. */
+::selection { background: color-mix(in srgb, var(--sage) 58%, transparent); color: var(--text); }
+body { background-image: none; background-attachment: initial; }
+.sidebar { background: var(--sidebar); }
+.brand-mark {
+  background: var(--forest-2);
+  color: #fffaf7;
+  box-shadow: 0 3px 10px rgba(24, 12, 18, .16);
+}
+.nav-item { color: color-mix(in srgb, var(--sidebar-text) 76%, var(--sidebar)); }
+.nav-item:hover { background: rgba(255,255,255,.075); color: var(--sidebar-text); }
+.nav-item.active {
+  border-color: color-mix(in srgb, var(--sage) 34%, transparent);
+  background: color-mix(in srgb, var(--sage) 19%, var(--sidebar));
+  color: #fffaf7;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+}
+.nav-item.active::before { background: var(--sage); }
+.btn-primary { background: var(--forest); box-shadow: 0 2px 6px color-mix(in srgb, var(--forest) 16%, transparent); }
+.btn-primary:hover { background: var(--forest-2); box-shadow: 0 3px 9px color-mix(in srgb, var(--forest) 18%, transparent); }
+.btn-secondary { border-color: var(--border-strong); background: var(--paper); color: var(--text); }
+.btn-secondary:hover { border-color: var(--sage); background: var(--surface-soft); }
+.dashboard-intro { background: var(--forest); box-shadow: 0 8px 22px rgba(59, 35, 44, .12); }
+.dashboard-intro::after { opacity: .35; }
+.animal-editor-intro { background: var(--surface-soft); }
+.progress-track span, .progress-bar span { background: var(--accent-teal); }
+@media (prefers-reduced-motion: reduce) { .skeleton-line { animation: none; } }
