@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, useEffect, useId, useState, useRef, type 
 type Tone = "success" | "warning" | "danger" | "info" | "primary" | "neutral";
 export function Icon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {
   const paths: Record<string, ReactNode> = {
+    brand: <><path d="M4 14c0-5 4-9 10-9h5v5c0 6-4 10-9 10-3 0-6-2-6-6Z"/><path d="M4 21c3-5 7-8 13-11"/><path d="M15 5c1-2 3-3 5-3"/></>,
     leaf: <><path d="M20 4c-7 0-13 3-13 10a6 6 0 0 0 6 6c7 0 10-6 7-16Z"/><path d="M3 21c3-5 7-8 13-11"/></>,
     home: <><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-6h6v6"/></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
