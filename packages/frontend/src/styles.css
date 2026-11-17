@@ -3351,3 +3351,186 @@ body { background-image: none; background-attachment: initial; }
   .dashboard-widget > .panel,
   .dashboard-widget-priorities > .panel { padding:13px; }
 }
+
+
+/* Shared data, form and dialog refinement — warm bordeaux / powder palette. */
+.data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.data-table thead th {
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .045em;
+  line-height: 1.35;
+  text-transform: none;
+}
+.data-table thead th:first-child { border-top-left-radius: 8px; }
+.data-table thead th:last-child { border-top-right-radius: 8px; }
+.data-table tbody td {
+  min-height: 54px;
+  padding: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  transition: background-color .14s ease;
+}
+.data-table tbody tr:nth-child(even):not(.data-table-empty) td {
+  background: color-mix(in srgb, var(--surface-soft) 52%, transparent);
+}
+.data-table tbody tr:hover:not(.data-table-empty) td {
+  background: color-mix(in srgb, var(--accent-clay-bg) 62%, var(--surface));
+}
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table .animal-name-cell strong,
+.data-table .item-name strong,
+.data-table .document-name strong { font-size: 13px; }
+.data-table .animal-name-cell small,
+.data-table .item-name small,
+.data-table .document-name small { font-size: 12px; }
+.data-table .row-actions { gap: 5px; }
+.row-actions .icon-button {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-color: transparent;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.row-actions .icon-button:hover {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--forest);
+}
+.row-actions .icon-button[aria-label*="elimin"],
+.row-actions .icon-button[aria-label*="Delete"] { color: color-mix(in srgb, var(--danger) 78%, var(--muted)); }
+.row-actions .icon-button[aria-label*="elimin"]:hover,
+.row-actions .icon-button[aria-label*="Delete"]:hover {
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--border));
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.badge {
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.badge-success { border-color: color-mix(in srgb, var(--success) 16%, transparent); }
+.badge-warning { border-color: color-mix(in srgb, var(--warning) 16%, transparent); }
+.badge-danger { border-color: color-mix(in srgb, var(--danger) 16%, transparent); }
+.badge-info { border-color: color-mix(in srgb, var(--info) 16%, transparent); }
+
+.control,
+.search-control {
+  border-color: var(--border-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color .14s ease, box-shadow .14s ease, background-color .14s ease;
+}
+.control { min-height: 42px; padding: 9px 11px; }
+.search-control input { font-size: 14px; }
+.control:focus,
+.search-control:focus-within {
+  border-color: var(--accent-clay);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-clay-bg) 86%, transparent);
+}
+.control[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.control[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-bg) 88%, transparent);
+}
+.field { gap: 7px; }
+.field-label { font-size: 13px; font-weight: 650; line-height: 1.4; }
+.field-hint { font-size: 12px; line-height: 1.45; }
+.field-error { font-size: 12px; font-weight: 550; line-height: 1.4; }
+.checkbox-field { font-size: 13px; }
+.checkbox-field input,
+.toggle-row input { accent-color: var(--accent-clay); }
+
+.modal {
+  border-radius: 12px;
+  box-shadow: var(--shadow-modal);
+}
+.modal-header { padding: 18px 20px; }
+.modal-header h2 { font-size: 17px; font-weight: 700; }
+.modal-content { padding: 20px; }
+.modal-actions { gap: 9px; margin-top: 10px; }
+.modal-actions .btn-secondary {
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.modal-actions .btn-secondary:hover {
+  border-color: var(--accent-clay);
+  background: var(--accent-clay-bg);
+}
+.modal-actions .btn-primary {
+  border-color: var(--forest);
+  background: var(--forest);
+  color: #fff;
+}
+.modal-actions .btn-primary:hover { background: var(--forest-2); }
+
+.alert {
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.alert-success,
+.toast-success {
+  border-color: color-mix(in srgb, var(--success) 24%, var(--border));
+  background: var(--success-bg);
+  color: var(--success);
+}
+.alert-danger,
+.toast-error {
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--border));
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.alert-warning,
+.toast-warning {
+  border-color: color-mix(in srgb, var(--warning) 24%, var(--border));
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.alert-info,
+.toast-info {
+  border-color: color-mix(in srgb, var(--info) 22%, var(--border));
+  background: var(--info-bg);
+  color: var(--info);
+}
+.error-state {
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border));
+  border-radius: 9px;
+  background: var(--danger-bg);
+  font-size: 13px;
+}
+.toast { font-size: 13px; }
+.toast > svg:first-child { color: currentColor; }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-clay);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .data-table thead th { padding: 11px 10px; font-size: 11px; }
+  .data-table tbody td { padding: 11px 10px; font-size: 13px; }
+  .modal-backdrop { padding: 12px; }
+  .modal { max-height: calc(100dvh - 24px); }
+  .modal-header { padding: 15px 16px; }
+  .modal-content { padding: 16px; }
+  .modal-actions { position: sticky; bottom: -16px; padding: 12px 0 2px; background: var(--surface); }
+}
