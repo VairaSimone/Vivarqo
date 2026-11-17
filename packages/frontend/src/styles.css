@@ -32,8 +32,8 @@
   --accent-amber-bg: #fbf2de;
   --accent-plum: #704b75;
   --accent-plum-bg: #f3edf4;
-  --accent-teal: #286c68;
-  --accent-teal-bg: #e8f3f1;
+  --accent-teal: #805965;
+  --accent-teal-bg: #f3e8eb;
   --sidebar: #593b45;
   --sidebar-text: #fbf4f1;
   --sidebar-muted: #dfcbd0;
@@ -56,19 +56,19 @@
   --icon-sm: 14px;
   --icon-md: 18px;
   --icon-lg: 22px;
-  --shadow-card: 0 2px 10px rgba(31, 48, 41, .045);
+  --shadow-card: 0 2px 10px rgba(59, 35, 44, .045);
   --shadow: var(--shadow-card);
-  --shadow-modal: 0 24px 80px rgba(15, 26, 22, .2);
+  --shadow-modal: 0 24px 80px rgba(35, 22, 28, .2);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #151d1a;
-  --surface: #1d2823;
-  --surface-soft: #202d27;
-  --text: #e7eee8;
-  --muted: #a1b0a7;
-  --border: #34433b;
-  --border-strong: #45574c;
+  --paper: #1c171a;
+  --surface: #282126;
+  --surface-soft: #30262c;
+  --text: #f2e9eb;
+  --muted: #c0adb4;
+  --border: #493940;
+  --border-strong: #604851;
   --forest: #d8aeb8;
   --forest-2: #c28e9b;
   --terracotta: #d9a3a8;
@@ -88,8 +88,8 @@
   --accent-amber-bg: #3b321f;
   --accent-plum: #d0b2d4;
   --accent-plum-bg: #352a39;
-  --accent-teal: #9accc5;
-  --accent-teal-bg: #203936;
+  --accent-teal: #d5aeb8;
+  --accent-teal-bg: #3a2930;
   --sidebar: #21191e;
   --sidebar-text: #fbf4f1;
   --sidebar-muted: #bdaab0;
@@ -3002,7 +3002,7 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
   border:1px solid color-mix(in srgb,var(--sage) 28%,var(--border));
   border-radius:16px;
   background:color-mix(in srgb,var(--surface) 88%,var(--paper));
-  box-shadow:0 5px 18px rgba(31,48,41,.035);
+  box-shadow:0 5px 18px rgba(59,35,44,.035);
 }
 .dashboard-widget-settings-panel > .panel {
   padding:0 0 10px;
