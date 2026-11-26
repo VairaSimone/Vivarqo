@@ -101,7 +101,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           {field(it?"Nome scientifico":"Scientific name",population.scientificName,v=>setPopulation(p=>({...p,scientificName:v})))}
           {field(it?"Quantità":"Quantity",population.quantity,v=>setPopulation(p=>({...p,quantity:v})),"number",true,{min:"1",step:"1"})}
           {field(it?"Data e ora":"Date and time",population.occurredAt,v=>setPopulation(p=>({...p,occurredAt:v})),"datetime-local",true)}
-          {population.movementType === "transfer" && select(it?"Acquario di destinazione":"Destination aquarium",population.toAquariumId,v=>setPopulation(p=>({...p,toAquariumId:v})),destinations.map(t=>[t.id,t.name]))}
+          {population.movementType === "transfer" && select(it?"Acquario di destinazione":"Destination aquarium",population.toAquariumId,v=>setPopulation(p=>({...p,toAquariumId:v})),destinations.map(t=>[t.id,t.name] as [string,string]))}
           {field(it?"Motivo":"Reason",population.reason,v=>setPopulation(p=>({...p,reason:v})))}
           {textarea(it?"Note":"Notes",population.notes,v=>setPopulation(p=>({...p,notes:v})))}
           <Button type="submit" disabled={saving || (population.movementType === "transfer" && !population.toAquariumId)}>{it?"Registra movimento":"Save movement"}</Button>
@@ -162,7 +162,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           <Button type="submit" disabled={saving}>{it?"Registra quarantena":"Save quarantine"}</Button>
         </form>
         {data.quarantines.some(row => row.status === "quarantine") && <div className="form-grid">
-          {select(it?"Acquario di destinazione per il rilascio":"Release destination aquarium",releaseDestinationId,v=>setReleaseDestinationId(v),destinations.map(t=>[t.id,t.name]))}
+          {select(it?"Acquario di destinazione per il rilascio":"Release destination aquarium",releaseDestinationId,v=>setReleaseDestinationId(v),destinations.map(t=>[t.id,t.name] as [string,string]))}
           {!releaseDestinationId && <p className="muted-note">{it?"Crea un altro acquario per poter trasferire i pesci fuori dalla quarantena.":"Create another aquarium to move fish out of quarantine."}</p>}
         </div>}
         <div className="ecosys-history">{data.quarantines.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.commonName||row.speciesKey)} × {String(row.quantity)} · {String(row.status)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.source||"—")}</span>{row.status === "quarantine" && <Button size="sm" variant="secondary" disabled={saving || !releaseDestinationId} onClick={() => void (async()=>{setSaving(true);setError("");try{await api.patch(`/quarantines/${row.id}`,{status:"released",endedAt:new Date().toISOString(),destinationAquariumId:releaseDestinationId});await load();setNotice(it?"Quarantena conclusa e popolazione aggiornata nell'acquario di destinazione.":"Quarantine ended and destination population updated.");}catch(e){setError(e instanceof ApiError?e.message:(it?"Aggiornamento non riuscito.":"Could not update quarantine."));}finally{setSaving(false);}})()}>{it?"Rilascia e trasferisci":"Release and transfer"}</Button>}</div>)}</div>
