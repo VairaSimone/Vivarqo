@@ -254,7 +254,7 @@ export function App() {
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/genetics")) page = <GeneticsPage locale={locale} />;
   else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
-  else if (matches("/finance")) page = <FinancePage locale={locale} />;
+  else if (matches("/finance")) page = <FinancePage locale={locale} path={path} />;
   else if (matches("/help")) page = <HelpCenterPage locale={locale} navigate={navigate} />;
   else if (matches("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (matches("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
