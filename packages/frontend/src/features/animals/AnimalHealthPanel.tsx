@@ -82,7 +82,7 @@ export function AnimalHealthPanel({ animalId, locale, archived, onDocuments }: {
   const update = (key: keyof FormState, value: string) => setForm(current => ({ ...current, [key]: value }));
   const label = (value: string) => it ? value : ({
     "Sintomo": "Symptom", "Visita veterinaria": "Veterinary visit", "Diagnosi": "Diagnosis",
-    "Sospetto": "Suspected condition", "Trattamento": "Treatment", "Controllo": "Check-up",
+    "Sospetto": "Suspected condition", "Trattamento": "Treatment", "Controllo": "Check-up", "Vaccinazione": "Vaccination",
     "In corso": "Ongoing", "Risolto": "Resolved", "Cronico": "Chronic",
   } as Record<string,string>)[value] ?? value;
   const typeLabels: Record<string,string> = { symptom: label("Sintomo"), visit: label("Visita veterinaria"), diagnosis: label("Diagnosi"), suspicion: label("Sospetto"), treatment: label("Trattamento"), checkup: label("Controllo"), vaccination: label("Vaccinazione") };
