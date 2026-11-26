@@ -116,6 +116,14 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(res.body.movements).toHaveLength(1);
       expect(res.body.notes).toHaveLength(1);
     });
+    await owner.agent.get("/api/v1/home/today/collection").expect(200).expect((res) => {
+      expect(res.body.totals.active).toBe(1);
+      expect(res.body.categories.find((item: { category: string }) => item.category === "birds").active).toBe(1);
+    });
+    await owner.agent.get("/api/v1/home/today/recent").expect(200).expect((res) => {
+      expect(res.body.events.some((item: { type: string }) => item.type === "aviary_movement")).toBe(true);
+      expect(res.body.events.some((item: { type: string }) => item.type === "aviary_note")).toBe(true);
+    });
     await owner.agent.get("/api/v1/aviaries").expect(200).expect((res) => expect(res.body.aviaries[0].capacityRemaining).toBe(11));
     await owner.agent.patch(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Voliera aggiornata", capacity: 15 }).expect(200);
