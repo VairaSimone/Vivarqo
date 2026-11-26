@@ -302,6 +302,7 @@ model ReminderRule {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal       Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
   tasks        Task[]
+  companionCareRecord CompanionCareRecord?
   @@unique([id, userId], map: "reminder_rules_id_user_id_unique")
   @@index([userId, nextDueAt], where: { isEnabled: true }, map: "reminder_rules_user_next_due_idx")
   @@index([animalId], map: "reminder_rules_animal_idx")
@@ -1210,6 +1211,8 @@ model CompanionCareRecord {
   treatmentStartAt DateTime? @map("treatment_start_at") @db.Timestamptz(6)
   treatmentEndAt DateTime? @map("treatment_end_at") @db.Timestamptz(6)
   isOngoing   Boolean   @default(false) @map("is_ongoing")
+  reminderRuleId String? @unique @map("reminder_rule_id") @db.Uuid
+  reminderRule ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
   @@index([userId, deletedAt, nextDueAt], map: "companion_care_user_due_idx")
   @@index([animalId, occurredAt(sort: Desc)], map: "companion_care_animal_occurred_idx")
   @@map("companion_care_records")
