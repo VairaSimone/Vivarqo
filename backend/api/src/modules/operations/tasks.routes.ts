@@ -136,8 +136,8 @@ export function createTasksRouter() {
       if (initial.reminderRuleId) await lockReminderRule(tx, auth.userId, initial.reminderRuleId);
       const existing = await tx.task.findFirst({ where: { id, userId: auth.userId } });
       if (!existing) throw new AppError(404, "TASK_NOT_FOUND", "Task not found");
-      if (existing.companionCareRecordId) {
-        throw new AppError(409, "CARE_TASK_MANAGED_BY_RECORD", "Update this health reminder from its care record");
+      if (existing.companionCareRecordId && ("status" in input || "category" in input || "animalId" in input)) {
+        throw new AppError(409, "CARE_TASK_MANAGED_BY_RECORD", "Change status, category and animal from the care record");
       }
       if (existing.status === "completed" && ("status" in input || "dueAt" in input)) {
         throw new AppError(409, "TASK_ALREADY_COMPLETED", "Completed tasks are historical records and cannot be reopened or rescheduled");
@@ -159,6 +159,16 @@ export function createTasksRouter() {
         }
       }
       const task = await tx.task.update({ where: { id }, data: data as never });
+      if (existing.companionCareRecordId) {
+        await tx.companionCareRecord.updateMany({
+          where: { id: existing.companionCareRecordId, userId: auth.userId, deletedAt: null },
+          data: {
+            ...(input.title !== undefined ? { title: input.title } : {}),
+            ...(input.description !== undefined ? { notes: input.description } : {}),
+            ...(input.dueAt !== undefined ? { nextDueAt: new Date(input.dueAt), completedAt: null } : {}),
+          },
+        });
+      }
       let nextTaskCreated = false;
       if (existing.reminderRuleId && (existing.status === "open" || input.status === "open")) {
         const rule = await tx.reminderRule.findFirst({
