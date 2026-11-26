@@ -450,7 +450,7 @@ export function createHomeCalendarRouter() {
         end: null,
         status: task.status,
         category: task.category,
-        targetPath: `/tasks/${task.id}`,
+        targetPath: task.companionCareRecordId ? "/companion-care" : `/tasks/${task.id}`,
         animal: task.animal,
         record: task,
       })),
