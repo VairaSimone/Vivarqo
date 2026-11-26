@@ -103,6 +103,47 @@ export function createHomeCalendarRouter() {
     res.status(200).json({ activeAnimals, feedingsToday, lowStockItems, lowStockCount: Number(lowStockCount[0]?.count ?? 0n) });
   });
 
+  router.get("/home/today/collection", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const configuration = await prisma.accountConfiguration.findUnique({
+      where: { userId: auth.userId }, select: { animalCategories: true },
+    });
+    const enabled = configuration?.animalCategories ?? [];
+    const [activeByCategory, archivedByCategory, activeTotal, archivedTotal, upcomingCare, recentCare] = await Promise.all([
+      prisma.animal.groupBy({ by: ["category"], where: { userId: auth.userId, status: "active" }, _count: { _all: true } }),
+      prisma.animal.groupBy({ by: ["category"], where: { userId: auth.userId, status: "archived" }, _count: { _all: true } }),
+      prisma.animal.count({ where: { userId: auth.userId, status: "active" } }),
+      prisma.animal.count({ where: { userId: auth.userId, status: "archived" } }),
+      prisma.task.findMany({
+        where: { userId: auth.userId, status: "open", dueAt: { gte: new Date(), lte: new Date(Date.now() + 14 * 86_400_000) } },
+        orderBy: { dueAt: "asc" }, take: 8,
+        include: { animal: { select: { id: true, name: true, category: true } } },
+      }),
+      prisma.animalNote.findMany({
+        where: { archivedAt: null, animal: { is: { userId: auth.userId, status: "active" } } },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 6,
+        include: { animal: { select: { id: true, name: true, category: true } } },
+      }),
+    ]);
+    const activeMap = new Map(activeByCategory.map((item) => [item.category, item._count._all]));
+    const archivedMap = new Map(archivedByCategory.map((item) => [item.category, item._count._all]));
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({
+      totals: { active: activeTotal, archived: archivedTotal },
+      categories: enabled.map((category) => ({
+        category, active: activeMap.get(category) ?? 0, archived: archivedMap.get(category) ?? 0,
+      })),
+      upcoming: upcomingCare.map((task) => ({
+        id: task.id, title: task.title, dueAt: task.dueAt, category: task.category,
+        animal: task.animal, targetPath: task.companionCareRecordId ? "/companion-care" : "/tasks",
+      })),
+      recentNotes: recentCare.map((note) => ({
+        id: note.id, title: note.title ?? note.body.slice(0, 80), occurredAt: note.occurredAt,
+        animal: note.animal, targetPath: "/animals/" + note.animalId,
+      })),
+    });
+  });
+
   router.get("/home/today/recent", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
     const today = localDateFor(new Date(), auth.timezone);
