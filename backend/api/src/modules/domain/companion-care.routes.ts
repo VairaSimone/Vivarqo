@@ -107,9 +107,11 @@ export function createCompanionCareRouter() {
       if (!updated.nextDueAt) {
         if (dueTask?.status === "open") await tx.task.update({ where: { id: dueTask.id }, data: { status: "dismissed" } });
       } else if (dueTask) {
+        const rescheduled = input.nextDueAt !== undefined;
         await tx.task.update({ where: { id: dueTask.id }, data: {
           title: updated.title, description: updated.notes, dueAt: updated.nextDueAt,
-          animalId: updated.animalId, status: "open", completedAt: null,
+          animalId: updated.animalId,
+          ...(rescheduled ? { status: "open", completedAt: null } : {}),
         } });
       } else {
         await tx.task.create({ data: {
