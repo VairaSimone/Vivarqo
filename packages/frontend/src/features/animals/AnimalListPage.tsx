@@ -31,7 +31,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [location, setLocation] = useState("");
   const [sex, setSex] = useState("");
   const [category, setCategory] = useState(query.get("category") ?? "");
-  const [enabledCategories, setEnabledCategories] = useState<string[]>(["reptiles"]);
+  const [enabledCategories, setEnabledCategories] = useState<string[]>([]);
   const [status, setStatus] = useState("active");
   const [sort, setSort] = useState("updatedAt");
   const [page, setPage] = useState(1);
@@ -75,6 +75,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         const categories = context.categories.filter((value) => ["reptiles", "fish", "birds", "dogs_cats"].includes(value));
         setEnabledCategories(categories);
         setCategory((current) => current && categories.includes(current) ? current : "");
+        setForm((current) => ({ ...current, category: current.category && categories.includes(current.category) ? current.category : categories[0] ?? "" }));
       })
       .catch(() => {
         if (!active) return;
@@ -142,7 +143,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     setPage(1);
   }
 
-  function openCreate() { setEditing(null); setForm({ ...emptyAnimal, category: enabledCategories[0] ?? "reptiles" }); setPhotoFile(null); setError(""); setModal(true); }
+  function openCreate() { setEditing(null); setForm({ ...emptyAnimal, category: enabledCategories[0] ?? "" }); setPhotoFile(null); setError(""); setModal(true); }
   function openEdit(animal: AnimalDto) {
     setEditing(animal);
     setPhotoFile(null);
@@ -254,7 +255,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   });
 
   return <div className="page-stack">
-    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value={selectedSavedFilterId} onChange={(e) => { setSelectedSavedFilterId(e.target.value); applySavedFilter(e.target.value); }}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" disabled={!selectedSavedFilterId} onClick={() => void deleteSavedFilter()}>{locale === "it" ? "Elimina filtro" : "Delete filter"}</Button><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button>{selectedAnimalIds.length > 0 && <Button variant="secondary" onClick={() => { setBulkCareError(""); setBulkCareModal(true); }}>{locale === "it" ? `Registra su ${selectedAnimalIds.length} animali` : `Record for ${selectedAnimalIds.length} animals`}</Button>}<Button variant="secondary" onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
+    <PageHeader eyebrow={t("navAnimals")} title={t("animalsTitle")} description={t("animalsSubtitle")} action={<div className="inline-actions"><Select aria-label={locale === "it" ? "Filtri salvati" : "Saved filters"} value={selectedSavedFilterId} onChange={(e) => { setSelectedSavedFilterId(e.target.value); applySavedFilter(e.target.value); }}><option value="">{locale === "it" ? "Filtri salvati" : "Saved filters"}</option>{(savedFiltersResource.data?.filters ?? []).map((filter) => <option key={filter.id} value={filter.id}>{filter.name}</option>)}</Select><Button variant="secondary" disabled={!selectedSavedFilterId} onClick={() => void deleteSavedFilter()}>{locale === "it" ? "Elimina filtro" : "Delete filter"}</Button><Button variant="secondary" onClick={() => void saveCurrentFilter()}>{locale === "it" ? "Salva filtri" : "Save filters"}</Button>{selectedAnimalIds.length > 0 && <Button variant="secondary" onClick={() => { setBulkCareError(""); setBulkCareModal(true); }}>{locale === "it" ? `Registra su ${selectedAnimalIds.length} animali` : `Record for ${selectedAnimalIds.length} animals`}</Button>}<Button variant="secondary" disabled={enabledCategories.length === 0} onClick={() => { setBulkError(""); setBulkModal(true); }}><Icon name="plus" size={16} />{t("bulkCreateAnimals")}</Button><Button onClick={openCreate} disabled={enabledCategories.length === 0}><Icon name="plus" size={16} />{t("animalNew")}</Button></div>} />
     <AnimalManagementPanel locale={locale} />
     <Panel>
       <ListToolbar searchValue={search} onSearchChange={(value) => { setSearch(value); setPage(1); }} searchPlaceholder={t("search")}
@@ -270,7 +271,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         resultCount={pager?.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> :
         rows.length === 0 && (pager?.total ?? 0) === 0 && !q && !species && !morph && !location && !sex && status === "active"
-          ? <EmptyState title={locale === "it" ? "Non hai ancora aggiunto animali" : "You haven't added any animals yet"} description={locale === "it" ? "Crea la scheda del primo esemplare oppure importa la tua collezione da Excel per iniziare a gestire alimentazioni, pesi e mute." : "Create your first animal profile or import your collection from Excel to start tracking feedings, weights and sheds."} action={<Button onClick={openCreate}><Icon name="plus" size={15} />{t("animalNew")}</Button>} />
+          ? <EmptyState title={locale === "it" ? "Non hai ancora aggiunto animali" : "You haven't added any animals yet"} description={locale === "it" ? "Crea la scheda del primo esemplare oppure importa la tua collezione da Excel per iniziare a gestire alimentazioni, pesi e mute." : "Create your first animal profile or import your collection from Excel to start tracking feedings, weights and sheds."} action={<Button onClick={openCreate} disabled={enabledCategories.length === 0}><Icon name="plus" size={15} />{t("animalNew")}</Button>} />
           : <DataTable headers={[locale === "it" ? "Seleziona" : "Select", t("name"), t("species"), t("morph"), t("sex"), t("location"), t("status"), t("actions")]} rows={rows} empty={t("noAnimals")} />}
       {pager && <Pagination page={pager.page} totalPages={pager.totalPages} onChange={setPage} label={t("page")} />}
     </Panel>
@@ -323,7 +324,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           setBulkError(t("bulkFormatError")); setBulkBusy(false); return;
         }
         const payload = parsed.map(([name, animalSpecies, animalSex, animalMorph, identifier]) => ({
-          name, species: animalSpecies, category: enabledCategories[0] ?? "reptiles", domainProfile: {}, sex: animalSex || "unknown",
+          name, species: animalSpecies, category: enabledCategories[0] ?? "", domainProfile: {}, sex: animalSex || "unknown",
           morph: animalMorph || null, identifier: identifier || null
         }));
         try {
@@ -334,7 +335,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       }}>
         {bulkError && <Alert tone="danger">{bulkError}</Alert>}
         <Field label={t("bulkAnimalRows")} hint={t("bulkInputHint")}><Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Nala | Python regius | female | Pastel | A-001" /></Field>
-        <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setBulkModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={bulkBusy}>{bulkBusy ? t("loading") : t("create")}</Button></div>
+        <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setBulkModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={bulkBusy || enabledCategories.length === 0}>{bulkBusy ? t("loading") : t("create")}</Button></div>
       </form>
     </Modal>}
     {weightQuickModal && <Modal title={t("addWeight")} onClose={() => setWeightQuickModal(false)}>
