@@ -7,7 +7,6 @@ type Bird = { id: string; name: string; species: string; sex: string; identifier
 type Profile = { ringType: string; ringNumber: string | null; ringYear: number | null; citesNumber: string | null; citesAnnex: string | null; citesAuthority: string | null; citesIssuedAt: string | null; citesExpiresAt: string | null; notes: string | null };
 type Pair = { id: string; femaleAnimalId: string; maleAnimalId: string; pairedAt: string; separatedAt: string | null; status: string; notes: string | null; female: { id: string; name: string; species: string }; male: { id: string; name: string; species: string }; cycle: { id: string; status: string; _count: { clutches: number; offspringBatches: number } } };
 type Maintenance = { id: string; occurredAt: string; action: string; area: string | null; products: string | null; nextDueAt: string | null; notes: string | null };
-type Health = { id: string; recordType: string; status: string; occurredAt: string; title: string; veterinarian: string | null; clinic: string | null; medication: string | null; dosage: string | null; nextDueAt: string | null; notes: string | null };
 
 const emptyProfile: Profile = { ringType: "none", ringNumber: null, ringYear: null, citesNumber: null, citesAnnex: null, citesAuthority: null, citesIssuedAt: null, citesExpiresAt: null, notes: null };
 const dateValue = () => new Date().toISOString().slice(0, 10);
@@ -18,7 +17,6 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [pairs, setPairs] = useState<Pair[]>([]);
   const [maintenance, setMaintenance] = useState<Maintenance[]>([]);
-  const [health, setHealth] = useState<Health[]>([]);
   const [femaleId, setFemaleId] = useState("");
   const [maleId, setMaleId] = useState("");
   const [pairedAt, setPairedAt] = useState(dateValue());
@@ -27,15 +25,6 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
   const [maintenanceProducts, setMaintenanceProducts] = useState("");
   const [maintenanceNextDue, setMaintenanceNextDue] = useState("");
   const [maintenanceNotes, setMaintenanceNotes] = useState("");
-  const [healthType, setHealthType] = useState("checkup");
-  const [healthTitle, setHealthTitle] = useState("");
-  const [healthDate, setHealthDate] = useState(() => new Date().toISOString().slice(0, 16));
-  const [healthVet, setHealthVet] = useState("");
-  const [healthClinic, setHealthClinic] = useState("");
-  const [healthMedication, setHealthMedication] = useState("");
-  const [healthDosage, setHealthDosage] = useState("");
-  const [healthNextDue, setHealthNextDue] = useState("");
-  const [healthNotes, setHealthNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -43,12 +32,9 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
   useEffect(() => { if (!birds.some(b => b.id === birdId)) setBirdId(birds[0]?.id ?? ""); }, [birds, birdId]);
   useEffect(() => { if (!birds.some(b => b.id === femaleId && b.sex === "female")) setFemaleId(birds.find(b => b.sex === "female")?.id ?? ""); if (!birds.some(b => b.id === maleId && b.sex === "male")) setMaleId(birds.find(b => b.sex === "male")?.id ?? ""); }, [birds, femaleId, maleId]);
   async function load() {
-    if (!birdId) { setProfile(emptyProfile); setHealth([]); return; }
-    const [p, h] = await Promise.all([
-      api.get<{ profile: Profile | null }>(`/birds/${encodeURIComponent(birdId)}/profile`),
-      api.get<{ records: Health[] }>(`/animals/${encodeURIComponent(birdId)}/health-records`),
-    ]);
-    setProfile(p.profile ?? emptyProfile); setHealth(h.records);
+    if (!birdId) { setProfile(emptyProfile); return; }
+    const p = await api.get<{ profile: Profile | null }>(`/birds/${encodeURIComponent(birdId)}/profile`);
+    setProfile(p.profile ?? emptyProfile);
   }
   useEffect(() => { void load().catch(e => setError(e instanceof ApiError ? e.message : (it ? "Impossibile caricare la scheda uccello." : "Could not load bird profile."))); }, [birdId, it]);
   useEffect(() => {
@@ -95,13 +81,6 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
       setMaintenanceArea("");setMaintenanceProducts("");setMaintenanceNextDue("");setMaintenanceNotes("");setNotice(it?"Manutenzione registrata.":"Maintenance recorded.");
     });
   }
-  async function createHealth(e:FormEvent) {
-    await run(e,async()=>{
-      await api.post(`/animals/${encodeURIComponent(birdId)}/health-records`,{recordType:healthType,status:"ongoing",occurredAt:new Date(healthDate).toISOString(),title:healthTitle,veterinarian:healthVet||null,clinic:healthClinic||null,medication:healthMedication||null,dosage:healthDosage||null,nextDueAt:healthNextDue?new Date(healthNextDue+"T12:00:00").toISOString():null,notes:healthNotes||null});
-      setHealth((await api.get<{records:Health[]}>(`/animals/${encodeURIComponent(birdId)}/health-records`)).records);
-      setHealthTitle("");setHealthVet("");setHealthClinic("");setHealthMedication("");setHealthDosage("");setHealthNextDue("");setHealthNotes("");setNotice(it?"Evento sanitario registrato.":"Health event recorded.");
-    });
-  }
   const field=(label:string,value:string,onChange:(v:string)=>void,type="text")=><label className="field"><span className="field-label">{label}</span><input className="control" type={type} value={value} onChange={e=>onChange(e.target.value)}/></label>;
 
   if (!birds.length) return <section className="panel"><h3>{it?"Gestione individuale e riproduzione":"Individual care and breeding"}</h3><p className="ecosys-empty">{it?"Registra prima gli uccelli nella sezione Animali.":"Add birds in the Animals section first."}</p></section>;
@@ -124,7 +103,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
         <label className="field"><span className="field-label">{it?"Note":"Notes"}</span><textarea className="control" value={profile.notes??""} onChange={e=>changeProfile("notes",e.target.value||null)}/></label>
         <Button type="submit" disabled={busy||!birdId}>{it?"Salva scheda":"Save profile"}</Button>
       </form>
-      <div className="inline-actions"><Button type="button" variant="secondary" onClick={()=>navigate(`/animals/${birdId}`)}>{it?"Apri scheda animale e fotografie":"Open animal record and photos"}</Button><Button type="button" variant="secondary" onClick={()=>navigate("/documents")}>{it?"Apri documenti e referti":"Open documents and reports"}</Button></div>
+      <div className="inline-actions"><Button type="button" variant="secondary" onClick={()=>navigate(`/animals/${birdId}`)}>{it?"Apri cartella sanitaria, foto e referti":"Open health record, photos and reports"}</Button><Button type="button" variant="secondary" onClick={()=>navigate("/documents")}>{it?"Apri archivio documenti":"Open document archive"}</Button></div>
     </section>
     <div className="divider"/>
     <section className="form-grid">
@@ -138,22 +117,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
       <div className="ecosys-history">{pairs.length===0?<p className="ecosys-empty">{it?"Nessuna coppia registrata.":"No breeding pairs recorded."}</p>:pairs.map(p=><article className="ecosys-reading" key={p.id}><strong>{p.female.name} × {p.male.name} · {p.status}</strong><span>{it?"Dal ":"Since "}{new Date(p.pairedAt).toLocaleDateString(it?"it-IT":"en-GB")} · {p.cycle._count.clutches} {it?"cove":"clutches"} · {p.cycle._count.offspringBatches} {it?"registri piccoli":"offspring batches"}</span><div className="inline-actions"><Button size="sm" onClick={()=>navigate(`/reproduction-cycles/${p.cycle.id}`)}>{it?"Apri ciclo, deposizioni e schiuse":"Open cycle, eggs and hatching"}</Button>{p.status==="active"&&<Button size="sm" variant="secondary" disabled={busy} onClick={()=>void updatePair(p,"paused")}>{it?"Sospendi":"Pause"}</Button>}{p.status==="paused"&&<Button size="sm" variant="secondary" disabled={busy} onClick={()=>void updatePair(p,"active")}>{it?"Riattiva":"Resume"}</Button>}{["active","paused"].includes(p.status)&&<Button size="sm" variant="danger" disabled={busy} onClick={()=>void updatePair(p,"completed")}>{it?"Concludi coppia":"End pair"}</Button>}</div></article>)}</div>
     </section>
     <div className="divider"/>
-    <section className="form-grid">
-      <h3>{it?"Scheda sanitaria individuale":"Individual health record"}</h3>
-      <form className="form-grid" onSubmit={createHealth}>
-        <label className="field"><span className="field-label">{it?"Tipo evento":"Event type"}</span><select className="control" value={healthType} onChange={e=>setHealthType(e.target.value)}><option value="checkup">{it?"Controllo":"Check-up"}</option><option value="visit">{it?"Visita veterinaria":"Veterinary visit"}</option><option value="diagnosis">{it?"Diagnosi":"Diagnosis"}</option><option value="treatment">{it?"Trattamento":"Treatment"}</option><option value="symptom">{it?"Sintomo":"Symptom"}</option></select></label>
-        {field(it?"Data e ora":"Date and time",healthDate,setHealthDate,"datetime-local")}
-        {field(it?"Titolo / motivo":"Title / reason",healthTitle,setHealthTitle)}
-        {field(it?"Veterinario":"Veterinarian",healthVet,setHealthVet)}
-        {field(it?"Struttura":"Clinic",healthClinic,setHealthClinic)}
-        {field(it?"Farmaco / trattamento":"Medicine / treatment",healthMedication,setHealthMedication)}
-        {field(it?"Dosaggio":"Dosage",healthDosage,setHealthDosage)}
-        {field(it?"Prossimo richiamo":"Next due date",healthNextDue,setHealthNextDue,"date")}
-        <label className="field"><span className="field-label">{it?"Note e referto sintetico":"Notes / report summary"}</span><textarea className="control" value={healthNotes} onChange={e=>setHealthNotes(e.target.value)}/></label>
-        <Button type="submit" disabled={busy||!birdId||!healthTitle.trim()}>{it?"Registra evento sanitario":"Save health event"}</Button>
-      </form>
-      <div className="ecosys-history">{health.map(h=><article className="ecosys-reading" key={h.id}><strong>{h.title} · {h.status}</strong><span>{h.recordType} · {new Date(h.occurredAt).toLocaleString(it?"it-IT":"en-GB")} · {[h.veterinarian,h.clinic].filter(Boolean).join(" · ")}</span>{h.medication&&<span>{h.medication} {h.dosage??""}</span>}{h.nextDueAt&&<span>{it?"Prossimo richiamo: ":"Next due: "}{new Date(h.nextDueAt).toLocaleDateString(it?"it-IT":"en-GB")}</span>}{h.notes&&<p>{h.notes}</p>}</article>)}</div>
-    </section>
+    <div className="inline-actions"><Button type="button" variant="secondary" onClick={()=>navigate(`/animals/${birdId}`)}>{it?"Apri cartella sanitaria, foto e referti":"Open health record, photos and reports"}</Button><Button type="button" variant="secondary" onClick={()=>navigate("/documents")}>{it?"Apri archivio documenti":"Open document archive"}</Button></div>
     {aviaryId && <>
     <div className="divider"/>
     <section className="form-grid">
