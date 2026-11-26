@@ -29,7 +29,7 @@ const companionCarePatchSchema = z.object({
   dosage: z.string().trim().max(120).nullable().optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
 }).strict()
-  .refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" })
+  .refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || new Date(value.treatmentEndAt).getTime() >= new Date(value.treatmentStartAt).getTime(), { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" })
   .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 function parseUuid(value: unknown): string {
@@ -109,12 +109,16 @@ export function createCompanionCareRouter() {
     const record = await prisma.$transaction(async (tx) => {
       const previous = await tx.companionCareRecord.findFirst({
         where: { id, userId: auth.userId, deletedAt: null },
-        select: { nextDueAt: true, completedAt: true, kind: true, isOngoing: true, treatmentEndAt: true },
+        select: { nextDueAt: true, completedAt: true, kind: true, isOngoing: true, treatmentStartAt: true, treatmentEndAt: true },
       });
       if (!previous) throw new AppError(404, "COMPANION_CARE_NOT_FOUND", "Care record not found");
       const resultingKind = input.kind ?? previous.kind;
       const resultingOngoing = input.isOngoing ?? previous.isOngoing;
+      const resultingStartAt = input.treatmentStartAt === undefined ? previous.treatmentStartAt : input.treatmentStartAt ? new Date(input.treatmentStartAt) : null;
       const resultingEndAt = input.treatmentEndAt === undefined ? previous.treatmentEndAt : input.treatmentEndAt ? new Date(input.treatmentEndAt) : null;
+      if (resultingStartAt && resultingEndAt && resultingEndAt.getTime() < resultingStartAt.getTime()) {
+        throw new AppError(400, "VALIDATION_ERROR", "Therapy end must not precede its start");
+      }
       if (resultingOngoing && (resultingKind !== "medication" || resultingEndAt !== null)) {
         throw new AppError(400, "VALIDATION_ERROR", "Only medication records without an end date can be ongoing therapies");
       }
