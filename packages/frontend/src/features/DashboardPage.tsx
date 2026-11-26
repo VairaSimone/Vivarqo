@@ -141,7 +141,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </div>
       {late && <Badge tone="danger">{t("overdue")}</Badge>}
       {isComplete && <Badge tone="success">{t("completed")}</Badge>}
-      {!isComplete && <button className="dashboard-row-open" aria-label={t("openTask")} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}><Icon name="chevron" size={16} /></button>}
+      {!isComplete && <button className="dashboard-row-open" aria-label={t("openTask")} onClick={() => navigate(category === "health" ? "/companion-care" : `/tasks/${encodeURIComponent(id)}`)}><Icon name="chevron" size={16} /></button>}
     </div>;
   };
 
