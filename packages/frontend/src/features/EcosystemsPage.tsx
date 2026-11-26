@@ -22,6 +22,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   const [birds, setBirds] = useState<Bird[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [selectedId, setSelectedId] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [selectedBirdIds, setSelectedBirdIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,19 +56,19 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     const load = async () => {
       try {
         if (aquariumMode) {
-          const result = await api.get<{ aquariums: Aquarium[] }>("/aquariums");
+          const result = await api.get<{ aquariums: Aquarium[] }>(`/aquariums${showArchived ? "?archived=true" : ""}`);
           if (!active) return;
           setAquariums(result.aquariums);
-          setSelectedId(result.aquariums[0]?.id ?? "");
+          setSelectedId(showArchived ? "" : result.aquariums[0]?.id ?? "");
         } else {
           const [aviaryResult, birdResult] = await Promise.all([
-            api.get<{ aviaries: Aviary[] }>("/aviaries"),
+            api.get<{ aviaries: Aviary[] }>(`/aviaries${showArchived ? "?archived=true" : ""}`),
             api.get<{ animals: Bird[] }>("/animals?category=birds&status=all&page=1&pageSize=100"),
           ]);
           if (!active) return;
           setAviaries(aviaryResult.aviaries);
           setBirds(birdResult.animals);
-          setSelectedId(aviaryResult.aviaries[0]?.id ?? "");
+          setSelectedId(showArchived ? "" : aviaryResult.aviaries[0]?.id ?? "");
         }
       } catch (reason) {
         if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare i dati." : "Unable to load data."));
@@ -77,7 +78,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     };
     void load();
     return () => { active = false; };
-  }, [aquariumMode, italian]);
+  }, [aquariumMode, italian, showArchived]);
 
   useEffect(() => {
     if (!aquariumMode || !selectedId) { setReadings([]); return; }
@@ -239,14 +240,14 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         </form>
       </section>
       <section className="panel">
-        <div className="panel-header"><div><h2>{aquariumMode ? (italian ? "Acquari registrati" : "Registered aquariums") : (italian ? "Voliere registrate" : "Registered aviaries")}</h2></div></div>
-        {aquariumMode ? aquariums.length === 0 ? <p className="ecosys-empty">{italian ? "Non hai ancora creato acquari." : "No aquariums yet."}</p> :
-          <div className="ecosys-list">{aquariums.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "ecosys-item selected" : "ecosys-item"} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.waterType} · {item.volumeLiters} L</span><small>{item._count?.readings ?? 0} {italian ? "misurazioni" : "readings"}</small></button>)}</div>
-          : aviaries.length === 0 ? <p className="ecosys-empty">{italian ? "Non hai ancora creato voliere." : "No aviaries yet."}</p> :
-          <div className="ecosys-list">{aviaries.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "ecosys-item selected" : "ecosys-item"} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.environment}</span><small>{item._count?.birds ?? 0} {italian ? "uccelli" : "birds"}</small></button>)}</div>}
+        <div className="panel-header"><div><h2>{showArchived ? (italian ? "Elementi archiviati" : "Archived items") : (aquariumMode ? (italian ? "Acquari registrati" : "Registered aquariums") : (italian ? "Voliere registrate" : "Registered aviaries"))}</h2></div><Button size="sm" variant="secondary" disabled={saving} onClick={() => setShowArchived((value) => !value)}>{showArchived ? (italian ? "Torna agli attivi" : "Show active") : (italian ? "Mostra archiviati" : "Show archived")}</Button></div>
+        {aquariumMode ? aquariums.length === 0 ? <p className="ecosys-empty">{showArchived ? (italian ? "Nessun acquario archiviato." : "No archived aquariums.") : (italian ? "Non hai ancora creato acquari." : "No aquariums yet.")}</p> :
+          <div className="ecosys-list">{aquariums.map((item) => <div className="ecosys-item" key={item.id}><strong>{item.name}</strong><span>{item.waterType} · {item.volumeLiters} L</span><small>{item._count?.readings ?? 0} {italian ? "misurazioni conservate" : "retained readings"}</small>{showArchived && <Button size="sm" disabled={saving} onClick={async () => { setSaving(true); setError(""); try { await api.post("/aquariums/" + encodeURIComponent(item.id) + "/restore", {}); setAquariums((current) => current.filter((entry) => entry.id !== item.id)); setNotice(italian ? "Acquario ripristinato." : "Aquarium restored."); } catch (reason) { setError(reason instanceof ApiError ? reason.message : (italian ? "Ripristino non riuscito." : "Unable to restore.")); } finally { setSaving(false); } }}>{italian ? "Ripristina" : "Restore"}</Button>}</div>)}</div>
+          : aviaries.length === 0 ? <p className="ecosys-empty">{showArchived ? (italian ? "Nessuna voliera archiviata." : "No archived aviaries.") : (italian ? "Non hai ancora creato voliere." : "No aviaries yet.")}</p> :
+          <div className="ecosys-list">{aviaries.map((item) => <div className="ecosys-item" key={item.id}><strong>{item.name}</strong><span>{item.environment}</span><small>{item._count?.birds ?? 0} {italian ? "uccelli associati" : "assigned birds"}</small>{showArchived && <Button size="sm" disabled={saving} onClick={async () => { setSaving(true); setError(""); try { await api.post("/aviaries/" + encodeURIComponent(item.id) + "/restore", {}); setAviaries((current) => current.filter((entry) => entry.id !== item.id)); setNotice(italian ? "Voliera ripristinata con le associazioni originali." : "Aviary restored with its original bird assignments."); } catch (reason) { setError(reason instanceof ApiError ? reason.message : (italian ? "Ripristino non riuscito." : "Unable to restore.")); } finally { setSaving(false); } }}>{italian ? "Ripristina" : "Restore"}</Button>}</div>)}</div>}
       </section>
     </div>
-    {aquariumMode && selectedAquarium && <section className="panel ecosys-details">
+    {!showArchived && aquariumMode && selectedAquarium && <section className="panel ecosys-details">
       <div className="panel-header"><div><h2>{italian ? "Nuova misurazione" : "New water reading"}</h2><p>{selectedAquarium.name} · {selectedAquarium.volumeLiters} L</p></div><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={editSelected}>{italian ? "Modifica acquario" : "Edit aquarium"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void archiveSelected()}>{italian ? "Archivia" : "Archive"}</Button></div></div>
       <form className="form-grid" onSubmit={createReading}>
         <label className="field"><span className="field-label">{italian ? "Data e ora" : "Date and time"}</span><input className="control" type="datetime-local" required value={measuredAt} onChange={(e) => setMeasuredAt(e.target.value)} /></label>
@@ -267,7 +268,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
           readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · GH {reading.ghDkh ?? "—"} · KH {reading.khDkh ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · Salinità {reading.salinityPpt ?? "—"} ppt · TDS {reading.tdsPpm ?? "—"}</span><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={() => { setEditingReadingId(reading.id); const date = new Date(reading.measuredAt); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); setMeasuredAt(date.toISOString().slice(0,16)); setTemperatureC(reading.temperatureC === null ? "" : String(reading.temperatureC)); setPh(reading.ph === null ? "" : String(reading.ph)); setGhDkh(reading.ghDkh === null ? "" : String(reading.ghDkh)); setKhDkh(reading.khDkh === null ? "" : String(reading.khDkh)); setAmmoniaMgL(reading.ammoniaMgL === null ? "" : String(reading.ammoniaMgL)); setNitriteMgL(reading.nitriteMgL === null ? "" : String(reading.nitriteMgL)); setNitrateMgL(reading.nitrateMgL === null ? "" : String(reading.nitrateMgL)); setSalinityPpt(reading.salinityPpt === null ? "" : String(reading.salinityPpt)); setTdsPpm(reading.tdsPpm === null ? "" : String(reading.tdsPpm)); }}>{italian ? "Modifica" : "Edit"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteReading(reading.id)}>{italian ? "Elimina" : "Delete"}</Button></div></div>) }
       </div>
     </section>}
-    {!aquariumMode && selectedAviary && <section className="panel ecosys-details">
+    {!showArchived && !aquariumMode && selectedAviary && <section className="panel ecosys-details">
       <div className="panel-header"><div><h2>{italian ? "Uccelli nella voliera" : "Birds in this aviary"}</h2><p>{selectedAviary.name}</p></div><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={editSelected}>{italian ? "Modifica voliera" : "Edit aviary"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void archiveSelected()}>{italian ? "Archivia" : "Archive"}</Button></div></div>
       {birds.length === 0 ? <p className="ecosys-empty">{italian ? "Prima registra gli uccelli nella sezione Animali." : "Add bird records in the Animals section first."}</p> :
         <form onSubmit={saveBirds} className="ecosys-bird-form">
