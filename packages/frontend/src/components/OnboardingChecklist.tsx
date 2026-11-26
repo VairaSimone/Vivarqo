@@ -110,7 +110,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
             </li>;
           })}
         </ol>
-        <p className="onboarding-checklist-footnote">{english ? "You can keep using SnakeBee without completing every suggestion. Your existing records are not changed." : "Puoi usare SnakeBee anche senza completare tutti i suggerimenti. I dati già presenti non vengono modificati."}</p>
+        <p className="onboarding-checklist-footnote">{english ? "You can keep using Vivarqo without completing every suggestion. Your existing records are not changed." : "Puoi usare Vivarqo anche senza completare tutti i suggerimenti. I dati già presenti non vengono modificati."}</p>
       </div>}
     </section>}
     {suggestions.length > 0 && <section className="onboarding-contextual" aria-label={english ? "Suggested next steps" : "Suggerimenti contestuali"}>
