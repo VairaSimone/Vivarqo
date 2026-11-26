@@ -14,8 +14,8 @@ CREATE TABLE "bird_profiles" (
   "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "bird_profiles_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "bird_profiles_user_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "bird_profiles_animal_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_profiles_animal_id_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "bird_profiles_ring_type_check" CHECK ("ring_type" IN ('none','closed','open','microchip')),
   CONSTRAINT "bird_profiles_ring_year_check" CHECK ("ring_year" IS NULL OR ("ring_year" BETWEEN 1900 AND 2200)),
   CONSTRAINT "bird_profiles_cites_dates_check" CHECK ("cites_expires_at" IS NULL OR "cites_issued_at" IS NULL OR "cites_expires_at" >= "cites_issued_at")
@@ -38,10 +38,10 @@ CREATE TABLE "bird_breeding_pairs" (
   "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "bird_breeding_pairs_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "bird_breeding_pairs_user_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "bird_breeding_pairs_female_fkey" FOREIGN KEY ("female_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "bird_breeding_pairs_male_fkey" FOREIGN KEY ("male_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "bird_breeding_pairs_cycle_fkey" FOREIGN KEY ("cycle_id") REFERENCES "reproduction_cycles"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_female_animal_id_fkey" FOREIGN KEY ("female_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_male_animal_id_fkey" FOREIGN KEY ("male_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "reproduction_cycles"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "bird_breeding_pairs_different_birds_check" CHECK ("female_animal_id" <> "male_animal_id"),
   CONSTRAINT "bird_breeding_pairs_status_check" CHECK ("status" IN ('active','paused','completed','cancelled')),
   CONSTRAINT "bird_breeding_pairs_dates_check" CHECK ("separated_at" IS NULL OR "separated_at" >= "paired_at")
@@ -62,7 +62,7 @@ CREATE TABLE "aviary_maintenance" (
   "notes" TEXT,
   "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "aviary_maintenance_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "aviary_maintenance_aviary_fkey" FOREIGN KEY ("aviary_id") REFERENCES "aviaries"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "aviary_maintenance_aviary_id_fkey" FOREIGN KEY ("aviary_id") REFERENCES "aviaries"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "aviary_maintenance_action_check" CHECK ("action" IN ('cleaning','disinfection','inspection','repair','other')),
   CONSTRAINT "aviary_maintenance_due_check" CHECK ("next_due_at" IS NULL OR "next_due_at" >= "occurred_at")
 );
