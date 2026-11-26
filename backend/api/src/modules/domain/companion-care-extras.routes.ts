@@ -33,6 +33,7 @@ const policySchema = z.object({
   reminderDays: z.number().int().min(0).max(365).default(30),
   notes: z.string().max(5000).nullable().optional(),
 });
+const policyPatchSchema = policySchema.partial().extend({ animalId: uuid.optional() });
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body);
   if (!result.success) throw new AppError(400, "VALIDATION_ERROR", "Request validation failed", { issues: result.error.issues });
@@ -113,7 +114,7 @@ export function createCompanionCareExtrasRouter() {
   router.patch("/companion-care/policies/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = routeId(req.params.id);
-    const input = parse(policySchema.partial().extend({ animalId: uuid.optional() }), req.body);
+    const input = parse(policyPatchSchema, req.body);
     const existing = await prisma.companionPolicy.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "COMPANION_POLICY_NOT_FOUND", "Policy not found");
     if (input.animalId) await ownedAnimal(auth.userId, input.animalId);
