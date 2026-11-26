@@ -53,16 +53,20 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       .send({ name: "Tropical", waterType: "freshwater", volumeLiters: 120, setupDate: "2026-01-01" }).expect(201);
     const id = aquarium.body.aquarium.id as string;
     await owner.agent.post(`/api/v1/aquariums/${id}/readings`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ measuredAt: new Date().toISOString(), temperatureC: 25.5, ph: 6.8, ammoniaMgL: 0, nitriteMgL: 0, nitrateMgL: 15 }).expect(201);
+      .send({ measuredAt: new Date().toISOString(), temperatureC: 25.5, ph: 6.8, ghDkh: null, khDkh: null, ammoniaMgL: 0, nitriteMgL: 0, nitrateMgL: null }).expect(201);
     await owner.agent.get(`/api/v1/aquariums/${id}/readings`).expect(200).expect((res) => {
       expect(res.body.readings).toHaveLength(1);
       expect(Number(res.body.readings[0].ph)).toBeCloseTo(6.8);
+      expect(res.body.readings[0].ghDkh).toBeNull();
+      expect(res.body.readings[0].khDkh).toBeNull();
+      expect(res.body.readings[0].nitrateMgL).toBeNull();
     });
     await other.agent.get(`/api/v1/aquariums/${id}/readings`).expect(404);
     await owner.agent.patch(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Tropical updated", location: "Living room" }).expect(200);
     await owner.agent.patch(`/api/v1/aquariums/${id}/readings/${(await owner.agent.get(`/api/v1/aquariums/${id}/readings`)).body.readings[0].id}`)
-      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ ph: 7.1 }).expect(200);
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ ph: 7.1, ghDkh: null, khDkh: null }).expect(200)
+      .expect((res) => { expect(res.body.reading.ghDkh).toBeNull(); expect(res.body.reading.khDkh).toBeNull(); });
     await owner.agent.delete(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
     await owner.agent.get("/api/v1/aquariums").expect(200).expect((res) => expect(res.body.aquariums).toHaveLength(0));
   });
