@@ -168,7 +168,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       .send({ eggs: [{ code: "U1", status: "incubating", laidAt: new Date("2026-11-10T10:00:00.000Z").toISOString() }] }).expect(201);
 
     await owner.agent.post(`/api/v1/animals/${female.id}/health-records`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ recordType: "checkup", status: "ongoing", occurredAt: new Date().toISOString(), title: "Controllo veterinario", veterinarian: "Dott.ssa Test", clinic: "Ambulatorio test" }).expect(201);
+      .send({ recordType: "vaccination", status: "ongoing", occurredAt: new Date().toISOString(), title: "Controllo veterinario", veterinarian: "Dott.ssa Test", clinic: "Ambulatorio test" }).expect(201);
     await owner.agent.get(`/api/v1/animals/${female.id}/health-records`).expect(200).expect((res) => expect(res.body.records).toHaveLength(1));
 
     await owner.agent.post(`/api/v1/aviaries/${aviaryId}/maintenance`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
