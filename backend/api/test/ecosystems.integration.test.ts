@@ -117,7 +117,9 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(res.body.notes).toHaveLength(1);
     });
     await owner.agent.get("/api/v1/home/today/collection").expect(200).expect((res) => {
+      expect(res.body.totals.total).toBe(1);
       expect(res.body.totals.active).toBe(1);
+      expect(res.body.categories.find((item: { category: string }) => item.category === "birds").total).toBe(1);
       expect(res.body.categories.find((item: { category: string }) => item.category === "birds").active).toBe(1);
     });
     await owner.agent.get("/api/v1/home/today/recent").expect(200).expect((res) => {
