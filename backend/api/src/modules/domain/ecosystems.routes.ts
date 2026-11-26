@@ -149,6 +149,9 @@ export function createEcosystemRouter() {
     const birds = await prisma.animal.findMany({ where: { id: { in: ids }, userId: auth.userId, category: "birds" }, select: { id: true } });
     if (birds.length !== ids.length) throw new AppError(400, "INVALID_BIRD", "One or more selected records are not birds in this account");
     await prisma.$transaction(async (tx) => {
+      // A bird can belong to one aviary only. Reassigning it moves the record,
+      // while the animal and its care history remain untouched.
+      if (ids.length) await tx.aviaryBird.deleteMany({ where: { animalId: { in: ids } } });
       await tx.aviaryBird.deleteMany({ where: { aviaryId: aviary.id } });
       if (ids.length) await tx.aviaryBird.createMany({ data: ids.map((animalId) => ({ aviaryId: aviary.id, animalId })) });
     });

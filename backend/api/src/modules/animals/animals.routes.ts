@@ -7,7 +7,7 @@ import { logger } from "../../logger.js";
 import { deletePrivateObject } from "../domain/private-storage.js";
 import { assertAnimalCapacity } from "../domain/billing-entitlements.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema, validateAnimalDomainProfile, type animalCategorySchema } from "./animals.schemas.js";
+import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema, validateAnimalDomainProfile } from "./animals.schemas.js";
 
 function requestId(res: Response): string {
   return typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
@@ -234,9 +234,11 @@ export function createAnimalRouter() {
     if (!existing) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
     const resultingCategory = input.category ?? existing.category;
     if (input.category) await assertAnimalCategoryEnabled(auth.userId, input.category);
-    if ("domainProfile" in input) {
-      const profile = validateAnimalDomainProfile(resultingCategory as "reptiles" | "fish" | "birds" | "dogs_cats", input.domainProfile ?? {});
+    if ("domainProfile" in input || input.category) {
+      const profileValue = input.domainProfile ?? (input.category ? {} : existing.domainProfile ?? {});
+      const profile = validateAnimalDomainProfile(resultingCategory as "reptiles" | "fish" | "birds" | "dogs_cats", profileValue);
       if (!profile.success) throw new AppError(400, "VALIDATION_ERROR", "Invalid category-specific animal profile", { issues: profile.error.issues });
+      if (input.category && !("domainProfile" in input)) input.domainProfile = {};
     }
     if (existing.status === "archived" && "status" in input) {
       throw new AppError(409, "ANIMAL_ARCHIVED", "Use the restore action before changing an archived animal status");

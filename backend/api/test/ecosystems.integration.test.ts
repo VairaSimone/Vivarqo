@@ -37,7 +37,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const agent = request.agent(app);
     const csrf = (await agent.get("/api/v1/auth/csrf")).body.csrfToken as string;
     await agent.post("/api/v1/auth/login").set("Origin", origin).set("X-CSRF-Token", csrf).send({ email, password }).expect(200);
-    return { agent, csrf };
+    return { userId: user.id, agent, csrf };
   }
   it("records aquarium water parameters and prevents cross-account access", async () => {
     const owner = await account(["fish"]);
@@ -57,7 +57,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const owner = await account(["birds"]);
     const aviary = await owner.agent.post("/api/v1/aviaries").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Voliere esterna", environment: "outdoor", capacity: 12 }).expect(201);
-    const bird = await prisma.animal.create({ data: { userId: (await prisma.user.findFirstOrThrow({ where: { email: { contains: "ecosystems-" } }, orderBy: { createdAt: "desc" } })).id, name: "Cocorita", species: "Melopsittacus undulatus", category: "birds" } });
+    const bird = await prisma.animal.create({ data: { userId: owner.userId, name: "Cocorita", species: "Melopsittacus undulatus", category: "birds" } });
     await owner.agent.put(`/api/v1/aviaries/${aviary.body.aviary.id}/birds`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ animalIds: [bird.id] }).expect(200).expect((res) => expect(res.body.assignedCount).toBe(1));
   });
