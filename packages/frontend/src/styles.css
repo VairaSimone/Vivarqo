@@ -3919,6 +3919,7 @@ kbd { font-size: 11px; }
 
 /* Ecosystem monitoring additions */
 .ecosys-trend { width: 100%; min-width: 0; }
+.status-danger { color: var(--danger); font-weight: 650; }
 .ecosys-trend svg { display: block; width: 100%; height: auto; max-height: 220px; overflow: visible; }
 .ecosys-trend .inline-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
 .ecosys-ranges .form-grid { align-items: end; }
