@@ -152,6 +152,7 @@ export const api = {
       "X-CSRF-Token": await getCsrfToken()
     });
     for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
+    headers.set("X-Document-Name", file.name);
     headers.set("Content-Type", file.type || "application/octet-stream");
     const response = await fetch(API_BASE + path, {
       method: "POST",
