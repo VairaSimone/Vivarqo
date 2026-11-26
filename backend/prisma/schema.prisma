@@ -62,8 +62,8 @@ model User {
   collaboratorMemberships WorkspaceMembership[] @relation("WorkspaceCollaborator")
   ownedWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationOwner")
   activeWorkspaceSessions UserSession[] @relation("SessionActiveWorkspace")
-  @@map("users")
   aquariumCompatibilityRules AquariumCompatibilityRule[]
+  @@map("users")
 }
 
 model WorkspaceMembership {
@@ -1500,8 +1500,8 @@ model AquariumCompatibilityRule {
   notes         String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, speciesAKey, speciesBKey], map: "aquarium_compatibility_user_species_key")
   @@index([userId, compatibility], map: "aquarium_compatibility_user_status_idx")
   @@map("aquarium_compatibility_rules")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
