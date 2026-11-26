@@ -189,7 +189,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
       } else {
         await api.post(`/aquariums/${encodeURIComponent(selectedId)}/readings`, payload);
       }
-      const result = await api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`);
+      const result = await api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings?take=1000`);
       setReadings(result.readings);
       setEditingReadingId(null);
       setTemperatureC(""); setPh(""); setGhDkh(""); setKhDkh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setSalinityPpt(""); setTdsPpm("");
