@@ -37,6 +37,8 @@ model User {
   accountConfiguration    AccountConfiguration?
   aquariums               Aquarium[]
   aviaries                Aviary[]
+  birdProfiles            BirdProfile[]
+  birdBreedingPairs       BirdBreedingPair[]
   companionCareRecords    CompanionCareRecord[]
   pushSubscriptions       PushSubscription[]
   pushDeliveryAttempts    PushDeliveryAttempt[]
@@ -191,6 +193,9 @@ model Animal {
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
   aviaryAssignments      AviaryBird[]
+  birdProfile            BirdProfile?
+  breedingPairsAsFemale  BirdBreedingPair[] @relation("BirdPairFemale")
+  breedingPairsAsMale    BirdBreedingPair[] @relation("BirdPairMale")
   aviaryMovements        AviaryMovement[]
   companionCareRecords   CompanionCareRecord[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
@@ -399,6 +404,7 @@ model ReproductionCycle {
   clutches          Clutch[]
   offspringBatches  OffspringBatch[]
   documents         Document[]
+  birdPair          BirdBreedingPair?
   @@unique([id, userId], map: "reproduction_cycles_id_user_id_unique")
   @@index([userId, status, startedOn(sort: Desc)], map: "reproduction_cycles_user_status_started_idx")
   @@index([parentAAnimalId], map: "reproduction_cycles_parent_a_idx")
@@ -1123,6 +1129,67 @@ model AviaryMovement {
   @@map("aviary_movements")
 }
 
+
+model BirdProfile {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  animalId       String   @unique @map("animal_id") @db.Uuid
+  ringType       String   @default("none") @map("ring_type") @db.VarChar(16)
+  ringNumber     String?  @map("ring_number") @db.VarChar(80)
+  ringYear       Int?     @map("ring_year")
+  citesNumber    String?  @map("cites_number") @db.VarChar(120)
+  citesAnnex     String?  @map("cites_annex") @db.VarChar(24)
+  citesAuthority String?  @map("cites_authority") @db.VarChar(160)
+  citesIssuedAt  DateTime? @map("cites_issued_at") @db.Date
+  citesExpiresAt DateTime? @map("cites_expires_at") @db.Date
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal         Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@unique([userId, ringNumber], map: "bird_profiles_user_ring_unique")
+  @@unique([userId, citesNumber], map: "bird_profiles_user_cites_unique")
+  @@index([userId, updatedAt(sort: Desc)], map: "bird_profiles_user_updated_idx")
+  @@map("bird_profiles")
+}
+
+model BirdBreedingPair {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  femaleAnimalId String   @map("female_animal_id") @db.Uuid
+  maleAnimalId   String   @map("male_animal_id") @db.Uuid
+  cycleId        String   @unique @map("cycle_id") @db.Uuid
+  pairedAt       DateTime @map("paired_at") @db.Date
+  separatedAt    DateTime? @map("separated_at") @db.Date
+  status         String   @default("active") @db.VarChar(16)
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  female         Animal   @relation("BirdPairFemale", fields: [femaleAnimalId], references: [id], onDelete: Restrict)
+  male           Animal   @relation("BirdPairMale", fields: [maleAnimalId], references: [id], onDelete: Restrict)
+  cycle          ReproductionCycle @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  @@index([userId, status, pairedAt(sort: Desc)], map: "bird_pairs_user_status_date_idx")
+  @@index([femaleAnimalId, maleAnimalId], map: "bird_pairs_animals_idx")
+  @@map("bird_breeding_pairs")
+}
+
+model AviaryMaintenance {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aviaryId    String   @map("aviary_id") @db.Uuid
+  occurredAt  DateTime @map("occurred_at") @db.Timestamptz(6)
+  action      String   @db.VarChar(24)
+  area        String?  @db.VarChar(160)
+  products    String?  @db.VarChar(240)
+  nextDueAt   DateTime? @map("next_due_at") @db.Timestamptz(6)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aviary      Aviary   @relation(fields: [aviaryId], references: [id], onDelete: Cascade)
+  @@index([aviaryId, occurredAt(sort: Desc)], map: "aviary_maintenance_aviary_occurred_idx")
+  @@index([aviaryId, nextDueAt], map: "aviary_maintenance_aviary_due_idx")
+  @@map("aviary_maintenance")
+}
+
 model AviaryNote {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   aviaryId   String   @map("aviary_id") @db.Uuid
@@ -1171,6 +1238,7 @@ model Aviary {
   movementsFrom AviaryMovement[] @relation("AviaryMovementFrom")
   movementsTo AviaryMovement[] @relation("AviaryMovementTo")
   notesHistory AviaryNote[]
+  maintenance  AviaryMaintenance[]
   @@index([userId, archivedAt, name], map: "aviaries_user_archived_name_idx")
   @@map("aviaries")
 }
