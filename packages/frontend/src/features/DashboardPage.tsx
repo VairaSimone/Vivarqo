@@ -294,7 +294,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
                 : eventType === "aviary_note" ? (locale === "it" ? rawTitle : rawTitle.replace("Nota:", "Aviary note:"))
                 : rawTitle;
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
-                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "aquarium_reading" ? "calendar" : eventType === "aviary_movement" ? "egg" : eventType === "aviary_note" || eventType === "note" ? "file" : "leaf"} size={15} /></span>
+                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "aquarium_reading" ? "calendar" : eventType === "aviary_movement" ? "leaf" : eventType === "aviary_note" || eventType === "note" ? "file" : "leaf"} size={15} /></span>
                 <span className="activity-copy"><strong>{eventTitle}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
                 <Icon name="chevron" size={15} />
               </button>;
