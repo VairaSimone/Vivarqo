@@ -16,7 +16,7 @@ const companionCareCreateSchema = z.object({
   isOngoing: z.boolean().optional(),
   dosage: z.string().trim().max(120).nullable().optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
-}).strict().refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" });
+}).strict().refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" }).refine((value) => !value.isOngoing || (value.kind === "medication" && !value.treatmentEndAt), { path: ["isOngoing"], message: "Only medication records without an end date can be ongoing therapies" });
 const companionCarePatchSchema = z.object({
   kind: z.enum(kinds).optional(), title: z.string().trim().min(1).max(160).optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(),
@@ -109,9 +109,15 @@ export function createCompanionCareRouter() {
     const record = await prisma.$transaction(async (tx) => {
       const previous = await tx.companionCareRecord.findFirst({
         where: { id, userId: auth.userId, deletedAt: null },
-        select: { nextDueAt: true, completedAt: true },
+        select: { nextDueAt: true, completedAt: true, kind: true, isOngoing: true, treatmentEndAt: true },
       });
       if (!previous) throw new AppError(404, "COMPANION_CARE_NOT_FOUND", "Care record not found");
+      const resultingKind = input.kind ?? previous.kind;
+      const resultingOngoing = input.isOngoing ?? previous.isOngoing;
+      const resultingEndAt = input.treatmentEndAt === undefined ? previous.treatmentEndAt : input.treatmentEndAt ? new Date(input.treatmentEndAt) : null;
+      if (resultingOngoing && (resultingKind !== "medication" || resultingEndAt !== null)) {
+        throw new AppError(400, "VALIDATION_ERROR", "Only medication records without an end date can be ongoing therapies");
+      }
       const requestedDueAt = input.nextDueAt === undefined ? undefined : input.nextDueAt ? new Date(input.nextDueAt) : null;
       const dueDateChanged = requestedDueAt !== undefined
         && (requestedDueAt?.getTime() ?? null) !== (previous.nextDueAt?.getTime() ?? null);
