@@ -4614,6 +4614,213 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
+  /api/v1/birds/{animalId}/profile:
+    parameters:
+      - name: animalId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getBirdIdentificationProfile
+      tags: [Animals]
+      summary: Recupera anello identificativo e dati CITES dell'uccello
+      responses:
+        '200':
+          description: Scheda identificativa individuale.
+          content:
+            application/json:
+              schema: { type: object, required: [profile], properties: { profile: { type: [object, 'null'] } } }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      operationId: upsertBirdIdentificationProfile
+      tags: [Animals]
+      summary: Crea o aggiorna anello identificativo e dati CITES
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/bird-management.routes.ts
+          symbol: profileSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                ringType: { type: string, enum: [none, closed, open, microchip] }
+                ringNumber: { type: [string, 'null'], maxLength: 80 }
+                ringYear: { type: [integer, 'null'], minimum: 1900, maximum: 2200 }
+                citesNumber: { type: [string, 'null'], maxLength: 120 }
+                citesAnnex: { type: [string, 'null'], maxLength: 24 }
+                citesAuthority: { type: [string, 'null'], maxLength: 160 }
+                citesIssuedAt: { type: [string, 'null'], format: date }
+                citesExpiresAt: { type: [string, 'null'], format: date }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200':
+          description: Scheda salvata.
+          content:
+            application/json:
+              schema: { type: object, required: [profile], properties: { profile: { type: object } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/bird-breeding-pairs:
+    get:
+      operationId: listBirdBreedingPairs
+      tags: [Animals]
+      summary: Elenca le coppie riproduttrici e i relativi cicli con conteggio covate e piccoli
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [all, active, paused, completed, cancelled], default: all }
+      responses:
+        '200':
+          description: Coppie dell'account.
+          content:
+            application/json:
+              schema: { type: object, required: [pairs], properties: { pairs: { type: array, items: { type: object } } } }
+    post:
+      operationId: createBirdBreedingPair
+      tags: [Animals]
+      summary: Registra una coppia e crea il relativo ciclo riproduttivo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/bird-management.routes.ts
+          symbol: pairSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [femaleAnimalId, maleAnimalId, pairedAt]
+              properties:
+                femaleAnimalId: { type: string, format: uuid }
+                maleAnimalId: { type: string, format: uuid }
+                pairedAt: { type: string, format: date }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Coppia e ciclo riproduttivo creati.
+          content:
+            application/json:
+              schema: { type: object, required: [pair], properties: { pair: { type: object } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/bird-breeding-pairs/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateBirdBreedingPair
+      tags: [Animals]
+      summary: Sospende, riattiva o conclude una coppia riproduttrice
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/bird-management.routes.ts
+          symbol: pairPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status: { type: string, enum: [active, paused, completed, cancelled] }
+                separatedAt: { type: [string, 'null'], format: date }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200': { description: Coppia aggiornata. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/aviaries/{aviaryId}/maintenance:
+    parameters:
+      - name: aviaryId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAviaryMaintenance
+      tags: [Ecosystems]
+      summary: Elenca pulizie, disinfezioni, ispezioni e scadenze di manutenzione
+      responses:
+        '200':
+          description: Registro manutenzione.
+          content:
+            application/json:
+              schema: { type: object, required: [records], properties: { records: { type: array, items: { type: object } } } }
+    post:
+      operationId: createAviaryMaintenance
+      tags: [Ecosystems]
+      summary: Registra un intervento di pulizia o manutenzione
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/bird-management.routes.ts
+          symbol: maintenanceSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurredAt, action]
+              properties:
+                occurredAt: { type: string, format: date-time }
+                action: { type: string, enum: [cleaning, disinfection, inspection, repair, other] }
+                area: { type: [string, 'null'], maxLength: 160 }
+                products: { type: [string, 'null'], maxLength: 240 }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201': { description: Intervento registrato. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/aviary-maintenance/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateAviaryMaintenance
+      tags: [Ecosystems]
+      summary: Modifica un intervento registrato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/bird-management.routes.ts
+          symbol: maintenancePatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                occurredAt: { type: string, format: date-time }
+                action: { type: string, enum: [cleaning, disinfection, inspection, repair, other] }
+                area: { type: [string, 'null'], maxLength: 160 }
+                products: { type: [string, 'null'], maxLength: 240 }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200': { description: Intervento aggiornato. }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAviaryMaintenance
+      tags: [Ecosystems]
+      summary: Elimina un intervento registrato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Intervento eliminato. }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/aviaries:
     get:
       operationId: listAviaries
