@@ -269,7 +269,10 @@ export function createEcosystemRouter() {
       orderBy: [{ name: "asc" }, { id: "asc" }],
       include: { _count: { select: { birds: true } } },
     });
-    res.status(200).json({ aviaries });
+    res.status(200).json({ aviaries: aviaries.map((aviary) => ({
+      ...aviary,
+      capacityRemaining: aviary.capacity === null ? null : Math.max(0, aviary.capacity - aviary._count.birds),
+    })) });
   });
 
   router.post("/aviaries", requireSession, async (req, res) => {
