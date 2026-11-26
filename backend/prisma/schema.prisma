@@ -34,6 +34,7 @@ model User {
   tasks                   Task[]
   notificationPreferences NotificationPreferences?
   userPreference           UserPreference?
+  accountConfiguration    AccountConfiguration?
   pushSubscriptions       PushSubscription[]
   pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
@@ -1049,6 +1050,16 @@ model UserPreference {
   @@map("user_preferences")
 }
 
+
+model AccountConfiguration {
+  userId       String   @id @map("user_id") @db.Uuid
+  animalCategories String[] @default([]) @map("animal_categories") @db.VarChar(24)
+  configuredAt DateTime @default(now()) @map("configured_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("account_configurations")
+}
 
 model PushDeliveryAttempt {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
