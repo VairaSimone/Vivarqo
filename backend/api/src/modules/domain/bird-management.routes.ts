@@ -4,7 +4,7 @@ import { prisma } from "../../db/prisma.js";
 import { AppError } from "../../errors/app-error.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 
-const dateOnly = z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/);
+const dateOnly = z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).refine(value => { const parsed = new Date(value + "T00:00:00.000Z"); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; }, "Invalid calendar date");
 const profileSchema = z.object({
   ringType: z.enum(["none", "closed", "open", "microchip"]).optional(),
   ringNumber: z.string().trim().max(80).nullable().optional(),
@@ -85,6 +85,19 @@ export function createBirdManagementRouter() {
     const animalId = parseUuid(req.params.animalId);
     await ownedBird(auth.userId, animalId);
     const input = parse(profileSchema, req.body);
+    const existing = await prisma.birdProfile.findFirst({ where: { userId: auth.userId, animalId } });
+    const ringType = input.ringType ?? existing?.ringType ?? "none";
+    const ringNumber = input.ringNumber !== undefined ? input.ringNumber : existing?.ringNumber ?? null;
+    const citesIssuedAt = input.citesIssuedAt !== undefined ? input.citesIssuedAt : existing?.citesIssuedAt?.toISOString().slice(0, 10) ?? null;
+    const citesExpiresAt = input.citesExpiresAt !== undefined ? input.citesExpiresAt : existing?.citesExpiresAt?.toISOString().slice(0, 10) ?? null;
+    if (ringType === "none" && ringNumber) throw new AppError(400, "RING_TYPE_REQUIRED", "Choose a ring or microchip type for the identification number");
+    if (citesIssuedAt && citesExpiresAt && citesExpiresAt < citesIssuedAt) throw new AppError(400, "INVALID_CITES_DATES", "CITES expiry cannot precede issue date");
+    for (const [field, value] of [["ringNumber", ringNumber], ["citesNumber", input.citesNumber !== undefined ? input.citesNumber : existing?.citesNumber ?? null]] as const) {
+      if (value) {
+        const duplicate = await prisma.birdProfile.findFirst({ where: { userId: auth.userId, animalId: { not: animalId }, [field]: value }, select: { id: true } });
+        if (duplicate) throw new AppError(409, field === "ringNumber" ? "RING_NUMBER_ALREADY_USED" : "CITES_NUMBER_ALREADY_USED", "This identification number is already assigned to another bird");
+      }
+    }
     const profile = await prisma.birdProfile.upsert({
       where: { animalId },
       create: {
