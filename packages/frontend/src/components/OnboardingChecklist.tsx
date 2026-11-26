@@ -13,7 +13,7 @@ type ProgressResponse = {
 const STORAGE_KEY = "vivarqo.onboarding.minimized";
 
 const steps: Array<{ key: Milestone; icon: string; path: string; title: { it: string; en: string }; description: { it: string; en: string }; action: { it: string; en: string } }> = [
-  { key: "animal", icon: "snake", path: "/animals?create=1", title: { it: "Aggiungi i tuoi animali", en: "Add your animals" }, description: { it: "Crea la prima scheda oppure importa la collezione da un file. Non serve configurare tutto adesso.", en: "Create your first profile or import your collection from a file. You don't need to configure everything now." }, action: { it: "Aggiungi animali", en: "Add animals" } },
+  { key: "animal", icon: "snake", path: "/animals?create=1", title: { it: "Aggiungi i tuoi animali", en: "Add your animals" }, description: { it: "Crea la prima scheda. Se arrivi da Excel, puoi importare la collezione invece di inserirla a mano.", en: "Create your first profile. If you are moving from Excel, you can import your collection instead." }, action: { it: "Aggiungi animali", en: "Add animals" } },
   { key: "feeding", icon: "feed", path: "/feeding?create=1", title: { it: "Registra la prima alimentazione", en: "Record your first feeding" }, description: { it: "Collega un pasto a uno o più animali e inizia a costruire il loro storico.", en: "Link a feeding to one or more animals and start building their care history." }, action: { it: "Registra pasto", en: "Record feeding" } },
 ];
 
@@ -80,6 +80,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
 
   const completedCount = steps.filter((step) => progress.completed[step.key] === true).length;
   const showChecklist = completedCount < steps.length;
+  const nextSteps = steps.filter((item, index) => steps.slice(0, index).every((previous) => progress.completed[previous.key] === true)).slice(0, 1);
   const suggestions = contextual.filter((item) => {
     if (progress.dismissedSuggestions.includes(item.key)) return false;
     if (item.key === "animal-care") return progress.completed.animal && !progress.completed.weight;
@@ -98,13 +99,14 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
       {!minimized && <div id="onboarding-checklist-content">
         <div className="onboarding-checklist-track" role="progressbar" aria-label={english ? "Getting started progress" : "Primi passi completati"} aria-valuemin={0} aria-valuemax={2} aria-valuenow={completedCount}><span style={{ width: `${completedCount / 2 * 100}%` }} /></div>
         <ol className="onboarding-checklist-items">
-          {steps.map((item) => {
+          {nextSteps.map((item) => {
             const done = progress.completed[item.key] === true;
             return <li key={item.key} className={done ? "is-complete" : ""}>
               <span className="onboarding-checklist-icon"><Icon name={done ? "checkCircle" : item.icon} size={18} /></span>
               <div className="onboarding-checklist-copy"><strong>{english ? item.title.en : item.title.it}</strong><p>{english ? item.description.en : item.description.it}</p></div>
               {done ? <span className="onboarding-checklist-done"><Icon name="check" size={14} />{english ? "Done" : "Completato"}</span>
                 : <Button size="sm" variant="secondary" onClick={() => onNavigate(item.path)}>{english ? item.action.en : item.action.it}<Icon name="arrow" size={14} /></Button>}
+              {item.key === "animal" && !done && <Button size="sm" variant="ghost" onClick={() => onNavigate("/imports")}>{english ? "Import from file" : "Importa da file"}</Button>}
             </li>;
           })}
         </ol>
