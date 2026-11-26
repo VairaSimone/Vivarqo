@@ -15,6 +15,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const remindersResource = useResource<{ items: Array<Record<string, unknown>>; count: number; truncated: boolean }>("/home/today/reminders");
   const feedingAlertsResource = useResource<{ items: Array<{ id: string; name: string; species: string; photoUrl?: string | null; lastMealAt: string | null; daysSinceLastMeal: number; feedingIntervalDays: number; feedingStatus: "no_history" | "overdue" | "due_soon" }> }>("/home/today/feeding-alerts");
   const overviewResource = useResource<{ activeAnimals: number; feedingsToday: number; lowStockItems: Array<{ id: string; name: string; quantityOnHand: string; minimumQuantity: string; unit: string }>; lowStockCount: number }>("/home/today/overview");
+  const collectionResource = useResource<{ totals: { active: number; archived: number }; categories: Array<{ category: string; active: number; archived: number }>; upcoming: Array<{ id: string; title: string; dueAt: string; category: string; animal: { id: string; name: string; category: string } | null; targetPath: string }>; recentNotes: Array<{ id: string; title: string; occurredAt: string; animal: { id: string; name: string; category: string }; targetPath: string }> }>("/home/today/collection");
   const recentResource = useResource<{ events: Array<{ type: string; occurredAt: string; title: string; targetPath: string }>; smartSuggestions: Array<{ id: string; type: string; title: string; dueAt: string | null; targetPath: string }> }>("/home/today/recent");
   const { toast, show } = useToast();
   const accountPreferences = useResource<{ preferences: { dashboardLayout?: { order?: string[]; visibility?: Record<string, boolean> } } }>("/account/preferences");
@@ -207,6 +208,21 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         </>}
       </Panel>}</div>}
 
+      <div className="dashboard-widget dashboard-collection-overview"><Panel>
+        <PanelHeader title={locale === "it" ? "Panoramica di tutti gli animali" : "All animals overview"} action={<Button size="sm" variant="ghost" onClick={() => collectionResource.reload()}>{locale === "it" ? "Aggiorna" : "Refresh"}</Button>} />
+        {collectionResource.loading && !collectionResource.data ? <Skeleton rows={3} /> : collectionResource.error ? <ErrorState message={collectionResource.error.message} retry={collectionResource.reload} /> : <>
+          <div className="dashboard-overview-grid">
+            <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=active")}><strong>{collectionResource.data?.totals.active ?? 0}</strong><span>{locale === "it" ? "Attivi" : "Active"}</span></button>
+            <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=archived")}><strong>{collectionResource.data?.totals.archived ?? 0}</strong><span>{locale === "it" ? "Archiviati" : "Archived"}</span></button>
+          </div>
+          <div className="dashboard-collection-categories">{(collectionResource.data?.categories ?? []).map((item) => {
+            const labels: Record<string, string> = { reptiles: locale === "it" ? "Rettili" : "Reptiles", fish: locale === "it" ? "Pesci" : "Fish", birds: locale === "it" ? "Uccelli" : "Birds", dogs_cats: locale === "it" ? "Cani e gatti" : "Dogs & cats" };
+            return <button className="simple-row" key={item.category} onClick={() => navigate("/animals?category=" + encodeURIComponent(item.category))}><span><strong>{labels[item.category] ?? item.category}</strong><small>{item.active} {locale === "it" ? "attivi" : "active"} · {item.archived} {locale === "it" ? "archiviati" : "archived"}</small></span><Icon name="chevron" size={15} /></button>;
+          })}</div>
+          {(collectionResource.data?.upcoming.length ?? 0) > 0 && <><div className="panel-separator" /><h3>{locale === "it" ? "Scadenze nei prossimi 14 giorni" : "Due in the next 14 days"}</h3>{collectionResource.data?.upcoming.slice(0,5).map((item) => <button className="simple-row" key={item.id} onClick={() => navigate(item.targetPath)}><span><strong>{item.title}</strong><small>{item.animal?.name ?? (locale === "it" ? "Attività generale" : "General task")} · {formatDateTime(item.dueAt, locale, timezone)}</small></span><Icon name="calendar" size={15} /></button>)}</>}
+          {(collectionResource.data?.recentNotes.length ?? 0) > 0 && <><div className="panel-separator" /><h3>{locale === "it" ? "Ultime note sugli animali" : "Latest animal notes"}</h3>{collectionResource.data?.recentNotes.slice(0,4).map((item) => <button className="simple-row" key={item.id} onClick={() => navigate(item.targetPath)}><span><strong>{item.title}</strong><small>{item.animal.name} · {formatDateTime(item.occurredAt, locale, timezone)}</small></span><Icon name="chevron" size={15} /></button>)}</>}
+        </>}
+      </Panel></div>
       <div className="dashboard-section-heading dashboard-section-heading-secondary dashboard-section-heading-operations"><span className="eyebrow">{locale === "it" ? "02 — OPERAZIONI" : "02 — OPERATIONS"}</span><p>{locale === "it" ? "Registra le attività di cura." : "Record routine care."}</p></div>
       <div className="dashboard-widget dashboard-bulk-feeding-widget"><Panel>
         <PanelHeader title={locale === "it" ? "Registrazione multipla delle alimentazioni" : "Bulk feeding registration"} />
