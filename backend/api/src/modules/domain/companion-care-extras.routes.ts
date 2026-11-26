@@ -127,7 +127,7 @@ export function createCompanionCareExtrasRouter() {
         title: "Scadenza: " + updated.title, description: updated.notes,
         animalId: updated.animalId, dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000),
       } });
-      else if (!existing.taskId) { const task = await tx.task.create({ data: { userId: auth.userId, animalId: updated.animalId, title: "Scadenza: " + updated.title, description: updated.notes, category: "health", dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000) } }); await tx.companionPolicy.update({ where: { id }, data: { taskId: task.id } }); }
+      else { const task = await tx.task.create({ data: { userId: auth.userId, animalId: updated.animalId, title: "Scadenza: " + updated.title, description: updated.notes, category: "health", dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000) } }); await tx.companionPolicy.update({ where: { id }, data: { taskId: task.id } }); }
       return updated;
     });
     res.json({ policy });
