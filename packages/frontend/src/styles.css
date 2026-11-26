@@ -3761,12 +3761,10 @@ kbd { font-size: 11px; }
 
 
 /* Dashboard hierarchy: daily husbandry first, account configuration last. */
-.dashboard-grid > .dashboard-widget-feeding-alerts { order: 10; }
-.dashboard-grid > .dashboard-widget-priorities { order: 20; }
-.dashboard-grid > .dashboard-widget-reminders { order: 30; }
-.dashboard-grid > .dashboard-widget-summary { order: 40; }
-.dashboard-grid > .dashboard-widget-quick-actions { order: 50; }
-.dashboard-grid > .dashboard-widget-recent { order: 60; }
+.dashboard-widget-settings-panel { order: -1; }
+.dashboard-section-heading-operations { order: 45; }
+.dashboard-bulk-feeding-widget { order: 46; }
+.dashboard-section-heading-monitoring { order: 55; }
 .dashboard-account-widgets {
   margin-top: 30px;
   padding-top: 22px;
