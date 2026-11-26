@@ -3789,3 +3789,20 @@ kbd { font-size: 11px; }
   .dashboard-account-widgets { margin-top: 22px; padding-top: 18px; }
   .dashboard-account-widget { max-width: none; }
 }
+
+
+/* Progressive onboarding: a short, action-led starting point before daily operations. */
+.dashboard-first-steps { margin: 0 0 22px; }
+.dashboard-first-steps:empty { display: none; }
+.dashboard-first-steps .onboarding-checklist {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+.dashboard-first-steps .onboarding-checklist-heading { align-items: flex-start; }
+.dashboard-first-steps .onboarding-checklist-items { gap: 12px; }
+.dashboard-first-steps .onboarding-checklist-items li { padding-block: 12px; }
+.dashboard-first-steps .onboarding-checklist-footnote { margin-top: 12px; }
+@media (max-width: 760px) {
+  .dashboard-first-steps { margin-bottom: 16px; }
+  .dashboard-first-steps .onboarding-checklist-items li { align-items: flex-start; flex-wrap: wrap; }
+}
