@@ -1089,6 +1089,15 @@ model Aquarium {
   user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   readings     AquariumWaterReading[]
   parameterRanges AquariumParameterRange[]
+  waterChanges AquariumWaterChange[]
+  filterMaintenances AquariumFilterMaintenance[]
+  productDosages AquariumProductDosing[]
+  populations AquariumPopulation[]
+  populationMovementsFrom AquariumPopulationMovement[] @relation("AquariumPopulationFrom")
+  populationMovementsTo AquariumPopulationMovement[] @relation("AquariumPopulationTo")
+  quarantines AquariumQuarantine[]
+  treatments AquariumTreatment[]
+  breedingRecords AquariumReproduction[]
   @@index([userId, archivedAt, name], map: "aquariums_user_archived_name_idx")
   @@map("aquariums")
 }
@@ -1337,4 +1346,145 @@ model HealthRecord {
   @@index([animalId, occurredAt(sort: Desc)], map: "health_records_animal_occurred_idx")
   @@index([animalId, status], map: "health_records_animal_status_idx")
   @@map("health_records")
+}
+
+
+model AquariumWaterChange {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId     String   @map("aquarium_id") @db.Uuid
+  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(6)
+  volumeLiters   Decimal  @map("volume_liters") @db.Decimal(10, 2)
+  percentage     Decimal? @db.Decimal(5, 2)
+  waterSource    String?  @map("water_source") @db.VarChar(120)
+  conditioner   String?  @db.VarChar(160)
+  temperatureC  Decimal? @map("temperature_c") @db.Decimal(5, 2)
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium       Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, occurredAt(sort: Desc)], map: "aquarium_water_changes_aquarium_occurred_idx")
+  @@map("aquarium_water_changes")
+}
+
+model AquariumFilterMaintenance {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId       String   @map("aquarium_id") @db.Uuid
+  occurredAt       DateTime @map("occurred_at") @db.Timestamptz(6)
+  filterName       String   @map("filter_name") @db.VarChar(160)
+  action           String   @db.VarChar(32)
+  material         String?  @db.VarChar(160)
+  materialChanged  Boolean  @default(false) @map("material_changed")
+  nextDueAt        DateTime? @map("next_due_at") @db.Timestamptz(6)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium         Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, occurredAt(sort: Desc)], map: "aquarium_filter_maintenance_aquarium_occurred_idx")
+  @@map("aquarium_filter_maintenances")
+}
+
+model AquariumProductDosing {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId    String   @map("aquarium_id") @db.Uuid
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz(6)
+  productName   String   @map("product_name") @db.VarChar(160)
+  productType   String   @map("product_type") @db.VarChar(32)
+  doseAmount    Decimal  @map("dose_amount") @db.Decimal(12, 4)
+  doseUnit      String   @map("dose_unit") @db.VarChar(32)
+  targetVolumeL Decimal? @map("target_volume_l") @db.Decimal(10, 2)
+  reason        String?  @db.VarChar(240)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium      Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, occurredAt(sort: Desc)], map: "aquarium_product_dosing_aquarium_occurred_idx")
+  @@map("aquarium_product_dosages")
+}
+
+model AquariumPopulation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId      String   @map("aquarium_id") @db.Uuid
+  speciesKey      String   @map("species_key") @db.VarChar(180)
+  commonName      String?  @map("common_name") @db.VarChar(160)
+  scientificName  String?  @map("scientific_name") @db.VarChar(180)
+  quantity        Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aquarium        Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@unique([aquariumId, speciesKey], map: "aquarium_population_aquarium_species_key")
+  @@index([aquariumId, quantity], map: "aquarium_population_aquarium_quantity_idx")
+  @@map("aquarium_populations")
+}
+
+model AquariumPopulationMovement {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fromAquariumId String?  @map("from_aquarium_id") @db.Uuid
+  toAquariumId  String?   @map("to_aquarium_id") @db.Uuid
+  speciesKey    String    @map("species_key") @db.VarChar(180)
+  commonName    String?   @map("common_name") @db.VarChar(160)
+  scientificName String?  @map("scientific_name") @db.VarChar(180)
+  movementType  String    @map("movement_type") @db.VarChar(24)
+  quantity      Int
+  occurredAt    DateTime  @map("occurred_at") @db.Timestamptz(6)
+  reason        String?   @db.VarChar(240)
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  fromAquarium  Aquarium? @relation("AquariumPopulationFrom", fields: [fromAquariumId], references: [id], onDelete: SetNull)
+  toAquarium    Aquarium? @relation("AquariumPopulationTo", fields: [toAquariumId], references: [id], onDelete: SetNull)
+  @@index([fromAquariumId, occurredAt(sort: Desc)], map: "aquarium_population_movements_from_idx")
+  @@index([toAquariumId, occurredAt(sort: Desc)], map: "aquarium_population_movements_to_idx")
+  @@map("aquarium_population_movements")
+}
+
+model AquariumQuarantine {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId     String   @map("aquarium_id") @db.Uuid
+  speciesKey     String   @map("species_key") @db.VarChar(180)
+  commonName     String?  @map("common_name") @db.VarChar(160)
+  scientificName String?  @map("scientific_name") @db.VarChar(180)
+  quantity       Int
+  startedAt      DateTime @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+  source         String?  @db.VarChar(180)
+  status         String   @default("quarantine") @db.VarChar(24)
+  observations  String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium       Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, startedAt(sort: Desc)], map: "aquarium_quarantine_aquarium_started_idx")
+  @@map("aquarium_quarantines")
+}
+
+model AquariumTreatment {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId     String   @map("aquarium_id") @db.Uuid
+  startedAt      DateTime @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+  treatmentType  String   @map("treatment_type") @db.VarChar(32)
+  productName    String   @map("product_name") @db.VarChar(160)
+  activeIngredient String? @map("active_ingredient") @db.VarChar(160)
+  doseAmount     Decimal? @map("dose_amount") @db.Decimal(12, 4)
+  doseUnit       String?  @map("dose_unit") @db.VarChar(32)
+  targetSpecies  String?  @map("target_species") @db.VarChar(180)
+  instructions   String?
+  outcome        String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium       Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, startedAt(sort: Desc)], map: "aquarium_treatments_aquarium_started_idx")
+  @@map("aquarium_treatments")
+}
+
+model AquariumReproduction {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId      String   @map("aquarium_id") @db.Uuid
+  speciesKey      String   @map("species_key") @db.VarChar(180)
+  commonName      String?  @map("common_name") @db.VarChar(160)
+  startedAt       DateTime @map("started_at") @db.Timestamptz(6)
+  spawnedAt       DateTime? @map("spawned_at") @db.Timestamptz(6)
+  hatchedAt       DateTime? @map("hatched_at") @db.Timestamptz(6)
+  eggsCount       Int?
+  hatchedCount    Int?
+  survivingCount  Int?
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium        Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, startedAt(sort: Desc)], map: "aquarium_reproduction_aquarium_started_idx")
+  @@map("aquarium_reproductions")
 }
