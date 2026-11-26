@@ -24,7 +24,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const [optimisticallyCompleted, setOptimisticallyCompleted] = useState<string[]>([]);
   const widgetKeys = ["priorities", "quickActions", "feedingAlerts", "reminders", "recent", "summary", "onboarding", "plan"] as const;
   type WidgetKey = typeof widgetKeys[number];
-  const defaultVisibility: Record<WidgetKey, boolean> = { priorities: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true, onboarding: false, plan: false };
+  const defaultVisibility: Record<WidgetKey, boolean> = { priorities: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true, onboarding: true, plan: false };
   const [widgetVisibility, setWidgetVisibility] = useState<Record<WidgetKey, boolean>>(defaultVisibility);
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState<WidgetKey[]>(["feedingAlerts", "priorities", "reminders", "summary", "quickActions", "recent", "onboarding", "plan"]);
@@ -163,6 +163,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       <Button variant="secondary" onClick={() => navigate("/tasks?create=1")}><Icon name="calendar" size={15} />{t("addTask")}</Button>
       <Button variant="secondary" onClick={() => navigate("/animals?create=1")}><Icon name="snake" size={15} />{t("addAnimal")}</Button>
     </div>
+    <div className="dashboard-first-steps">{widgetVisibility.onboarding && <OnboardingChecklist locale={locale} onNavigate={navigate} />}</div>
     <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "01 — SITUAZIONE OPERATIVA" : "01 — DAILY OVERVIEW"}</span><p>{locale === "it" ? "Prima le scadenze, poi il resto." : "Deadlines first, everything else after."}</p></div>
     <div className="dashboard-grid">
       <div className="dashboard-widget-settings-panel"><Panel><PanelHeader title={locale === "it" ? "Personalizza dashboard" : "Customize dashboard"} action={<Button size="sm" variant="ghost" onClick={() => setWidgetSettingsOpen((open) => !open)}>{widgetSettingsOpen ? (locale === "it" ? "Chiudi" : "Close") : (locale === "it" ? "Configura" : "Configure")}</Button>} />{widgetSettingsOpen && <div className="dashboard-widget-settings"><Button size="sm" variant="secondary" onClick={resetDashboardLayout}>{locale === "it" ? "Ripristina layout" : "Reset layout"}</Button>{widgetOrder.map((key, index) => <div className="dashboard-widget-setting" key={key}><label><input type="checkbox" checked={widgetVisibility[key]} onChange={(event) => toggleWidget(key, event.target.checked)} />{widgetLabels[key]}</label><span><Button size="sm" variant="ghost" disabled={index === 0} onClick={() => moveWidget(key, -1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} su` : `Move ${widgetLabels[key]} up`}>↑</Button><Button size="sm" variant="ghost" disabled={index === widgetOrder.length - 1} onClick={() => moveWidget(key, 1)} aria-label={locale === "it" ? `Sposta ${widgetLabels[key]} giù` : `Move ${widgetLabels[key]} down`}>↓</Button></span></div>)}</div>}</Panel></div>
@@ -309,8 +310,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
       </Panel>}</div>}
     </div>
     <div className="dashboard-account-widgets">
-      <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "04 — ACCOUNT E PRIMI PASSI" : "04 — ACCOUNT AND GETTING STARTED"}</span><p>{locale === "it" ? "Informazioni non operative, separate dalle attività." : "Non-operational information, separate from daily tasks."}</p></div>
-      {widgetVisibility.onboarding && <div className="dashboard-account-widget" style={{ order: widgetOrder.indexOf("onboarding") }}><OnboardingChecklist locale={locale} onNavigate={navigate} /></div>}
+      <div className="dashboard-section-heading"><span className="eyebrow">{locale === "it" ? "04 — ACCOUNT" : "04 — ACCOUNT"}</span><p>{locale === "it" ? "Piano e impostazioni, separati dal lavoro quotidiano." : "Plan and settings, separate from daily work."}</p></div>
       {widgetVisibility.plan && <div className="dashboard-account-widget" style={{ order: widgetOrder.indexOf("plan") }}><PlanUsageSummary locale={locale} compact onNavigate={navigate} /></div>}
     </div>
     {toast}
