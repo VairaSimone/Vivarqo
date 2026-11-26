@@ -13,6 +13,8 @@ const aquariumSchema = z.object({
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
 
+const aquariumPatchSchema = aquariumSchema.partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 const readingSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
   temperatureC: z.coerce.number().min(-5).max(60).nullable().optional(),
@@ -27,6 +29,8 @@ const readingSchema = z.object({
   notes: z.string().trim().max(5000).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== "measuredAt" && value[key as keyof typeof value] != null), "At least one water parameter is required");
 
+const readingPatchSchema = readingSchema.partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 const aviarySchema = z.object({
   name: z.string().trim().min(1).max(120),
   environment: z.enum(["indoor", "outdoor", "mixed"]),
@@ -35,6 +39,8 @@ const aviarySchema = z.object({
   notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
 
+const aviaryPatchSchema = aviarySchema.partial().strict()
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 const aviaryBirdAssignmentSchema = z.object({
   animalIds: z.array(z.string().uuid()).max(500),
 }).strict();
@@ -90,6 +96,31 @@ export function createEcosystemRouter() {
     res.status(201).json({ aquarium });
   });
 
+  router.patch("/aquariums/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const id = parseUuid(req.params.id);
+    await ownedAquarium(auth.userId, id);
+    const input = parse(aquariumPatchSchema, req.body);
+    const aquarium = await prisma.aquarium.update({
+      where: { id },
+      data: {
+        ...input,
+        ...(input.setupDate !== undefined ? { setupDate: input.setupDate ? new Date(input.setupDate + "T00:00:00.000Z") : null } : {}),
+      },
+    });
+    res.status(200).json({ aquarium });
+  });
+
+  router.delete("/aquariums/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const id = parseUuid(req.params.id);
+    await ownedAquarium(auth.userId, id);
+    await prisma.aquarium.update({ where: { id }, data: { archivedAt: new Date() } });
+    res.status(204).send();
+  });
+
   router.get("/aquariums/:id/readings", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "fish");
@@ -100,6 +131,30 @@ export function createEcosystemRouter() {
       take: 200,
     });
     res.status(200).json({ readings });
+  });
+
+  router.patch("/aquariums/:id/readings/:readingId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
+    const readingId = parseUuid(req.params.readingId);
+    const existing = await prisma.aquariumWaterReading.findFirst({ where: { id: readingId, aquariumId: aquarium.id }, select: { id: true } });
+    if (!existing) throw new AppError(404, "WATER_READING_NOT_FOUND", "Water reading not found");
+    const input = parse(readingPatchSchema, req.body);
+    const reading = await prisma.aquariumWaterReading.update({ where: { id: readingId }, data: {
+      ...input, ...(input.measuredAt ? { measuredAt: new Date(input.measuredAt) } : {}),
+    } });
+    res.status(200).json({ reading });
+  });
+
+  router.delete("/aquariums/:id/readings/:readingId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
+    const readingId = parseUuid(req.params.readingId);
+    const result = await prisma.aquariumWaterReading.deleteMany({ where: { id: readingId, aquariumId: aquarium.id } });
+    if (!result.count) throw new AppError(404, "WATER_READING_NOT_FOUND", "Water reading not found");
+    res.status(204).send();
   });
 
   router.post("/aquariums/:id/readings", requireSession, async (req, res) => {
@@ -128,6 +183,33 @@ export function createEcosystemRouter() {
     const input = parse(aviarySchema, req.body);
     const aviary = await prisma.aviary.create({ data: { ...input, userId: auth.userId } });
     res.status(201).json({ aviary });
+  });
+
+  router.patch("/aviaries/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const id = parseUuid(req.params.id);
+    const aviary = await ownedAviary(auth.userId, id);
+    const input = parse(aviaryPatchSchema, req.body);
+    const nextCapacity = input.capacity === undefined ? aviary.capacity : input.capacity;
+    if (nextCapacity !== null) {
+      const assigned = await prisma.aviaryBird.count({ where: { aviaryId: id } });
+      if (assigned > nextCapacity) throw new AppError(409, "AVIARY_CAPACITY_BELOW_ASSIGNMENTS", "Capacity cannot be lower than the number of assigned birds", { assigned, capacity: nextCapacity });
+    }
+    const updated = await prisma.aviary.update({ where: { id }, data: input });
+    res.status(200).json({ aviary: updated });
+  });
+
+  router.delete("/aviaries/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const id = parseUuid(req.params.id);
+    await ownedAviary(auth.userId, id);
+    await prisma.$transaction(async (tx) => {
+      await tx.aviaryBird.deleteMany({ where: { aviaryId: id } });
+      await tx.aviary.update({ where: { id }, data: { archivedAt: new Date() } });
+    });
+    res.status(204).send();
   });
 
   router.get("/aviaries/:id/birds", requireSession, async (req, res) => {

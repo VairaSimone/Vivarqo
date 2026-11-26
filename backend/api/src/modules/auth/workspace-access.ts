@@ -11,6 +11,7 @@ const personalPrefixes = [
 ];
 const workspacePrefixes = [
   "/animals", "/feeding-sessions", "/feeding-entries", "/feeding",
+  "/aquariums", "/aviaries", "/companion-care",
   "/weights", "/sheds", "/animal-notes", "/health-records",
   "/tasks", "/reminder-rules", "/home", "/calendar",
   "/species-breeding-profiles", "/reproduction", "/reproduction-pairs",
@@ -40,6 +41,7 @@ function canWriteAsOperator(path: string): boolean {
   if (["/animals/locations", "/animals/move", "/animals/filters"].some((prefix) => startsWithPath(path, prefix))) return true;
   if (/^\/animals\/[^/]+\/(?:weights|sheds|notes|health-records)$/.test(path)) return true;
   return [
+    "/aquariums", "/aviaries", "/companion-care",
     "/feeding-sessions", "/feeding-entries", "/weights", "/sheds",
     "/animal-notes", "/health-records", "/tasks", "/reminder-rules",
   ].some((prefix) => startsWithPath(path, prefix));

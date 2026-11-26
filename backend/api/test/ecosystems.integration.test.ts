@@ -59,6 +59,12 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(Number(res.body.readings[0].ph)).toBeCloseTo(6.8);
     });
     await other.agent.get(`/api/v1/aquariums/${id}/readings`).expect(404);
+    await owner.agent.patch(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Tropical updated", location: "Living room" }).expect(200);
+    await owner.agent.patch(`/api/v1/aquariums/${id}/readings/${(await owner.agent.get(`/api/v1/aquariums/${id}/readings`)).body.readings[0].id}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({ ph: 7.1 }).expect(200);
+    await owner.agent.delete(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    await owner.agent.get("/api/v1/aquariums").expect(200).expect((res) => expect(res.body.aquariums).toHaveLength(0));
   });
 
   it("records dog and cat health events with account isolation", async () => {
@@ -83,5 +89,9 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const bird = await prisma.animal.create({ data: { userId: owner.userId, name: "Cocorita", species: "Melopsittacus undulatus", category: "birds" } });
     await owner.agent.put(`/api/v1/aviaries/${aviary.body.aviary.id}/birds`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ animalIds: [bird.id] }).expect(200).expect((res) => expect(res.body.assignedCount).toBe(1));
+    await owner.agent.patch(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Voliera aggiornata", capacity: 15 }).expect(200);
+    await owner.agent.delete(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    await owner.agent.get("/api/v1/aviaries").expect(200).expect((res) => expect(res.body.aviaries).toHaveLength(0));
   });
 });

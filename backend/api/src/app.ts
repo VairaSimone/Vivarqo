@@ -103,9 +103,10 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Validate browser intent before touching a server-side session.
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
-  app.use("/api/v1", animalDomainAccessGuard);
   app.use("/api/v1", createCollaboratorRouter(dependencies.emailSender, dependencies.premiumEntitlement));
+  // Resolve the effective workspace identity before checking account-scoped animal categories.
   app.use("/api/v1", createWorkspaceAccessGuard(dependencies.premiumEntitlement));
+  app.use("/api/v1", animalDomainAccessGuard);
   app.use("/api/v1", subscriptionAccessGuard);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));

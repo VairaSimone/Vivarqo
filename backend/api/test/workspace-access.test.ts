@@ -23,6 +23,11 @@ describe("workspace role permissions", () => {
 
   it("allows operators to manage husbandry but not genetics, reproduction or administration", () => {
     expect(() => assertRolePermission("operator", "POST", "/feeding-sessions")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/aquariums/00000000-0000-4000-8000-000000000001")).not.toThrow();
+    expect(() => assertRolePermission("operator", "DELETE", "/aviaries/00000000-0000-4000-8000-000000000001")).not.toThrow();
+    expect(() => assertRolePermission("operator", "POST", "/companion-care")).not.toThrow();
+    expectDenied("viewer", "PATCH", "/aquariums/00000000-0000-4000-8000-000000000001");
+    expectDenied("breeding", "DELETE", "/aviaries/00000000-0000-4000-8000-000000000001");
     expect(() => assertRolePermission("operator", "PATCH", "/animals/123/weights")).not.toThrow();
     expect(() => assertRolePermission("operator", "POST", "/animals/locations")).not.toThrow();
     expect(() => assertRolePermission("operator", "PATCH", "/animals/123", { notes: "routine care" })).not.toThrow();
