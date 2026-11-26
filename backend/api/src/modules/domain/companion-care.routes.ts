@@ -61,7 +61,7 @@ export function createCompanionCareRouter() {
     const records = await prisma.companionCareRecord.findMany({
       where: { userId: auth.userId, deletedAt: null, ...(animalId ? { animalId } : {}), ...dueFilter,
         ...(upcomingOnly ? { completedAt: null, nextDueAt: { gte: now } } : {}) },
-      include: { animal: { select: { id: true, name: true, species: true } } },
+      include: { animal: { select: { id: true, name: true, species: true } }, task: { select: { id: true, status: true } } },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 200,
     });
     res.status(200).json({ records: records.map((record) => ({ ...record, dueStatus: record.completedAt ? "completed" : !record.nextDueAt ? "none" : record.nextDueAt < now ? "overdue" : "upcoming" })) });
