@@ -11,3 +11,7 @@ ALTER TABLE "companion_care_records"
 CREATE INDEX "companion_care_records_animal_ongoing_idx"
   ON "companion_care_records"("animal_id", "is_ongoing")
   WHERE "deleted_at" IS NULL AND "is_ongoing" = true;
+
+ALTER TABLE "companion_care_records"
+  ADD CONSTRAINT "companion_care_records_ongoing_medication_check"
+  CHECK (NOT "is_ongoing" OR ("kind" = 'medication' AND "treatment_end_at" IS NULL));
