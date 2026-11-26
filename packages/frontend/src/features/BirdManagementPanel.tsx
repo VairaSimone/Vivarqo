@@ -12,7 +12,7 @@ type Health = { id: string; recordType: string; status: string; occurredAt: stri
 const emptyProfile: Profile = { ringType: "none", ringNumber: null, ringYear: null, citesNumber: null, citesAnnex: null, citesAuthority: null, citesIssuedAt: null, citesExpiresAt: null, notes: null };
 const dateValue = () => new Date().toISOString().slice(0, 10);
 
-export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { locale: Locale; birds: Bird[]; aviaryId: string; navigate: (path: string) => void }) {
+export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { locale: Locale; birds: Bird[]; aviaryId: string | null; navigate: (path: string) => void }) {
   const it = locale === "it";
   const [birdId, setBirdId] = useState("");
   const [profile, setProfile] = useState<Profile>(emptyProfile);
@@ -55,7 +55,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
     let active = true;
     Promise.all([
       api.get<{ pairs: Pair[] }>("/bird-breeding-pairs"),
-      api.get<{ records: Maintenance[] }>(`/aviaries/${encodeURIComponent(aviaryId)}/maintenance`),
+      aviaryId ? api.get<{ records: Maintenance[] }>(`/aviaries/${encodeURIComponent(aviaryId)}/maintenance`) : Promise.resolve({ records: [] as Maintenance[] }),
     ]).then(([p,m]) => { if(active){setPairs(p.pairs);setMaintenance(m.records);} })
       .catch(e => { if(active)setError(e instanceof ApiError?e.message:(it?"Impossibile caricare i registri.":"Could not load bird registers.")); });
     return () => { active = false; };
@@ -88,6 +88,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
     } catch(e){setError(e instanceof ApiError?e.message:(it?"Aggiornamento non riuscito.":"Update failed."));} finally{setBusy(false);}
   }
   async function createMaintenance(e:FormEvent) {
+    if (!aviaryId) return;
     await run(e,async()=>{
       await api.post(`/aviaries/${encodeURIComponent(aviaryId)}/maintenance`,{occurredAt:new Date().toISOString(),action:maintenanceAction,area:maintenanceArea||null,products:maintenanceProducts||null,nextDueAt:maintenanceNextDue?new Date(maintenanceNextDue+"T12:00:00").toISOString():null,notes:maintenanceNotes||null});
       setMaintenance((await api.get<{records:Maintenance[]}>(`/aviaries/${encodeURIComponent(aviaryId)}/maintenance`)).records);
@@ -153,6 +154,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
       </form>
       <div className="ecosys-history">{health.map(h=><article className="ecosys-reading" key={h.id}><strong>{h.title} · {h.status}</strong><span>{h.recordType} · {new Date(h.occurredAt).toLocaleString(it?"it-IT":"en-GB")} · {[h.veterinarian,h.clinic].filter(Boolean).join(" · ")}</span>{h.medication&&<span>{h.medication} {h.dosage??""}</span>}{h.nextDueAt&&<span>{it?"Prossimo richiamo: ":"Next due: "}{new Date(h.nextDueAt).toLocaleDateString(it?"it-IT":"en-GB")}</span>}{h.notes&&<p>{h.notes}</p>}</article>)}</div>
     </section>
+    {aviaryId && <>
     <div className="divider"/>
     <section className="form-grid">
       <h3>{it?"Pulizia e manutenzione voliera":"Aviary cleaning and maintenance"}</h3>
@@ -166,5 +168,6 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
       </form>
       <div className="ecosys-history">{maintenance.map(m=><article className="ecosys-reading" key={m.id}><strong>{m.action} · {new Date(m.occurredAt).toLocaleString(it?"it-IT":"en-GB")}</strong><span>{[m.area,m.products].filter(Boolean).join(" · ")}</span>{m.nextDueAt&&<span>{it?"Prossima: ":"Next: "}{new Date(m.nextDueAt).toLocaleString(it?"it-IT":"en-GB")}</span>}{m.notes&&<p>{m.notes}</p>}</article>)}</div>
     </section>
+    </>}
   </section>;
 }
