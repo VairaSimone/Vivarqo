@@ -7,8 +7,60 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 const milestones = ["animal", "feeding", "weight", "shed", "reminder", "clutch", "egg"] as const;
 const suggestions = ["animal-care", "clutch-eggs"] as const;
 
+
+const animalCategories = ["reptiles", "fish", "birds", "dogs_cats"] as const;
+const configurationSchema = z.object({
+  categories: z.array(z.enum(animalCategories)).min(1).max(animalCategories.length)
+    .refine((categories) => new Set(categories).size === categories.length, "Categories must be unique"),
+}).strict();
+
 export function createOnboardingRouter() {
   const router = Router();
+
+  router.get("/configuration", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const configuration = await prisma.accountConfiguration.findUnique({
+      where: { userId: auth.userId },
+      select: { animalCategories: true, configuredAt: true },
+    });
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({
+      categories: configuration?.animalCategories ?? [],
+      configuredAt: configuration?.configuredAt ?? null,
+    });
+  });
+
+  router.post("/configuration", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const parsed = configurationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(400, "VALIDATION_ERROR", "Select at least one valid animal category", {
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.map(String).join("."),
+          message: issue.message,
+        })),
+      });
+    }
+    const configuredAt = new Date();
+    const configuration = await prisma.accountConfiguration.upsert({
+      where: { userId: auth.userId },
+      create: {
+        userId: auth.userId,
+        animalCategories: parsed.data.categories,
+        configuredAt,
+      },
+      update: {
+        animalCategories: parsed.data.categories,
+        configuredAt,
+      },
+      select: { animalCategories: true, configuredAt: true },
+    });
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({
+      categories: configuration.animalCategories,
+      configuredAt: configuration.configuredAt,
+    });
+  });
 
   router.get("/progress", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
