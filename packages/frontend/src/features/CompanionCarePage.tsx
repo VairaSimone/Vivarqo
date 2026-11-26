@@ -4,13 +4,14 @@ import type { Locale } from "../lib/domain";
 import { Alert, Button, Field, Input, LoadingState, PageHeader, Panel, Select, Textarea } from "../components/ui";
 
 type CompanionAnimal = { id: string; name: string; species: string };
-type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; provider: string | null; dosage: string | null; notes: string | null; animal: CompanionAnimal };
+type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; dosage: string | null; notes: string | null; animal: CompanionAnimal };
 const kinds = ["vaccination", "medication", "vet_visit", "parasite_prevention", "surgery", "grooming", "other"];
 
 export function CompanionCarePage({ locale }: { locale: Locale }) {
   const it = locale === "it";
   const [animals, setAnimals] = useState<CompanionAnimal[]>([]);
   const [records, setRecords] = useState<CareRecord[]>([]);
+  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "upcoming" | "completed">("all");
   const [animalId, setAnimalId] = useState("");
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [kind, setKind] = useState("vaccination");
@@ -125,17 +126,26 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     </Panel>
     <Panel>
       <h2>{it ? "Storico e scadenze" : "History & due dates"}</h2>
-      {records.length === 0 ? <p>{it ? "Non ci sono ancora eventi registrati." : "No care events recorded yet."}</p> :
-        <div className="ecosys-history">{records.map((record) => <article className="ecosys-reading" key={record.id}>
-          <strong>{record.animal.name} · {record.title}</strong>
-          <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Prossima scadenza: " : "Next due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
-          {record.provider && <span>{record.provider}{record.dosage ? " · " + record.dosage : ""}</span>}
-          {record.notes && <span>{record.notes}</span>}
-          <div className="inline-actions">
-            <Button size="sm" variant="secondary" disabled={saving} onClick={() => editRecord(record)}>{it ? "Modifica" : "Edit"}</Button>
-            <Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteRecord(record)}>{it ? "Elimina" : "Delete"}</Button>
-          </div>
-        </article>)}</div>}
+      <div className="dashboard-task-filters" role="group" aria-label={it ? "Filtra scadenze sanitarie" : "Filter health due dates"}>
+        {(["all", "overdue", "upcoming", "completed"] as const).map((filter) => <button key={filter} type="button" className={dueFilter === filter ? "dashboard-task-filter is-active" : "dashboard-task-filter"} aria-pressed={dueFilter === filter} onClick={() => setDueFilter(filter)}>{({all: it ? "Tutte" : "All", overdue: it ? "Scadute" : "Overdue", upcoming: it ? "Future" : "Upcoming", completed: it ? "Completate" : "Completed"})[filter]}</button>)}
+      </div>
+      {records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming")) === dueFilter).length === 0
+        ? <p>{it ? "Nessun evento in questa categoria." : "No records in this category."}</p>
+        : <div className="ecosys-history">{records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming")) === dueFilter).map((record) => {
+          const status = record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming");
+          return <article className="ecosys-reading" key={record.id}>
+            <strong>{record.animal.name} · {record.title}</strong>
+            <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Scadenza: " : "Due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
+            <span>{status === "overdue" ? (it ? "Scaduta" : "Overdue") : status === "completed" ? (it ? "Completata" : "Completed") : status === "upcoming" ? (it ? "In programma" : "Upcoming") : (it ? "Senza scadenza" : "No due date")}</span>
+            {record.provider && <span>{record.provider}{record.dosage ? " · " + record.dosage : ""}</span>}
+            {record.notes && <span>{record.notes}</span>}
+            <div className="inline-actions">
+              {status !== "completed" && record.task?.status === "open" && <Button size="sm" disabled={saving} onClick={async () => { setSaving(true); setError(""); try { await api.post("/tasks/" + record.task!.id + "/complete", {}); await reload(); setNotice(it ? "Scadenza segnata come completata." : "Due date marked as completed."); } catch (reason) { setError(reason instanceof ApiError ? reason.message : (it ? "Operazione non riuscita." : "Operation failed.")); } finally { setSaving(false); } }}>{it ? "Segna completata" : "Mark complete"}</Button>}
+              <Button size="sm" variant="secondary" disabled={saving} onClick={() => editRecord(record)}>{it ? "Modifica" : "Edit"}</Button>
+              <Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteRecord(record)}>{it ? "Elimina" : "Delete"}</Button>
+            </div>
+          </article>;
+        })}</div>
     </Panel>
   </div>;
 }
