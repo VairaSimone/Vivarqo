@@ -22,6 +22,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [section, setSection] = useState("population");
+  const [releaseDestinationId, setReleaseDestinationId] = useState("");
   const [water, setWater] = useState({ occurredAt: nowLocal(), volumeLiters: "", percentage: "25", waterSource: "", conditioner: "" });
   const [filter, setFilter] = useState({ occurredAt: nowLocal(), filterName: "", action: "cleaning", material: "", materialChanged: false, nextDueAt: "" });
   const [dose, setDose] = useState({ occurredAt: nowLocal(), productName: "", productType: "fertilizer", doseAmount: "", doseUnit: "ml", targetVolumeL: String(aquarium.volumeLiters) });
@@ -39,6 +40,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
     finally { setLoading(false); }
   }, [aquarium.id, it]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (!destinations.some(t => t.id === releaseDestinationId)) setReleaseDestinationId(destinations[0]?.id ?? ""); }, [destinations, releaseDestinationId]);
   useEffect(() => {
     const percentage = Number(water.percentage);
     if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) { setCalculatedLiters(null); return; }
@@ -159,7 +161,11 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           {textarea(it?"Osservazioni":"Observations",quarantine.observations,v=>setQuarantine(p=>({...p,observations:v})))}
           <Button type="submit" disabled={saving}>{it?"Registra quarantena":"Save quarantine"}</Button>
         </form>
-        <div className="ecosys-history">{data.quarantines.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.commonName||row.speciesKey)} × {String(row.quantity)} · {String(row.status)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.source||"—")}</span>{row.status === "quarantine" && <Button size="sm" variant="secondary" disabled={saving} onClick={() => void submit(new Event("submit") as unknown as FormEvent, async () => { await api.patch(`/quarantines/${row.id}`, { status: "released", endedAt: new Date().toISOString() }); })}>{it?"Concludi quarantena":"End quarantine"}</Button>}</div>)}</div>
+        {data.quarantines.some(row => row.status === "quarantine") && <div className="form-grid">
+          {select(it?"Acquario di destinazione per il rilascio":"Release destination aquarium",releaseDestinationId,v=>setReleaseDestinationId(v),destinations.map(t=>[t.id,t.name]))}
+          {!releaseDestinationId && <p className="muted-note">{it?"Crea un altro acquario per poter trasferire i pesci fuori dalla quarantena.":"Create another aquarium to move fish out of quarantine."}</p>}
+        </div>}
+        <div className="ecosys-history">{data.quarantines.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.commonName||row.speciesKey)} × {String(row.quantity)} · {String(row.status)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.source||"—")}</span>{row.status === "quarantine" && <Button size="sm" variant="secondary" disabled={saving || !releaseDestinationId} onClick={() => void (async()=>{setSaving(true);setError("");try{await api.patch(`/quarantines/${row.id}`,{status:"released",endedAt:new Date().toISOString(),destinationAquariumId:releaseDestinationId});await load();setNotice(it?"Quarantena conclusa e popolazione aggiornata nell'acquario di destinazione.":"Quarantine ended and destination population updated.");}catch(e){setError(e instanceof ApiError?e.message:(it?"Aggiornamento non riuscito.":"Could not update quarantine."));}finally{setSaving(false);}})()}>{it?"Rilascia e trasferisci":"Release and transfer"}</Button>}</div>)}</div>
       </>}
       {section === "treatments" && <>
         <h3>{it?"Trattamenti e medicinali":"Treatments and medication"}</h3>
