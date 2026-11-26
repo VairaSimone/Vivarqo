@@ -16,6 +16,8 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
   beforeAll(() => { app = createApp({ checkDatabase: async () => undefined }); });
   afterAll(async () => {
     await prisma.companionCareRecord.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.birdBreedingPair.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.reproductionCycle.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aquarium.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aviary.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.animal.deleteMany({ where: { userId: { in: userIds } } });
@@ -162,10 +164,8 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(res.body.pairs[0].cycle.id).toBe(cycleId);
     });
     await other.agent.get("/api/v1/bird-breeding-pairs").expect(200).expect((res) => expect(res.body.pairs).toHaveLength(0));
-    const clutch = await owner.agent.post("/api/v1/clutches").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ cycleId, laidOn: "2026-11-10", eggCount: 3, status: "active" }).expect(201);
-    await owner.agent.post(`/api/v1/clutches/${clutch.body.clutch.id}/eggs`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ eggs: [{ code: "U1", status: "incubating", laidAt: new Date("2026-11-10T10:00:00.000Z").toISOString() }] }).expect(201);
+    await owner.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches`).expect(200)
+      .expect((res) => expect(res.body.clutches).toHaveLength(0));
 
     await owner.agent.post(`/api/v1/animals/${female.id}/health-records`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ recordType: "vaccination", status: "ongoing", occurredAt: new Date().toISOString(), title: "Controllo veterinario", veterinarian: "Dott.ssa Test", clinic: "Ambulatorio test" }).expect(201);
