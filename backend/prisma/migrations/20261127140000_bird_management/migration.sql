@@ -47,6 +47,7 @@ CREATE TABLE "bird_breeding_pairs" (
   CONSTRAINT "bird_breeding_pairs_dates_check" CHECK ("separated_at" IS NULL OR "separated_at" >= "paired_at")
 );
 CREATE UNIQUE INDEX "bird_breeding_pairs_cycle_id_key" ON "bird_breeding_pairs"("cycle_id");
+CREATE UNIQUE INDEX "bird_pairs_one_active_pair_unique" ON "bird_breeding_pairs"("user_id","female_animal_id","male_animal_id") WHERE "status" = 'active';
 CREATE INDEX "bird_pairs_user_status_date_idx" ON "bird_breeding_pairs"("user_id","status","paired_at" DESC);
 CREATE INDEX "bird_pairs_animals_idx" ON "bird_breeding_pairs"("female_animal_id","male_animal_id");
 
