@@ -289,7 +289,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
               <Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteRecord(record)}>{it ? "Elimina" : "Delete"}</Button>
             </div>
           </article>;
-        })}</div>
+        })}</div>}
     </Panel>
   </div>;
 }
