@@ -5,7 +5,7 @@ import { AppError } from "../../errors/app-error.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 
 const date = z.string().datetime({ offset: true });
-const waterChangeSchema = z.object({
+export const waterChangeSchema = z.object({
   occurredAt: date, volumeLiters: z.coerce.number().positive().max(10000000),
   percentage: z.coerce.number().positive().max(100).nullable().optional(),
   waterSource: z.string().trim().max(120).nullable().optional(),
@@ -13,21 +13,21 @@ const waterChangeSchema = z.object({
   temperatureC: z.coerce.number().min(-5).max(60).nullable().optional(),
   notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
-const filterSchema = z.object({
+export const filterSchema = z.object({
   occurredAt: date, filterName: z.string().trim().min(1).max(160),
   action: z.enum(["cleaning","replacement","inspection","other"]),
   material: z.string().trim().max(160).nullable().optional(),
   materialChanged: z.boolean().default(false), nextDueAt: date.nullable().optional(),
   notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
-const dosingSchema = z.object({
+export const dosingSchema = z.object({
   occurredAt: date, productName: z.string().trim().min(1).max(160),
   productType: z.enum(["fertilizer","conditioner","mineral","bacteria","other"]),
   doseAmount: z.coerce.number().positive().max(100000000), doseUnit: z.string().trim().min(1).max(32),
   targetVolumeL: z.coerce.number().positive().max(10000000).nullable().optional(),
   reason: z.string().trim().max(240).nullable().optional(), notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
-const populationMovementSchema = z.object({
+export const populationMovementSchema = z.object({
   movementType: z.enum(["introduction","removal","transfer","mortality"]),
   speciesKey: z.string().trim().min(1).max(180),
   commonName: z.string().trim().max(160).nullable().optional(),
@@ -37,7 +37,7 @@ const populationMovementSchema = z.object({
   toAquariumId: z.string().uuid().nullable().optional(),
   reason: z.string().trim().max(240).nullable().optional(), notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
-const quarantineSchema = z.object({
+export const quarantineSchema = z.object({
   speciesKey: z.string().trim().min(1).max(180), commonName: z.string().trim().max(160).nullable().optional(),
   scientificName: z.string().trim().max(180).nullable().optional(), quantity: z.coerce.number().int().positive().max(1000000),
   startedAt: date, endedAt: date.nullable().optional(), source: z.string().trim().max(180).nullable().optional(),
@@ -46,7 +46,7 @@ const quarantineSchema = z.object({
 }).strict().superRefine((v, ctx) => {
   if (v.endedAt && Date.parse(v.endedAt) < Date.parse(v.startedAt)) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
-const treatmentSchema = z.object({
+export const treatmentSchema = z.object({
   startedAt: date, endedAt: date.nullable().optional(), treatmentType: z.enum(["medication","antiparasitic","other"]),
   productName: z.string().trim().min(1).max(160), activeIngredient: z.string().trim().max(160).nullable().optional(),
   doseAmount: z.coerce.number().positive().nullable().optional(), doseUnit: z.string().trim().max(32).nullable().optional(),
@@ -55,7 +55,7 @@ const treatmentSchema = z.object({
 }).strict().superRefine((v, ctx) => {
   if (v.endedAt && Date.parse(v.endedAt) < Date.parse(v.startedAt)) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
-const reproductionSchema = z.object({
+export const reproductionSchema = z.object({
   speciesKey: z.string().trim().min(1).max(180), commonName: z.string().trim().max(160).nullable().optional(),
   startedAt: date, spawnedAt: date.nullable().optional(), hatchedAt: date.nullable().optional(),
   eggsCount: z.coerce.number().int().min(0).max(1000000).nullable().optional(),
@@ -66,7 +66,7 @@ const reproductionSchema = z.object({
   if (v.eggsCount != null && v.hatchedCount != null && v.hatchedCount > v.eggsCount) ctx.addIssue({ code: "custom", path: ["hatchedCount"], message: "Hatched count cannot exceed egg count" });
   if (v.hatchedCount != null && v.survivingCount != null && v.survivingCount > v.hatchedCount) ctx.addIssue({ code: "custom", path: ["survivingCount"], message: "Surviving count cannot exceed hatched count" });
 });
-const compatibilitySchema = z.object({
+export const compatibilitySchema = z.object({
   speciesAKey: z.string().trim().min(1).max(180), speciesBKey: z.string().trim().min(1).max(180),
   compatibility: z.enum(["compatible","caution","incompatible"]), notes: z.string().trim().max(10000).nullable().optional(),
 }).strict().refine(v => v.speciesAKey.toLowerCase() !== v.speciesBKey.toLowerCase(), "Choose two different species");
