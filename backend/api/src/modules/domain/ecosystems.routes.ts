@@ -86,11 +86,11 @@ async function ownedAviary(userId: string, id: string) {
 export function createEcosystemRouter() {
   const router = Router();
 
-  router.get("/aquariums", requireSession, async (_req, res) => {
+  router.get("/aquariums", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "fish");
     const aquariums = await prisma.aquarium.findMany({
-      where: { userId: auth.userId, archivedAt: null },
+      where: { userId: auth.userId, archivedAt: req.query.archived === "true" ? { not: null } : null },
       orderBy: [{ name: "asc" }, { id: "asc" }],
       include: { _count: { select: { readings: true } }, readings: { orderBy: { measuredAt: "desc" }, take: 1 } },
     });
@@ -120,6 +120,16 @@ export function createEcosystemRouter() {
         ...(input.setupDate !== undefined ? { setupDate: input.setupDate ? new Date(input.setupDate + "T00:00:00.000Z") : null } : {}),
       },
     });
+    res.status(200).json({ aquarium });
+  });
+
+  router.post("/aquariums/:id/restore", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const id = parseUuid(req.params.id);
+    const archived = await prisma.aquarium.findFirst({ where: { id, userId: auth.userId, archivedAt: { not: null } } });
+    if (!archived) throw new AppError(404, "ARCHIVED_AQUARIUM_NOT_FOUND", "Archived aquarium not found");
+    const aquarium = await prisma.aquarium.update({ where: { id }, data: { archivedAt: null } });
     res.status(200).json({ aquarium });
   });
 
@@ -177,11 +187,11 @@ export function createEcosystemRouter() {
     res.status(201).json({ reading });
   });
 
-  router.get("/aviaries", requireSession, async (_req, res) => {
+  router.get("/aviaries", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "birds");
     const aviaries = await prisma.aviary.findMany({
-      where: { userId: auth.userId, archivedAt: null },
+      where: { userId: auth.userId, archivedAt: req.query.archived === "true" ? { not: null } : null },
       orderBy: [{ name: "asc" }, { id: "asc" }],
       include: { _count: { select: { birds: true } } },
     });
@@ -211,15 +221,27 @@ export function createEcosystemRouter() {
     res.status(200).json({ aviary: updated });
   });
 
+  router.post("/aviaries/:id/restore", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const id = parseUuid(req.params.id);
+    const archived = await prisma.aviary.findFirst({ where: { id, userId: auth.userId, archivedAt: { not: null } }, include: { _count: { select: { birds: true } } } });
+    if (!archived) throw new AppError(404, "ARCHIVED_AVIARY_NOT_FOUND", "Archived aviary not found");
+    if (archived.capacity !== null && archived._count.birds > archived.capacity) {
+      throw new AppError(409, "AVIARY_CAPACITY_BELOW_ASSIGNMENTS", "Archived aviary assignments exceed its capacity", { assigned: archived._count.birds, capacity: archived.capacity });
+    }
+    const aviary = await prisma.aviary.update({ where: { id }, data: { archivedAt: null } });
+    res.status(200).json({ aviary });
+  });
+
   router.delete("/aviaries/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "birds");
     const id = parseUuid(req.params.id);
     await ownedAviary(auth.userId, id);
-    await prisma.$transaction(async (tx) => {
-      await tx.aviaryBird.deleteMany({ where: { aviaryId: id } });
-      await tx.aviary.update({ where: { id }, data: { archivedAt: new Date() } });
-    });
+    // Keep bird assignments attached to the archived aviary. They are historical
+    // placement data and become active again if the aviary is restored.
+    await prisma.aviary.update({ where: { id }, data: { archivedAt: new Date() } });
     res.status(204).send();
   });
 
