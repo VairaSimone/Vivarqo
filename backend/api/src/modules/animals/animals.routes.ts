@@ -358,6 +358,8 @@ export function createAnimalRouter() {
             financeEntries: true,
             geneticTraits: true,
             traitsAsSource: true,
+            aviaryAssignments: true,
+            aviaryMovements: true,
           },
         },
         publicShare: true,
