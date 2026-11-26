@@ -205,7 +205,7 @@ export function createEcosystemRouter() {
     const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
     const escapeCsv = (value: unknown) => {
       const raw = value === null || value === undefined ? "" : String(value);
-      const safe = /^[=+@\\-]/.test(raw) ? "'" + raw : raw;
+      const safe = typeof value === "string" && /^[=+@\\-\\t\\r]/.test(raw) ? "'" + raw : raw;
       return '"' + safe.replace(/"/g, '""') + '"';
     };
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
