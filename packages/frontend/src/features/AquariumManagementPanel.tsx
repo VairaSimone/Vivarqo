@@ -88,8 +88,8 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
         })}>
           {select(it ? "Operazione" : "Movement", population.movementType, v => setPopulation(p => ({...p,movementType:v})), [["introduction",it?"Introduzione":"Introduction"],["removal",it?"Uscita":"Removal"],["mortality",it?"Mortalità":"Mortality"],["transfer",it?"Trasferimento":"Transfer"]])}
           {field(it?"Chiave specie (nome scientifico consigliato)":"Species key (scientific name recommended)",population.speciesKey,v=>setPopulation(p=>({...p,speciesKey:v})),"text",true)}
-          {field(it?"Nome comune":"Common name",population.commonName,v=>setPopulation(p=>({...p,commonName:v} ))}
-          {field(it?"Nome scientifico":"Scientific name",population.scientificName,v=>setPopulation(p=>({...p,scientificName:v} ))}
+          {field(it?"Nome comune":"Common name",population.commonName,v=>setPopulation(p=>({...p,commonName:v})))}
+          {field(it?"Nome scientifico":"Scientific name",population.scientificName,v=>setPopulation(p=>({...p,scientificName:v})))}
           {field(it?"Quantità":"Quantity",population.quantity,v=>setPopulation(p=>({...p,quantity:v})),"number",true,{min:"1",step:"1"})}
           {field(it?"Data e ora":"Date and time",population.occurredAt,v=>setPopulation(p=>({...p,occurredAt:v})),"datetime-local",true)}
           {population.movementType === "transfer" && select(it?"Acquario di destinazione":"Destination aquarium",population.toAquariumId,v=>setPopulation(p=>({...p,toAquariumId:v})),destinations.map(t=>[t.id,t.name]))}
