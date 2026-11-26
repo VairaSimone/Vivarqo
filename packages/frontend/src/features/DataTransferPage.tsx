@@ -223,6 +223,20 @@ function ImportPage({ locale }: { locale: Locale }) {
   return <div className="page-stack">
     <PageHeader eyebrow={t("navAdmin")} title={t("importTitle")}
       description={t("importGuidedDescription")} />
+    {entity === "animals" && <Panel>
+      <div className="animal-import-intro">
+        <div className="animal-import-icon"><Icon name="file-spreadsheet" size={22} /></div>
+        <div>
+          <h2>{locale === "it" ? "Trasferisci i tuoi animali da Excel" : "Bring your animals over from Excel"}</h2>
+          <p>{locale === "it" ? "Carica il tuo archivio CSV o Excel. SnakeBee riconosce le colonne più comuni e ti permette di controllare i dati prima di creare le schede." : "Upload your CSV or Excel file. SnakeBee recognises common columns and lets you review everything before creating profiles."}</p>
+          <div className="animal-import-points">
+            <span><Icon name="file-check" size={14} /> CSV / XLSX</span>
+            <span><Icon name="scan-search" size={14} /> {locale === "it" ? "Riconoscimento colonne" : "Column matching"}</span>
+            <span><Icon name="shield-check" size={14} /> {locale === "it" ? "Anteprima prima dell'importazione" : "Review before import"}</span>
+          </div>
+        </div>
+      </div>
+    </Panel>}
     <Panel>
       <form className="form-stack" onSubmit={uploadPreview}>
         {error && <Alert tone="danger">{error}</Alert>}
@@ -231,7 +245,7 @@ function ImportPage({ locale }: { locale: Locale }) {
             <Select value={entity} onChange={(e) => changeEntity(e.target.value)} disabled={busy}>
               {importEntities.map((value) => <option value={value} key={value}>{labels[value]}</option>)}
             </Select>
-            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "vivarqo-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello CSV per Excel" : "Download CSV template for Excel"}</Button></div>
+            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "snakebee-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello CSV per Excel" : "Download CSV template for Excel"}</Button></div>
           </Field>
           <Field label={t("chooseFile")}>
             <Input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -302,16 +316,61 @@ function ImportPage({ locale }: { locale: Locale }) {
         <h3>{t("invalidRows")}</h3>
         {errors.slice(0, 50).map((item, index) => <div key={index}>
           <strong>{t("row")} {String(item.row ?? "")}</strong>
-          <span>{getString(item, "column")}</span>
-          <small>{getString(item, "reason")}</small>
+          <span>{fieldLabel(getString(item, "column"))}</span>
+          <small>{locale === "it" ? ({
+            "Required": "Campo obbligatorio",
+            "Invalid input": "Valore non valido",
+            "This identifier already exists in your account": "Questo identificativo è già presente nel tuo account",
+            "Duplicate identifier in this file": "Identificativo duplicato nel file",
+            "This identifier already exists in your account at confirmation time": "Questo identificativo è stato inserito nel frattempo"
+          } as Record<string, string>)[getString(item, "reason")] ?? getString(item, "reason") : getString(item, "reason")}</small>
         </div>)}
       </div>}
       {duplicates.length > 0 && <>
-        <Alert tone="warning">{t("duplicates")}: {duplicates.length}. {t("duplicateWarning")}</Alert>
-        <label className="checkbox-field"><input type="checkbox" checked={allowDuplicates} onChange={(e) => setAllowDuplicates(e.target.checked)} />{t("allowDuplicatesConfirmation")}</label>
+        <Alert tone="warning">{locale === "it"
+          ? `${duplicates.length} possibili corrispondenze per nome e specie. Controllale: potrebbero essere animali già presenti oppure omonimi.`
+          : `${duplicates.length} possible name and species matches. Review them: they may already exist or simply share a name.`}</Alert>
+        <div className="import-duplicate-list">{duplicates.slice(0, 20).map((duplicate, index) => <div key={index}>
+          <strong>{locale === "it" ? "Riga" : "Row"} {String(duplicate.row ?? "")}: {getString(duplicate, "name")}</strong>
+          <span>{getString(duplicate, "species")}</span>
+          {Array.isArray(duplicate.matches) && <small>{(duplicate.matches as Item[]).map((match) => [getString(match, "name"), getString(match, "identifier")].filter(Boolean).join(" · ")).join(" / ")}</small>}
+        </div>)}</div>
+        <label className="checkbox-field"><input type="checkbox" checked={allowDuplicates} onChange={(e) => setAllowDuplicates(e.target.checked)} />{locale === "it" ? "Ho controllato le corrispondenze e voglio comunque importare queste righe" : "I reviewed the matches and still want to import these rows"}</label>
       </>}
       {previewRows.length > 0 && <div className="import-preview">
-        <h3>{t("validRowsPreview")}</h3><pre>{JSON.stringify(previewRows.slice(0, 8), null, 2)}</pre>
+        <div className="subsection-heading">
+          <h3>{locale === "it" ? "Anteprima dei dati" : "Data preview"}</h3>
+          <span>{locale === "it" ? "Prime " : "First "}{Math.min(previewRows.length, 20)} {locale === "it" ? "righe" : "rows"}</span>
+        </div>
+        <div className="import-preview-table-wrap">
+          <table className="import-preview-table">
+            <thead><tr>
+              <th>{locale === "it" ? "Riga file" : "File row"}</th>
+              {(entity === "animals"
+                ? ["name", "identifier", "species", "sex", "morph", "birthDate", "locationLabel"]
+                : Object.keys(((previewRows[0]?.record ?? previewRows[0]?.animal ?? previewRows[0] ?? {}) as Item)).slice(0, 7)
+              ).filter((field) => availableFields.includes(field)).map((field) => <th key={field}>{fieldLabel(field)}</th>)}
+            </tr></thead>
+            <tbody>{previewRows.slice(0, 20).map((row, index) => {
+              const record = (row.animal ?? row.record ?? row) as Item;
+              const columns = (entity === "animals"
+                ? ["name", "identifier", "species", "sex", "morph", "birthDate", "locationLabel"]
+                : Object.keys(record).slice(0, 7)
+              ).filter((field) => availableFields.includes(field));
+              return <tr key={String(row.rowNumber ?? index)}>
+                <td>{String(row.rowNumber ?? index + 1)}</td>
+                {columns.map((field) => {
+                  const value = record[field];
+                  return <td key={field}>{value === null || value === undefined || value === ""
+                    ? "—"
+                    : typeof value === "boolean" ? (value ? (locale === "it" ? "Sì" : "Yes") : "No")
+                    : typeof value === "object" ? JSON.stringify(value)
+                    : String(value)}</td>;
+                })}
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
       </div>}
       <div className="modal-actions">
         <Button onClick={() => void confirmImport()} disabled={!canConfirm}>{t("confirmImport")}</Button>
