@@ -103,7 +103,8 @@ export function createCompanionCareExtrasRouter() {
       }, include: { animal: { select: { id: true, name: true, species: true } } } });
       const dueAt = new Date(created.expiresAt.getTime() - created.reminderDays * 86_400_000);
       const task = await tx.task.create({ data: { userId: auth.userId, animalId: created.animalId, title: "Scadenza: " + created.title, description: created.notes, category: "health", dueAt } });
-      return { ...created, reminderTaskId: task.id };
+      const linked = await tx.companionPolicy.update({ where: { id: created.id }, data: { taskId: task.id }, include: { animal: { select: { id: true, name: true, species: true } } } });
+      return linked;
     });
     res.status(201).json({ policy });
   });
@@ -119,12 +120,12 @@ export function createCompanionCareExtrasRouter() {
         ...input, ...(input.startsAt !== undefined ? { startsAt: input.startsAt ? new Date(input.startsAt + "T12:00:00.000Z") : null } : {}),
         ...(input.expiresAt ? { expiresAt: new Date(input.expiresAt + "T12:00:00.000Z") } : {}),
       }, include: { animal: { select: { id: true, name: true, species: true } } });
-      const openTask = await tx.task.findFirst({ where: { userId: auth.userId, animalId: existing.animalId, title: "Scadenza: " + existing.title, status: "open" } });
+      const openTask = existing.taskId ? await tx.task.findFirst({ where: { id: existing.taskId, userId: auth.userId, status: "open" } }) : null;
       if (openTask) await tx.task.update({ where: { id: openTask.id }, data: {
         title: "Scadenza: " + updated.title, description: updated.notes,
         animalId: updated.animalId, dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000),
       } });
-      else await tx.task.create({ data: { userId: auth.userId, animalId: updated.animalId, title: "Scadenza: " + updated.title, description: updated.notes, category: "health", dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000) } });
+      else if (!existing.taskId) { const task = await tx.task.create({ data: { userId: auth.userId, animalId: updated.animalId, title: "Scadenza: " + updated.title, description: updated.notes, category: "health", dueAt: new Date(updated.expiresAt.getTime() - updated.reminderDays * 86_400_000) } }); await tx.companionPolicy.update({ where: { id }, data: { taskId: task.id } }); }
       return updated;
     });
     res.json({ policy });
@@ -135,7 +136,7 @@ export function createCompanionCareExtrasRouter() {
     const existing = await prisma.companionPolicy.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "COMPANION_POLICY_NOT_FOUND", "Policy not found");
     await prisma.$transaction(async tx => {
-      await tx.task.updateMany({ where: { userId: auth.userId, animalId: existing.animalId, title: "Scadenza: " + existing.title, status: "open" }, data: { status: "dismissed" } });
+      if (existing.taskId) await tx.task.updateMany({ where: { id: existing.taskId, userId: auth.userId, status: "open" }, data: { status: "dismissed" } });
       await tx.companionPolicy.delete({ where: { id } });
     });
     res.status(204).end();
