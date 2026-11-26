@@ -35,6 +35,8 @@ model User {
   notificationPreferences NotificationPreferences?
   userPreference           UserPreference?
   accountConfiguration    AccountConfiguration?
+  aquariums               Aquarium[]
+  aviaries                Aviary[]
   pushSubscriptions       PushSubscription[]
   pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
@@ -134,6 +136,8 @@ model Animal {
   identifier             String?               @db.Citext
   species                String                @db.VarChar(160)
   sex                    String                @default("unknown") @db.VarChar(12)
+  category               String                @default("reptiles") @db.VarChar(24)
+  domainProfile          Json?                 @map("domain_profile") @db.JsonB
   morph                  String?               @db.VarChar(200)
   motherAnimalId         String?               @map("mother_animal_id") @db.Uuid
   fatherAnimalId         String?               @map("father_animal_id") @db.Uuid
@@ -185,8 +189,10 @@ model Animal {
   geneticTraitHistory    AnimalGeneticTraitHistory[]
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
+  aviaryAssignments      AviaryBird[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
+  @@index([userId, category, status], map: "animals_user_category_status_idx")
   @@index([userId, status], map: "animals_user_status_idx")
   @@index([userId, name], map: "animals_user_name_idx")
   @@index([userId, species], map: "animals_user_species_idx")
@@ -1060,6 +1066,73 @@ model AccountConfiguration {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([configuredAt], map: "account_configurations_configured_at_idx")
   @@map("account_configurations")
+}
+
+
+model Aquarium {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String                 @map("user_id") @db.Uuid
+  name         String                 @db.VarChar(120)
+  waterType    String                 @map("water_type") @db.VarChar(16)
+  volumeLiters Decimal                @map("volume_liters") @db.Decimal(10, 2)
+  setupDate    DateTime?              @map("setup_date") @db.Date
+  location     String?                @db.VarChar(160)
+  notes        String?
+  archivedAt   DateTime?              @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readings     AquariumWaterReading[]
+  @@index([userId, archivedAt, name], map: "aquariums_user_archived_name_idx")
+  @@map("aquariums")
+}
+
+model AquariumWaterReading {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId     String    @map("aquarium_id") @db.Uuid
+  measuredAt     DateTime  @map("measured_at") @db.Timestamptz(6)
+  temperatureC   Decimal?  @map("temperature_c") @db.Decimal(5, 2)
+  ph             Decimal?  @db.Decimal(4, 2)
+  ghDkh          Decimal?  @map("gh_dkh") @db.Decimal(6, 2)
+  khDkh          Decimal?  @map("kh_dkh") @db.Decimal(6, 2)
+  ammoniaMgL     Decimal?  @map("ammonia_mg_l") @db.Decimal(8, 4)
+  nitriteMgL     Decimal?  @map("nitrite_mg_l") @db.Decimal(8, 4)
+  nitrateMgL     Decimal?  @map("nitrate_mg_l") @db.Decimal(8, 3)
+  salinityPpt    Decimal?  @map("salinity_ppt") @db.Decimal(7, 3)
+  tdsPpm         Int?      @map("tds_ppm")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium       Aquarium  @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, measuredAt(sort: Desc)], map: "aquarium_water_readings_aquarium_measured_idx")
+  @@map("aquarium_water_readings")
+}
+
+model Aviary {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  name         String       @db.VarChar(120)
+  environment  String       @db.VarChar(16)
+  location     String?      @db.VarChar(160)
+  capacity     Int?
+  notes        String?
+  archivedAt   DateTime?    @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birds        AviaryBird[]
+  @@index([userId, archivedAt, name], map: "aviaries_user_archived_name_idx")
+  @@map("aviaries")
+}
+
+model AviaryBird {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aviaryId   String   @map("aviary_id") @db.Uuid
+  animalId   String   @unique(map: "aviary_birds_animal_id_key") @map("animal_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aviary     Aviary   @relation(fields: [aviaryId], references: [id], onDelete: Cascade)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([aviaryId], map: "aviary_birds_aviary_idx")
+  @@map("aviary_birds")
 }
 
 model PushDeliveryAttempt {

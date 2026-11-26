@@ -7,7 +7,7 @@ import { logger } from "../../logger.js";
 import { deletePrivateObject } from "../domain/private-storage.js";
 import { assertAnimalCapacity } from "../domain/billing-entitlements.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema } from "./animals.schemas.js";
+import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema, validateAnimalDomainProfile, type animalCategorySchema } from "./animals.schemas.js";
 
 function requestId(res: Response): string {
   return typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
@@ -32,6 +32,20 @@ function parseUuid(value: string | string[] | undefined, label = "id"): string {
     throw new AppError(400, "INVALID_ID", `Invalid ${label}`);
   }
   return id;
+}
+
+
+async function assertAnimalCategoryEnabled(userId: string, category: string) {
+  const configuration = await prisma.accountConfiguration.findUnique({
+    where: { userId },
+    select: { animalCategories: true },
+  });
+  if (!configuration?.animalCategories.includes(category)) {
+    throw new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This animal category is not enabled for the account", {
+      category,
+      settingsPath: "/settings/categories",
+    });
+  }
 }
 
 function toAnimalData(input: z.output<typeof createAnimalSchema>) {
@@ -147,6 +161,7 @@ export function createAnimalRouter() {
   router.post("/", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(createAnimalSchema, req.body);
+    await assertAnimalCategoryEnabled(auth.userId, input.category);
     await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId);
     try {
       const animal = await prisma.$transaction(async (tx) => {
@@ -172,6 +187,7 @@ export function createAnimalRouter() {
   router.post("/bulk", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(bulkAnimalsSchema, req.body);
+    await Promise.all([...new Set(input.animals.map((animal) => animal.category))].map((category) => assertAnimalCategoryEnabled(auth.userId, category)));
     const identifiers = input.animals.map((animal) => animal.identifier?.trim().toLocaleLowerCase("it-IT")).filter((value): value is string => Boolean(value));
     if (new Set(identifiers).size !== identifiers.length) {
       throw new AppError(400, "DUPLICATE_IDENTIFIERS_IN_REQUEST", "The request contains repeated animal identifiers");
@@ -216,6 +232,12 @@ export function createAnimalRouter() {
     await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId, id);
     const existing = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+    const resultingCategory = input.category ?? existing.category;
+    if (input.category) await assertAnimalCategoryEnabled(auth.userId, input.category);
+    if ("domainProfile" in input) {
+      const profile = validateAnimalDomainProfile(resultingCategory as "reptiles" | "fish" | "birds" | "dogs_cats", input.domainProfile ?? {});
+      if (!profile.success) throw new AppError(400, "VALIDATION_ERROR", "Invalid category-specific animal profile", { issues: profile.error.issues });
+    }
     if (existing.status === "archived" && "status" in input) {
       throw new AppError(409, "ANIMAL_ARCHIVED", "Use the restore action before changing an archived animal status");
     }

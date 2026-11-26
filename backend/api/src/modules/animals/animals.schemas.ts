@@ -7,6 +7,43 @@ function isValidCalendarDate(value: string): boolean {
 }
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refine(isValidCalendarDate, "Invalid calendar date");
 
+
+export const animalCategorySchema = z.enum(["reptiles", "fish", "birds", "dogs_cats"]);
+const animalDomainProfiles = {
+  reptiles: z.object({
+    enclosure: nullableText(120),
+    brumation: z.enum(["not_applicable", "planned", "in_progress", "completed"]).optional(),
+    feedingNotes: z.string().trim().max(2_000).nullable().optional(),
+  }).strict(),
+  fish: z.object({
+    aquariumId: z.string().uuid().nullable().optional(),
+    waterType: z.enum(["freshwater", "saltwater", "brackish"]).optional(),
+    temperament: nullableText(120),
+    maxSizeCm: z.coerce.number().positive().max(500).nullable().optional(),
+    shoaling: z.boolean().optional(),
+    diet: nullableText(160),
+  }).strict(),
+  birds: z.object({
+    ringNumber: nullableText(80),
+    aviaryId: z.string().uuid().nullable().optional(),
+    diet: nullableText(160),
+    tameness: z.enum(["wild", "socialized", "tame"]).optional(),
+    flightStatus: z.enum(["full_flight", "clipped", "unknown"]).optional(),
+  }).strict(),
+  dogs_cats: z.object({
+    breed: nullableText(160),
+    microchip: nullableText(40),
+    sterilized: z.boolean().optional(),
+    vaccinationStatus: z.enum(["unknown", "not_up_to_date", "up_to_date"]).optional(),
+    coatColor: nullableText(120),
+    weightKg: z.coerce.number().positive().max(250).nullable().optional(),
+  }).strict(),
+} as const;
+
+export function validateAnimalDomainProfile(category: z.infer<typeof animalCategorySchema>, profile: unknown) {
+  return animalDomainProfiles[category].safeParse(profile ?? {});
+}
+
 export const animalStatusSchema = z.enum(["active", "sold", "transferred", "deceased", "archived"]);
 export const animalSexSchema = z.enum(["male", "female", "unknown"]);
 export const feedingOutcomeSchema = z.enum(["ate", "refused", "not_offered", "unknown"]);
@@ -16,6 +53,8 @@ export const animalFields = {
   name: z.string().trim().min(1).max(120),
   identifier: nullableText(120),
   species: z.string().trim().min(1).max(160),
+  category: animalCategorySchema.default("reptiles"),
+  domainProfile: z.record(z.string(), z.unknown()).default({}),
   sex: animalSexSchema.default("unknown"),
   morph: nullableText(200),
   motherAnimalId: z.string().uuid().nullable().optional(),
@@ -35,6 +74,10 @@ export const animalFields = {
 };
 
 export const createAnimalSchema = z.object(animalFields).strict().superRefine((value, ctx) => {
+  const profile = validateAnimalDomainProfile(value.category, value.domainProfile);
+  if (!profile.success) {
+    for (const issue of profile.error.issues) ctx.addIssue({ ...issue, path: ["domainProfile", ...issue.path] });
+  }
   if (value.status === "archived") {
     ctx.addIssue({ code: "custom", path: ["status"], message: "Use the archive action to archive an animal" });
   }
@@ -44,6 +87,8 @@ export const patchAnimalSchema = z.object({
   name: animalFields.name.optional(),
   identifier: animalFields.identifier,
   species: animalFields.species.optional(),
+  category: animalCategorySchema.optional(),
+  domainProfile: z.record(z.string(), z.unknown()).optional(),
   sex: animalSexSchema.optional(),
   morph: animalFields.morph,
   motherAnimalId: animalFields.motherAnimalId,

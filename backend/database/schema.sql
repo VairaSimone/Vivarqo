@@ -1224,6 +1224,70 @@ DO $schema$ BEGIN
   END IF;
 END $schema$;
 
+
+-- ---------------------------------------------------------------------------
+-- 2b. Multi-domain animal and habitat management
+-- ---------------------------------------------------------------------------
+ALTER TABLE animals
+  ADD COLUMN category VARCHAR(24) NOT NULL DEFAULT 'reptiles',
+  ADD COLUMN domain_profile JSONB;
+CREATE INDEX animals_user_category_status_idx ON animals (user_id, category, status);
+
+CREATE TABLE aquariums (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  water_type VARCHAR(16) NOT NULL CHECK (water_type IN ('freshwater', 'saltwater', 'brackish')),
+  volume_liters NUMERIC(10,2) NOT NULL CHECK (volume_liters > 0),
+  setup_date DATE,
+  location VARCHAR(160),
+  notes TEXT,
+  archived_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aquariums_user_archived_name_idx ON aquariums (user_id, archived_at, name);
+
+CREATE TABLE aquarium_water_readings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  aquarium_id UUID NOT NULL REFERENCES aquariums(id) ON DELETE CASCADE,
+  measured_at TIMESTAMPTZ NOT NULL,
+  temperature_c NUMERIC(5,2) CHECK (temperature_c IS NULL OR temperature_c BETWEEN -5 AND 60),
+  ph NUMERIC(4,2) CHECK (ph IS NULL OR ph BETWEEN 0 AND 14),
+  gh_dkh NUMERIC(6,2) CHECK (gh_dkh IS NULL OR gh_dkh >= 0),
+  kh_dkh NUMERIC(6,2) CHECK (kh_dkh IS NULL OR kh_dkh >= 0),
+  ammonia_mg_l NUMERIC(8,4) CHECK (ammonia_mg_l IS NULL OR ammonia_mg_l >= 0),
+  nitrite_mg_l NUMERIC(8,4) CHECK (nitrite_mg_l IS NULL OR nitrite_mg_l >= 0),
+  nitrate_mg_l NUMERIC(8,3) CHECK (nitrate_mg_l IS NULL OR nitrate_mg_l >= 0),
+  salinity_ppt NUMERIC(7,3) CHECK (salinity_ppt IS NULL OR salinity_ppt >= 0),
+  tds_ppm INTEGER CHECK (tds_ppm IS NULL OR tds_ppm >= 0),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aquarium_water_readings_aquarium_measured_idx ON aquarium_water_readings (aquarium_id, measured_at DESC);
+
+CREATE TABLE aviaries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  environment VARCHAR(16) NOT NULL CHECK (environment IN ('indoor', 'outdoor', 'mixed')),
+  location VARCHAR(160),
+  capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+  notes TEXT,
+  archived_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aviaries_user_archived_name_idx ON aviaries (user_id, archived_at, name);
+
+CREATE TABLE aviary_birds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  aviary_id UUID NOT NULL REFERENCES aviaries(id) ON DELETE CASCADE,
+  animal_id UUID NOT NULL UNIQUE REFERENCES animals(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aviary_birds_aviary_idx ON aviary_birds (aviary_id);
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
