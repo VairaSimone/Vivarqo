@@ -345,3 +345,15 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     </section>}
   </section>;
 }
+
+
+function TrendChart({ readings, parameter, locale }: { readings: Reading[]; parameter: Parameter; locale: Locale }) {
+  const values = [...readings].reverse().map((reading) => ({ date: reading.measuredAt, value: reading[parameter] === null ? null : Number(reading[parameter]) })).filter((item): item is { date: string; value: number } => item.value !== null && Number.isFinite(item.value));
+  if (values.length < 2) return <p className="ecosys-empty">{locale === "it" ? "Servono almeno due misurazioni del parametro selezionato." : "At least two readings are needed for this parameter."}</p>;
+  const min = Math.min(...values.map((item) => item.value));
+  const max = Math.max(...values.map((item) => item.value));
+  const span = max - min || 1;
+  const points = values.map((item, index) => ({ x: 8 + index * 584 / (values.length - 1), y: 112 - (item.value - min) / span * 96 }));
+  const path = points.map((point, index) => (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1)).join(" ");
+  return <div className="ecosys-trend"><svg viewBox="0 0 600 132" role="img" aria-label={(locale === "it" ? "Grafico andamento " : "Trend chart ") + parameter}><path d="M8 16H592 M8 64H592 M8 112H592" stroke="currentColor" opacity=".15" fill="none"/><path d={path} stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>{points.map((point,index)=><circle key={index} cx={point.x} cy={point.y} r="3" fill="currentColor"/>)}</svg><div className="inline-actions"><span>Min: {min}</span><span>Max: {max}</span><span>{values.length} {locale === "it" ? "punti" : "points"}</span></div><small>{new Date(values[0]!.date).toLocaleDateString(locale === "it" ? "it-IT" : "en-GB")} → {new Date(values[values.length-1]!.date).toLocaleDateString(locale === "it" ? "it-IT" : "en-GB")}</small></div>;
+}
