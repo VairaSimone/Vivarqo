@@ -27,18 +27,18 @@ function normalizeHeader(value: string): string {
 }
 
 const aliases: Record<string, string> = {
-  name: "name", nome: "name", nomedisplay: "name", nomevisualizzato: "name", nomeanimale: "name", animalname: "name",
-  identifier: "identifier", id: "identifier", codice: "identifier", codiceidentificativo: "identifier", identificativo: "identifier",
-  species: "species", specie: "species", speciesname: "species",
-  sex: "sex", sesso: "sex",
-  morph: "morph", morfo: "morph", morphologia: "morph",
+  name: "name", nome: "name", nomedisplay: "name", nomevisualizzato: "name", nomeanimale: "name", animalname: "name", animal: "name",
+  identifier: "identifier", id: "identifier", codice: "identifier", codiceidentificativo: "identifier", identificativo: "identifier", numero: "identifier", numeroidentificativo: "identifier", tag: "identifier",
+  species: "species", specie: "species", speciesname: "species", tipologia: "species",
+  sex: "sex", sesso: "sex", gender: "sex",
+  morph: "morph", morfo: "morph", morphologia: "morph", variante: "morph",
   geneticsnotes: "geneticsNotes", annotazionigenetiche: "geneticsNotes", genetica: "geneticsNotes", geneticnotes: "geneticsNotes",
-  birthdate: "birthDate", datadinascita: "birthDate", nascita: "birthDate",
+  birthdate: "birthDate", datadinascita: "birthDate", nascita: "birthDate", datanascita: "birthDate", dob: "birthDate",
   birthdateestimated: "birthDateEstimated", datastimata: "birthDateEstimated", nascitastimata: "birthDateEstimated",
   acquireddate: "acquiredDate", dataacquisizione: "acquiredDate", acquisizione: "acquiredDate",
   origindescription: "originDescription", provenienza: "originDescription", origine: "originDescription",
   previousbreeder: "previousBreeder", allevatoreprecedente: "previousBreeder",
-  location: "locationLabel", locationlabel: "locationLabel", posizione: "locationLabel", alloggiamento: "locationLabel",
+  location: "locationLabel", locationlabel: "locationLabel", posizione: "locationLabel", alloggiamento: "locationLabel", rack: "locationLabel", stabulazione: "locationLabel", scaffale: "locationLabel", contenitore: "locationLabel", box: "locationLabel",
   status: "status", stato: "status",
   notes: "notes", note: "notes", notedellanimale: "notes",
 };
@@ -250,9 +250,11 @@ export function createImportRouter() {
     if (!entity) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
     const headers = templateHeaders[entity];
     if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
-    const csv = "\uFEFF" + headers.map((header) => `"${header}"`).join(",") + "\r\n";
+    const animalTemplateHeaders = ["Nome", "Identificativo", "Specie", "Sesso", "Morph", "Note genetiche", "Data di nascita", "Nascita stimata", "Data acquisizione", "Provenienza", "Allevatore precedente", "Rack / Posizione", "Stato", "Note"];
+    const outputHeaders = entity === "animals" ? animalTemplateHeaders : headers;
+    const csv = "\uFEFF" + outputHeaders.map((header) => `"${header}"`).join(",") + "\r\n";
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="vivarqo-${entity}-template.csv"`);
+    res.setHeader("Content-Disposition", `attachment; filename="snakebee-${entity}-template.csv"`);
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).send(csv);
   });
