@@ -92,11 +92,12 @@ export function createBirdManagementRouter() {
     const citesExpiresAt = input.citesExpiresAt !== undefined ? input.citesExpiresAt : existing?.citesExpiresAt?.toISOString().slice(0, 10) ?? null;
     if (ringType === "none" && ringNumber) throw new AppError(400, "RING_TYPE_REQUIRED", "Choose a ring or microchip type for the identification number");
     if (citesIssuedAt && citesExpiresAt && citesExpiresAt < citesIssuedAt) throw new AppError(400, "INVALID_CITES_DATES", "CITES expiry cannot precede issue date");
-    for (const [field, value] of [["ringNumber", ringNumber], ["citesNumber", input.citesNumber !== undefined ? input.citesNumber : existing?.citesNumber ?? null]] as const) {
-      if (value) {
-        const duplicate = await prisma.birdProfile.findFirst({ where: { userId: auth.userId, animalId: { not: animalId }, [field]: value }, select: { id: true } });
-        if (duplicate) throw new AppError(409, field === "ringNumber" ? "RING_NUMBER_ALREADY_USED" : "CITES_NUMBER_ALREADY_USED", "This identification number is already assigned to another bird");
-      }
+    if (ringNumber && await prisma.birdProfile.findFirst({ where: { userId: auth.userId, animalId: { not: animalId }, ringNumber }, select: { id: true } })) {
+      throw new AppError(409, "RING_NUMBER_ALREADY_USED", "This ring number is already assigned to another bird");
+    }
+    const citesNumber = input.citesNumber !== undefined ? input.citesNumber : existing?.citesNumber ?? null;
+    if (citesNumber && await prisma.birdProfile.findFirst({ where: { userId: auth.userId, animalId: { not: animalId }, citesNumber }, select: { id: true } })) {
+      throw new AppError(409, "CITES_NUMBER_ALREADY_USED", "This CITES number is already assigned to another bird");
     }
     const profile = await prisma.birdProfile.upsert({
       where: { animalId },
