@@ -81,10 +81,12 @@ export function createCompanionCareExtrasRouter() {
     if (!deleted.count) throw new AppError(404, "COMPANION_LOG_NOT_FOUND", "Log not found");
     res.status(204).end();
   });
-  router.get("/companion-care/policies", requireSession, async (_req, res) => {
+  router.get("/companion-care/policies", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireDogsCats(auth.userId);
-    const policies = await prisma.companionPolicy.findMany({ where: { userId: auth.userId }, include: { animal: { select: { id: true, name: true, species: true } } }, orderBy: [{ expiresAt: "asc" }, { createdAt: "desc" }], take: 200 });
+    const animalId = req.query.animalId === undefined ? undefined : routeId(String(req.query.animalId));
+    if (animalId) await ownedAnimal(auth.userId, animalId);
+    const policies = await prisma.companionPolicy.findMany({ where: { userId: auth.userId, ...(animalId ? { animalId } : {}) }, include: { animal: { select: { id: true, name: true, species: true } } }, orderBy: [{ expiresAt: "asc" }, { createdAt: "desc" }], take: 200 });
     res.json({ policies });
   });
   router.post("/companion-care/policies", requireSession, async (req, res) => {
