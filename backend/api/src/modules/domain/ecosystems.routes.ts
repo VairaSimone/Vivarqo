@@ -58,7 +58,11 @@ const aquariumRangeSchema = z.object({
     minValue: z.number().finite().nullable(),
     maxValue: z.number().finite().nullable(),
   }).strict().refine((item) => item.minValue !== null || item.maxValue !== null, "At least one bound is required")
-    .refine((item) => item.minValue === null || item.maxValue === null || item.minValue <= item.maxValue, "Minimum cannot exceed maximum")).max(5),
+    .refine((item) => item.minValue === null || item.maxValue === null || item.minValue <= item.maxValue, "Minimum cannot exceed maximum")
+    .refine((item) => {
+      const bounds = { temperatureC: [-5, 60], ph: [0, 14], ghDkh: [0, 100], khDkh: [0, 100], nitrateMgL: [0, 10000] }[item.parameter];
+      return [item.minValue, item.maxValue].every((value) => value === null || (value >= bounds[0]! && value <= bounds[1]!));
+    }, "Range bounds are outside the supported parameter domain")).max(5),
 }).strict();
 const aviaryNoteSchema = z.object({
   title: z.string().trim().max(160).nullable().optional(),
