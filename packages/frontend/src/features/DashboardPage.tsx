@@ -288,9 +288,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
                 : eventType === "birth" ? (locale === "it" ? rawTitle.replace("Nascita:", "Nascita registrata:") : rawTitle.replace("Nascita:", "Birth recorded:"))
                 : eventType === "incubation" ? (locale === "it" ? rawTitle : rawTitle.replace("Manutenzione incubatrice:", "Incubator maintenance:"))
                 : eventType === "animal_update" ? (locale === "it" ? rawTitle : rawTitle.replace("Scheda aggiornata:", "Animal profile updated:"))
+                : eventType === "aquarium_reading" ? (locale === "it" ? rawTitle : rawTitle.replace("Misurazione:", "Water reading:"))
+                : eventType === "aviary_movement" ? (locale === "it" ? rawTitle : rawTitle.replace("Spostamento:", "Bird moved:"))
+                : eventType === "aviary_note" ? (locale === "it" ? rawTitle : rawTitle.replace("Nota:", "Aviary note:"))
                 : rawTitle;
               return <button className="activity-row" key={`${eventType}-${index}`} onClick={() => navigate(target || "/animals")}>
-                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "note" ? "file" : "leaf"} size={15} /></span>
+                <span className="activity-dot"><Icon name={eventType === "feeding" ? "feed" : eventType === "weight" ? "weight" : eventType === "reproduction" || eventType === "birth" ? "egg" : eventType === "incubation" ? "clock" : eventType === "animal_update" ? "edit" : eventType === "aquarium_reading" ? "droplet" : eventType === "aviary_movement" ? "bird" : eventType === "aviary_note" || eventType === "note" ? "file" : "leaf"} size={15} /></span>
                 <span className="activity-copy"><strong>{eventTitle}</strong><small>{formatDateTime(getString(event, "occurredAt"), locale, timezone)}</small></span>
                 <Icon name="chevron" size={15} />
               </button>;
