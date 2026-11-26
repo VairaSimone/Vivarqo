@@ -52,6 +52,19 @@ const aviarySchema = z.object({
 
 const aviaryPatchSchema = aviarySchema.partial().strict()
   .refine((value) => Object.keys(value).length > 0, "At least one field is required");
+const aquariumRangeSchema = z.object({
+  ranges: z.array(z.object({
+    parameter: z.enum(["temperatureC", "ph", "ghDkh", "khDkh", "nitrateMgL"]),
+    minValue: z.number().finite().nullable(),
+    maxValue: z.number().finite().nullable(),
+  }).strict().refine((item) => item.minValue !== null || item.maxValue !== null, "At least one bound is required")
+    .refine((item) => item.minValue === null || item.maxValue === null || item.minValue <= item.maxValue, "Minimum cannot exceed maximum")).max(5),
+}).strict();
+const aviaryNoteSchema = z.object({
+  title: z.string().trim().max(160).nullable().optional(),
+  body: z.string().trim().min(1).max(10000),
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
 const aviaryBirdAssignmentSchema = z.object({
   animalIds: z.array(z.string().uuid()).max(500),
 }).strict();
@@ -148,10 +161,71 @@ export function createEcosystemRouter() {
     const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
     const readings = await prisma.aquariumWaterReading.findMany({
       where: { aquariumId: aquarium.id },
-      orderBy: { measuredAt: "desc" },
-      take: 200,
+      orderBy: [{ measuredAt: "desc" }, { id: "desc" }],
+      take: Math.min(1000, Math.max(1, Number(req.query.take) || 200)),
+      skip: Math.max(0, Math.min(100000, Number(req.query.skip) || 0)),
     });
     res.status(200).json({ readings });
+  });
+
+  router.get("/aquariums/:id/ranges", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
+    const ranges = await prisma.aquariumParameterRange.findMany({ where: { aquariumId: aquarium.id }, orderBy: { parameter: "asc" } });
+    res.status(200).json({ ranges });
+  });
+
+  router.put("/aquariums/:id/ranges", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
+    const input = parse(aquariumRangeSchema, req.body);
+    if (new Set(input.ranges.map((item) => item.parameter)).size !== input.ranges.length) {
+      throw new AppError(400, "DUPLICATE_PARAMETER_RANGE", "Each parameter can have only one range");
+    }
+    const ranges = await prisma.$transaction(async (tx) => {
+      for (const range of input.ranges) {
+        await tx.aquariumParameterRange.upsert({
+          where: { aquariumId_parameter: { aquariumId: aquarium.id, parameter: range.parameter } },
+          create: { aquariumId: aquarium.id, ...range },
+          update: { minValue: range.minValue, maxValue: range.maxValue },
+        });
+      }
+      const keep = input.ranges.map((item) => item.parameter);
+      await tx.aquariumParameterRange.deleteMany({ where: { aquariumId: aquarium.id, ...(keep.length ? { parameter: { notIn: keep } } : {}) } });
+      return tx.aquariumParameterRange.findMany({ where: { aquariumId: aquarium.id }, orderBy: { parameter: "asc" } });
+    });
+    res.status(200).json({ ranges });
+  });
+
+  router.get("/aquariums/:id/export.csv", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "fish");
+    const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id));
+    const escapeCsv = (value: unknown) => {
+      const raw = value === null || value === undefined ? "" : String(value);
+      const safe = /^[=+@\\-]/.test(raw) ? "'" + raw : raw;
+      return '"' + safe.replace(/"/g, '""') + '"';
+    };
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="aquarium-' + aquarium.id + '-readings.csv"');
+    res.write("\uFEFF");
+    res.write(["measuredAt","temperatureC","ph","ghDkh","khDkh","ammoniaMgL","nitriteMgL","nitrateMgL","salinityPpt","tdsPpm","notes"].join(";") + "\r\n");
+    let cursor: string | undefined;
+    while (true) {
+      const batch = await prisma.aquariumWaterReading.findMany({
+        where: { aquariumId: aquarium.id }, orderBy: [{ measuredAt: "asc" }, { id: "asc" }],
+        take: 1000, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (!batch.length) break;
+      for (const row of batch) {
+        res.write([row.measuredAt.toISOString(),row.temperatureC,row.ph,row.ghDkh,row.khDkh,row.ammoniaMgL,row.nitriteMgL,row.nitrateMgL,row.salinityPpt,row.tdsPpm,row.notes].map(escapeCsv).join(";") + "\r\n");
+      }
+      cursor = batch[batch.length - 1]!.id;
+      if (batch.length < 1000) break;
+    }
+    res.end();
   });
 
   router.patch("/aquariums/:id/readings/:readingId", requireSession, async (req, res) => {
@@ -256,6 +330,32 @@ export function createEcosystemRouter() {
     res.status(200).json({ birds });
   });
 
+  router.get("/aviaries/:id/history", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const aviary = await prisma.aviary.findFirst({ where: { id: parseUuid(req.params.id), userId: auth.userId } });
+    if (!aviary) throw new AppError(404, "AVIARY_NOT_FOUND", "Aviary not found");
+    const [movements, notes] = await Promise.all([
+      prisma.aviaryMovement.findMany({
+        where: { OR: [{ fromAviaryId: aviary.id }, { toAviaryId: aviary.id }] },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 200,
+        include: { animal: { select: { id: true, name: true, species: true } }, fromAviary: { select: { id: true, name: true } }, toAviary: { select: { id: true, name: true } } },
+      }),
+      prisma.aviaryNote.findMany({ where: { aviaryId: aviary.id }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 100 }),
+    ]);
+    res.status(200).json({ movements, notes });
+  });
+
+  router.post("/aviaries/:id/notes", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const aviary = await prisma.aviary.findFirst({ where: { id: parseUuid(req.params.id), userId: auth.userId } });
+    if (!aviary) throw new AppError(404, "AVIARY_NOT_FOUND", "Aviary not found");
+    const input = parse(aviaryNoteSchema, req.body);
+    const note = await prisma.aviaryNote.create({ data: { aviaryId: aviary.id, ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}) } });
+    res.status(201).json({ note });
+  });
+
   router.put("/aviaries/:id/birds", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "birds");
@@ -272,8 +372,16 @@ export function createEcosystemRouter() {
     const birds = await prisma.animal.findMany({ where: { id: { in: ids }, userId: auth.userId, category: "birds" }, select: { id: true } });
     if (birds.length !== ids.length) throw new AppError(400, "INVALID_BIRD", "One or more selected records are not birds in this account");
     await prisma.$transaction(async (tx) => {
-      // A bird can belong to one aviary only. Reassigning it moves the record,
-      // while the animal and its care history remain untouched.
+      const current = await tx.aviaryBird.findMany({ where: { OR: [{ aviaryId: aviary.id }, ...(ids.length ? [{ animalId: { in: ids } }] : [])] }, select: { animalId: true, aviaryId: true } });
+      const currentByAnimal = new Map(current.map((item) => [item.animalId, item.aviaryId]));
+      const targetByAnimal = new Map(ids.map((animalId) => [animalId, aviary.id]));
+      const changed = new Set([...currentByAnimal.keys(), ...targetByAnimal.keys()]);
+      const movements = [...changed].flatMap((animalId) => {
+        const fromAviaryId = currentByAnimal.get(animalId) ?? null;
+        const toAviaryId = targetByAnimal.get(animalId) ?? null;
+        return fromAviaryId === toAviaryId ? [] : [{ animalId, fromAviaryId, toAviaryId }];
+      });
+      if (movements.length) await tx.aviaryMovement.createMany({ data: movements });
       if (ids.length) await tx.aviaryBird.deleteMany({ where: { animalId: { in: ids } } });
       await tx.aviaryBird.deleteMany({ where: { aviaryId: aviary.id } });
       if (ids.length) await tx.aviaryBird.createMany({ data: ids.map((animalId) => ({ aviaryId: aviary.id, animalId })) });
