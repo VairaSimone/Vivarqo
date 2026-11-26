@@ -41,6 +41,7 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
     { path: "/help", label: "navHelp", icon: "help" },
     { path: "/notifications", label: "navNotifications", icon: "bell" },
     { path: "/billing", label: "navBilling", icon: "wallet" },
+    { path: "/settings/categories", label: "navCategories", icon: "settings" },
     { path: "/settings", label: "navSettings", icon: "settings" }
   ] }
 ];
@@ -51,7 +52,7 @@ const routeTitles: Record<string, string> = {
   "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding", "/genetics": "navGenetics",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",
-  "/billing": "navBilling", "/settings": "navSettings", "/help": "navHelp"
+  "/billing": "navBilling", "/settings/categories": "navCategories", "/settings": "navSettings", "/help": "navHelp"
 };
 
 export function AppShell({ children, path, user, locale, onNavigate, onLocaleChange, onSignOut, unreadCount = 0 }: {
