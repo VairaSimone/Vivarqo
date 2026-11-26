@@ -273,6 +273,7 @@ export function App() {
   else if (matches("/help")) page = <HelpCenterPage locale={locale} navigate={navigate} />;
   else if (matches("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (matches("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
+  else if (matches("/settings/categories")) page = <AccountCategoriesPage locale={locale} mode="settings" onComplete={() => navigate("/today")} />;
   else if (matches("/notifications") || matches("/settings") || matches("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
       onDisplayPreferencesChange={(next) => setDisplayPreferencesState((current) => ({ ...current, ...next, timezone }))}
       navigate={navigate} />;
