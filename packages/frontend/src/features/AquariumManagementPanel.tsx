@@ -77,6 +77,13 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
         <h3>{it ? "Popolazione attuale" : "Current population"}</h3>
         {data.populations.length === 0 ? <p className="ecosys-empty">{it ? "Nessuna specie registrata. Registra un'introduzione per iniziare." : "No species recorded. Log an introduction to start."}</p> :
           <div className="ecosys-history">{data.populations.map(row => <div className="ecosys-reading" key={row.id}><strong>{String(row.commonName || row.speciesKey)} · {String(row.quantity)}</strong><span>{String(row.scientificName || row.speciesKey)}</span></div>)}</div>}
+        {(() => {
+          const warnings = data.compatibilityRules.filter(rule => {
+            const a = String(rule.speciesAKey).toLowerCase(), b = String(rule.speciesBKey).toLowerCase();
+            return data.populations.some(p => String(p.speciesKey).toLowerCase() === a) && data.populations.some(p => String(p.speciesKey).toLowerCase() === b) && rule.compatibility !== "compatible";
+          });
+          return warnings.length ? <Alert tone="danger">{warnings.map(w => `${String(w.speciesAKey)} + ${String(w.speciesBKey)}: ${String(w.compatibility)}`).join(" · ")}</Alert> : null;
+        })()}
         <h3>{it ? "Registra ingresso, uscita, mortalità o trasferimento" : "Log introduction, removal, mortality or transfer"}</h3>
         <form className="form-grid" onSubmit={e => void submit(e, async () => {
           await api.post(path + "/population-movements", {
@@ -152,7 +159,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           {textarea(it?"Osservazioni":"Observations",quarantine.observations,v=>setQuarantine(p=>({...p,observations:v})))}
           <Button type="submit" disabled={saving}>{it?"Registra quarantena":"Save quarantine"}</Button>
         </form>
-        <div className="ecosys-history">{data.quarantines.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.commonName||row.speciesKey)} × {String(row.quantity)} · {String(row.status)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.source||"—")}</span></div>)}</div>
+        <div className="ecosys-history">{data.quarantines.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.commonName||row.speciesKey)} × {String(row.quantity)} · {String(row.status)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.source||"—")}</span>{row.status === "quarantine" && <Button size="sm" variant="secondary" disabled={saving} onClick={() => void submit(new Event("submit") as unknown as FormEvent, async () => { await api.patch(`/quarantines/${row.id}`, { status: "released", endedAt: new Date().toISOString() }); })}>{it?"Concludi quarantena":"End quarantine"}</Button>}</div>)}</div>
       </>}
       {section === "treatments" && <>
         <h3>{it?"Trattamenti e medicinali":"Treatments and medication"}</h3>
@@ -167,7 +174,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           {textarea(it?"Istruzioni":"Instructions",treatment.instructions,v=>setTreatment(p=>({...p,instructions:v})))}
           <Button type="submit" disabled={saving}>{it?"Registra trattamento":"Save treatment"}</Button>
         </form>
-        <div className="ecosys-history">{data.treatments.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.productName)} · {String(row.treatmentType)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.activeIngredient||"—")} · {String(row.doseAmount||"")} {String(row.doseUnit||"")}</span></div>)}</div>
+        <div className="ecosys-history">{data.treatments.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.productName)} · {String(row.treatmentType)}</strong><span>{dateLabel(row.startedAt,it)} · {String(row.activeIngredient||"—")} · {String(row.doseAmount||"")} {String(row.doseUnit||"")}</span>{!row.endedAt && <Button size="sm" variant="secondary" disabled={saving} onClick={() => void (async()=>{setSaving(true);try{await api.patch(`/aquarium-treatments/${row.id}`,{endedAt:new Date().toISOString()});await load();}catch(e){setError(e instanceof ApiError?e.message:(it?"Aggiornamento non riuscito.":"Could not update treatment."));}finally{setSaving(false);}})()}>{it?"Concludi trattamento":"Complete treatment"}</Button>}</div>)}</div>
       </>}
       {section === "breeding" && <>
         <h3>{it?"Riproduzione, deposizione e schiuse":"Breeding, spawning and hatching"}</h3>
