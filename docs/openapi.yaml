@@ -3432,6 +3432,67 @@ paths:
                   workspaces: { type: array, items: { type: object } }
                   activeWorkspaceOwnerId: { type: [string, 'null'], format: uuid }
                   premiumEnabled: { type: boolean }
+  /api/v1/aviaries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateAviary
+      tags: [Ecosystems]
+      summary: Modifica i dettagli di una voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviaryPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                environment: { type: string, enum: [indoor, outdoor, mixed] }
+                location: { type: [string, 'null'], maxLength: 160 }
+                capacity: { type: [integer, 'null'], minimum: 1, maximum: 100000 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200': { description: Voliera aggiornata. }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: archiveAviary
+      tags: [Ecosystems]
+      summary: Archivia una voliera e rimuove le assegnazioni, senza eliminare le schede degli uccelli
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Voliera archiviata. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/context:
+    get:
+      operationId: getActiveWorkspaceContext
+      tags: [Collaboration]
+      summary: Restituisce categorie e ruolo del workspace attivo
+      responses:
+        '200':
+          description: Contesto effettivo del workspace, personale o condiviso.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, activeWorkspaceOwnerId, role, ownerName, isPersonalWorkspace]
+                properties:
+                  categories:
+                    type: array
+                    items: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
+                  activeWorkspaceOwnerId: { type: [string, 'null'], format: uuid }
+                  role: { type: [string, 'null'], enum: [admin, operator, breeding, viewer] }
+                  ownerName: { type: string }
+                  isPersonalWorkspace: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
   /api/v1/collaborators/invitations:
     post:
       operationId: inviteWorkspaceCollaborator
@@ -4448,6 +4509,45 @@ paths:
                   aquarium: { type: object }
         '400':
           $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateAquarium
+      tags: [Ecosystems]
+      summary: Modifica i dettagli di un acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+                volumeLiters: { type: number, exclusiveMinimum: 0 }
+                setupDate: { type: [string, 'null'], format: date }
+                location: { type: [string, 'null'], maxLength: 160 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '200': { description: Acquario aggiornato. }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: archiveAquarium
+      tags: [Ecosystems]
+      summary: Archivia un acquario conservando lo storico delle misurazioni
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Acquario archiviato. }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/aquariums/{id}/readings:
     parameters:
       - name: id
@@ -4565,6 +4665,56 @@ paths:
                   aviary: { type: object }
         '400':
           $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}/readings/{readingId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: readingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Modifica una misurazione dei parametri dell'acqua
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: readingPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                measuredAt: { type: string, format: date-time }
+                temperatureC: { type: [number, 'null'], minimum: -5, maximum: 60 }
+                ph: { type: [number, 'null'], minimum: 0, maximum: 14 }
+                ghDkh: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                khDkh: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                ammoniaMgL: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+                nitriteMgL: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+                nitrateMgL: { type: [number, 'null'], minimum: 0, maximum: 10000 }
+                salinityPpt: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                tdsPpm: { type: [integer, 'null'], minimum: 0, maximum: 100000 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200': { description: Misurazione aggiornata. }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Elimina una misurazione errata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Misurazione eliminata. }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/aviaries/{id}/birds:
     parameters:
       - name: id
