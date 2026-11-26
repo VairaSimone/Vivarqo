@@ -19,7 +19,7 @@ const inputDateTime = () => {
   return date.toISOString().slice(0, 16);
 };
 
-export function EcosystemsPage({ locale, path }: { locale: Locale; path: string }) {
+export function EcosystemsPage({ locale, path, navigate }: { locale: Locale; path: string; navigate: (path: string) => void }) {
   const italian = locale === "it";
   const aquariumMode = path.startsWith("/aquariums");
   const [aquariums, setAquariums] = useState<Aquarium[]>([]);
@@ -365,7 +365,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
       <form className="form-grid" onSubmit={addAviaryNote}><h3>{italian ? "Nota o intervento sulla voliera" : "Aviary note or intervention"}</h3><label className="field"><span className="field-label">{italian ? "Titolo" : "Title"}</span><input className="control" maxLength={160} value={noteTitle} onChange={(event) => setNoteTitle(event.target.value)} /></label><label className="field"><span className="field-label">{italian ? "Descrizione" : "Description"}</span><textarea className="control" required maxLength={10000} value={noteBody} onChange={(event) => setNoteBody(event.target.value)} /></label><Button type="submit" disabled={saving}>{italian ? "Aggiungi nota" : "Add note"}</Button></form>
       <div className="ecosys-history"><h3>{italian ? "Note e interventi" : "Notes and interventions"}</h3>{aviaryNotes.map((note) => <div className="ecosys-reading" key={note.id}><strong>{note.title || (italian ? "Nota" : "Note")}</strong><span>{new Date(note.occurredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</span><p>{note.body}</p><div className="inline-actions"><Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteAviaryNote(note.id)}>{italian ? "Elimina" : "Delete"}</Button></div></div>)}</div>
     </section>}
-    {!showArchived && !aquariumMode && selectedAviary && <BirdManagementPanel locale={locale} birds={birds} aviaryId={selectedAviary.id} navigate={(next) => { window.location.assign(next); }} />}
+    {!showArchived && !aquariumMode && selectedAviary && <BirdManagementPanel locale={locale} birds={birds} aviaryId={selectedAviary.id} navigate={navigate} />}
   </section>;
 }
 
