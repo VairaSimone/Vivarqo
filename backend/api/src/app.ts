@@ -40,6 +40,7 @@ import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
+import { createAquariumManagementRouter } from "./modules/domain/aquarium-management.routes.js";
 import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
 import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
 
@@ -128,6 +129,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createDocumentShareRouter());
   app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createEcosystemRouter());
+  app.use("/api/v1", createAquariumManagementRouter());
   app.use("/api/v1", createCompanionCareRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
