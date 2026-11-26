@@ -46,6 +46,15 @@ export const quarantineSchema = z.object({
 }).strict().superRefine((v, ctx) => {
   if (v.endedAt && Date.parse(v.endedAt) < Date.parse(v.startedAt)) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
+export const quarantinePatchSchema = z.object({
+  status: z.enum(["quarantine","released","isolated","lost"]).optional(),
+  endedAt: date.nullable().optional(),
+  observations: z.string().trim().max(10000).nullable().optional(),
+}).strict().refine(v => Object.keys(v).length > 0, "At least one field is required");
+export const treatmentPatchSchema = z.object({
+  endedAt: date.nullable().optional(),
+  outcome: z.string().trim().max(10000).nullable().optional(),
+}).strict().refine(v => Object.keys(v).length > 0, "At least one field is required");
 export const treatmentSchema = z.object({
   startedAt: date, endedAt: date.nullable().optional(), treatmentType: z.enum(["medication","antiparasitic","other"]),
   productName: z.string().trim().min(1).max(160), activeIngredient: z.string().trim().max(160).nullable().optional(),
@@ -153,6 +162,26 @@ export function createAquariumManagementRouter() {
     const record = await prisma.aquariumQuarantine.create({ data: { aquariumId: aquarium.id, ...v, startedAt: new Date(v.startedAt), endedAt: asDate(v.endedAt) } });
     res.status(201).json({ quarantine: record });
   });
+  router.patch("/quarantines/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext; await requireFishCategory(auth.userId);
+    const id = parseUuid(req.params.id);
+    const existing = await prisma.aquariumQuarantine.findFirst({ where: { id, aquarium: { is: { userId: auth.userId } } }, select: { id: true } });
+    if (!existing) throw new AppError(404, "AQUARIUM_QUARANTINE_NOT_FOUND", "Quarantine record not found");
+    const v = parse(quarantinePatchSchema, req.body);
+    const record = await prisma.aquariumQuarantine.update({ where: { id }, data: { ...v, ...(v.endedAt !== undefined ? { endedAt: asDate(v.endedAt) } : {}) } });
+    res.status(200).json({ quarantine: record });
+  });
+  router.patch("/aquarium-treatments/:id", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext; await requireFishCategory(auth.userId);
+    const id = parseUuid(req.params.id);
+    const existing = await prisma.aquariumTreatment.findFirst({ where: { id, aquarium: { is: { userId: auth.userId } } }, select: { id: true, startedAt: true } });
+    if (!existing) throw new AppError(404, "AQUARIUM_TREATMENT_NOT_FOUND", "Treatment record not found");
+    const v = parse(treatmentPatchSchema, req.body);
+    if (v.endedAt && Date.parse(v.endedAt) < existing.startedAt.getTime()) throw new AppError(400, "INVALID_DATE_RANGE", "Treatment end date cannot precede start date");
+    const record = await prisma.aquariumTreatment.update({ where: { id }, data: { ...v, ...(v.endedAt !== undefined ? { endedAt: asDate(v.endedAt) } : {}) } });
+    res.status(200).json({ treatment: record });
+  });
+
   router.post("/aquariums/:id/reproductions", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext; await requireFishCategory(auth.userId);
     const aquarium = await ownedAquarium(auth.userId, parseUuid(req.params.id)); const v = parse(reproductionSchema, req.body);
