@@ -41,17 +41,14 @@ export function createOnboardingRouter() {
         })),
       });
     }
-    const configuredAt = new Date();
     const configuration = await prisma.accountConfiguration.upsert({
       where: { userId: auth.userId },
       create: {
         userId: auth.userId,
         animalCategories: parsed.data.categories,
-        configuredAt,
       },
       update: {
         animalCategories: parsed.data.categories,
-        configuredAt,
       },
       select: { animalCategories: true, configuredAt: true },
     });
