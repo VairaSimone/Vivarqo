@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import type { Locale } from "../lib/domain";
 import { Alert, Button, Field, Input, LoadingState, PageHeader, Panel, Select, Textarea } from "../components/ui";
+import { CompanionCareExtras } from "./CompanionCareExtras";
 
 type CompanionAnimal = { id: string; name: string; species: string };
 type CompanionProfile = { microchip?: string | null; veterinarianName?: string | null; veterinaryClinic?: string | null; veterinaryPhone?: string | null; veterinaryEmail?: string | null; veterinaryAddress?: string | null; allergies?: string | null; chronicConditions?: string | null };
@@ -259,6 +260,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
         </form>
         {documents.length > 0 ? <div className="ecosys-history">{documents.map((doc) => <article className="ecosys-reading" key={doc.id}><strong>{doc.originalFilename}</strong><span>{({veterinary_report:it ? "Referto" : "Report",prescription:it ? "Ricetta" : "Prescription",certificate:it ? "Certificato" : "Certificate",invoice:it ? "Fattura" : "Invoice"} as Record<string,string>)[doc.category] ?? doc.category} · {(Number(doc.sizeBytes)/1024).toFixed(0)} KB</span><div className="inline-actions"><Button size="sm" onClick={() => void api.download("/documents/" + doc.id + "/download",doc.originalFilename)}>{it ? "Scarica" : "Download"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteDocument(doc)}>{it ? "Elimina" : "Delete"}</Button></div></article>)}</div> : <p>{it ? "Nessun documento caricato." : "No documents uploaded."}</p>}
       </Panel>
+      <CompanionCareExtras animalId={animalId} locale={locale} />
     </>}
     <Panel>
       <h2>{it ? "Storico e scadenze" : "History & due dates"}</h2>
