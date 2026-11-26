@@ -41,6 +41,7 @@ import { createDomainImportRouter } from "./modules/domain/domain-import.routes.
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
 import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
+import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -102,6 +103,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   // Validate browser intent before touching a server-side session.
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
+  app.use("/api/v1", animalDomainAccessGuard);
   app.use("/api/v1", createCollaboratorRouter(dependencies.emailSender, dependencies.premiumEntitlement));
   app.use("/api/v1", createWorkspaceAccessGuard(dependencies.premiumEntitlement));
   app.use("/api/v1", subscriptionAccessGuard);

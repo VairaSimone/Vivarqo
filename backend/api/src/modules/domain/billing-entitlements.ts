@@ -86,9 +86,13 @@ export const isSubscriptionAccessExempt = (path: string) =>
   // Animal-domain availability is controlled by account categories, not by a commercial tier.
   // Commercial plans still apply their quotas in the write services (e.g. assertAnimalCapacity).
   path.startsWith("/onboarding/") || path.startsWith("/animals") || path.startsWith("/care-records") ||
-  path.startsWith("/reproduction") || path.startsWith("/clutches") || path.startsWith("/eggs") ||
-  path.startsWith("/genetic-traits") || path.startsWith("/aquariums") || path.startsWith("/aviaries") ||
-  path.startsWith("/companion-care");
+  path.startsWith("/feeding-sessions") || path.startsWith("/feeding-entries") || path.startsWith("/weights") ||
+  path.startsWith("/sheds") || path.startsWith("/animal-notes") || path.startsWith("/health-records") ||
+  path.startsWith("/reproduction") || path.startsWith("/reproduction-pairs") || path.startsWith("/species-breeding-profiles") ||
+  path.startsWith("/reproduction-statistics") || path.startsWith("/incubators") || path.startsWith("/clutches") ||
+  path.startsWith("/eggs") || path.startsWith("/offspring-batches") || path.startsWith("/reproductive-events") ||
+  path.startsWith("/incubation-logs") || path.startsWith("/genetic-traits") ||
+  path.startsWith("/aquariums") || path.startsWith("/aviaries") || path.startsWith("/companion-care");
 export const subscriptionAccessGuard: RequestHandler = async (req, res, next) => {
   if (env.BILLING_ACCESS_MODE !== "subscription_required" || isSubscriptionAccessExempt(req.path)) { next(); return; }
   const auth = res.locals.auth as { userId: string } | undefined;

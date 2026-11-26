@@ -24,7 +24,7 @@ function groupsForCategories(categories: string[]): Array<{ title: string; items
     { path: "/animals", label: "navAnimals", icon: "snake" },
     { path: "/feeding", label: "navFeeding", icon: "feed" },
   ];
-  if (has("reptiles") || has("birds")) animalItems.push({ path: "/reproduction", label: "navBreeding", icon: "leaf" });
+  if (has("reptiles")) animalItems.push({ path: "/reproduction", label: "navBreeding", icon: "leaf" });
   if (has("reptiles")) animalItems.push({ path: "/genetics", label: "navGenetics", icon: "leaf" });
   if (has("fish")) animalItems.push({ path: "/aquariums", label: "navAquariums", icon: "box" });
   if (has("birds")) animalItems.push({ path: "/aviaries", label: "navAviaries", icon: "leaf" });

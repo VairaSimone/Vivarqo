@@ -40,6 +40,12 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     await agent.post("/api/v1/auth/login").set("Origin", origin).set("X-CSRF-Token", csrf).send({ email, password }).expect(200);
     return { userId: user.id, agent, csrf };
   }
+
+  it("enforces account categories on module API routes", async () => {
+    const birdsOnly = await account(["birds"]);
+    await birdsOnly.agent.get("/api/v1/aquariums").expect(403).expect((res) => expect(res.body.error?.code ?? res.body.code).toBe("ANIMAL_CATEGORY_NOT_ENABLED"));
+    await birdsOnly.agent.get("/api/v1/aviaries").expect(200);
+  });
   it("records aquarium water parameters and prevents cross-account access", async () => {
     const owner = await account(["fish"]);
     const other = await account(["fish"]);

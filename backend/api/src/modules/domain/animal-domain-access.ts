@@ -1,0 +1,67 @@
+import type { RequestHandler } from "express";
+import { prisma } from "../../db/prisma.js";
+import { AppError } from "../../errors/app-error.js";
+
+const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
+  { prefixes: ["/aquariums"], category: "fish" },
+  { prefixes: ["/aviaries"], category: "birds" },
+  { prefixes: ["/companion-care"], category: "dogs_cats" },
+  {
+    prefixes: [
+      "/reproduction", "/reproduction-pairs", "/species-breeding-profiles", "/reproduction-statistics",
+      "/incubators", "/clutches", "/eggs", "/offspring-batches", "/reproductive-events",
+      "/incubation-logs", "/genetic-traits",
+    ],
+    category: "reptiles",
+  },
+];
+const generalAnimalRoutes = [
+  "/animals", "/care-records", "/feeding-sessions", "/feeding-entries",
+  "/weights", "/sheds", "/animal-notes", "/health-records",
+];
+
+function matchesPath(path: string, prefix: string) {
+  return path === prefix || path.startsWith(prefix + "/");
+}
+
+/** Category access is account-scoped and intentionally separate from commercial entitlements. */
+export const animalDomainAccessGuard: RequestHandler = async (req, res, next) => {
+  const categoryRoute = categoryRoutes.find((item) => item.prefixes.some((prefix) => matchesPath(req.path, prefix)));
+  const isGeneralAnimalRoute = generalAnimalRoutes.some((prefix) => matchesPath(req.path, prefix));
+  if (!categoryRoute && !isGeneralAnimalRoute) { next(); return; }
+
+  const auth = res.locals.auth as { userId: string } | undefined;
+  if (!auth) { next(); return; }
+
+  const configuration = await prisma.accountConfiguration.findUnique({
+    where: { userId: auth.userId },
+    select: { animalCategories: true },
+  });
+  const categories = configuration?.animalCategories ?? [];
+
+  if (categoryRoute && !categories.includes(categoryRoute.category)) {
+    next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This animal domain is not enabled for the account", {
+      category: categoryRoute.category,
+      settingsPath: "/settings/categories",
+    }));
+    return;
+  }
+
+  if (isGeneralAnimalRoute && categories.length === 0) {
+    next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "Select at least one animal category to use animal modules", {
+      settingsPath: "/settings/categories",
+    }));
+    return;
+  }
+
+  const requestedCategory = typeof req.query.category === "string" ? req.query.category : undefined;
+  if (isGeneralAnimalRoute && requestedCategory && !categories.includes(requestedCategory)) {
+    next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This animal category is not enabled for the account", {
+      category: requestedCategory,
+      settingsPath: "/settings/categories",
+    }));
+    return;
+  }
+
+  next();
+};
