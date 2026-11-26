@@ -33,6 +33,13 @@ const animalDomainProfiles = {
   dogs_cats: z.object({
     breed: nullableText(160),
     microchip: nullableText(40),
+    veterinarianName: nullableText(160),
+    veterinaryClinic: nullableText(160),
+    veterinaryPhone: nullableText(40),
+    veterinaryEmail: z.string().trim().email().max(254).nullable().optional(),
+    veterinaryAddress: nullableText(300),
+    allergies: z.string().trim().max(5000).nullable().optional(),
+    chronicConditions: z.string().trim().max(5000).nullable().optional(),
     sterilized: z.boolean().optional(),
     vaccinationStatus: z.enum(["unknown", "not_up_to_date", "up_to_date"]).optional(),
     coatColor: nullableText(120),
