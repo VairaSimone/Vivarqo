@@ -68,12 +68,31 @@ function animalResponse<T extends { id: string; photoKey: string | null; qrToken
   };
 }
 
-async function validateAnimalParents(userId: string, motherAnimalId?: string | null, fatherAnimalId?: string | null, childId?: string) {
+async function validateAnimalParents(
+  userId: string,
+  motherAnimalId: string | null | undefined,
+  fatherAnimalId: string | null | undefined,
+  childCategory: string,
+  childSpecies: string,
+  childId?: string,
+) {
   const ids = [...new Set([motherAnimalId, fatherAnimalId].filter((id): id is string => Boolean(id)))];
   if (ids.length === 0) return;
   if (childId && ids.includes(childId)) throw new AppError(400, "INVALID_ANIMAL_PARENT", "An animal cannot be its own parent");
-  const parents = await prisma.animal.findMany({ where: { id: { in: ids }, userId }, select: { id: true, sex: true } });
+  const parents = await prisma.animal.findMany({
+    where: { id: { in: ids }, userId },
+    select: { id: true, sex: true, category: true, species: true },
+  });
   if (parents.length !== ids.length) throw new AppError(400, "INVALID_ANIMAL_PARENT", "Selected parent not found in this account");
+  const incompatible = parents.find((parent) =>
+    parent.category !== childCategory ||
+    parent.species.trim().toLocaleLowerCase("it-IT") !== childSpecies.trim().toLocaleLowerCase("it-IT"),
+  );
+  if (incompatible) {
+    throw new AppError(400, "INCOMPATIBLE_ANIMAL_PARENT", "Parents must belong to the same animal category and species as the offspring", {
+      childCategory, childSpecies,
+    });
+  }
   if (motherAnimalId && parents.find((parent) => parent.id === motherAnimalId)?.sex !== "female") throw new AppError(400, "INVALID_MOTHER", "The selected mother must be female");
   if (fatherAnimalId && parents.find((parent) => parent.id === fatherAnimalId)?.sex !== "male") throw new AppError(400, "INVALID_FATHER", "The selected father must be male");
   if (childId) {
@@ -170,7 +189,7 @@ export function createAnimalRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(createAnimalSchema, req.body);
     await assertAnimalCategoryEnabled(auth.userId, input.category);
-    await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId);
+    await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId, input.category, input.species);
     try {
       const animal = await prisma.$transaction(async (tx) => {
         await assertAnimalCapacity(tx, auth.userId, 1);
@@ -238,11 +257,19 @@ export function createAnimalRouter() {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
     const input = parseBody(patchAnimalSchema, req.body);
-    await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId, id);
     const existing = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
-    await assertAnimalCategoryEnabled(auth.userId, existing.category);
     const resultingCategory = input.category ?? existing.category;
+    const resultingSpecies = input.species ?? existing.species;
+    await validateAnimalParents(
+      auth.userId,
+      input.motherAnimalId !== undefined ? input.motherAnimalId : existing.motherAnimalId,
+      input.fatherAnimalId !== undefined ? input.fatherAnimalId : existing.fatherAnimalId,
+      resultingCategory,
+      resultingSpecies,
+      id,
+    );
+    await assertAnimalCategoryEnabled(auth.userId, existing.category);
     if (input.category) await assertAnimalCategoryEnabled(auth.userId, input.category);
     if ("domainProfile" in input || input.category) {
       const profileValue = input.domainProfile ?? (input.category ? {} : existing.domainProfile ?? {});
