@@ -371,10 +371,13 @@ const initialMigrationName = expectedSchema.migrations[0]!;
 export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
   const [columns, indexes, constraints, triggers, functions, extensions] = await Promise.all([
     prisma.$queryRawUnsafe<SchemaRows[]>(
-      "SELECT table_name AS \"tableName\", column_name AS \"columnName\", udt_name AS \"udtName\", " +
-      "is_nullable AS \"isNullable\", character_maximum_length AS \"characterMaximumLength\", " +
-      "numeric_precision AS \"numericPrecision\", numeric_scale AS \"numericScale\" " +
-      "FROM information_schema.columns WHERE table_schema = 'public'",
+      "SELECT c.table_name AS \"tableName\", c.column_name AS \"columnName\", c.udt_name AS \"udtName\", " +
+      "c.is_nullable AS \"isNullable\", COALESCE(c.character_maximum_length, e.character_maximum_length) AS \"characterMaximumLength\", " +
+      "c.numeric_precision AS \"numericPrecision\", c.numeric_scale AS \"numericScale\" " +
+      "FROM information_schema.columns c LEFT JOIN information_schema.element_types e " +
+      "ON c.table_catalog = e.object_catalog AND c.table_schema = e.object_schema AND c.table_name = e.object_name " +
+      "AND e.object_type = 'TABLE' AND c.dtd_identifier = e.collection_type_identifier " +
+      "WHERE c.table_schema = 'public'",
     ),
     prisma.$queryRawUnsafe<Array<{
       indexName: string;

@@ -27,6 +27,7 @@ tags:
   - name: Exports
   - name: Billing
   - name: Onboarding
+  - name: Ecosystems
 security:
   - sessionCookieDev: []
   - sessionCookieProd: []
@@ -4389,6 +4390,238 @@ paths:
       responses:
         '204': { description: Foto eliminata. }
         '404': { description: Uovo non trovato. }
+
+
+  /api/v1/aquariums:
+    get:
+      operationId: listAquariums
+      tags: [Ecosystems]
+      summary: Elenca gli acquari dell'account con ultima misurazione
+      responses:
+        '200':
+          description: Acquari dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aquariums]
+                properties:
+                  aquariums:
+                    type: array
+                    items:
+                      type: object
+    post:
+      operationId: createAquarium
+      tags: [Ecosystems]
+      summary: Crea un acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, waterType, volumeLiters]
+              properties:
+                name: { type: string, maxLength: 120 }
+                waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+                volumeLiters: { type: number, exclusiveMinimum: 0 }
+                setupDate: { type: [string, 'null'], format: date }
+                location: { type: [string, 'null'], maxLength: 160 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Acquario creato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aquarium]
+                properties:
+                  aquarium: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}/readings:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAquariumWaterReadings
+      tags: [Ecosystems]
+      summary: Elenca le misurazioni dei parametri dell'acqua
+      responses:
+        '200':
+          description: Storico misurazioni.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [readings]
+                properties:
+                  readings:
+                    type: array
+                    items: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Registra una misurazione dei parametri dell'acqua
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: readingSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [measuredAt]
+              properties:
+                measuredAt: { type: string, format: date-time }
+                temperatureC: { type: [number, 'null'], minimum: -5, maximum: 60 }
+                ph: { type: [number, 'null'], minimum: 0, maximum: 14 }
+                ghDkh: { type: [number, 'null'], minimum: 0 }
+                khDkh: { type: [number, 'null'], minimum: 0 }
+                ammoniaMgL: { type: [number, 'null'], minimum: 0 }
+                nitriteMgL: { type: [number, 'null'], minimum: 0 }
+                nitrateMgL: { type: [number, 'null'], minimum: 0 }
+                salinityPpt: { type: [number, 'null'], minimum: 0 }
+                tdsPpm: { type: [integer, 'null'], minimum: 0 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Misurazione registrata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reading]
+                properties:
+                  reading: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries:
+    get:
+      operationId: listAviaries
+      tags: [Ecosystems]
+      summary: Elenca le voliere dell'account
+      responses:
+        '200':
+          description: Voliere dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aviaries]
+                properties:
+                  aviaries:
+                    type: array
+                    items: { type: object }
+    post:
+      operationId: createAviary
+      tags: [Ecosystems]
+      summary: Crea una voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviarySchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, environment]
+              properties:
+                name: { type: string, maxLength: 120 }
+                environment: { type: string, enum: [indoor, outdoor, mixed] }
+                location: { type: [string, 'null'], maxLength: 160 }
+                capacity: { type: [integer, 'null'], minimum: 1 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Voliera creata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aviary]
+                properties:
+                  aviary: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries/{id}/birds:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAviaryBirds
+      tags: [Ecosystems]
+      summary: Elenca gli uccelli assegnati alla voliera
+      responses:
+        '200':
+          description: Uccelli della voliera.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [birds]
+                properties:
+                  birds:
+                    type: array
+                    items: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: assignAviaryBirds
+      tags: [Ecosystems]
+      summary: Sostituisce l'assegnazione degli uccelli alla voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: z.object({ animalIds:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [animalIds]
+              properties:
+                animalIds:
+                  type: array
+                  maxItems: 500
+                  uniqueItems: true
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Assegnazioni aggiornate.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignedCount]
+                properties:
+                  assignedCount: { type: integer, minimum: 0 }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
 
 components:
   securitySchemes:
