@@ -109,11 +109,13 @@ export function createHomeCalendarRouter() {
       where: { userId: auth.userId }, select: { animalCategories: true },
     });
     const enabled = configuration?.animalCategories ?? [];
-    const [activeByCategory, archivedByCategory, activeTotal, archivedTotal, upcomingCare, recentCare] = await Promise.all([
+    const [activeByCategory, archivedByCategory, totalByCategory, activeTotal, archivedTotal, totalAnimals, upcomingCare, recentCare] = await Promise.all([
       prisma.animal.groupBy({ by: ["category"], where: { userId: auth.userId, status: "active" }, _count: { _all: true } }),
       prisma.animal.groupBy({ by: ["category"], where: { userId: auth.userId, status: "archived" }, _count: { _all: true } }),
+      prisma.animal.groupBy({ by: ["category"], where: { userId: auth.userId }, _count: { _all: true } }),
       prisma.animal.count({ where: { userId: auth.userId, status: "active" } }),
       prisma.animal.count({ where: { userId: auth.userId, status: "archived" } }),
+      prisma.animal.count({ where: { userId: auth.userId } }),
       prisma.task.findMany({
         where: { userId: auth.userId, status: "open", dueAt: { gte: new Date(), lte: new Date(Date.now() + 14 * 86_400_000) } },
         orderBy: { dueAt: "asc" }, take: 8,
@@ -127,13 +129,14 @@ export function createHomeCalendarRouter() {
     ]);
     const activeMap = new Map(activeByCategory.map((item) => [item.category, item._count._all]));
     const archivedMap = new Map(archivedByCategory.map((item) => [item.category, item._count._all]));
+    const totalMap = new Map(totalByCategory.map((item) => [item.category, item._count._all]));
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
-      totals: { active: activeTotal, archived: archivedTotal },
+      totals: { total: totalAnimals, active: activeTotal, archived: archivedTotal },
       categories: ["reptiles", "fish", "birds", "dogs_cats"].filter((category) =>
         enabled.includes(category) || (activeMap.get(category) ?? 0) > 0 || (archivedMap.get(category) ?? 0) > 0,
       ).map((category) => ({
-        category, active: activeMap.get(category) ?? 0, archived: archivedMap.get(category) ?? 0,
+        category, total: totalMap.get(category) ?? 0, active: activeMap.get(category) ?? 0, archived: archivedMap.get(category) ?? 0,
       })),
       upcoming: upcomingCare.map((task) => ({
         id: task.id, title: task.title, dueAt: task.dueAt, category: task.category,
