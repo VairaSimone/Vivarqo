@@ -22,8 +22,7 @@ CREATE TABLE "aviary_movements" (
   CONSTRAINT "aviary_movements_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "aviary_movements_animal_id_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "aviary_movements_from_aviary_id_fkey" FOREIGN KEY ("from_aviary_id") REFERENCES "aviaries"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "aviary_movements_to_aviary_id_fkey" FOREIGN KEY ("to_aviary_id") REFERENCES "aviaries"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "aviary_movements_change_check" CHECK ("from_aviary_id" IS DISTINCT FROM "to_aviary_id")
+  CONSTRAINT "aviary_movements_to_aviary_id_fkey" FOREIGN KEY ("to_aviary_id") REFERENCES "aviaries"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 CREATE INDEX "aviary_movements_animal_occurred_idx" ON "aviary_movements"("animal_id","occurred_at" DESC);
 CREATE INDEX "aviary_movements_from_occurred_idx" ON "aviary_movements"("from_aviary_id","occurred_at" DESC);
