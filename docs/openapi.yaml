@@ -354,6 +354,9 @@ paths:
         - name: species
           in: query
           schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
         - name: sex
           in: query
           schema: { type: string, enum: [male, female, unknown] }
@@ -4864,6 +4867,40 @@ components:
         email: { type: string, format: email, maxLength: 254 }
         currentPassword: { type: string, minLength: 1, maxLength: 128 }
         newPassword: { type: string, minLength: 12, maxLength: 128 }
+    AnimalDomainProfile:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            enclosure: { type: [string, 'null'], maxLength: 120 }
+            brumation: { type: string, enum: [not_applicable, planned, in_progress, completed] }
+            feedingNotes: { type: [string, 'null'], maxLength: 2000 }
+        - type: object
+          additionalProperties: false
+          properties:
+            aquariumId: { type: [string, 'null'], format: uuid }
+            waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+            temperament: { type: [string, 'null'], maxLength: 120 }
+            maxSizeCm: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 500 }
+            shoaling: { type: boolean }
+            diet: { type: [string, 'null'], maxLength: 160 }
+        - type: object
+          additionalProperties: false
+          properties:
+            ringNumber: { type: [string, 'null'], maxLength: 80 }
+            aviaryId: { type: [string, 'null'], format: uuid }
+            diet: { type: [string, 'null'], maxLength: 160 }
+            tameness: { type: string, enum: [wild, socialized, tame] }
+            flightStatus: { type: string, enum: [full_flight, clipped, unknown] }
+        - type: object
+          additionalProperties: false
+          properties:
+            breed: { type: [string, 'null'], maxLength: 160 }
+            microchip: { type: [string, 'null'], maxLength: 40 }
+            sterilized: { type: boolean }
+            vaccinationStatus: { type: string, enum: [unknown, not_up_to_date, up_to_date] }
+            coatColor: { type: [string, 'null'], maxLength: 120 }
+            weightKg: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 250 }
     AnimalWrite:
       type: object
       additionalProperties: false
@@ -4872,6 +4909,8 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
+        category: { type: string, enum: [reptiles, fish, birds, dogs_cats], default: reptiles }
+        domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
         sex: { type: string, enum: [male, female, unknown], default: unknown }
         morph: { type: [string, 'null'], maxLength: 200 }
         geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
@@ -4892,6 +4931,8 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
+        category: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
+        domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
         sex: { type: string, enum: [male, female, unknown] }
         morph: { type: [string, 'null'], maxLength: 200 }
         geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
@@ -6617,6 +6658,16 @@ components:
           "species": {
             "type": "string"
           },
+          "category": {
+            "type": "string",
+            "enum": ["reptiles", "fish", "birds", "dogs_cats"]
+          },
+          "domainProfile": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/AnimalDomainProfile" },
+              { "type": "null" }
+            ]
+          },
           "sex": {
             "type": "string",
             "enum": [
@@ -6741,6 +6792,10 @@ components:
           },
           "species": {
             "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["reptiles", "fish", "birds", "dogs_cats"]
           },
           "status": {
             "type": "string",

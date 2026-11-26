@@ -50,7 +50,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const owner = await account(["fish"]);
     const other = await account(["fish"]);
     const aquarium = await owner.agent.post("/api/v1/aquariums").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Tropical", waterType: "freshwater", volumeLiters: 120 }).expect(201);
+      .send({ name: "Tropical", waterType: "freshwater", volumeLiters: 120, setupDate: "2026-01-01" }).expect(201);
     const id = aquarium.body.aquarium.id as string;
     await owner.agent.post(`/api/v1/aquariums/${id}/readings`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ measuredAt: new Date().toISOString(), temperatureC: 25.5, ph: 6.8, ammoniaMgL: 0, nitriteMgL: 0, nitrateMgL: 15 }).expect(201);

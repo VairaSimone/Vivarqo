@@ -6,7 +6,7 @@ import { Alert, Button, LoadingState } from "../components/ui";
 type Aquarium = { id: string; name: string; waterType: string; volumeLiters: string | number; readings?: Array<Record<string, unknown>>; _count?: { readings: number } };
 type Aviary = { id: string; name: string; environment: string; capacity: number | null; _count?: { birds: number } };
 type Bird = { id: string; name: string; species: string; identifier: string | null };
-type Reading = { id: string; measuredAt: string; temperatureC: string | number | null; ph: string | number | null; ammoniaMgL: string | number | null; nitriteMgL: string | number | null; nitrateMgL: string | number | null; tdsPpm: number | null };
+type Reading = { id: string; measuredAt: string; temperatureC: string | number | null; ph: string | number | null; ghDkh: string | number | null; khDkh: string | number | null; ammoniaMgL: string | number | null; nitriteMgL: string | number | null; nitrateMgL: string | number | null; salinityPpt: string | number | null; tdsPpm: number | null };
 
 const inputDateTime = () => {
   const date = new Date();
@@ -35,9 +35,12 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   const [measuredAt, setMeasuredAt] = useState(inputDateTime);
   const [temperatureC, setTemperatureC] = useState("");
   const [ph, setPh] = useState("");
+  const [ghDkh, setGhDkh] = useState("");
+  const [khDkh, setKhDkh] = useState("");
   const [ammoniaMgL, setAmmoniaMgL] = useState("");
   const [nitriteMgL, setNitriteMgL] = useState("");
   const [nitrateMgL, setNitrateMgL] = useState("");
+  const [salinityPpt, setSalinityPpt] = useState("");
   const [tdsPpm, setTdsPpm] = useState("");
 
   const selectedAquarium = useMemo(() => aquariums.find((item) => item.id === selectedId), [aquariums, selectedId]);
@@ -120,14 +123,17 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         measuredAt: new Date(measuredAt).toISOString(),
         temperatureC: temperatureC === "" ? null : Number(temperatureC),
         ph: ph === "" ? null : Number(ph),
+        ghDkh: ghDkh === "" ? null : Number(ghDkh),
+        khDkh: khDkh === "" ? null : Number(khDkh),
         ammoniaMgL: ammoniaMgL === "" ? null : Number(ammoniaMgL),
         nitriteMgL: nitriteMgL === "" ? null : Number(nitriteMgL),
         nitrateMgL: nitrateMgL === "" ? null : Number(nitrateMgL),
+        salinityPpt: salinityPpt === "" ? null : Number(salinityPpt),
         tdsPpm: tdsPpm === "" ? null : Number(tdsPpm),
       });
       const result = await api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`);
       setReadings(result.readings);
-      setTemperatureC(""); setPh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setTdsPpm("");
+      setTemperatureC(""); setPh(""); setGhDkh(""); setKhDkh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setSalinityPpt(""); setTdsPpm("");
       setNotice(italian ? "Parametri dell'acqua registrati." : "Water parameters recorded.");
     });
   }
@@ -178,15 +184,18 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         <label className="field"><span className="field-label">{italian ? "Data e ora" : "Date and time"}</span><input className="control" type="datetime-local" required value={measuredAt} onChange={(e) => setMeasuredAt(e.target.value)} /></label>
         <label className="field"><span className="field-label">Temperatura (°C)</span><input className="control" type="number" min="-5" max="60" step="0.1" value={temperatureC} onChange={(e) => setTemperatureC(e.target.value)} /></label>
         <label className="field"><span className="field-label">pH</span><input className="control" type="number" min="0" max="14" step="0.01" value={ph} onChange={(e) => setPh(e.target.value)} /></label>
+        <label className="field"><span className="field-label">GH (°dGH)</span><input className="control" type="number" min="0" max="100" step="0.1" value={ghDkh} onChange={(e) => setGhDkh(e.target.value)} /></label>
+        <label className="field"><span className="field-label">KH (°dKH)</span><input className="control" type="number" min="0" max="100" step="0.1" value={khDkh} onChange={(e) => setKhDkh(e.target.value)} /></label>
         <label className="field"><span className="field-label">Ammoniaca (mg/L)</span><input className="control" type="number" min="0" step="0.0001" value={ammoniaMgL} onChange={(e) => setAmmoniaMgL(e.target.value)} /></label>
         <label className="field"><span className="field-label">Nitriti (mg/L)</span><input className="control" type="number" min="0" step="0.0001" value={nitriteMgL} onChange={(e) => setNitriteMgL(e.target.value)} /></label>
         <label className="field"><span className="field-label">Nitrati (mg/L)</span><input className="control" type="number" min="0" step="0.001" value={nitrateMgL} onChange={(e) => setNitrateMgL(e.target.value)} /></label>
+        <label className="field"><span className="field-label">Salinità (ppt)</span><input className="control" type="number" min="0" max="100" step="0.001" value={salinityPpt} onChange={(e) => setSalinityPpt(e.target.value)} /></label>
         <label className="field"><span className="field-label">TDS (ppm)</span><input className="control" type="number" min="0" step="1" value={tdsPpm} onChange={(e) => setTdsPpm(e.target.value)} /></label>
         <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{italian ? "Registra parametri" : "Save reading"}</Button></div>
       </form>
       <div className="ecosys-history"><h3>{italian ? "Storico recente" : "Recent history"}</h3>
         {readings.length === 0 ? <p className="ecosys-empty">{italian ? "Nessuna misurazione registrata." : "No readings recorded."}</p> :
-          readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · TDS {reading.tdsPpm ?? "—"}</span></div>)}
+          readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · GH {reading.ghDkh ?? "—"} · KH {reading.khDkh ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · Salinità {reading.salinityPpt ?? "—"} ppt · TDS {reading.tdsPpm ?? "—"}</span></div>)}
       </div>
     </section>}
     {!aquariumMode && selectedAviary && <section className="panel ecosys-details">

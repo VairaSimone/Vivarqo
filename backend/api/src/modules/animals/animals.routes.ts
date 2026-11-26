@@ -129,11 +129,12 @@ export function createAnimalRouter() {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid sort option");
     }
 
-    const where: Record<string, unknown> = { userId: auth.userId };
+    const configuration = await prisma.accountConfiguration.findUnique({ where: { userId: auth.userId }, select: { animalCategories: true } });
+    const enabledCategories = configuration?.animalCategories ?? [];
+    const where: Record<string, unknown> = { userId: auth.userId, category: category || { in: enabledCategories } };
     if (status && status !== "all") where.status = status;
     else if (!status) where.status = "active";
     if (sex) where.sex = sex;
-    if (category) where.category = category;
     if (species) where.species = { contains: species, mode: "insensitive" };
     if (morph) where.morph = { contains: morph, mode: "insensitive" };
     if (location) where.locationLabel = { contains: location, mode: "insensitive" };
@@ -229,6 +230,7 @@ export function createAnimalRouter() {
     const id = parseUuid(req.params.id!);
     const animal = await prisma.animal.findFirst({ where: { id, userId: auth.userId }, include: { mother: { select: { id: true, name: true, morph: true, sex: true } }, father: { select: { id: true, name: true, morph: true, sex: true } } } });
     if (!animal) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+    await assertAnimalCategoryEnabled(auth.userId, animal.category);
     res.status(200).json({ animal: animalResponse(animal) });
   });
 
@@ -239,6 +241,7 @@ export function createAnimalRouter() {
     await validateAnimalParents(auth.userId, input.motherAnimalId, input.fatherAnimalId, id);
     const existing = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
+    await assertAnimalCategoryEnabled(auth.userId, existing.category);
     const resultingCategory = input.category ?? existing.category;
     if (input.category) await assertAnimalCategoryEnabled(auth.userId, input.category);
     if ("domainProfile" in input || input.category) {

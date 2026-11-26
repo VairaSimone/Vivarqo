@@ -8,7 +8,7 @@ const aquariumSchema = z.object({
   name: z.string().trim().min(1).max(120),
   waterType: z.enum(["freshwater", "saltwater", "brackish"]),
   volumeLiters: z.coerce.number().positive().max(10_000_000),
-  setupDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable().optional(),
+  setupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   location: z.string().trim().max(160).nullable().optional(),
   notes: z.string().trim().max(10_000).nullable().optional(),
 }).strict();
@@ -151,6 +151,9 @@ export function createEcosystemRouter() {
       throw new AppError(400, "VALIDATION_ERROR", "Bird ids must be unique");
     }
     const ids = input.data.animalIds;
+    if (aviary.capacity !== null && ids.length > aviary.capacity) {
+      throw new AppError(409, "AVIARY_CAPACITY_EXCEEDED", "The selected birds exceed the aviary capacity", { capacity: aviary.capacity, requested: ids.length });
+    }
     const birds = await prisma.animal.findMany({ where: { id: { in: ids }, userId: auth.userId, category: "birds" }, select: { id: true } });
     if (birds.length !== ids.length) throw new AppError(400, "INVALID_BIRD", "One or more selected records are not birds in this account");
     await prisma.$transaction(async (tx) => {

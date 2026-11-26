@@ -1237,14 +1237,16 @@ CREATE TABLE aquariums (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL,
-  water_type VARCHAR(16) NOT NULL CHECK (water_type IN ('freshwater', 'saltwater', 'brackish')),
-  volume_liters NUMERIC(10,2) NOT NULL CHECK (volume_liters > 0),
+  water_type VARCHAR(16) NOT NULL,
+  volume_liters NUMERIC(10,2) NOT NULL,
   setup_date DATE,
   location VARCHAR(160),
   notes TEXT,
   archived_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT aquariums_water_type_check CHECK (water_type IN ('freshwater', 'saltwater', 'brackish')),
+  CONSTRAINT aquariums_volume_positive_check CHECK (volume_liters > 0)
 );
 CREATE INDEX aquariums_user_archived_name_idx ON aquariums (user_id, archived_at, name);
 
@@ -1252,17 +1254,26 @@ CREATE TABLE aquarium_water_readings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   aquarium_id UUID NOT NULL REFERENCES aquariums(id) ON DELETE CASCADE,
   measured_at TIMESTAMPTZ NOT NULL,
-  temperature_c NUMERIC(5,2) CHECK (temperature_c IS NULL OR temperature_c BETWEEN -5 AND 60),
-  ph NUMERIC(4,2) CHECK (ph IS NULL OR ph BETWEEN 0 AND 14),
-  gh_dkh NUMERIC(6,2) CHECK (gh_dkh IS NULL OR gh_dkh >= 0),
-  kh_dkh NUMERIC(6,2) CHECK (kh_dkh IS NULL OR kh_dkh >= 0),
-  ammonia_mg_l NUMERIC(8,4) CHECK (ammonia_mg_l IS NULL OR ammonia_mg_l >= 0),
-  nitrite_mg_l NUMERIC(8,4) CHECK (nitrite_mg_l IS NULL OR nitrite_mg_l >= 0),
-  nitrate_mg_l NUMERIC(8,3) CHECK (nitrate_mg_l IS NULL OR nitrate_mg_l >= 0),
-  salinity_ppt NUMERIC(7,3) CHECK (salinity_ppt IS NULL OR salinity_ppt >= 0),
-  tds_ppm INTEGER CHECK (tds_ppm IS NULL OR tds_ppm >= 0),
+  temperature_c NUMERIC(5,2),
+  ph NUMERIC(4,2),
+  gh_dkh NUMERIC(6,2),
+  kh_dkh NUMERIC(6,2),
+  ammonia_mg_l NUMERIC(8,4),
+  nitrite_mg_l NUMERIC(8,4),
+  nitrate_mg_l NUMERIC(8,3),
+  salinity_ppt NUMERIC(7,3),
+  tds_ppm INTEGER,
   notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT aquarium_water_readings_temperature_check CHECK (temperature_c IS NULL OR temperature_c BETWEEN -5 AND 60),
+  CONSTRAINT aquarium_water_readings_ph_check CHECK (ph IS NULL OR ph BETWEEN 0 AND 14),
+  CONSTRAINT aquarium_water_readings_gh_check CHECK (gh_dkh IS NULL OR gh_dkh >= 0),
+  CONSTRAINT aquarium_water_readings_kh_check CHECK (kh_dkh IS NULL OR kh_dkh >= 0),
+  CONSTRAINT aquarium_water_readings_ammonia_check CHECK (ammonia_mg_l IS NULL OR ammonia_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_nitrite_check CHECK (nitrite_mg_l IS NULL OR nitrite_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_nitrate_check CHECK (nitrate_mg_l IS NULL OR nitrate_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_salinity_check CHECK (salinity_ppt IS NULL OR salinity_ppt >= 0),
+  CONSTRAINT aquarium_water_readings_tds_check CHECK (tds_ppm IS NULL OR tds_ppm >= 0)
 );
 CREATE INDEX aquarium_water_readings_aquarium_measured_idx ON aquarium_water_readings (aquarium_id, measured_at DESC);
 
