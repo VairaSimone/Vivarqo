@@ -16,6 +16,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
   beforeAll(() => { app = createApp({ checkDatabase: async () => undefined }); });
   afterAll(async () => {
     await prisma.companionCareRecord.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.healthRecord.deleteMany({ where: { animal: { is: { userId: { in: userIds } } } } });
     await prisma.birdBreedingPair.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.reproductionCycle.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aquarium.deleteMany({ where: { userId: { in: userIds } } });
