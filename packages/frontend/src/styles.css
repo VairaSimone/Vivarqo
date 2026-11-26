@@ -3915,3 +3915,20 @@ kbd { font-size: 11px; }
 .ecosys-bird-picker small { color:var(--muted); font-size:11px; }
 @media(max-width:800px) { .ecosys-layout { grid-template-columns:1fr; } }
 @media(max-width:560px) { .ecosys-bird-picker { grid-template-columns:1fr; } }
+
+
+/* Ecosystem monitoring additions */
+.ecosys-trend { width: 100%; min-width: 0; }
+.ecosys-trend svg { display: block; width: 100%; height: auto; max-height: 220px; overflow: visible; }
+.ecosys-trend .inline-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.ecosys-ranges .form-grid { align-items: end; }
+.ecosys-ranges .inline-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ecosys-monitoring .panel-header { flex-wrap: wrap; }
+.ecosys-monitoring .panel-header .inline-actions { flex-wrap: wrap; }
+.dashboard-collection-categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 12px; }
+.dashboard-collection-overview h3 { margin: 14px 0 8px; }
+@media (max-width: 520px) {
+  .ecosys-monitoring .panel-header .inline-actions { width: 100%; }
+  .ecosys-monitoring .panel-header .inline-actions select { min-width: 0; flex: 1; }
+  .ecosys-ranges .inline-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
