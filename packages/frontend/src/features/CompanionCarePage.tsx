@@ -201,7 +201,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
         <form className="form-stack" onSubmit={save}>
           <div className="form-grid">
             <Field label={it ? "Animale" : "Animal"}><Select required value={animalId} onChange={(e) => setAnimalId(e.target.value)}>{animals.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}</Select></Field>
-            <Field label={it ? "Tipo evento" : "Event type"}><Select value={kind} onChange={(e) => setKind(e.target.value)}>{kinds.map((value) => <option key={value} value={value}>{it ? ({vaccination:"Vaccinazione",medication:"Farmaco/terapia",vet_visit:"Visita veterinaria",parasite_prevention:"Antiparassitario",surgery:"Intervento",grooming:"Toelettatura",other:"Altro"} as Record<string,string>)[value] : value.replaceAll("_"," ")}</option>)}</Select></Field>
+            <Field label={it ? "Tipo evento" : "Event type"}><Select value={kind} onChange={(e) => { setKind(e.target.value); if (e.target.value !== "medication") setIsOngoing(false); }}>{kinds.map((value) => <option key={value} value={value}>{it ? ({vaccination:"Vaccinazione",medication:"Farmaco/terapia",vet_visit:"Visita veterinaria",parasite_prevention:"Antiparassitario",surgery:"Intervento",grooming:"Toelettatura",other:"Altro"} as Record<string,string>)[value] : value.replaceAll("_"," ")}</option>)}</Select></Field>
             <Field label={it ? "Descrizione" : "Title"}><Input required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
             <Field label={it ? "Data evento" : "Event date"}><Input type="date" required value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} /></Field>
             <Field label={it ? "Prossima scadenza" : "Next due date"}><Input type="date" value={nextDueAt} onChange={(e) => setNextDueAt(e.target.value)} /></Field>
@@ -210,7 +210,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
           </div>
           <Field label={it ? "Note" : "Notes"}><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
           <div className="modal-actions"><Button type="submit" disabled={saving || !animalId}>{saving ? (it ? "Salvataggio…" : "Saving…") : (editingRecordId ? (it ? "Salva modifiche" : "Save changes") : (it ? "Registra evento" : "Save event"))}</Button>
-            {editingRecordId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingRecordId(null); setTitle(""); setNextDueAt(""); setProvider(""); setDosage(""); setNotes(""); }}>{it ? "Annulla" : "Cancel"}</Button>}</div>
+            {editingRecordId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingRecordId(null); setTitle(""); setNextDueAt(""); setProvider(""); setClinic(""); setDosage(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false); }}>{it ? "Annulla" : "Cancel"}</Button>}</div>
         </form>}
     </Panel>
     {animalId && <>
