@@ -212,6 +212,7 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
         <PanelHeader title={locale === "it" ? "Panoramica di tutti gli animali" : "All animals overview"} action={<Button size="sm" variant="ghost" onClick={() => collectionResource.reload()}>{locale === "it" ? "Aggiorna" : "Refresh"}</Button>} />
         {collectionResource.loading && !collectionResource.data ? <Skeleton rows={3} /> : collectionResource.error ? <ErrorState message={collectionResource.error.message} retry={collectionResource.reload} /> : <>
           <div className="dashboard-overview-grid">
+            <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=all")}><strong>{collectionResource.data?.totals.total ?? 0}</strong><span>{locale === "it" ? "Totale animali" : "Total animals"}</span></button>
             <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=active")}><strong>{collectionResource.data?.totals.active ?? 0}</strong><span>{locale === "it" ? "Attivi" : "Active"}</span></button>
             <button className="dashboard-overview-item" onClick={() => navigate("/animals?status=archived")}><strong>{collectionResource.data?.totals.archived ?? 0}</strong><span>{locale === "it" ? "Archiviati" : "Archived"}</span></button>
           </div>
