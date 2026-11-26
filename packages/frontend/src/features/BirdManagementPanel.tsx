@@ -50,7 +50,7 @@ export function BirdManagementPanel({ locale, birds, aviaryId, navigate }: { loc
     ]);
     setProfile(p.profile ?? emptyProfile); setHealth(h.records);
   }
-  useEffect(() => { void load().catch(e => setError(e instanceof ApiError ? e.message : (it ? "Impossibile caricare la scheda uccello." : "Could not load bird profile."))); }, [birdId]);
+  useEffect(() => { void load().catch(e => setError(e instanceof ApiError ? e.message : (it ? "Impossibile caricare la scheda uccello." : "Could not load bird profile."))); }, [birdId, it]);
   useEffect(() => {
     let active = true;
     Promise.all([
