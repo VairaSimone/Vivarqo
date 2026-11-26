@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Response } from "express";
 import { z } from "zod";
+import { Prisma } from "../../generated/prisma/client.js";
 import { AppError } from "../../errors/app-error.js";
 import { prisma } from "../../db/prisma.js";
 import { logger } from "../../logger.js";
@@ -51,6 +52,7 @@ async function assertAnimalCategoryEnabled(userId: string, category: string) {
 function toAnimalData(input: z.output<typeof createAnimalSchema>) {
   return {
     ...input,
+    domainProfile: input.domainProfile as Prisma.InputJsonValue,
     birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
     acquiredDate: input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null,
   };
