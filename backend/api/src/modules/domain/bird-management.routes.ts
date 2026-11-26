@@ -36,7 +36,7 @@ const maintenanceSchema = z.object({
   products: z.string().trim().max(240).nullable().optional(),
   nextDueAt: z.string().datetime({ offset: true }).nullable().optional(),
   notes: z.string().trim().max(10000).nullable().optional(),
-}).strict().refine(v => !v.nextDueAt || new Date(v.nextDueAt).getTime() >= new Date(v.occurredAt).getTime(), { path: ["nextDueAt"], message: "Next maintenance cannot precede this maintenance" });
+}).strict().refine(v => !v.nextDueAt || !v.occurredAt || new Date(v.nextDueAt).getTime() >= new Date(v.occurredAt).getTime(), { path: ["nextDueAt"], message: "Next maintenance cannot precede this maintenance" });
 const maintenancePatchSchema = maintenanceSchema.partial().strict().refine(v => Object.keys(v).length > 0, "At least one field is required");
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
@@ -147,7 +147,7 @@ export function createBirdManagementRouter() {
     const pairedAt = new Date(input.pairedAt + "T00:00:00.000Z");
     const pair = await prisma.$transaction(async tx => {
       const cycle = await tx.reproductionCycle.create({ data: {
-        userId: auth.userId, name: female.name + " × " + male.name, startedOn: pairedAt,
+        userId: auth.userId, name: (female.name + " × " + male.name).slice(0, 160), startedOn: pairedAt,
         status: "active", parentAAnimalId: female.id, parentBAnimalId: male.id, notes: input.notes ?? null,
       } });
       return tx.birdBreedingPair.create({ data: {
