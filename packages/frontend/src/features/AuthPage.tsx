@@ -74,13 +74,13 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
 
   return <div className="auth-page">
     <div className="auth-visual">
-      <div className="auth-brand"><span className="brand-mark"><Icon name="brand" size={23} /></span><strong>SnakeBee</strong></div>
+      <div className="auth-brand"><span className="brand-mark"><Icon name="brand" size={23} /></span><strong>Vivarqo</strong></div>
       <div className="auth-visual-copy">
         <span className="eyebrow">{locale === "it" ? "IL GESTIONALE PER ALLEVATORI" : "BUILT FOR ANIMAL BREEDERS"}</span>
         <h1>{locale === "it" ? "Meno fogli.\nPiù controllo." : "Less paperwork.\nMore control."}</h1>
         <p>{locale === "it"
-          ? "SnakeBee riunisce in un unico spazio le informazioni e le attività quotidiane del tuo allevamento. Sai sempre cosa hai registrato e cosa richiede attenzione."
-          : "SnakeBee brings your collection records and daily breeding work into one workspace, so you can see what is documented and what needs attention."}</p>
+          ? "Vivarqo riunisce in un unico spazio le informazioni e le attività quotidiane del tuo allevamento. Sai sempre cosa hai registrato e cosa richiede attenzione."
+          : "Vivarqo brings your collection records and daily breeding work into one workspace, so you can see what is documented and what needs attention."}</p>
         <ul className="auth-benefits">
           <li><Icon name="snake" size={18} /><span><strong>{locale === "it" ? "Schede animali" : "Animal records"}</strong><small>{locale === "it" ? "Anagrafica, foto, identificativi e storico." : "Profiles, photos, identifiers and history."}</small></span></li>
           <li><Icon name="feed" size={18} /><span><strong>{locale === "it" ? "Cura e monitoraggio" : "Care and tracking"}</strong><small>{locale === "it" ? "Pasti, mute, pesi e note in ordine cronologico." : "Feeding, sheds, weights and chronological notes."}</small></span></li>
@@ -115,7 +115,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
           {mode === "login" && <button type="button" onClick={() => navigate("/register")}>{t("noAccount")} · {t("createAccount")}</button>}
         </div>
       </div>
-      <div className="auth-legal"><span>SnakeBee · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><a href="/legal/privacy">{locale === "it" ? "Privacy" : "Privacy"}</a><a href="/legal/cookies">{locale === "it" ? "Cookie" : "Cookies"}</a><a href="/legal/terms">{locale === "it" ? "Termini" : "Terms"}</a></nav></div>
+      <div className="auth-legal"><span>Vivarqo · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><a href="/legal/privacy">{locale === "it" ? "Privacy" : "Privacy"}</a><a href="/legal/cookies">{locale === "it" ? "Cookie" : "Cookies"}</a><a href="/legal/terms">{locale === "it" ? "Termini" : "Terms"}</a></nav></div>
     </div>
   </div>;
 }
