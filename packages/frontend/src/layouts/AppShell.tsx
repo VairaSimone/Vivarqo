@@ -195,15 +195,19 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         api.get<{ tasks: TaskDto[] }>("/tasks" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
         api.get<{ documents: DocumentDto[] }>("/documents" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
         api.get<{ cycles: ReproductionCycleSummaryDto[] }>("/reproduction-cycles" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
+        api.get<{ sessions: Array<Record<string, unknown>> }>("/feeding-sessions" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
+        api.get<{ items: Array<Record<string, unknown>> }>("/inventory/items" + queryString({ page: 1, pageSize: 5, active: "all", q: query }), { signal: controller.signal }),
+        api.get<{ entries: Array<Record<string, unknown>> }>("/finance/entries" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
+        api.get<{ genes: Array<Record<string, unknown>> }>("/genetics/catalog", { signal: controller.signal }),
       ]);
       if (!active || controller.signal.aborted) return;
-      const [animalResponse, taskResponse, documentResponse, cycleResponse] = requests;
+      const [animalResponse, taskResponse, documentResponse, cycleResponse, feedingResponse, inventoryResponse, financeResponse, geneticsResponse] = requests;
       const results = [
         ...(animalResponse.status === "fulfilled" ? animalResponse.value.animals.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "species"), group: t("navAnimals"), path: "/animals/" + getString(item, "id")
         })) : []),
         ...(taskResponse.status === "fulfilled" ? taskResponse.value.tasks.map((item) => ({
-          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks?q=" + encodeURIComponent(query)
+          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks/" + getString(item, "id")
         })) : []),
         ...(documentResponse.status === "fulfilled" ? documentResponse.value.documents.map((item) => ({
           id: getString(item, "id"), title: getString(item, "originalFilename"), subtitle: getString(item, "category"), group: t("navDocuments"), path: "/documents?q=" + encodeURIComponent(query)
@@ -211,7 +215,24 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         ...(cycleResponse.status === "fulfilled" ? cycleResponse.value.cycles.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name") || t("cycles"), subtitle: getString(item, "status"), group: t("navBreeding"), path: "/reproduction-cycles/" + getString(item, "id")
         })) : []),
-      ].filter((item) => item.id && item.title).slice(0, 20);
+        ...(feedingResponse.status === "fulfilled" ? feedingResponse.value.sessions.map((item) => {
+          const entries = Array.isArray(item.entries) ? item.entries as Array<Record<string, unknown>> : [];
+          const firstEntry = entries[0];
+          const animal = firstEntry?.animal;
+          return { id: getString(item, "id"), title: entries.length === 1 ? getString(animal, "name") : (locale === "it" ? "Sessione di alimentazione" : "Feeding session"), subtitle: getString(firstEntry, "foodType") || getString(item, "performedAt"), group: t("navFeeding"), path: "/feeding?q=" + encodeURIComponent(query) };
+        }) : []),
+        ...(inventoryResponse.status === "fulfilled" ? inventoryResponse.value.items.map((item) => ({
+          id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "category"), group: t("navInventory"), path: "/inventory?q=" + encodeURIComponent(query)
+        })) : []),
+        ...(financeResponse.status === "fulfilled" ? financeResponse.value.entries.map((item) => ({
+          id: getString(item, "id"), title: getString(item, "description") || getString(item, "category"), subtitle: getString(item, "occurredOn"), group: t("navFinance"), path: "/finance?q=" + encodeURIComponent(query)
+        })) : []),
+        ...(geneticsResponse.status === "fulfilled" ? geneticsResponse.value.genes
+          .filter((gene) => [getString(gene, "name"), getString(gene, "symbol"), getString(gene, "species")].some((value) => value.toLocaleLowerCase().includes(query.toLocaleLowerCase())))
+          .slice(0, 5).map((gene) => ({
+            id: getString(gene, "id"), title: getString(gene, "name"), subtitle: getString(gene, "species") + " · " + getString(gene, "symbol"), group: t("navGenetics"), path: "/genetics"
+          })) : []),
+      ].filter((item) => item.id && item.title).slice(0, 30);
       setSearchResults(results);
       setSearchFailed(requests.every((result) => result.status === "rejected"));
       setSearchLoading(false);
