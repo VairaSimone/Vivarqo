@@ -47,6 +47,7 @@ export const quarantineSchema = z.object({
   if (v.endedAt && Date.parse(v.endedAt) < Date.parse(v.startedAt)) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
 export const quarantinePatchSchema = z.object({
+  destinationAquariumId: z.string().uuid().optional(),
   status: z.enum(["quarantine","released","isolated","lost"]).optional(),
   endedAt: date.nullable().optional(),
   observations: z.string().trim().max(10000).nullable().optional(),
@@ -165,10 +166,32 @@ export function createAquariumManagementRouter() {
   router.patch("/quarantines/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext; await requireFishCategory(auth.userId);
     const id = parseUuid(req.params.id);
-    const existing = await prisma.aquariumQuarantine.findFirst({ where: { id, aquarium: { is: { userId: auth.userId } } }, select: { id: true } });
+    const existing = await prisma.aquariumQuarantine.findFirst({ where: { id, aquarium: { is: { userId: auth.userId } } }, select: { id: true, aquariumId: true, speciesKey: true, commonName: true, scientificName: true, quantity: true, status: true } });
     if (!existing) throw new AppError(404, "AQUARIUM_QUARANTINE_NOT_FOUND", "Quarantine record not found");
     const v = parse(quarantinePatchSchema, req.body);
-    const record = await prisma.aquariumQuarantine.update({ where: { id }, data: { ...v, ...(v.endedAt !== undefined ? { endedAt: asDate(v.endedAt) } : {}) } });
+    if (v.status === "released" && existing.status !== "released") {
+      if (!v.destinationAquariumId) throw new AppError(400, "QUARANTINE_DESTINATION_REQUIRED", "Choose the destination aquarium before releasing quarantined fish");
+      const destination = await ownedAquarium(auth.userId, v.destinationAquariumId);
+      const record = await prisma.$transaction(async tx => {
+        const updated = await tx.aquariumQuarantine.update({ where: { id }, data: { ...v, endedAt: asDate(v.endedAt) ?? new Date() } });
+        await tx.aquariumPopulation.upsert({
+          where: { aquariumId_speciesKey: { aquariumId: destination.id, speciesKey: existing.speciesKey } },
+          create: { aquariumId: destination.id, speciesKey: existing.speciesKey, commonName: existing.commonName, scientificName: existing.scientificName, quantity: existing.quantity },
+          update: { quantity: { increment: existing.quantity } },
+        });
+        await tx.aquariumPopulationMovement.create({ data: {
+          toAquariumId: destination.id, speciesKey: existing.speciesKey, commonName: existing.commonName,
+          scientificName: existing.scientificName, movementType: "introduction", quantity: existing.quantity,
+          occurredAt: asDate(v.endedAt) ?? new Date(), reason: "Released from quarantine",
+          notes: "Quarantine record " + existing.id,
+        } });
+        return updated;
+      });
+      res.status(200).json({ quarantine: record });
+      return;
+    }
+    const { destinationAquariumId: _destinationAquariumId, ...update } = v;
+    const record = await prisma.aquariumQuarantine.update({ where: { id }, data: { ...update, ...(v.endedAt !== undefined ? { endedAt: asDate(v.endedAt) } : {}) } });
     res.status(200).json({ quarantine: record });
   });
   router.patch("/aquarium-treatments/:id", requireSession, async (req, res) => {
