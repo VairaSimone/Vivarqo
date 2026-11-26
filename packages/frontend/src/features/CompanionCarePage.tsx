@@ -7,7 +7,7 @@ type CompanionAnimal = { id: string; name: string; species: string };
 type CompanionProfile = { microchip?: string | null; veterinarianName?: string | null; veterinaryClinic?: string | null; veterinaryPhone?: string | null; veterinaryEmail?: string | null; veterinaryAddress?: string | null; allergies?: string | null; chronicConditions?: string | null };
 type Weight = { id: string; measuredAt: string; weightG: string | number; notes: string | null };
 type CompanionDocument = { id: string; originalFilename: string; category: string; sizeBytes: string; createdAt: string };
-type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "imminent" | "future" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; clinic?: string | null; treatmentStartAt?: string | null; treatmentEndAt?: string | null; isOngoing?: boolean; dosage: string | null; notes: string | null; animal: CompanionAnimal };
+type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "imminent" | "future" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; clinic?: string | null; treatmentStartAt?: string | null; treatmentEndAt?: string | null; isOngoing?: boolean; dosage: string | null; frequency?: string | null; notes: string | null; animal: CompanionAnimal };
 const kinds = ["vaccination", "medication", "vet_visit", "parasite_prevention", "surgery", "grooming", "other"];
 
 export function CompanionCarePage({ locale }: { locale: Locale }) {
@@ -35,6 +35,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
   const [nextDueAt, setNextDueAt] = useState("");
   const [provider, setProvider] = useState("");
   const [dosage, setDosage] = useState("");
+  const [frequency, setFrequency] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,19 +121,19 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
         animalId, kind, title,
         occurredAt: new Date(occurredAt + "T12:00:00").toISOString(),
         nextDueAt: nextDueAt ? new Date(nextDueAt + "T12:00:00").toISOString() : null,
-        provider: provider || null, clinic: clinic || null, dosage: dosage || null, notes: notes || null, treatmentStartAt: therapyStartAt ? new Date(therapyStartAt + "T12:00:00").toISOString() : null, treatmentEndAt: therapyEndAt ? new Date(therapyEndAt + "T12:00:00").toISOString() : null, isOngoing,
+        provider: provider || null, clinic: clinic || null, dosage: dosage || null, frequency: frequency || null, notes: notes || null, treatmentStartAt: therapyStartAt ? new Date(therapyStartAt + "T12:00:00").toISOString() : null, treatmentEndAt: therapyEndAt ? new Date(therapyEndAt + "T12:00:00").toISOString() : null, isOngoing,
       };
       if (editingRecordId) {
         await api.patch("/companion-care/" + editingRecordId, {
           kind, title, occurredAt: payload.occurredAt, nextDueAt: payload.nextDueAt,
-          provider: payload.provider, clinic: payload.clinic, dosage: payload.dosage, notes: payload.notes, treatmentStartAt: payload.treatmentStartAt, treatmentEndAt: payload.treatmentEndAt, isOngoing: payload.isOngoing,
+          provider: payload.provider, clinic: payload.clinic, dosage: payload.dosage, frequency: payload.frequency, notes: payload.notes, treatmentStartAt: payload.treatmentStartAt, treatmentEndAt: payload.treatmentEndAt, isOngoing: payload.isOngoing,
         });
       } else {
         await api.post("/companion-care", payload);
       }
       await reload();
       setEditingRecordId(null);
-      setTitle(""); setNextDueAt(""); setProvider(""); setClinic(""); setDosage(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false);
+      setTitle(""); setNextDueAt(""); setProvider(""); setClinic(""); setDosage(""); setFrequency(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false);
       setNotice(it ? (editingRecordId ? "Evento aggiornato." : "Evento registrato correttamente.") : (editingRecordId ? "Care event updated." : "Care event saved."));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : (it ? "Salvataggio non riuscito." : "Unable to save record."));
@@ -147,7 +148,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     setOccurredAt(new Date(record.occurredAt).toISOString().slice(0, 10));
     setNextDueAt(record.nextDueAt ? new Date(record.nextDueAt).toISOString().slice(0, 10) : "");
     setProvider(record.provider ?? ""); setClinic(record.clinic ?? ""); setTherapyStartAt(record.treatmentStartAt ? new Date(record.treatmentStartAt).toISOString().slice(0,10) : ""); setTherapyEndAt(record.treatmentEndAt ? new Date(record.treatmentEndAt).toISOString().slice(0,10) : ""); setIsOngoing(Boolean(record.isOngoing));
-    setDosage(record.dosage ?? "");
+    setDosage(record.dosage ?? ""); setFrequency(record.frequency ?? "");
     setNotes(record.notes ?? "");
     setError("");
     setNotice("");
@@ -206,7 +207,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
             <Field label={it ? "Data evento" : "Event date"}><Input type="date" required value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} /></Field>
             <Field label={it ? "Prossima scadenza" : "Next due date"}><Input type="date" value={nextDueAt} onChange={(e) => setNextDueAt(e.target.value)} /></Field>
             <Field label={it ? "Veterinario" : "Veterinarian"}><Input maxLength={160} value={provider} onChange={(e) => setProvider(e.target.value)} /></Field><Field label={it ? "Struttura veterinaria" : "Veterinary clinic"}><Input maxLength={160} value={clinic} onChange={(e) => setClinic(e.target.value)} /></Field>
-            <Field label={it ? "Dosaggio" : "Dosage"}><Input maxLength={120} value={dosage} onChange={(e) => setDosage(e.target.value)} /></Field>{kind === "medication" && <><Field label={it ? "Inizio terapia" : "Therapy start"}><Input type="date" value={therapyStartAt} onChange={(e) => setTherapyStartAt(e.target.value)} /></Field><Field label={it ? "Fine terapia" : "Therapy end"}><Input type="date" value={therapyEndAt} onChange={(e) => setTherapyEndAt(e.target.value)} /></Field><label className="field"><span>{it ? "Terapia continuativa" : "Ongoing therapy"}</span><input type="checkbox" checked={isOngoing} onChange={(e) => setIsOngoing(e.target.checked)} /></label></>}
+            <Field label={it ? "Dosaggio" : "Dosage"}><Input maxLength={120} value={dosage} onChange={(e) => setDosage(e.target.value)} /></Field>{kind === "medication" && <Field label={it ? "Frequenza" : "Frequency"}><Input maxLength={120} placeholder={it ? "es. 1 volta al giorno" : "e.g. once daily"} value={frequency} onChange={(e) => setFrequency(e.target.value)} /></Field>}{kind === "medication" && <><Field label={it ? "Inizio terapia" : "Therapy start"}><Input type="date" value={therapyStartAt} onChange={(e) => setTherapyStartAt(e.target.value)} /></Field><Field label={it ? "Fine terapia" : "Therapy end"}><Input type="date" value={therapyEndAt} onChange={(e) => setTherapyEndAt(e.target.value)} /></Field><label className="field"><span>{it ? "Terapia continuativa" : "Ongoing therapy"}</span><input type="checkbox" checked={isOngoing} onChange={(e) => setIsOngoing(e.target.checked)} /></label></>}
           </div>
           <Field label={it ? "Note" : "Notes"}><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
           <div className="modal-actions"><Button type="submit" disabled={saving || !animalId}>{saving ? (it ? "Salvataggio…" : "Saving…") : (editingRecordId ? (it ? "Salva modifiche" : "Save changes") : (it ? "Registra evento" : "Save event"))}</Button>
@@ -244,7 +245,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
       </Panel>
       <Panel><h2>{it ? "Terapie continuative" : "Ongoing therapies"}</h2>
         {activeTherapies.length === 0 ? <p>{it ? "Nessuna terapia continuativa attiva." : "No active ongoing therapies."}</p> :
-          <div className="ecosys-history">{activeTherapies.map((therapy) => <article className="ecosys-reading" key={therapy.id}><strong>{therapy.title}</strong><span>{therapy.dosage ?? (it ? "Dosaggio non indicato" : "Dosage not specified")}{therapy.treatmentStartAt ? " · " + (it ? "Dal " : "Since ") + new Date(therapy.treatmentStartAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>{therapy.provider && <span>{therapy.provider}{therapy.clinic ? " · " + therapy.clinic : ""}</span>}{therapy.notes && <span>{therapy.notes}</span>}<div className="inline-actions"><Button size="sm" variant="secondary" onClick={() => editRecord(therapy)}>{it ? "Modifica" : "Edit"}</Button><Button size="sm" variant="secondary" onClick={() => void finishTherapy(therapy)}>{it ? "Termina terapia" : "End therapy"}</Button></div></article>)}</div>}
+          <div className="ecosys-history">{activeTherapies.map((therapy) => <article className="ecosys-reading" key={therapy.id}><strong>{therapy.title}</strong><span>{[therapy.dosage, therapy.frequency].filter(Boolean).join(" · ") || (it ? "Dosaggio non indicato" : "Dosage not specified")}{therapy.treatmentStartAt ? " · " + (it ? "Dal " : "Since ") + new Date(therapy.treatmentStartAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>{therapy.provider && <span>{therapy.provider}{therapy.clinic ? " · " + therapy.clinic : ""}</span>}{therapy.notes && <span>{therapy.notes}</span>}<div className="inline-actions"><Button size="sm" variant="secondary" onClick={() => editRecord(therapy)}>{it ? "Modifica" : "Edit"}</Button><Button size="sm" variant="secondary" onClick={() => void finishTherapy(therapy)}>{it ? "Termina terapia" : "End therapy"}</Button></div></article>)}</div>}
       </Panel>
       <Panel><h2>{it ? "Documenti sanitari" : "Medical documents"}</h2>
         <form className="form-grid" onSubmit={uploadDocument}>
@@ -268,7 +269,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
             <strong>{record.animal.name} · {record.title}</strong>
             <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Scadenza: " : "Due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
             <span>{status === "overdue" ? (it ? "Scaduta" : "Overdue") : status === "completed" ? (it ? "Completata" : "Completed") : status === "imminent" ? (it ? "In scadenza entro 7 giorni" : "Due within 7 days") : status === "future" ? (it ? "Futura" : "Future") : (it ? "Senza scadenza" : "No due date")}</span>
-            {(record.provider || record.clinic) && <span>{[record.provider, record.clinic].filter(Boolean).join(" · ")}</span>}{record.dosage && <span>{record.dosage}</span>}{record.isOngoing && <span>{it ? "Terapia continuativa attiva" : "Ongoing therapy"}</span>}
+            {(record.provider || record.clinic) && <span>{[record.provider, record.clinic].filter(Boolean).join(" · ")}</span>}{record.dosage && <span>{record.dosage}</span>}{record.frequency && <span>{record.frequency}</span>}{record.isOngoing && <span>{it ? "Terapia continuativa attiva" : "Ongoing therapy"}</span>}
             {record.notes && <span>{record.notes}</span>}
             <div className="inline-actions">
               {status !== "completed" && record.task?.status === "open" && <Button size="sm" disabled={saving} onClick={async () => { setSaving(true); setError(""); try { await api.post("/tasks/" + record.task!.id + "/complete", {}); await reload(); setNotice(it ? "Scadenza segnata come completata." : "Due date marked as completed."); } catch (reason) { setError(reason instanceof ApiError ? reason.message : (it ? "Operazione non riuscita." : "Operation failed.")); } finally { setSaving(false); } }}>{it ? "Segna completata" : "Mark complete"}</Button>}
