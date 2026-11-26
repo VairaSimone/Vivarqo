@@ -183,6 +183,8 @@ model Animal {
   originOffspringBatch   OffspringBatch?       @relation("AnimalOriginBatch", fields: [originOffspringBatchId], references: [id], onDelete: Restrict)
   documents              Document[]
   healthRecords          HealthRecord[]
+  fastingPeriods         ReptileFastingPeriod[]
+  brumationPeriods       ReptileBrumationPeriod[]
   publicShare            PublicShare?
   financeEntries         FinanceEntry[]
   geneticTraits          AnimalGeneticTrait[]  @relation("GeneticTraitAnimal")
@@ -193,6 +195,8 @@ model Animal {
   aviaryAssignments      AviaryBird[]
   aviaryMovements        AviaryMovement[]
   companionCareRecords   CompanionCareRecord[]
+  fastingPeriods         ReptileFastingPeriod[]
+  brumationPeriods       ReptileBrumationPeriod[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
   @@index([userId, category, status], map: "animals_user_category_status_idx")
@@ -1337,4 +1341,42 @@ model HealthRecord {
   @@index([animalId, occurredAt(sort: Desc)], map: "health_records_animal_occurred_idx")
   @@index([animalId, status], map: "health_records_animal_status_idx")
   @@map("health_records")
+}
+
+
+model ReptileFastingPeriod {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId           String   @map("animal_id") @db.Uuid
+  periodType         String   @default("fasting") @map("period_type") @db.VarChar(16)
+  startedAt          DateTime @map("started_at") @db.Timestamptz(6)
+  endedAt            DateTime? @map("ended_at") @db.Timestamptz(6)
+  lastAcceptedMealAt DateTime? @map("last_accepted_meal_at") @db.Timestamptz(6)
+  refusedMealsCount  Int      @default(0) @map("refused_meals_count")
+  reason             String?  @db.VarChar(240)
+  startWeightG       Decimal? @map("start_weight_g") @db.Decimal(10, 2)
+  endWeightG         Decimal? @map("end_weight_g") @db.Decimal(10, 2)
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal             Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([animalId, startedAt(sort: Desc)], map: "reptile_fasting_animal_started_idx")
+  @@map("reptile_fasting_periods")
+}
+
+model ReptileBrumationPeriod {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId       String   @map("animal_id") @db.Uuid
+  startedAt      DateTime @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+  startWeightG   Decimal? @map("start_weight_g") @db.Decimal(10, 2)
+  endWeightG     Decimal? @map("end_weight_g") @db.Decimal(10, 2)
+  temperatureC   Decimal? @map("temperature_c") @db.Decimal(5, 2)
+  humidityPct    Decimal? @map("humidity_pct") @db.Decimal(5, 2)
+  conditions     String?
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  animal         Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([animalId, startedAt(sort: Desc)], map: "reptile_brumation_animal_started_idx")
+  @@map("reptile_brumation_periods")
 }
