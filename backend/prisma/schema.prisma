@@ -195,8 +195,6 @@ model Animal {
   aviaryAssignments      AviaryBird[]
   aviaryMovements        AviaryMovement[]
   companionCareRecords   CompanionCareRecord[]
-  fastingPeriods         ReptileFastingPeriod[]
-  brumationPeriods       ReptileBrumationPeriod[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
   @@index([userId, category, status], map: "animals_user_category_status_idx")
