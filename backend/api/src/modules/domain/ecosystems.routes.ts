@@ -359,6 +359,17 @@ export function createEcosystemRouter() {
     res.status(201).json({ note });
   });
 
+  router.delete("/aviaries/:id/notes/:noteId", requireSession, async (req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    await requireCategory(auth.userId, "birds");
+    const aviary = await prisma.aviary.findFirst({ where: { id: parseUuid(req.params.id), userId: auth.userId }, select: { id: true } });
+    if (!aviary) throw new AppError(404, "AVIARY_NOT_FOUND", "Aviary not found");
+    const noteId = parseUuid(req.params.noteId);
+    const deleted = await prisma.aviaryNote.deleteMany({ where: { id: noteId, aviaryId: aviary.id } });
+    if (!deleted.count) throw new AppError(404, "AVIARY_NOTE_NOT_FOUND", "Aviary note not found");
+    res.status(204).send();
+  });
+
   router.put("/aviaries/:id/birds", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "birds");
