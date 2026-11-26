@@ -139,6 +139,9 @@ export const api = {
   patch<T = void>(path: string, body: unknown): Promise<T> {
     return request<T>(path, "PATCH", body).then((result) => { invalidateAfterMutation(path); return result; });
   },
+  put<T = void>(path: string, body: unknown): Promise<T> {
+    return request<T>(path, "PUT", body).then((result) => { invalidateAfterMutation(path); return result; });
+  },
   delete<T = void>(path: string, body?: unknown): Promise<T> {
     return request<T>(path, "DELETE", body).then((result) => { invalidateAfterMutation(path); return result; });
   },

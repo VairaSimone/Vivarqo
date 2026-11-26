@@ -281,7 +281,7 @@ function databaseType(prismaType: string, isList: boolean, attributes: string): 
   }
   return {
     pgType: isList ? "_" + baseType : baseType,
-    ...(override?.[1] === "VarChar" || override?.[1] === "Char" ? { maxLength: args[0] } : {}),
+    ...(!isList && (override?.[1] === "VarChar" || override?.[1] === "Char") ? { maxLength: args[0] } : {}),
     ...(override?.[1] === "Decimal" ? { precision: args[0], scale: args[1] } : {}),
   };
 }
