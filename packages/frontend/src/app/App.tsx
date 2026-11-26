@@ -131,15 +131,20 @@ export function App() {
     }
     let active = true;
     setAuthReady(false);
-    api.get<{ user: User }>("/auth/me").then((result) => {
+    api.get<{ user: User }>("/auth/me").then(async (result) => {
       if (!active) return;
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
       setAuthError("");
-      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
-      if (!active) return;
-      if (!configuration.configuredAt) navigate("/setup");
-      else if (window.location.pathname === "/setup") navigate("/today");
+      try {
+        const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+        if (!active) return;
+        if (!configuration.configuredAt) navigate("/setup");
+        else if (window.location.pathname === "/setup") navigate("/today");
+      } catch (reason) {
+        if (!active) return;
+        setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+      }
     }).catch((reason: unknown) => {
       if (!active) return;
       setUser(null);
