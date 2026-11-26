@@ -121,6 +121,15 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     return () => { active = false; };
   }, [aquariumMode, selectedId, italian]);
 
+  useEffect(() => {
+    if (aquariumMode || !selectedId) { setMovements([]); setAviaryNotes([]); return; }
+    let active = true;
+    api.get<{ movements: AviaryMovement[]; notes: AviaryNote[] }>(`/aviaries/${encodeURIComponent(selectedId)}/history`)
+      .then((result) => { if (active) { setMovements(result.movements); setAviaryNotes(result.notes); } })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare lo storico della voliera." : "Unable to load aviary history.")); });
+    return () => { active = false; };
+  }, [aquariumMode, selectedId, italian]);
+
   async function submit(event: FormEvent<HTMLFormElement>, operation: () => Promise<void>) {
     event.preventDefault();
     setSaving(true); setError(""); setNotice("");
@@ -189,6 +198,28 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     await submit(event, async () => {
       await api.put(`/aviaries/${encodeURIComponent(selectedId)}/birds`, { animalIds: selectedBirdIds });
       setNotice(italian ? "Assegnazione degli uccelli aggiornata." : "Bird assignment updated.");
+    });
+  }
+
+  async function saveRanges(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      const parameters: Parameter[] = ["temperatureC", "ph", "ghDkh", "khDkh", "nitrateMgL"];
+      const payload = { ranges: parameters.filter((parameter) => rangeDraft[parameter].min !== "" || rangeDraft[parameter].max !== "").map((parameter) => ({
+        parameter, minValue: rangeDraft[parameter].min === "" ? null : Number(rangeDraft[parameter].min),
+        maxValue: rangeDraft[parameter].max === "" ? null : Number(rangeDraft[parameter].max),
+      })) };
+      const result = await api.put<{ ranges: ParameterRange[] }>(`/aquariums/${encodeURIComponent(selectedId)}/ranges`, payload);
+      setRanges(result.ranges);
+      setNotice(italian ? "Intervalli dei parametri aggiornati." : "Parameter ranges updated.");
+    });
+  }
+
+  async function addAviaryNote(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      const result = await api.post<{ note: AviaryNote }>(`/aviaries/${encodeURIComponent(selectedId)}/notes`, { title: noteTitle || null, body: noteBody });
+      setAviaryNotes((current) => [result.note, ...current]);
+      setNoteTitle(""); setNoteBody("");
+      setNotice(italian ? "Nota aggiunta alla voliera." : "Aviary note added.");
     });
   }
 
