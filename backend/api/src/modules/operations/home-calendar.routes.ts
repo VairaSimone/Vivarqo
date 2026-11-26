@@ -149,7 +149,7 @@ export function createHomeCalendarRouter() {
     const today = localDateFor(new Date(), auth.timezone);
     const bounds = localDayBounds(today, auth.timezone);
     const from = new Date(bounds.start.getTime() - 7 * 86_400_000);
-    const [feedings, weights, sheds, notes, reproduction, births, maintenance, animalUpdates, dueMaintenance, eggs] = await Promise.all([
+    const [feedings, weights, sheds, notes, reproduction, births, maintenance, animalUpdates, dueMaintenance, eggs, aquariumReadings, aviaryMovements, aviaryNotes] = await Promise.all([
       prisma.feedingSession.findMany({ where: { userId: auth.userId, performedAt: { gte: from, lt: bounds.end } }, orderBy: { performedAt: "desc" }, take: 15, include: { entries: { where: { animal: { is: { userId: auth.userId } } }, include: { animal: { select: { id: true, name: true } } } } } }),
       prisma.weightMeasurement.findMany({ where: { animal: { is: { userId: auth.userId } }, measuredAt: { gte: from, lt: bounds.end } }, orderBy: { measuredAt: "desc" }, take: 15, include: { animal: { select: { id: true, name: true } } } }),
       prisma.shedRecord.findMany({ where: { animal: { is: { userId: auth.userId } }, occurredAt: { gte: from, lt: bounds.end } }, orderBy: { occurredAt: "desc" }, take: 15, include: { animal: { select: { id: true, name: true } } } }),
@@ -160,6 +160,9 @@ export function createHomeCalendarRouter() {
       prisma.animal.findMany({ where: { userId: auth.userId, status: "active", updatedAt: { gte: from, lt: bounds.end } }, orderBy: { updatedAt: "desc" }, take: 15, select: { id: true, name: true, updatedAt: true } }),
       prisma.incubator.findMany({ where: { userId: auth.userId, isActive: true, maintenanceIntervalDays: { not: null }, nextMaintenanceAt: { lte: localDayBounds(addCalendarDays(today, 8), auth.timezone).start } }, orderBy: { nextMaintenanceAt: "asc" }, take: 20, select: { id: true, name: true, nextMaintenanceAt: true, maintenanceIntervalDays: true } }),
       prisma.egg.findMany({ where: { clutch: { is: { cycle: { is: { userId: auth.userId } } } }, expectedHatchAt: { gte: bounds.start, lte: localDayBounds(addCalendarDays(today, 8), auth.timezone).start }, status: { notIn: ["hatched", "failed"] } }, orderBy: { expectedHatchAt: "asc" }, take: 30, include: { clutch: { select: { cycleId: true, cycle: { select: { name: true } } } } } }),
+      prisma.aquariumWaterReading.findMany({ where: { aquarium: { is: { userId: auth.userId } }, measuredAt: { gte: from, lt: bounds.end } }, orderBy: { measuredAt: "desc" }, take: 10, include: { aquarium: { select: { id: true, name: true } } } }),
+      prisma.aviaryMovement.findMany({ where: { OR: [{ fromAviary: { is: { userId: auth.userId } } }, { toAviary: { is: { userId: auth.userId } } }], occurredAt: { gte: from, lt: bounds.end } }, orderBy: { occurredAt: "desc" }, take: 10, include: { animal: { select: { id: true, name: true } }, fromAviary: { select: { id: true, name: true } }, toAviary: { select: { id: true, name: true } } } }),
+      prisma.aviaryNote.findMany({ where: { aviary: { is: { userId: auth.userId } }, occurredAt: { gte: from, lt: bounds.end } }, orderBy: { occurredAt: "desc" }, take: 10, include: { aviary: { select: { id: true, name: true } } } }),
     ]);
     const events = [
       ...feedings.map((item) => ({ type: "feeding" as const, occurredAt: item.performedAt, title: "Feeding session", targetPath: "/feeding" })),
@@ -170,6 +173,9 @@ export function createHomeCalendarRouter() {
       ...births.map((item) => ({ type: "birth" as const, occurredAt: item.bornOn, title: `Nascita: ${item.count} piccoli`, targetPath: `/reproduction-cycles/${item.cycleId}` })),
       ...maintenance.map((item) => ({ type: "incubation" as const, occurredAt: item.occurredAt, title: `Manutenzione incubatrice: ${item.incubator.name}`, targetPath: "/reproduction-cycles" })),
       ...animalUpdates.map((item) => ({ type: "animal_update" as const, occurredAt: item.updatedAt, title: `Scheda aggiornata: ${item.name}`, targetPath: `/animals/${item.id}` })),
+      ...aquariumReadings.map((item) => ({ type: "aquarium_reading" as const, occurredAt: item.measuredAt, title: `Misurazione: ${item.aquarium.name}`, targetPath: "/aquariums" })),
+      ...aviaryMovements.map((item) => ({ type: "aviary_movement" as const, occurredAt: item.occurredAt, title: `Spostamento: ${item.animal.name}`, targetPath: "/aviaries" })),
+      ...aviaryNotes.map((item) => ({ type: "aviary_note" as const, occurredAt: item.occurredAt, title: item.title ?? `Nota: ${item.aviary.name}`, targetPath: "/aviaries" })),
     ].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, 20);
     const smartSuggestions = [
       ...dueMaintenance.map((item) => ({ id: `incubator-${item.id}`, type: "incubator_maintenance", title: item.name, dueAt: item.nextMaintenanceAt, targetPath: "/reproduction-cycles" })),
