@@ -5,7 +5,7 @@ import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 
 const recordSchema = z.object({
-  recordType: z.enum(["symptom", "visit", "diagnosis", "suspicion", "treatment", "checkup"]),
+  recordType: z.enum(["symptom", "visit", "diagnosis", "suspicion", "treatment", "checkup", "vaccination"]),
   status: z.enum(["ongoing", "resolved", "chronic"]).default("ongoing"),
   occurredAt: z.string().datetime(),
   title: z.string().trim().min(1).max(160),
