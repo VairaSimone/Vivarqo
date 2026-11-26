@@ -5,7 +5,7 @@ import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 
 const date = z.string().datetime({ offset: true });
-const fastingSchema = z.object({
+export const reptileFastingPeriodSchema = z.object({
   periodType: z.enum(["fasting", "refusal"]).default("fasting"),
   startedAt: date,
   endedAt: date.nullable().optional(),
@@ -16,9 +16,9 @@ const fastingSchema = z.object({
   endWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
   notes: z.string().trim().max(20000).nullable().optional(),
 }).strict().superRefine((v, ctx) => {
-  if (v.endedAt && v.endedAt < v.startedAt) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
+  if (v.endedAt && Date.parse(v.endedAt) < Date.parse(v.startedAt)) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
-const brumationSchema = z.object({
+export const reptileBrumationPeriodSchema = z.object({
   startedAt: date,
   endedAt: date.nullable().optional(),
   startWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
@@ -64,7 +64,7 @@ export function createReptileCareRouter() {
   router.post("/animals/:animalId/fasting-periods", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext, animalId = idOf(req.params.animalId);
     await animal(auth.userId, animalId, true);
-    const input = bodyOf(fastingSchema, req.body);
+    const input = bodyOf(reptileFastingPeriodSchema, req.body);
     const created = await prisma.reptileFastingPeriod.create({ data: {
       animalId, ...input, startedAt: new Date(input.startedAt),
       endedAt: input.endedAt ? new Date(input.endedAt) : null,
@@ -96,7 +96,7 @@ export function createReptileCareRouter() {
   router.post("/animals/:animalId/brumation-periods", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext, animalId = idOf(req.params.animalId);
     await animal(auth.userId, animalId, true);
-    const input = bodyOf(brumationSchema, req.body);
+    const input = bodyOf(reptileBrumationPeriodSchema, req.body);
     const created = await prisma.reptileBrumationPeriod.create({ data: {
       animalId, ...input, startedAt: new Date(input.startedAt), endedAt: input.endedAt ? new Date(input.endedAt) : null,
     } });
