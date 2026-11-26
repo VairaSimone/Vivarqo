@@ -53,8 +53,11 @@ export function createCompanionCareRouter() {
     if (animalId) await ownedAnimal(auth.userId, animalId);
     const now = new Date();
     const status = typeof req.query.status === "string" ? req.query.status : "all";
-    if (!["all", "overdue", "upcoming", "completed"].includes(status)) throw new AppError(400, "VALIDATION_ERROR", "Invalid care due status");
+    if (!["all", "overdue", "imminent", "future", "upcoming", "completed"].includes(status)) throw new AppError(400, "VALIDATION_ERROR", "Invalid care due status");
+    const imminentLimit = new Date(now.getTime() + 7 * 86_400_000);
     const dueFilter = status === "overdue" ? { completedAt: null, nextDueAt: { not: null, lt: now } }
+      : status === "imminent" ? { completedAt: null, nextDueAt: { gte: now, lte: imminentLimit } }
+      : status === "future" ? { completedAt: null, nextDueAt: { gt: imminentLimit } }
       : status === "upcoming" ? { completedAt: null, nextDueAt: { gte: now } }
       : status === "completed" ? { completedAt: { not: null } } : {};
     const upcomingOnly = req.query.upcomingOnly === "true";
@@ -64,7 +67,7 @@ export function createCompanionCareRouter() {
       include: { animal: { select: { id: true, name: true, species: true } }, task: { select: { id: true, status: true } } },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 200,
     });
-    res.status(200).json({ records: records.map((record) => ({ ...record, dueStatus: record.completedAt ? "completed" : !record.nextDueAt ? "none" : record.nextDueAt < now ? "overdue" : "upcoming" })) });
+    res.status(200).json({ records: records.map((record) => ({ ...record, dueStatus: record.completedAt ? "completed" : !record.nextDueAt ? "none" : record.nextDueAt < now ? "overdue" : record.nextDueAt.getTime() <= now.getTime() + 7 * 86_400_000 ? "imminent" : "future" })) });
   });
   router.post("/companion-care", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
