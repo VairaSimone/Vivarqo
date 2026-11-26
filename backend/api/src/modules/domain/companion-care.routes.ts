@@ -16,7 +16,7 @@ const companionCareCreateSchema = z.object({
   isOngoing: z.boolean().optional(),
   dosage: z.string().trim().max(120).nullable().optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
-}).strict().refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" }).refine((value) => !value.isOngoing || (value.kind === "medication" && !value.treatmentEndAt), { path: ["isOngoing"], message: "Only medication records without an end date can be ongoing therapies" });
+}).strict().refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || new Date(value.treatmentEndAt).getTime() >= new Date(value.treatmentStartAt).getTime(), { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" }).refine((value) => !value.isOngoing || (value.kind === "medication" && !value.treatmentEndAt), { path: ["isOngoing"], message: "Only medication records without an end date can be ongoing therapies" });
 const companionCarePatchSchema = z.object({
   kind: z.enum(kinds).optional(), title: z.string().trim().min(1).max(160).optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(),
