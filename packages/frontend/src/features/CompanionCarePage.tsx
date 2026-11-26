@@ -4,7 +4,7 @@ import type { Locale } from "../lib/domain";
 import { Alert, Button, Field, Input, LoadingState, PageHeader, Panel, Select, Textarea } from "../components/ui";
 
 type CompanionAnimal = { id: string; name: string; species: string };
-type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; dosage: string | null; notes: string | null; animal: CompanionAnimal };
+type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "imminent" | "future" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; dosage: string | null; notes: string | null; animal: CompanionAnimal };
 const kinds = ["vaccination", "medication", "vet_visit", "parasite_prevention", "surgery", "grooming", "other"];
 
 export function CompanionCarePage({ locale }: { locale: Locale }) {
