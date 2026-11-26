@@ -41,6 +41,7 @@ import { createDomainImportRouter } from "./modules/domain/domain-import.routes.
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
 import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
+import { createBirdManagementRouter } from "./modules/domain/bird-management.routes.js";
 import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
 
 export interface AppDependencies {
@@ -129,6 +130,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createEcosystemRouter());
   app.use("/api/v1", createCompanionCareRouter());
+  app.use("/api/v1", createBirdManagementRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
   app.use("/api/v1", createBillingRouter(dependencies.billing));
