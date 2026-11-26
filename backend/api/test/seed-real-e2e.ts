@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     parallelism: 1,
   });
   for (const account of accounts) {
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { email: account.email },
       create: {
         ...account,
@@ -33,6 +33,11 @@ async function main(): Promise<void> {
         accountStatus: "active",
         deletedAt: null,
       },
+    });
+    await prisma.accountConfiguration.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, animalCategories: ["reptiles"] },
+      update: { animalCategories: ["reptiles"] },
     });
   }
 }
