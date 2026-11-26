@@ -74,7 +74,7 @@ export function AuthPage({ mode, locale, onSuccess, navigate, onLocaleChange }: 
 
   return <div className="auth-page">
     <div className="auth-visual">
-      <div className="auth-brand"><span className="brand-mark"><Icon name="leaf" size={23} /></span><strong>SnakeBee</strong></div>
+      <div className="auth-brand"><span className="brand-mark"><Icon name="brand" size={23} /></span><strong>SnakeBee</strong></div>
       <div className="auth-visual-copy">
         <span className="eyebrow">{locale === "it" ? "IL GESTIONALE PER ALLEVATORI" : "BUILT FOR ANIMAL BREEDERS"}</span>
         <h1>{locale === "it" ? "Meno fogli.\nPiù controllo." : "Less paperwork.\nMore control."}</h1>
