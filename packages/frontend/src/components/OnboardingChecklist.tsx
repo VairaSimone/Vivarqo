@@ -13,13 +13,8 @@ type ProgressResponse = {
 const STORAGE_KEY = "vivarqo.onboarding.minimized";
 
 const steps: Array<{ key: Milestone; icon: string; path: string; title: { it: string; en: string }; description: { it: string; en: string }; action: { it: string; en: string } }> = [
-  { key: "animal", icon: "snake", path: "/animals?create=1", title: { it: "Inserisci il primo animale", en: "Add your first animal" }, description: { it: "Crea la scheda del tuo primo esemplare, oppure importa la tua collezione.", en: "Create your first animal profile, or import your collection." }, action: { it: "Aggiungi animale", en: "Add animal" } },
-  { key: "feeding", icon: "feed", path: "/feeding?create=1", title: { it: "Registra un'alimentazione", en: "Record a feeding" }, description: { it: "Registra l'esito di un pasto, anche per più animali.", en: "Record a feeding outcome, including for multiple animals." }, action: { it: "Registra pasto", en: "Record feeding" } },
-  { key: "weight", icon: "weight", path: "/animals?weigh=1", title: { it: "Registra una pesata", en: "Record a weight" }, description: { it: "Inizia a seguire la crescita e le variazioni di peso.", en: "Start tracking growth and weight changes." }, action: { it: "Registra peso", en: "Record weight" } },
-  { key: "shed", icon: "leaf", path: "/animals", title: { it: "Registra una muta", en: "Record a shed" }, description: { it: "Tieni traccia delle mute e della loro qualità dalla scheda dell'animale.", en: "Track sheds and their quality from an animal profile." }, action: { it: "Apri animali", en: "Open animals" } },
-  { key: "reminder", icon: "calendar", path: "/tasks?tab=reminders&create=1", title: { it: "Crea un promemoria", en: "Create a reminder" }, description: { it: "Imposta una scadenza ricorrente per le attività di gestione.", en: "Set a recurring due date for routine care." }, action: { it: "Crea promemoria", en: "Create reminder" } },
-  { key: "clutch", icon: "egg", path: "/reproduction?create=1", title: { it: "Crea un ciclo riproduttivo", en: "Create a breeding cycle" }, description: { it: "Collega i riproduttori e organizza gli eventi della stagione.", en: "Link the breeding animals and organize the season's events." }, action: { it: "Crea ciclo", en: "Create cycle" } },
-  { key: "egg", icon: "egg", path: "/reproduction", title: { it: "Registra le prime uova", en: "Record your first eggs" }, description: { it: "Apri un ciclo riproduttivo, aggiungi una covata e registra le singole uova.", en: "Open a breeding cycle, add a clutch and record individual eggs." }, action: { it: "Apri riproduzioni", en: "Open breeding" } },
+  { key: "animal", icon: "snake", path: "/animals?create=1", title: { it: "Aggiungi i tuoi animali", en: "Add your animals" }, description: { it: "Crea la prima scheda oppure importa la collezione da un file. Non serve configurare tutto adesso.", en: "Create your first profile or import your collection from a file. You don't need to configure everything now." }, action: { it: "Aggiungi animali", en: "Add animals" } },
+  { key: "feeding", icon: "feed", path: "/feeding?create=1", title: { it: "Registra la prima alimentazione", en: "Record your first feeding" }, description: { it: "Collega un pasto a uno o più animali e inizia a costruire il loro storico.", en: "Link a feeding to one or more animals and start building their care history." }, action: { it: "Registra pasto", en: "Record feeding" } },
 ];
 
 const contextual = [
@@ -94,14 +89,14 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
   return <>
     {showChecklist && <section className="onboarding-checklist panel" aria-labelledby="onboarding-checklist-title">
       <div className="onboarding-checklist-heading">
-        <div><span className="eyebrow">{english ? "YOUR FIRST STEPS" : "IL TUO ALLEVAMENTO"}</span><h2 id="onboarding-checklist-title">{english ? "Get started with Vivarqo" : "Inizia a utilizzare Vivarqo"}</h2><p>{english ? "Complete these seven actions to get the most out of your workspace." : "Completa queste sette attività per iniziare a gestire il tuo allevamento."}</p></div>
+        <div><span className="eyebrow">{english ? "YOUR FIRST STEPS" : "PER INIZIARE"}</span><h2 id="onboarding-checklist-title">{english ? "Start with the essentials" : "Inizia dalle cose essenziali"}</h2><p>{english ? "Add your animals, then record a feeding. You can explore the other features when you need them." : "Inserisci i tuoi animali e registra un pasto. Le altre funzioni le scoprirai quando ti serviranno."}</p></div>
         <div className="onboarding-checklist-heading-actions">
-          <div className="onboarding-checklist-progress" aria-label={english ? `${completedCount} of 7 completed` : `${completedCount} di 7 completati`}><strong>{completedCount}/7</strong><span>{english ? "completed" : "completati"}</span></div>
+          <div className="onboarding-checklist-progress" aria-label={english ? `${completedCount} of 2 completed` : `${completedCount} di 2 completati`}><strong>{completedCount}/2</strong><span>{english ? "completed" : "completati"}</span></div>
           <Button size="sm" variant="ghost" onClick={() => toggleMinimized(!minimized)} aria-expanded={!minimized} aria-controls="onboarding-checklist-content"><Icon name={minimized ? "chevron" : "minus"} size={15} />{minimized ? (english ? "Expand" : "Espandi") : (english ? "Minimize" : "Riduci")}</Button>
         </div>
       </div>
       {!minimized && <div id="onboarding-checklist-content">
-        <div className="onboarding-checklist-track" role="progressbar" aria-label={english ? "Onboarding progress" : "Avanzamento configurazione"} aria-valuemin={0} aria-valuemax={7} aria-valuenow={completedCount}><span style={{ width: `${completedCount / 7 * 100}%` }} /></div>
+        <div className="onboarding-checklist-track" role="progressbar" aria-label={english ? "Getting started progress" : "Primi passi completati"} aria-valuemin={0} aria-valuemax={2} aria-valuenow={completedCount}><span style={{ width: `${completedCount / 2 * 100}%` }} /></div>
         <ol className="onboarding-checklist-items">
           {steps.map((item) => {
             const done = progress.completed[item.key] === true;
@@ -113,7 +108,7 @@ export function OnboardingChecklist({ locale, onNavigate }: { locale: Locale; on
             </li>;
           })}
         </ol>
-        <p className="onboarding-checklist-footnote">{english ? "Imported data counts too. Completed steps remain completed even if you later delete records." : "Anche i dati importati vengono riconosciuti. Un passaggio completato resta tale anche se in seguito elimini dei record."}</p>
+        <p className="onboarding-checklist-footnote">{english ? "You can keep using SnakeBee without completing every suggestion. Your existing records are not changed." : "Puoi usare SnakeBee anche senza completare tutti i suggerimenti. I dati già presenti non vengono modificati."}</p>
       </div>}
     </section>}
     {suggestions.length > 0 && <section className="onboarding-contextual" aria-label={english ? "Suggested next steps" : "Suggerimenti contestuali"}>
