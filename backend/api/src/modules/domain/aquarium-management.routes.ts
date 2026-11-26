@@ -173,7 +173,7 @@ export function createAquariumManagementRouter() {
       if (!v.destinationAquariumId) throw new AppError(400, "QUARANTINE_DESTINATION_REQUIRED", "Choose the destination aquarium before releasing quarantined fish");
       const destination = await ownedAquarium(auth.userId, v.destinationAquariumId);
       const record = await prisma.$transaction(async tx => {
-        const updated = await tx.aquariumQuarantine.update({ where: { id }, data: { ...v, endedAt: asDate(v.endedAt) ?? new Date() } });
+        const updated = await tx.aquariumQuarantine.update({ where: { id }, data: { status: "released", ...(v.observations !== undefined ? { observations: v.observations } : {}), endedAt: asDate(v.endedAt) ?? new Date() } });
         await tx.aquariumPopulation.upsert({
           where: { aquariumId_speciesKey: { aquariumId: destination.id, speciesKey: existing.speciesKey } },
           create: { aquariumId: destination.id, speciesKey: existing.speciesKey, commonName: existing.commonName, scientificName: existing.scientificName, quantity: existing.quantity },
