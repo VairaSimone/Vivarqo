@@ -140,8 +140,8 @@ export function App() {
       try {
         const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
         if (!active) return;
-        if (!configuration.configuredAt) navigate("/setup");
-        else if (window.location.pathname === "/setup") navigate("/today");
+        if (!configuration.configuredAt && window.location.pathname !== "/setup") navigate("/setup");
+        else if (configuration.configuredAt && window.location.pathname === "/setup") navigate("/today");
       } catch (reason) {
         if (!active) return;
         setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
