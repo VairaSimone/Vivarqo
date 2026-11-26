@@ -24,7 +24,7 @@ export function OnboardingTour({ locale, onNavigate, onClose }: {
   return <div className="onboarding-backdrop" role="presentation">
     <section className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <header className="onboarding-header">
-        <span className="onboarding-brand"><span className="brand-mark"><Icon name="brand" /></span><span><strong>SnakeBee</strong><small>{english ? "Your breeding workspace" : "Il tuo spazio di allevamento"}</small></span></span>
+        <span className="onboarding-brand"><span className="brand-mark"><Icon name="brand" /></span><span><strong>Vivarqo</strong><small>{english ? "Your breeding workspace" : "Il tuo spazio di allevamento"}</small></span></span>
         <button type="button" className="onboarding-close" onClick={finish} aria-label={english ? "Close tutorial" : "Chiudi tutorial"}><Icon name="close" /></button>
       </header>
       <div className="onboarding-progress" aria-label={english ? `Step ${step + 1} of ${steps.length}` : `Passaggio ${step + 1} di ${steps.length}`}>
