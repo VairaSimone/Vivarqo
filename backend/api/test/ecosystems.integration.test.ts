@@ -67,7 +67,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     await owner.agent.get(`/api/v1/aquariums/${id}/ranges`).expect(200).expect((res) => expect(res.body.ranges).toHaveLength(2));
     await owner.agent.put(`/api/v1/aquariums/${id}/ranges`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ ranges: [{ parameter: "ph", minValue: 8, maxValue: 6 }] }).expect(400);
-    await owner.agent.get(`/api/v1/aquariums/${id}/export.csv`).expect(200).expect("Content-Type", /text\\/csv/).expect((res) => expect(res.text).toContain("temperatureC"));
+    await owner.agent.get(`/api/v1/aquariums/${id}/export.csv`).expect(200).expect("Content-Type", new RegExp("text/csv")).expect((res) => expect(res.text).toContain("temperatureC"));
     await other.agent.get(`/api/v1/aquariums/${id}/readings`).expect(404);
     await owner.agent.patch(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Tropical updated", location: "Living room" }).expect(200);
