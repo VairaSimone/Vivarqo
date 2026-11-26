@@ -215,6 +215,12 @@ export function createTasksRouter() {
         data: { status: "completed", completedAt: now },
       });
       if (claimed.count !== 1) throw new AppError(409, "TASK_NOT_OPEN", "The task has already been completed or dismissed");
+      if (existing.companionCareRecordId) {
+        await tx.companionCareRecord.updateMany({
+          where: { id: existing.companionCareRecordId, userId: auth.userId, deletedAt: null },
+          data: { completedAt: now },
+        });
+      }
 
       let nextTask: unknown = null;
       let nextDueAt: Date | null = null;
