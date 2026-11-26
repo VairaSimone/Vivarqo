@@ -1058,6 +1058,7 @@ model AccountConfiguration {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([configuredAt], map: "account_configurations_configured_at_idx")
   @@map("account_configurations")
 }
 
