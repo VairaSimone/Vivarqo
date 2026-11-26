@@ -126,11 +126,6 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
 
   useEffect(() => {
-    try { setShowTour(localStorage.getItem("snakebee:onboarding:v1") !== "completed"); }
-    catch { setShowTour(false); }
-  }, []);
-
-  useEffect(() => {
     if (!mobileMenu) return;
     const sidebar = document.getElementById("application-sidebar");
     const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
