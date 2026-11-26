@@ -131,6 +131,11 @@ Il contratto API versionato e verificato dalla CI è in [docs/openapi.yaml](docs
 
 ## Moduli animali indipendenti dal piano commerciale
 
+### Cura e salute di cani e gatti
+
+La categoria `dogs_cats` abilita schede dedicate e il registro `companion-care`. Gli eventi supportano vaccinazioni, farmaci, visite veterinarie, prevenzione parassiti, interventi, toelettatura e altre attività, con data evento, prossima scadenza, professionista/struttura, dosaggio e note. Gli eventi sono associati all'animale e all'account, con soft-delete.
+
+
 Le categorie selezionate in `account_configurations.animal_categories` determinano quali domini animali sono attivi per l'account. La disponibilità dei moduli di dominio (schede animali, cura, riproduzione/genetica, acquari e voliere) non viene dedotta dal piano commerciale. I piani continuano a governare le quote già previste, come il numero massimo di animali e i limiti documentali: non decidono quali categorie l'account può gestire.
 
 Le API di dominio verificano la categoria abilitata sull'account e l'appartenenza dei record all'utente. La selezione di una categoria non abilita automaticamente funzionalità non ancora implementate: ogni modulo diventa visibile solo quando la relativa schermata e API sono disponibili.

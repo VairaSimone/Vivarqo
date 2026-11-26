@@ -1634,4 +1634,23 @@ CREATE UNIQUE INDEX finance_entries_source_transfer_unique ON finance_entries(so
 DROP INDEX IF EXISTS finance_entries_source_stock_movement_unique;
 CREATE UNIQUE INDEX finance_entries_source_stock_movement_unique ON finance_entries(source_stock_movement_id);
 
+
+CREATE TABLE IF NOT EXISTS companion_care_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+  kind VARCHAR(32) NOT NULL CHECK (kind IN ('vaccination','medication','vet_visit','parasite_prevention','surgery','grooming','other')),
+  title VARCHAR(160) NOT NULL,
+  occurred_at TIMESTAMPTZ(6) NOT NULL,
+  next_due_at TIMESTAMPTZ(6),
+  provider VARCHAR(160),
+  dosage VARCHAR(120),
+  notes TEXT,
+  deleted_at TIMESTAMPTZ(6),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS companion_care_user_due_idx ON companion_care_records(user_id, deleted_at, next_due_at);
+CREATE INDEX IF NOT EXISTS companion_care_animal_occurred_idx ON companion_care_records(animal_id, occurred_at DESC);
+
 COMMIT;

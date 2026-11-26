@@ -4623,6 +4623,133 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
 
+
+  /api/v1/companion-care:
+    get:
+      operationId: listCompanionCareRecords
+      tags: [Animals]
+      summary: Elenca vaccinazioni, farmaci, visite e scadenze di cani e gatti
+      parameters:
+        - name: animalId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: upcomingOnly
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Storico cura e salute dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [records]
+                properties:
+                  records:
+                    type: array
+                    items: { type: object }
+    post:
+      operationId: createCompanionCareRecord
+      tags: [Animals]
+      summary: Registra un evento sanitario o di cura per un cane o gatto
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care.routes.ts
+          symbol: companionCareCreateSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [animalId, kind, title, occurredAt]
+              properties:
+                animalId: { type: string, format: uuid }
+                kind: { type: string, enum: [vaccination, medication, vet_visit, parasite_prevention, surgery, grooming, other] }
+                title: { type: string, minLength: 1, maxLength: 160 }
+                occurredAt: { type: string, format: date-time }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                provider: { type: [string, 'null'], maxLength: 160 }
+                dosage: { type: [string, 'null'], maxLength: 120 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Evento sanitario registrato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record]
+                properties:
+                  record: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/companion-care/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateCompanionCareRecord
+      tags: [Animals]
+      summary: Modifica un evento sanitario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care.routes.ts
+          symbol: companionCarePatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: string, enum: [vaccination, medication, vet_visit, parasite_prevention, surgery, grooming, other] }
+                title: { type: string, minLength: 1, maxLength: 160 }
+                occurredAt: { type: string, format: date-time }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                provider: { type: [string, 'null'], maxLength: 160 }
+                dosage: { type: [string, 'null'], maxLength: 120 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200':
+          description: Evento aggiornato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record]
+                properties:
+                  record: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteCompanionCareRecord
+      tags: [Animals]
+      summary: Archivia un evento sanitario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Evento archiviato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean, const: true }
+        '404':
+          $ref: '#/components/responses/Error'
+
 components:
   securitySchemes:
     sessionCookieDev:

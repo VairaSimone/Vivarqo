@@ -15,6 +15,7 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
   let app: Express;
   beforeAll(() => { app = createApp({ checkDatabase: async () => undefined }); });
   afterAll(async () => {
+    await prisma.companionCareRecord.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aquarium.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aviary.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.animal.deleteMany({ where: { userId: { in: userIds } } });
@@ -52,6 +53,22 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(Number(res.body.readings[0].ph)).toBeCloseTo(6.8);
     });
     await other.agent.get(`/api/v1/aquariums/${id}/readings`).expect(404);
+  });
+
+  it("records dog and cat health events with account isolation", async () => {
+    const owner = await account(["dogs_cats"]);
+    const other = await account(["dogs_cats"]);
+    const animal = await prisma.animal.create({ data: {
+      userId: owner.userId, name: "Milo", species: "Gatto europeo", category: "dogs_cats",
+      domainProfile: { microchip: "380260000000001", sterilized: true },
+    } });
+    const created = await owner.agent.post("/api/v1/companion-care").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ animalId: animal.id, kind: "vaccination", title: "Richiamo annuale", occurredAt: new Date().toISOString(), nextDueAt: new Date(Date.now() + 365 * 86400000).toISOString(), provider: "Ambulatorio test" }).expect(201);
+    const recordId = created.body.record.id as string;
+    await owner.agent.get(`/api/v1/companion-care?animalId=${animal.id}`).expect(200).expect((res) => expect(res.body.records).toHaveLength(1));
+    await other.agent.get(`/api/v1/companion-care?animalId=${animal.id}`).expect(404);
+    await other.agent.patch(`/api/v1/companion-care/${recordId}`).set("Origin", origin).set("X-CSRF-Token", other.csrf)
+      .send({ title: "Tentativo cross-account" }).expect(404);
   });
   it("assigns only birds owned by the account to an aviary", async () => {
     const owner = await account(["birds"]);

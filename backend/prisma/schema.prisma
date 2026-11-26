@@ -37,6 +37,7 @@ model User {
   accountConfiguration    AccountConfiguration?
   aquariums               Aquarium[]
   aviaries                Aviary[]
+  companionCareRecords    CompanionCareRecord[]
   pushSubscriptions       PushSubscription[]
   pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
@@ -190,6 +191,7 @@ model Animal {
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
   aviaryAssignments      AviaryBird[]
+  companionCareRecords   CompanionCareRecord[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
   @@index([userId, category, status], map: "animals_user_category_status_idx")
@@ -1133,6 +1135,28 @@ model AviaryBird {
   animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
   @@index([aviaryId], map: "aviary_birds_aviary_idx")
   @@map("aviary_birds")
+}
+
+
+model CompanionCareRecord {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  animalId    String    @map("animal_id") @db.Uuid
+  kind        String    @db.VarChar(32)
+  title       String    @db.VarChar(160)
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(6)
+  nextDueAt   DateTime? @map("next_due_at") @db.Timestamptz(6)
+  provider    String?   @db.VarChar(160)
+  dosage      String?   @db.VarChar(120)
+  notes       String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal      Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([userId, deletedAt, nextDueAt], map: "companion_care_user_due_idx")
+  @@index([animalId, occurredAt(sort: Desc)], map: "companion_care_animal_occurred_idx")
+  @@map("companion_care_records")
 }
 
 model PushDeliveryAttempt {

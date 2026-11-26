@@ -40,6 +40,7 @@ import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
+import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -124,6 +125,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createDocumentShareRouter());
   app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createEcosystemRouter());
+  app.use("/api/v1", createCompanionCareRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
   app.use("/api/v1", createBillingRouter(dependencies.billing));
