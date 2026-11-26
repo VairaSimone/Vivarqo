@@ -79,12 +79,18 @@ export async function assertDocumentCapacity(tx: Prisma.TransactionClient, userI
     quotaError(() => assertStorageWithinLimit(usage._sum.sizeBytes ?? 0n, requestedBytes, entitlements.maxStorageBytes, entitlements.plan));
   }
 }
-const accessExempt = (path: string) =>
+export const isSubscriptionAccessExempt = (path: string) =>
   path.startsWith("/auth/") || path === "/account" || path.startsWith("/account/") || path === "/collaborators" || path.startsWith("/collaborators/") ||
   path === "/billing" || path.startsWith("/billing/") || path === "/webhooks/stripe" ||
-  path === "/push/public-key" || path.startsWith("/public/");
+  path === "/push/public-key" || path.startsWith("/public/") ||
+  // Animal-domain availability is controlled by account categories, not by a commercial tier.
+  // Commercial plans still apply their quotas in the write services (e.g. assertAnimalCapacity).
+  path.startsWith("/onboarding/") || path.startsWith("/animals") || path.startsWith("/care-records") ||
+  path.startsWith("/reproduction") || path.startsWith("/clutches") || path.startsWith("/eggs") ||
+  path.startsWith("/genetic-traits") || path.startsWith("/aquariums") || path.startsWith("/aviaries") ||
+  path.startsWith("/companion-care");
 export const subscriptionAccessGuard: RequestHandler = async (req, res, next) => {
-  if (env.BILLING_ACCESS_MODE !== "subscription_required" || accessExempt(req.path)) { next(); return; }
+  if (env.BILLING_ACCESS_MODE !== "subscription_required" || isSubscriptionAccessExempt(req.path)) { next(); return; }
   const auth = res.locals.auth as { userId: string } | undefined;
   if (!auth) { next(); return; } // Individual private routes still return their normal 401 response.
   const subscription = await prisma.subscription.findUnique({ where: { userId: auth.userId }, select: subscriptionSelect });

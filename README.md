@@ -129,6 +129,12 @@ La PWA include manifest, icona e service worker. Per scelta di sicurezza la cach
 
 Il contratto API versionato e verificato dalla CI è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md); la specifica di riferimento è in [backend/docs/specification.md](backend/docs/specification.md).
 
+## Moduli animali indipendenti dal piano commerciale
+
+Le categorie selezionate in `account_configurations.animal_categories` determinano quali domini animali sono attivi per l'account. La disponibilità dei moduli di dominio (schede animali, cura, riproduzione/genetica, acquari e voliere) non viene dedotta dal piano commerciale. I piani continuano a governare le quote già previste, come il numero massimo di animali e i limiti documentali: non decidono quali categorie l'account può gestire.
+
+Le API di dominio verificano la categoria abilitata sull'account e l'appartenenza dei record all'utente. La selezione di una categoria non abilita automaticamente funzionalità non ancora implementate: ogni modulo diventa visibile solo quando la relativa schermata e API sono disponibili.
+
 ## Anagrafiche animali e registri di cura
 
 Le API di questo incremento sono private: richiedono una sessione valida e, per le richieste mutative da browser, il token CSRF ottenuto da `GET /api/v1/auth/csrf`. Tutte le query di dominio filtrano per proprietario; una risorsa di un altro account risponde come non trovata.
