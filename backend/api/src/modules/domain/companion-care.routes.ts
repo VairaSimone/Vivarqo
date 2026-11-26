@@ -10,9 +10,13 @@ const companionCareCreateSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }),
   nextDueAt: z.string().datetime({ offset: true }).nullable().optional(),
   provider: z.string().trim().max(160).nullable().optional(),
+  clinic: z.string().trim().max(160).nullable().optional(),
+  treatmentStartAt: z.string().datetime({ offset: true }).nullable().optional(),
+  treatmentEndAt: z.string().datetime({ offset: true }).nullable().optional(),
+  isOngoing: z.boolean().optional(),
   dosage: z.string().trim().max(120).nullable().optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
-}).strict();
+}).strict().refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" });
 const companionCarePatchSchema = z.object({
   kind: z.enum(kinds).optional(), title: z.string().trim().min(1).max(160).optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(),
@@ -76,7 +80,7 @@ export function createCompanionCareRouter() {
     await ownedAnimal(auth.userId, input.animalId);
     const record = await prisma.$transaction(async (tx) => {
       const created = await tx.companionCareRecord.create({
-        data: { ...input, userId: auth.userId, occurredAt: new Date(input.occurredAt), nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null },
+        data: { ...input, userId: auth.userId, occurredAt: new Date(input.occurredAt), nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null, treatmentStartAt: input.treatmentStartAt ? new Date(input.treatmentStartAt) : null, treatmentEndAt: input.treatmentEndAt ? new Date(input.treatmentEndAt) : null },
         include: { animal: { select: { id: true, name: true, species: true } } },
       });
       if (created.nextDueAt) {
@@ -107,7 +111,7 @@ export function createCompanionCareRouter() {
         && (requestedDueAt?.getTime() ?? null) !== (previous.nextDueAt?.getTime() ?? null);
       const updated = await tx.companionCareRecord.update({
         where: { id },
-        data: { ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}),
+        data: { ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}), ...(input.treatmentStartAt !== undefined ? { treatmentStartAt: input.treatmentStartAt ? new Date(input.treatmentStartAt) : null } : {}), ...(input.treatmentEndAt !== undefined ? { treatmentEndAt: input.treatmentEndAt ? new Date(input.treatmentEndAt) : null } : {}),
           ...(requestedDueAt !== undefined ? { nextDueAt: requestedDueAt, ...(dueDateChanged ? { completedAt: null } : {}) } : {}) },
         include: { animal: { select: { id: true, name: true, species: true } } },
       });
