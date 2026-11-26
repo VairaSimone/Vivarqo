@@ -63,6 +63,7 @@ model User {
   ownedWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationOwner")
   activeWorkspaceSessions UserSession[] @relation("SessionActiveWorkspace")
   @@map("users")
+  aquariumCompatibilityRules AquariumCompatibilityRule[]
 }
 
 model WorkspaceMembership {
@@ -1502,4 +1503,5 @@ model AquariumCompatibilityRule {
   @@unique([userId, speciesAKey, speciesBKey], map: "aquarium_compatibility_user_species_key")
   @@index([userId, compatibility], map: "aquarium_compatibility_user_status_idx")
   @@map("aquarium_compatibility_rules")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
