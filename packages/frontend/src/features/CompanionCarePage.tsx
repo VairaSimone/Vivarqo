@@ -166,6 +166,17 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     } finally { setSaving(false); }
   }
 
+  const chronologicalWeights = [...weights].reverse();
+  const weightNumbers = chronologicalWeights.map((item) => Number(item.weightG) / 1000).filter(Number.isFinite);
+  const weightMin = weightNumbers.length ? Math.min(...weightNumbers) : 0;
+  const weightMax = weightNumbers.length ? Math.max(...weightNumbers) : 0;
+  const weightSpan = weightMax - weightMin || 1;
+  const weightPoints = chronologicalWeights.map((item, index) => ({
+    x: chronologicalWeights.length < 2 ? 300 : 12 + index * 576 / (chronologicalWeights.length - 1),
+    y: 112 - ((Number(item.weightG) / 1000 - weightMin) / weightSpan) * 96,
+  }));
+  const weightPath = weightPoints.map((point, index) => (index ? "L" : "M") + point.x.toFixed(1) + " " + point.y.toFixed(1)).join(" ");
+  const activeTherapies = records.filter((record) => record.animalId === animalId && record.kind === "medication" && record.isOngoing && !record.completedAt);
   if (loading) return <LoadingState />;
   return <div className="page-stack">
     <PageHeader eyebrow={it ? "CANI E GATTI" : "DOGS & CATS"} title={it ? "Cura e salute" : "Health & care"}
@@ -213,7 +224,11 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
           <Field label={it ? "Note" : "Notes"}><Input value={weightNotes} onChange={(e) => setWeightNotes(e.target.value)} maxLength={5000} /></Field>
           <Button type="submit" disabled={saving}>{it ? "Registra peso" : "Save weight"}</Button>
         </form>
-        {weights.length > 0 ? <div className="ecosys-history">{[...weights].reverse().map((w) => <article className="ecosys-reading" key={w.id}><strong>{(Number(w.weightG)/1000).toFixed(3)} kg</strong><span>{new Date(w.measuredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}</span>{w.notes && <span>{w.notes}</span>}</article>)}</div> : <p>{it ? "Nessuna pesata registrata." : "No weight measurements yet."}</p>}
+        {weights.length > 0 ? <><div className="ecosys-trend"><svg viewBox="0 0 600 132" role="img" aria-label={it ? "Andamento del peso in chilogrammi" : "Weight trend in kilograms"}><path d="M8 16H592 M8 64H592 M8 112H592" stroke="currentColor" opacity=".15" fill="none"/><path d={weightPath} stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>{weightPoints.map((point,index)=><circle key={index} cx={point.x} cy={point.y} r="3" fill="currentColor"/>)}</svg><div className="inline-actions"><span>{it ? "Minimo" : "Min"}: {weightMin.toFixed(3)} kg</span><span>{it ? "Massimo" : "Max"}: {weightMax.toFixed(3)} kg</span><span>{weights.length} {it ? "misurazioni" : "measurements"}</span></div></div><div className="ecosys-history">{[...weights].reverse().map((w) => <article className="ecosys-reading" key={w.id}><strong>{(Number(w.weightG)/1000).toFixed(3)} kg</strong><span>{new Date(w.measuredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}</span>{w.notes && <span>{w.notes}</span>}</article>)}</div></> : <p>{it ? "Nessuna pesata registrata." : "No weight measurements yet."}</p>}
+      </Panel>
+      <Panel><h2>{it ? "Terapie continuative" : "Ongoing therapies"}</h2>
+        {activeTherapies.length === 0 ? <p>{it ? "Nessuna terapia continuativa attiva." : "No active ongoing therapies."}</p> :
+          <div className="ecosys-history">{activeTherapies.map((therapy) => <article className="ecosys-reading" key={therapy.id}><strong>{therapy.title}</strong><span>{therapy.dosage ?? (it ? "Dosaggio non indicato" : "Dosage not specified")}{therapy.treatmentStartAt ? " · " + (it ? "Dal " : "Since ") + new Date(therapy.treatmentStartAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>{therapy.provider && <span>{therapy.provider}{therapy.clinic ? " · " + therapy.clinic : ""}</span>}{therapy.notes && <span>{therapy.notes}</span>}<div className="inline-actions"><Button size="sm" variant="secondary" onClick={() => editRecord(therapy)}>{it ? "Modifica" : "Edit"}</Button><Button size="sm" variant="secondary" onClick={() => { setEditingRecordId(therapy.id); setIsOngoing(false); setTherapyEndAt(new Date().toISOString().slice(0,10)); }}>{it ? "Termina terapia" : "End therapy"}</Button></div></article>)}</div>}
       </Panel>
       <Panel><h2>{it ? "Documenti sanitari" : "Medical documents"}</h2>
         <form className="form-grid" onSubmit={uploadDocument}>
