@@ -11,7 +11,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
   const it = locale === "it";
   const [animals, setAnimals] = useState<CompanionAnimal[]>([]);
   const [records, setRecords] = useState<CareRecord[]>([]);
-  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "upcoming" | "completed">("all");
+  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "imminent" | "future" | "completed">("all");
   const [animalId, setAnimalId] = useState("");
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [kind, setKind] = useState("vaccination");
@@ -127,16 +127,16 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     <Panel>
       <h2>{it ? "Storico e scadenze" : "History & due dates"}</h2>
       <div className="dashboard-task-filters" role="group" aria-label={it ? "Filtra scadenze sanitarie" : "Filter health due dates"}>
-        {(["all", "overdue", "upcoming", "completed"] as const).map((filter) => <button key={filter} type="button" className={dueFilter === filter ? "dashboard-task-filter is-active" : "dashboard-task-filter"} aria-pressed={dueFilter === filter} onClick={() => setDueFilter(filter)}>{({all: it ? "Tutte" : "All", overdue: it ? "Scadute" : "Overdue", upcoming: it ? "Future" : "Upcoming", completed: it ? "Completate" : "Completed"})[filter]}</button>)}
+        {(["all", "overdue", "imminent", "future", "completed"] as const).map((filter) => <button key={filter} type="button" className={dueFilter === filter ? "dashboard-task-filter is-active" : "dashboard-task-filter"} aria-pressed={dueFilter === filter} onClick={() => setDueFilter(filter)}>{({all: it ? "Tutte" : "All", overdue: it ? "Scadute" : "Overdue", imminent: it ? "Imminenti (7 gg)" : "Due soon (7 days)", future: it ? "Future" : "Future", completed: it ? "Completate" : "Completed"})[filter]}</button>)}
       </div>
-      {records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming")) === dueFilter).length === 0
+      {records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : new Date(record.nextDueAt).getTime() <= Date.now() + 7 * 86_400_000 ? "imminent" : "future")) === dueFilter).length === 0
         ? <p>{it ? "Nessun evento in questa categoria." : "No records in this category."}</p>
         : <div className="ecosys-history">{records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming")) === dueFilter).map((record) => {
           const status = record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming");
           return <article className="ecosys-reading" key={record.id}>
             <strong>{record.animal.name} · {record.title}</strong>
             <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Scadenza: " : "Due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
-            <span>{status === "overdue" ? (it ? "Scaduta" : "Overdue") : status === "completed" ? (it ? "Completata" : "Completed") : status === "upcoming" ? (it ? "In programma" : "Upcoming") : (it ? "Senza scadenza" : "No due date")}</span>
+            <span>{status === "overdue" ? (it ? "Scaduta" : "Overdue") : status === "completed" ? (it ? "Completata" : "Completed") : status === "imminent" ? (it ? "In scadenza entro 7 giorni" : "Due within 7 days") : status === "future" ? (it ? "Futura" : "Future") : (it ? "Senza scadenza" : "No due date")}</span>
             {record.provider && <span>{record.provider}{record.dosage ? " · " + record.dosage : ""}</span>}
             {record.notes && <span>{record.notes}</span>}
             <div className="inline-actions">
