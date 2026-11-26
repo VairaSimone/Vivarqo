@@ -1664,4 +1664,172 @@ CREATE TABLE IF NOT EXISTS companion_care_records (
 CREATE INDEX IF NOT EXISTS companion_care_user_due_idx ON companion_care_records(user_id, deleted_at, next_due_at);
 CREATE INDEX IF NOT EXISTS companion_care_animal_occurred_idx ON companion_care_records(animal_id, occurred_at DESC);
 
+
+-- Keep the consolidated baseline in sync with versioned ecosystem and care migrations.
+ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "companion_care_record_id" UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS "tasks_companion_care_record_id_key" ON "tasks"("companion_care_record_id");
+
+ALTER TABLE "companion_care_records"
+  ADD COLUMN IF NOT EXISTS "completed_at" TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS "clinic" VARCHAR(160),
+  ADD COLUMN IF NOT EXISTS "treatment_start_at" TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS "treatment_end_at" TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS "is_ongoing" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "frequency" VARCHAR(120);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_companion_care_record_id_fkey') THEN
+    ALTER TABLE "tasks" ADD CONSTRAINT "tasks_companion_care_record_id_fkey"
+      FOREIGN KEY ("companion_care_record_id") REFERENCES "companion_care_records"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companion_care_records_treatment_dates_check') THEN
+    ALTER TABLE "companion_care_records" ADD CONSTRAINT "companion_care_records_treatment_dates_check"
+      CHECK ("treatment_start_at" IS NULL OR "treatment_end_at" IS NULL OR "treatment_end_at" >= "treatment_start_at");
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companion_care_records_ongoing_medication_check') THEN
+    ALTER TABLE "companion_care_records" ADD CONSTRAINT "companion_care_records_ongoing_medication_check"
+      CHECK (NOT "is_ongoing" OR ("kind" = 'medication' AND "treatment_end_at" IS NULL));
+  END IF;
+END $$;
+
+DROP INDEX IF EXISTS "companion_care_records_animal_ongoing_idx";
+CREATE INDEX "companion_care_records_animal_ongoing_idx"
+  ON "companion_care_records"("animal_id", "is_ongoing")
+  WHERE "deleted_at" IS NULL AND "is_ongoing";
+
+ALTER TABLE "tasks" DROP CONSTRAINT IF EXISTS "tasks_category_check";
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_category_check"
+  CHECK ("category" IN ('feeding','weighing','shed_check','cleaning','reproduction','incubation','document','inventory','health','custom'));
+
+ALTER TABLE "health_records" DROP CONSTRAINT IF EXISTS "health_records_type_check";
+ALTER TABLE "health_records" ADD CONSTRAINT "health_records_type_check"
+  CHECK ("record_type" IN ('symptom','visit','diagnosis','suspicion','treatment','checkup','vaccination'));
+
+CREATE TABLE IF NOT EXISTS "aquarium_parameter_ranges" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "aquarium_id" UUID NOT NULL,
+  "parameter" VARCHAR(32) NOT NULL,
+  "min_value" DECIMAL(12,4),
+  "max_value" DECIMAL(12,4),
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "aquarium_parameter_ranges_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "aquarium_parameter_ranges_aquarium_id_fkey" FOREIGN KEY ("aquarium_id") REFERENCES "aquariums"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "aquarium_parameter_ranges_bounds_check" CHECK ("min_value" IS NULL OR "max_value" IS NULL OR "min_value" <= "max_value"),
+  CONSTRAINT "aquarium_parameter_ranges_has_bound_check" CHECK ("min_value" IS NOT NULL OR "max_value" IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "aquarium_parameter_ranges_aquarium_parameter_key" ON "aquarium_parameter_ranges"("aquarium_id","parameter");
+
+CREATE TABLE IF NOT EXISTS "aviary_movements" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "animal_id" UUID NOT NULL,
+  "from_aviary_id" UUID,
+  "to_aviary_id" UUID,
+  "occurred_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "notes" TEXT,
+  CONSTRAINT "aviary_movements_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "aviary_movements_animal_id_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "aviary_movements_from_aviary_id_fkey" FOREIGN KEY ("from_aviary_id") REFERENCES "aviaries"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "aviary_movements_to_aviary_id_fkey" FOREIGN KEY ("to_aviary_id") REFERENCES "aviaries"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "aviary_movements_animal_occurred_idx" ON "aviary_movements"("animal_id","occurred_at" DESC);
+CREATE INDEX IF NOT EXISTS "aviary_movements_from_occurred_idx" ON "aviary_movements"("from_aviary_id","occurred_at" DESC);
+CREATE INDEX IF NOT EXISTS "aviary_movements_to_occurred_idx" ON "aviary_movements"("to_aviary_id","occurred_at" DESC);
+
+CREATE TABLE IF NOT EXISTS "aviary_notes" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "aviary_id" UUID NOT NULL,
+  "title" VARCHAR(160),
+  "body" TEXT NOT NULL,
+  "occurred_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "aviary_notes_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "aviary_notes_aviary_id_fkey" FOREIGN KEY ("aviary_id") REFERENCES "aviaries"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "aviary_notes_aviary_occurred_idx" ON "aviary_notes"("aviary_id","occurred_at" DESC);
+
+CREATE TABLE IF NOT EXISTS "bird_profiles" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "user_id" UUID NOT NULL,
+  "animal_id" UUID NOT NULL,
+  "ring_type" VARCHAR(16) NOT NULL DEFAULT 'none',
+  "ring_number" VARCHAR(80),
+  "ring_year" INTEGER,
+  "cites_number" VARCHAR(120),
+  "cites_annex" VARCHAR(24),
+  "cites_authority" VARCHAR(160),
+  "cites_issued_at" DATE,
+  "cites_expires_at" DATE,
+  "notes" TEXT,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "bird_profiles_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "bird_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_profiles_animal_id_fkey" FOREIGN KEY ("animal_id") REFERENCES "animals"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_profiles_ring_type_check" CHECK ("ring_type" IN ('none','closed','open','microchip')),
+  CONSTRAINT "bird_profiles_ring_year_check" CHECK ("ring_year" IS NULL OR ("ring_year" BETWEEN 1900 AND 2200)),
+  CONSTRAINT "bird_profiles_cites_dates_check" CHECK ("cites_expires_at" IS NULL OR "cites_issued_at" IS NULL OR "cites_expires_at" >= "cites_issued_at")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "bird_profiles_animal_id_key" ON "bird_profiles"("animal_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "bird_profiles_user_ring_unique" ON "bird_profiles"("user_id","ring_number");
+CREATE UNIQUE INDEX IF NOT EXISTS "bird_profiles_user_cites_unique" ON "bird_profiles"("user_id","cites_number");
+CREATE INDEX IF NOT EXISTS "bird_profiles_user_updated_idx" ON "bird_profiles"("user_id","updated_at" DESC);
+
+CREATE TABLE IF NOT EXISTS "bird_breeding_pairs" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "user_id" UUID NOT NULL,
+  "female_animal_id" UUID NOT NULL,
+  "male_animal_id" UUID NOT NULL,
+  "cycle_id" UUID NOT NULL,
+  "paired_at" DATE NOT NULL,
+  "separated_at" DATE,
+  "status" VARCHAR(16) NOT NULL DEFAULT 'active',
+  "notes" TEXT,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "bird_breeding_pairs_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "bird_breeding_pairs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_female_animal_id_fkey" FOREIGN KEY ("female_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_male_animal_id_fkey" FOREIGN KEY ("male_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_cycle_id_fkey" FOREIGN KEY ("cycle_id") REFERENCES "reproduction_cycles"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "bird_breeding_pairs_different_birds_check" CHECK ("female_animal_id" <> "male_animal_id"),
+  CONSTRAINT "bird_breeding_pairs_status_check" CHECK ("status" IN ('active','paused','completed','cancelled')),
+  CONSTRAINT "bird_breeding_pairs_dates_check" CHECK ("separated_at" IS NULL OR "separated_at" >= "paired_at")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "bird_breeding_pairs_cycle_id_key" ON "bird_breeding_pairs"("cycle_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "bird_pairs_one_active_pair_unique" ON "bird_breeding_pairs"("user_id","female_animal_id","male_animal_id") WHERE "status" = 'active';
+CREATE INDEX IF NOT EXISTS "bird_pairs_user_status_date_idx" ON "bird_breeding_pairs"("user_id","status","paired_at" DESC);
+CREATE INDEX IF NOT EXISTS "bird_pairs_animals_idx" ON "bird_breeding_pairs"("female_animal_id","male_animal_id");
+
+CREATE TABLE IF NOT EXISTS "aviary_maintenance" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "aviary_id" UUID NOT NULL,
+  "occurred_at" TIMESTAMPTZ(6) NOT NULL,
+  "action" VARCHAR(24) NOT NULL,
+  "area" VARCHAR(160),
+  "products" VARCHAR(240),
+  "next_due_at" TIMESTAMPTZ(6),
+  "notes" TEXT,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "aviary_maintenance_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "aviary_maintenance_aviary_id_fkey" FOREIGN KEY ("aviary_id") REFERENCES "aviaries"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "aviary_maintenance_action_check" CHECK ("action" IN ('cleaning','disinfection','inspection','repair','other')),
+  CONSTRAINT "aviary_maintenance_due_check" CHECK ("next_due_at" IS NULL OR "next_due_at" >= "occurred_at")
+);
+CREATE INDEX IF NOT EXISTS "aviary_maintenance_aviary_occurred_idx" ON "aviary_maintenance"("aviary_id","occurred_at" DESC);
+CREATE INDEX IF NOT EXISTS "aviary_maintenance_aviary_due_idx" ON "aviary_maintenance"("aviary_id","next_due_at");
+
+INSERT INTO "aviary_movements" ("animal_id","from_aviary_id","to_aviary_id","occurred_at")
+SELECT ab."animal_id", NULL, ab."aviary_id", ab."created_at"
+FROM "aviary_birds" ab
+WHERE NOT EXISTS (
+  SELECT 1 FROM "aviary_movements" m
+  WHERE m."animal_id" = ab."animal_id"
+    AND m."from_aviary_id" IS NULL
+    AND m."to_aviary_id" = ab."aviary_id"
+    AND m."occurred_at" = ab."created_at"
+);
+
 COMMIT;
