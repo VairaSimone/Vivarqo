@@ -92,7 +92,8 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.getByLabel("Descrizione").fill("Vaccino aggiornato E2E");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText("Vaccino aggiornato E2E", { exact: true })).toBeVisible();
+  const updatedRecord = page.locator(".ecosys-reading").filter({ hasText: "Vaccino aggiornato E2E" });
   page.once("dialog", (dialog) => dialog.accept());
-  await record.getByRole("button", { name: "Elimina" }).click();
+  await updatedRecord.getByRole("button", { name: "Elimina" }).click();
   await expect(page.getByText("Vaccino aggiornato E2E", { exact: true })).toHaveCount(0);
 });
