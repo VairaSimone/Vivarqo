@@ -119,7 +119,7 @@ export function App() {
         setUser(null);
       } else {
         setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
-        navigate("/today");
+        navigate("/setup");
       }
     });
     return () => { active = false; };
@@ -145,6 +145,7 @@ export function App() {
       } catch (reason) {
         if (!active) return;
         setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+        navigate("/setup");
       }
     }).catch((reason: unknown) => {
       if (!active) return;
