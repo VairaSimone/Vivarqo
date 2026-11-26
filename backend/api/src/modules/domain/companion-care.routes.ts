@@ -97,17 +97,25 @@ export function createCompanionCareRouter() {
     await ownedRecord(auth.userId, id);
     const input = parse(companionCarePatchSchema, req.body);
     const record = await prisma.$transaction(async (tx) => {
+      const previous = await tx.companionCareRecord.findFirst({
+        where: { id, userId: auth.userId, deletedAt: null },
+        select: { nextDueAt: true, completedAt: true },
+      });
+      if (!previous) throw new AppError(404, "COMPANION_CARE_NOT_FOUND", "Care record not found");
+      const requestedDueAt = input.nextDueAt === undefined ? undefined : input.nextDueAt ? new Date(input.nextDueAt) : null;
+      const dueDateChanged = requestedDueAt !== undefined
+        && (requestedDueAt?.getTime() ?? null) !== (previous.nextDueAt?.getTime() ?? null);
       const updated = await tx.companionCareRecord.update({
         where: { id },
         data: { ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}),
-          ...(input.nextDueAt !== undefined ? { nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null, completedAt: null } : {}) },
+          ...(requestedDueAt !== undefined ? { nextDueAt: requestedDueAt, ...(dueDateChanged ? { completedAt: null } : {}) } : {}) },
         include: { animal: { select: { id: true, name: true, species: true } } },
       });
       const dueTask = await tx.task.findFirst({ where: { companionCareRecordId: id } });
       if (!updated.nextDueAt) {
         if (dueTask?.status === "open") await tx.task.update({ where: { id: dueTask.id }, data: { status: "dismissed" } });
       } else if (dueTask) {
-        const rescheduled = input.nextDueAt !== undefined;
+        const rescheduled = dueDateChanged;
         await tx.task.update({ where: { id: dueTask.id }, data: {
           title: updated.title, description: updated.notes, dueAt: updated.nextDueAt,
           animalId: updated.animalId,
