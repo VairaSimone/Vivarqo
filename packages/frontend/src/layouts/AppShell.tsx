@@ -18,7 +18,7 @@ type BeforeInstallPromptEvent = Event & {
 type User = { displayName: string; email: string; locale: Locale };
 type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" | "help" };
 
-function groupsForCategories(categories: string[]): Array<{ title: string; items: NavItem[] }> {
+function groupsForCategories(categories: string[], sharedWorkspace = false): Array<{ title: string; items: NavItem[] }> {
   const has = (category: string) => categories.includes(category);
   const animalItems: NavItem[] = [
     { path: "/animals", label: "navAnimals", icon: "snake" },
@@ -47,7 +47,7 @@ function groupsForCategories(categories: string[]): Array<{ title: string; items
       { path: "/help", label: "navHelp", icon: "help" },
       { path: "/notifications", label: "navNotifications", icon: "bell" },
       { path: "/billing", label: "navBilling", icon: "wallet" },
-      { path: "/settings/categories", label: "navCategories", icon: "settings" },
+      ...(!sharedWorkspace ? [{ path: "/settings/categories", label: "navCategories", icon: "settings" as const }] : []),
       { path: "/settings", label: "navSettings", icon: "settings" }
     ] }
   ];
@@ -69,6 +69,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   onSignOut: () => void; unreadCount?: number;
 }) {
   const [animalCategories, setAnimalCategories] = useState<string[]>([]);
+  const [sharedWorkspace, setSharedWorkspace] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -87,11 +88,17 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
 
   useEffect(() => {
     let active = true;
-    if (path !== "/settings/categories") {
-      api.get<{ categories: string[] }>("/onboarding/configuration")
-        .then((configuration) => { if (active) setAnimalCategories(configuration.categories); })
-        .catch(() => { if (active) setAnimalCategories([]); });
-    }
+    api.get<{ categories: string[]; isPersonalWorkspace: boolean }>("/collaborators/context")
+      .then((configuration) => {
+        if (!active) return;
+        setAnimalCategories(configuration.categories);
+        setSharedWorkspace(!configuration.isPersonalWorkspace);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAnimalCategories([]);
+        setSharedWorkspace(false);
+      });
     return () => { active = false; };
   }, [path]);
 
@@ -281,7 +288,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         <span className="brand-copy"><strong>Vivarqo</strong><small>{t("brandTagline")}</small></span>
       </button>
       <div className="nav-scroll">
-        {groupsForCategories(animalCategories).map((group) => <div className="nav-section" key={group.title}>
+        {groupsForCategories(animalCategories, sharedWorkspace).map((group) => <div className="nav-section" key={group.title}>
           <span className="nav-caption">{group.title === "navAdmin" ? (locale === "it" ? "GESTIONE" : "MANAGEMENT") : group.title === "navPreferences" ? (locale === "it" ? "ACCOUNT" : "ACCOUNT") : t(group.title)}</span>
           {group.items.map(renderItem)}
         </div>)}

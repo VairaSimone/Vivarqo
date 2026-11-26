@@ -29,8 +29,19 @@ const readingSchema = z.object({
   notes: z.string().trim().max(5000).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== "measuredAt" && value[key as keyof typeof value] != null), "At least one water parameter is required");
 
-const readingPatchSchema = readingSchema.partial().strict()
-  .refine((value) => Object.keys(value).length > 0, "At least one field is required");
+const readingPatchSchema = z.object({
+  measuredAt: z.string().datetime({ offset: true }).optional(),
+  temperatureC: z.coerce.number().min(-5).max(60).nullable().optional(),
+  ph: z.coerce.number().min(0).max(14).nullable().optional(),
+  ghDkh: z.coerce.number().min(0).max(100).nullable().optional(),
+  khDkh: z.coerce.number().min(0).max(100).nullable().optional(),
+  ammoniaMgL: z.coerce.number().min(0).max(1000).nullable().optional(),
+  nitriteMgL: z.coerce.number().min(0).max(1000).nullable().optional(),
+  nitrateMgL: z.coerce.number().min(0).max(10000).nullable().optional(),
+  salinityPpt: z.coerce.number().min(0).max(100).nullable().optional(),
+  tdsPpm: z.coerce.number().int().min(0).max(100000).nullable().optional(),
+  notes: z.string().trim().max(5000).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 const aviarySchema = z.object({
   name: z.string().trim().min(1).max(120),
   environment: z.enum(["indoor", "outdoor", "mixed"]),

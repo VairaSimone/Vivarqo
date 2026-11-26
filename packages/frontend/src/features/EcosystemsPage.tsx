@@ -25,6 +25,8 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   const [selectedBirdIds, setSelectedBirdIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingSelected, setEditingSelected] = useState(false);
+  const [editingReadingId, setEditingReadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
@@ -105,21 +107,37 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
 
   async function createAquarium(event: FormEvent<HTMLFormElement>) {
     await submit(event, async () => {
-      const result = await api.post<{ aquarium: Aquarium }>("/aquariums", { name, waterType, volumeLiters: Number(volumeLiters) });
-      setAquariums((current) => [...current, result.aquarium].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedId(result.aquarium.id); setName(""); setNotice(italian ? "Acquario creato." : "Aquarium created.");
+      const payload = { name, waterType, volumeLiters: Number(volumeLiters) };
+      if (editingSelected && selectedId) {
+        const result = await api.patch<{ aquarium: Aquarium }>(`/aquariums/${encodeURIComponent(selectedId)}`, payload);
+        setAquariums((current) => current.map((item) => item.id === selectedId ? result.aquarium : item).sort((a, b) => a.name.localeCompare(b.name)));
+        setEditingSelected(false);
+        setNotice(italian ? "Acquario aggiornato." : "Aquarium updated.");
+      } else {
+        const result = await api.post<{ aquarium: Aquarium }>("/aquariums", payload);
+        setAquariums((current) => [...current, result.aquarium].sort((a, b) => a.name.localeCompare(b.name)));
+        setSelectedId(result.aquarium.id); setName(""); setNotice(italian ? "Acquario creato." : "Aquarium created.");
+      }
     });
   }
   async function createAviary(event: FormEvent<HTMLFormElement>) {
     await submit(event, async () => {
-      const result = await api.post<{ aviary: Aviary }>("/aviaries", { name, environment, capacity: capacity ? Number(capacity) : null });
-      setAviaries((current) => [...current, result.aviary].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedId(result.aviary.id); setName(""); setCapacity(""); setNotice(italian ? "Voliera creata." : "Aviary created.");
+      const payload = { name, environment, capacity: capacity ? Number(capacity) : null };
+      if (editingSelected && selectedId) {
+        const result = await api.patch<{ aviary: Aviary }>(`/aviaries/${encodeURIComponent(selectedId)}`, payload);
+        setAviaries((current) => current.map((item) => item.id === selectedId ? result.aviary : item).sort((a, b) => a.name.localeCompare(b.name)));
+        setEditingSelected(false);
+        setNotice(italian ? "Voliera aggiornata." : "Aviary updated.");
+      } else {
+        const result = await api.post<{ aviary: Aviary }>("/aviaries", payload);
+        setAviaries((current) => [...current, result.aviary].sort((a, b) => a.name.localeCompare(b.name)));
+        setSelectedId(result.aviary.id); setName(""); setCapacity(""); setNotice(italian ? "Voliera creata." : "Aviary created.");
+      }
     });
   }
   async function createReading(event: FormEvent<HTMLFormElement>) {
     await submit(event, async () => {
-      await api.post(`/aquariums/${encodeURIComponent(selectedId)}/readings`, {
+      const payload = {
         measuredAt: new Date(measuredAt).toISOString(),
         temperatureC: temperatureC === "" ? null : Number(temperatureC),
         ph: ph === "" ? null : Number(ph),
@@ -130,11 +148,17 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         nitrateMgL: nitrateMgL === "" ? null : Number(nitrateMgL),
         salinityPpt: salinityPpt === "" ? null : Number(salinityPpt),
         tdsPpm: tdsPpm === "" ? null : Number(tdsPpm),
-      });
+      };
+      if (editingReadingId) {
+        await api.patch(`/aquariums/${encodeURIComponent(selectedId)}/readings/${encodeURIComponent(editingReadingId)}`, payload);
+      } else {
+        await api.post(`/aquariums/${encodeURIComponent(selectedId)}/readings`, payload);
+      }
       const result = await api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`);
       setReadings(result.readings);
+      setEditingReadingId(null);
       setTemperatureC(""); setPh(""); setGhDkh(""); setKhDkh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setSalinityPpt(""); setTdsPpm("");
-      setNotice(italian ? "Parametri dell'acqua registrati." : "Water parameters recorded.");
+      setNotice(italian ? (editingReadingId ? "Misurazione aggiornata." : "Parametri dell'acqua registrati.") : (editingReadingId ? "Reading updated." : "Water parameters recorded."));
     });
   }
   async function saveBirds(event: FormEvent<HTMLFormElement>) {
@@ -142,6 +166,49 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
       await api.put(`/aviaries/${encodeURIComponent(selectedId)}/birds`, { animalIds: selectedBirdIds });
       setNotice(italian ? "Assegnazione degli uccelli aggiornata." : "Bird assignment updated.");
     });
+  }
+
+  function editSelected() {
+    setEditingSelected(true);
+    if (aquariumMode && selectedAquarium) {
+      setName(selectedAquarium.name);
+      setWaterType(selectedAquarium.waterType);
+      setVolumeLiters(String(selectedAquarium.volumeLiters));
+    } else if (!aquariumMode && selectedAviary) {
+      setName(selectedAviary.name);
+      setEnvironment(selectedAviary.environment);
+      setCapacity(selectedAviary.capacity === null ? "" : String(selectedAviary.capacity));
+    }
+  }
+
+  async function archiveSelected() {
+    const label = aquariumMode ? selectedAquarium?.name : selectedAviary?.name;
+    if (!selectedId || !label || !window.confirm(italian ? `Archiviare "${label}"? I dati storici saranno conservati.` : `Archive "${label}"? Historical records will be retained.`)) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await api.delete(`${aquariumMode ? "/aquariums" : "/aviaries"}/${encodeURIComponent(selectedId)}`);
+      if (aquariumMode) setAquariums((current) => current.filter((item) => item.id !== selectedId));
+      else setAviaries((current) => current.filter((item) => item.id !== selectedId));
+      setSelectedId("");
+      setEditingSelected(false);
+      setReadings([]);
+      setNotice(italian ? "Elemento archiviato." : "Item archived.");
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : (italian ? "Archiviazione non riuscita." : "Unable to archive item."));
+    } finally { setSaving(false); }
+  }
+
+  async function deleteReading(readingId: string) {
+    if (!selectedId || !window.confirm(italian ? "Eliminare questa misurazione?" : "Delete this water reading?")) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await api.delete(`/aquariums/${encodeURIComponent(selectedId)}/readings/${encodeURIComponent(readingId)}`);
+      setReadings((current) => current.filter((item) => item.id !== readingId));
+      if (editingReadingId === readingId) setEditingReadingId(null);
+      setNotice(italian ? "Misurazione eliminata." : "Reading deleted.");
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : (italian ? "Eliminazione non riuscita." : "Unable to delete reading."));
+    } finally { setSaving(false); }
   }
 
   if (loading) return <LoadingState />;
@@ -157,7 +224,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     {notice && <Alert tone="success">{notice}</Alert>}
     <div className="ecosys-layout">
       <section className="panel ecosys-form-panel">
-        <div className="panel-header"><div><h2>{aquariumMode ? (italian ? "Nuovo acquario" : "New aquarium") : (italian ? "Nuova voliera" : "New aviary")}</h2></div></div>
+        <div className="panel-header"><div><h2>{editingSelected ? (italian ? "Modifica elemento" : "Edit item") : (aquariumMode ? (italian ? "Nuovo acquario" : "New aquarium") : (italian ? "Nuova voliera" : "New aviary"))}</h2></div></div>
         <form className="form-grid" onSubmit={aquariumMode ? createAquarium : createAviary}>
           <label className="field"><span className="field-label">{italian ? "Nome" : "Name"}</span><input className="control" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
           {aquariumMode ? <>
@@ -167,7 +234,8 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
             <label className="field"><span className="field-label">{italian ? "Ambiente" : "Environment"}</span><select className="control" value={environment} onChange={(e) => setEnvironment(e.target.value)}><option value="indoor">{italian ? "Interno" : "Indoor"}</option><option value="outdoor">{italian ? "Esterno" : "Outdoor"}</option><option value="mixed">{italian ? "Misto" : "Mixed"}</option></select></label>
             <label className="field"><span className="field-label">{italian ? "Capienza" : "Capacity"}</span><input className="control" type="number" min="1" step="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
           </>}
-          <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{saving ? (italian ? "Salvataggio…" : "Saving…") : (italian ? "Crea" : "Create")}</Button></div>
+          <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{saving ? (italian ? "Salvataggio…" : "Saving…") : (editingSelected ? (italian ? "Salva modifiche" : "Save changes") : (italian ? "Crea" : "Create"))}</Button>
+            {editingSelected && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingSelected(false); setName(""); setCapacity(""); }}>{italian ? "Annulla" : "Cancel"}</Button>}</div>
         </form>
       </section>
       <section className="panel">
@@ -179,7 +247,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
       </section>
     </div>
     {aquariumMode && selectedAquarium && <section className="panel ecosys-details">
-      <div className="panel-header"><div><h2>{italian ? "Nuova misurazione" : "New water reading"}</h2><p>{selectedAquarium.name} · {selectedAquarium.volumeLiters} L</p></div></div>
+      <div className="panel-header"><div><h2>{italian ? "Nuova misurazione" : "New water reading"}</h2><p>{selectedAquarium.name} · {selectedAquarium.volumeLiters} L</p></div><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={editSelected}>{italian ? "Modifica acquario" : "Edit aquarium"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void archiveSelected()}>{italian ? "Archivia" : "Archive"}</Button></div></div>
       <form className="form-grid" onSubmit={createReading}>
         <label className="field"><span className="field-label">{italian ? "Data e ora" : "Date and time"}</span><input className="control" type="datetime-local" required value={measuredAt} onChange={(e) => setMeasuredAt(e.target.value)} /></label>
         <label className="field"><span className="field-label">Temperatura (°C)</span><input className="control" type="number" min="-5" max="60" step="0.1" value={temperatureC} onChange={(e) => setTemperatureC(e.target.value)} /></label>
@@ -191,15 +259,16 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         <label className="field"><span className="field-label">Nitrati (mg/L)</span><input className="control" type="number" min="0" step="0.001" value={nitrateMgL} onChange={(e) => setNitrateMgL(e.target.value)} /></label>
         <label className="field"><span className="field-label">Salinità (ppt)</span><input className="control" type="number" min="0" max="100" step="0.001" value={salinityPpt} onChange={(e) => setSalinityPpt(e.target.value)} /></label>
         <label className="field"><span className="field-label">TDS (ppm)</span><input className="control" type="number" min="0" step="1" value={tdsPpm} onChange={(e) => setTdsPpm(e.target.value)} /></label>
-        <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{italian ? "Registra parametri" : "Save reading"}</Button></div>
+        <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{saving ? (italian ? "Salvataggio…" : "Saving…") : (editingReadingId ? (italian ? "Aggiorna misurazione" : "Update reading") : (italian ? "Registra parametri" : "Save reading"))}</Button>
+        {editingReadingId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingReadingId(null); setTemperatureC(""); setPh(""); setGhDkh(""); setKhDkh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setSalinityPpt(""); setTdsPpm(""); }}>{italian ? "Annulla modifica" : "Cancel edit"}</Button>}</div>
       </form>
       <div className="ecosys-history"><h3>{italian ? "Storico recente" : "Recent history"}</h3>
         {readings.length === 0 ? <p className="ecosys-empty">{italian ? "Nessuna misurazione registrata." : "No readings recorded."}</p> :
-          readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · GH {reading.ghDkh ?? "—"} · KH {reading.khDkh ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · Salinità {reading.salinityPpt ?? "—"} ppt · TDS {reading.tdsPpm ?? "—"}</span></div>)}
+          readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · GH {reading.ghDkh ?? "—"} · KH {reading.khDkh ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · Salinità {reading.salinityPpt ?? "—"} ppt · TDS {reading.tdsPpm ?? "—"}</span><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={() => { setEditingReadingId(reading.id); const date = new Date(reading.measuredAt); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); setMeasuredAt(date.toISOString().slice(0,16)); setTemperatureC(reading.temperatureC === null ? "" : String(reading.temperatureC)); setPh(reading.ph === null ? "" : String(reading.ph)); setGhDkh(reading.ghDkh === null ? "" : String(reading.ghDkh)); setKhDkh(reading.khDkh === null ? "" : String(reading.khDkh)); setAmmoniaMgL(reading.ammoniaMgL === null ? "" : String(reading.ammoniaMgL)); setNitriteMgL(reading.nitriteMgL === null ? "" : String(reading.nitriteMgL)); setNitrateMgL(reading.nitrateMgL === null ? "" : String(reading.nitrateMgL)); setSalinityPpt(reading.salinityPpt === null ? "" : String(reading.salinityPpt)); setTdsPpm(reading.tdsPpm === null ? "" : String(reading.tdsPpm)); }}>{italian ? "Modifica" : "Edit"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteReading(reading.id)}>{italian ? "Elimina" : "Delete"}</Button></div></div>) }
       </div>
     </section>}
     {!aquariumMode && selectedAviary && <section className="panel ecosys-details">
-      <div className="panel-header"><div><h2>{italian ? "Uccelli nella voliera" : "Birds in this aviary"}</h2><p>{selectedAviary.name}</p></div></div>
+      <div className="panel-header"><div><h2>{italian ? "Uccelli nella voliera" : "Birds in this aviary"}</h2><p>{selectedAviary.name}</p></div><div className="inline-actions"><Button size="sm" variant="secondary" disabled={saving} onClick={editSelected}>{italian ? "Modifica voliera" : "Edit aviary"}</Button><Button size="sm" variant="danger" disabled={saving} onClick={() => void archiveSelected()}>{italian ? "Archivia" : "Archive"}</Button></div></div>
       {birds.length === 0 ? <p className="ecosys-empty">{italian ? "Prima registra gli uccelli nella sezione Animali." : "Add bird records in the Animals section first."}</p> :
         <form onSubmit={saveBirds} className="ecosys-bird-form">
           <div className="ecosys-bird-picker">{birds.map((bird) => <label key={bird.id} className="checkbox-field"><input type="checkbox" checked={selectedBirdIds.includes(bird.id)} onChange={(event) => setSelectedBirdIds((current) => event.target.checked ? [...current, bird.id] : current.filter((id) => id !== bird.id))} /><span><strong>{bird.name}</strong><small>{bird.species}</small></span></label>)}</div>

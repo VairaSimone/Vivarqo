@@ -12,6 +12,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
   const [animals, setAnimals] = useState<CompanionAnimal[]>([]);
   const [records, setRecords] = useState<CareRecord[]>([]);
   const [animalId, setAnimalId] = useState("");
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [kind, setKind] = useState("vaccination");
   const [title, setTitle] = useState("");
   const [occurredAt, setOccurredAt] = useState(new Date().toISOString().slice(0, 10));
@@ -48,17 +49,53 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     event.preventDefault();
     setSaving(true); setError(""); setNotice("");
     try {
-      await api.post("/companion-care", {
+      const payload = {
         animalId, kind, title,
         occurredAt: new Date(occurredAt + "T12:00:00").toISOString(),
         nextDueAt: nextDueAt ? new Date(nextDueAt + "T12:00:00").toISOString() : null,
         provider: provider || null, dosage: dosage || null, notes: notes || null,
-      });
+      };
+      if (editingRecordId) {
+        await api.patch("/companion-care/" + editingRecordId, {
+          kind, title, occurredAt: payload.occurredAt, nextDueAt: payload.nextDueAt,
+          provider: payload.provider, dosage: payload.dosage, notes: payload.notes,
+        });
+      } else {
+        await api.post("/companion-care", payload);
+      }
       await reload();
+      setEditingRecordId(null);
       setTitle(""); setNextDueAt(""); setProvider(""); setDosage(""); setNotes("");
-      setNotice(it ? "Evento registrato correttamente." : "Care event saved.");
+      setNotice(it ? (editingRecordId ? "Evento aggiornato." : "Evento registrato correttamente.") : (editingRecordId ? "Care event updated." : "Care event saved."));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : (it ? "Salvataggio non riuscito." : "Unable to save record."));
+    } finally { setSaving(false); }
+  }
+
+  function editRecord(record: CareRecord) {
+    setEditingRecordId(record.id);
+    setAnimalId(record.animalId);
+    setKind(record.kind);
+    setTitle(record.title);
+    setOccurredAt(new Date(record.occurredAt).toISOString().slice(0, 10));
+    setNextDueAt(record.nextDueAt ? new Date(record.nextDueAt).toISOString().slice(0, 10) : "");
+    setProvider(record.provider ?? "");
+    setDosage(record.dosage ?? "");
+    setNotes(record.notes ?? "");
+    setError("");
+    setNotice("");
+  }
+
+  async function deleteRecord(record: CareRecord) {
+    if (!window.confirm(it ? `Eliminare l'evento "${record.title}"?` : `Delete care event "${record.title}"?`)) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await api.delete("/companion-care/" + record.id);
+      if (editingRecordId === record.id) setEditingRecordId(null);
+      await reload();
+      setNotice(it ? "Evento eliminato." : "Care event deleted.");
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : (it ? "Eliminazione non riuscita." : "Unable to delete record."));
     } finally { setSaving(false); }
   }
 
@@ -69,7 +106,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     {error && <Alert tone="danger">{error}</Alert>}
     {notice && <Alert tone="success">{notice}</Alert>}
     <Panel>
-      <h2>{it ? "Registra un evento" : "Add a care event"}</h2>
+      <h2>{editingRecordId ? (it ? "Modifica evento" : "Edit care event") : (it ? "Registra un evento" : "Add a care event")}</h2>
       {animals.length === 0 ? <p>{it ? "Prima crea una scheda cane o gatto nella sezione Animali." : "Create a dog or cat profile in Animals first."}</p> :
         <form className="form-stack" onSubmit={save}>
           <div className="form-grid">
@@ -82,7 +119,8 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
             <Field label={it ? "Dosaggio" : "Dosage"}><Input maxLength={120} value={dosage} onChange={(e) => setDosage(e.target.value)} /></Field>
           </div>
           <Field label={it ? "Note" : "Notes"}><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-          <div className="modal-actions"><Button type="submit" disabled={saving || !animalId}>{saving ? (it ? "Salvataggio…" : "Saving…") : (it ? "Registra evento" : "Save event")}</Button></div>
+          <div className="modal-actions"><Button type="submit" disabled={saving || !animalId}>{saving ? (it ? "Salvataggio…" : "Saving…") : (editingRecordId ? (it ? "Salva modifiche" : "Save changes") : (it ? "Registra evento" : "Save event"))}</Button>
+            {editingRecordId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingRecordId(null); setTitle(""); setNextDueAt(""); setProvider(""); setDosage(""); setNotes(""); }}>{it ? "Annulla" : "Cancel"}</Button>}</div>
         </form>}
     </Panel>
     <Panel>
@@ -93,6 +131,10 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
           <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Prossima scadenza: " : "Next due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
           {record.provider && <span>{record.provider}{record.dosage ? " · " + record.dosage : ""}</span>}
           {record.notes && <span>{record.notes}</span>}
+          <div className="inline-actions">
+            <Button size="sm" variant="secondary" disabled={saving} onClick={() => editRecord(record)}>{it ? "Modifica" : "Edit"}</Button>
+            <Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteRecord(record)}>{it ? "Elimina" : "Delete"}</Button>
+          </div>
         </article>)}</div>}
     </Panel>
   </div>;
