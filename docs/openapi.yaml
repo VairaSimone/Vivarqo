@@ -4980,6 +4980,7 @@ paths:
               type: object
               minProperties: 1
               properties:
+                destinationAquariumId: { type: string, format: uuid }
                 status: { type: string, enum: [quarantine, released, isolated, lost] }
                 endedAt: { type: [string, 'null'], format: date-time }
                 observations: { type: [string, 'null'], maxLength: 10000 }
