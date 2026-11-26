@@ -107,3 +107,17 @@ CREATE TABLE "aquarium_reproductions" (
   )
 );
 CREATE INDEX "aquarium_reproduction_aquarium_started_idx" ON "aquarium_reproductions"("aquarium_id","started_at" DESC);
+
+CREATE TABLE "aquarium_compatibility_rules" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(), "user_id" UUID NOT NULL,
+  "species_a_key" VARCHAR(180) NOT NULL, "species_b_key" VARCHAR(180) NOT NULL,
+  "compatibility" VARCHAR(16) NOT NULL, "notes" TEXT,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "aquarium_compatibility_rules_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "aquarium_compatibility_rules_user_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "aquarium_compatibility_rules_status_check" CHECK ("compatibility" IN ('compatible','caution','incompatible')),
+  CONSTRAINT "aquarium_compatibility_rules_pair_check" CHECK ("species_a_key" < "species_b_key"),
+  CONSTRAINT "aquarium_compatibility_user_species_key" UNIQUE ("user_id","species_a_key","species_b_key")
+);
+CREATE INDEX "aquarium_compatibility_user_status_idx" ON "aquarium_compatibility_rules"("user_id","compatibility");
