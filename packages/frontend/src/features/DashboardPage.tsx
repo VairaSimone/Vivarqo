@@ -24,15 +24,15 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
   const [optimisticallyCompleted, setOptimisticallyCompleted] = useState<string[]>([]);
   const widgetKeys = ["priorities", "quickActions", "feedingAlerts", "reminders", "recent", "summary", "onboarding", "plan"] as const;
   type WidgetKey = typeof widgetKeys[number];
-  const defaultVisibility: Record<WidgetKey, boolean> = { priorities: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true, onboarding: true, plan: true };
+  const defaultVisibility: Record<WidgetKey, boolean> = { priorities: true, quickActions: true, feedingAlerts: true, reminders: true, recent: true, summary: true, onboarding: false, plan: false };
   const [widgetVisibility, setWidgetVisibility] = useState<Record<WidgetKey, boolean>>(defaultVisibility);
   const [widgetSettingsOpen, setWidgetSettingsOpen] = useState(false);
-  const [widgetOrder, setWidgetOrder] = useState<WidgetKey[]>([...widgetKeys]);
+  const [widgetOrder, setWidgetOrder] = useState<WidgetKey[]>(["feedingAlerts", "priorities", "reminders", "summary", "quickActions", "recent", "onboarding", "plan"]);
   useEffect(() => {
     const layout = accountPreferences.data?.preferences.dashboardLayout;
     if (!layoutReady && accountPreferences.data) {
       const valid = Array.isArray(layout?.order) ? [...new Set(layout.order.filter((key): key is WidgetKey => widgetKeys.includes(key as WidgetKey)))] : [];
-      setWidgetOrder([...valid, ...widgetKeys.filter((key) => !valid.includes(key))]);
+      setWidgetOrder(valid.length ? [...valid, ...widgetKeys.filter((key) => !valid.includes(key))] : ["feedingAlerts", "priorities", "reminders", "summary", "quickActions", "recent", "onboarding", "plan"]);
       setWidgetVisibility({ ...defaultVisibility, ...(layout?.visibility ?? {}) });
       setLayoutReady(true);
     }
