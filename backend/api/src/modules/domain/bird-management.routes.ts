@@ -37,7 +37,14 @@ const maintenanceSchema = z.object({
   nextDueAt: z.string().datetime({ offset: true }).nullable().optional(),
   notes: z.string().trim().max(10000).nullable().optional(),
 }).strict().refine(v => !v.nextDueAt || !v.occurredAt || new Date(v.nextDueAt).getTime() >= new Date(v.occurredAt).getTime(), { path: ["nextDueAt"], message: "Next maintenance cannot precede this maintenance" });
-const maintenancePatchSchema = maintenanceSchema.partial().strict().refine(v => Object.keys(v).length > 0, "At least one field is required");
+const maintenancePatchSchema = z.object({
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+  action: z.enum(["cleaning", "disinfection", "inspection", "repair", "other"]).optional(),
+  area: z.string().trim().max(160).nullable().optional(),
+  products: z.string().trim().max(240).nullable().optional(),
+  nextDueAt: z.string().datetime({ offset: true }).nullable().optional(),
+  notes: z.string().trim().max(10000).nullable().optional(),
+}).strict().refine(v => Object.keys(v).length > 0, "At least one field is required");
 
 function parse<T extends z.ZodType>(schema: T, body: unknown): z.output<T> {
   const result = schema.safeParse(body);
