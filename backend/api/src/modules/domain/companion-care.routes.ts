@@ -22,9 +22,15 @@ const companionCarePatchSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }).optional(),
   nextDueAt: z.string().datetime({ offset: true }).nullable().optional(),
   provider: z.string().trim().max(160).nullable().optional(),
+  clinic: z.string().trim().max(160).nullable().optional(),
+  treatmentStartAt: z.string().datetime({ offset: true }).nullable().optional(),
+  treatmentEndAt: z.string().datetime({ offset: true }).nullable().optional(),
+  isOngoing: z.boolean().optional(),
   dosage: z.string().trim().max(120).nullable().optional(),
   notes: z.string().trim().max(5000).nullable().optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, "At least one field is required");
+}).strict()
+  .refine((value) => !value.treatmentStartAt || !value.treatmentEndAt || value.treatmentEndAt >= value.treatmentStartAt, { path: ["treatmentEndAt"], message: "Therapy end must not precede its start" })
+  .refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 function parseUuid(value: unknown): string {
   if (typeof value !== "string" || !z.string().uuid().safeParse(value).success) throw new AppError(400, "INVALID_ID", "Invalid id");
