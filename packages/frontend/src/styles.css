@@ -3758,3 +3758,36 @@ kbd { font-size: 11px; }
   .task-main strong, .activity-copy strong { font-size: 14px; }
   .task-main small, .activity-copy small, .simple-row small { font-size: 12px; }
 }
+
+
+/* Dashboard hierarchy: daily husbandry first, account configuration last. */
+.dashboard-grid > .dashboard-widget-feeding-alerts { order: 10; }
+.dashboard-grid > .dashboard-widget-priorities { order: 20; }
+.dashboard-grid > .dashboard-widget-reminders { order: 30; }
+.dashboard-grid > .dashboard-widget-summary { order: 40; }
+.dashboard-grid > .dashboard-widget-quick-actions { order: 50; }
+.dashboard-grid > .dashboard-widget-recent { order: 60; }
+.dashboard-account-widgets {
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+.dashboard-account-widgets > .dashboard-section-heading p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.dashboard-account-widget {
+  max-width: 760px;
+  opacity: .92;
+}
+.dashboard-account-widget .panel {
+  background: color-mix(in srgb, var(--surface-soft) 48%, var(--surface));
+  box-shadow: none;
+}
+.dashboard-account-widgets .dashboard-section-heading .eyebrow {
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .dashboard-account-widgets { margin-top: 22px; padding-top: 18px; }
+  .dashboard-account-widget { max-width: none; }
+}
