@@ -48,13 +48,17 @@ export function ReptileCarePanel({ animalId, locale, archived }: { animalId: str
     finally { setSaving(false); }
   }
   async function finishFasting(row: Fasting) {
-    const endedAt = new Date().toISOString();
-    try { await api.patch(`/fasting-periods/${row.id}`, { ...row, startedAt: row.startedAt, endedAt, lastAcceptedMealAt: row.lastAcceptedMealAt, startWeightG: row.startWeightG == null ? null : Number(row.startWeightG), endWeightG: row.endWeightG == null ? null : Number(row.endWeightG), refusedMealsCount: row.refusedMealsCount, reason: row.reason, notes: row.notes }); await load(); }
+    const finalWeight = window.prompt(it ? "Peso alla fine del digiuno (g). Lascia vuoto se non misurato." : "Weight at end of fast (g). Leave blank if not measured.", row.endWeightG == null ? "" : String(row.endWeightG));
+    if (finalWeight === null) return;
+    if (finalWeight.trim() && (!Number.isFinite(Number(finalWeight)) || Number(finalWeight) <= 0)) { setError(it ? "Inserisci un peso valido." : "Enter a valid weight."); return; }
+    try { await api.patch(`/fasting-periods/${row.id}`, { periodType: row.periodType, startedAt: row.startedAt, endedAt: new Date().toISOString(), lastAcceptedMealAt: row.lastAcceptedMealAt, refusedMealsCount: row.refusedMealsCount, reason: row.reason, startWeightG: row.startWeightG == null ? null : Number(row.startWeightG), endWeightG: finalWeight.trim() ? Number(finalWeight) : null, notes: row.notes }); await load(); }
     catch (e) { setError(e instanceof ApiError ? e.message : (it ? "Aggiornamento non riuscito." : "Could not update record.")); }
   }
   async function finishBrumation(row: Brumation) {
-    const endedAt = new Date().toISOString();
-    try { await api.patch(`/brumation-periods/${row.id}`, { ...row, startedAt: row.startedAt, endedAt, startWeightG: row.startWeightG == null ? null : Number(row.startWeightG), endWeightG: row.endWeightG == null ? null : Number(row.endWeightG), temperatureC: row.temperatureC == null ? null : Number(row.temperatureC), humidityPct: row.humidityPct == null ? null : Number(row.humidityPct) }); await load(); }
+    const finalWeight = window.prompt(it ? "Peso alla fine della brumazione (g). Lascia vuoto se non misurato." : "Weight at end of brumation (g). Leave blank if not measured.", row.endWeightG == null ? "" : String(row.endWeightG));
+    if (finalWeight === null) return;
+    if (finalWeight.trim() && (!Number.isFinite(Number(finalWeight)) || Number(finalWeight) <= 0)) { setError(it ? "Inserisci un peso valido." : "Enter a valid weight."); return; }
+    try { await api.patch(`/brumation-periods/${row.id}`, { startedAt: row.startedAt, endedAt: new Date().toISOString(), startWeightG: row.startWeightG == null ? null : Number(row.startWeightG), endWeightG: finalWeight.trim() ? Number(finalWeight) : null, temperatureC: row.temperatureC == null ? null : Number(row.temperatureC), humidityPct: row.humidityPct == null ? null : Number(row.humidityPct), conditions: row.conditions, notes: row.notes }); await load(); }
     catch (e) { setError(e instanceof ApiError ? e.message : (it ? "Aggiornamento non riuscito." : "Could not update record.")); }
   }
   const remove = async (path: string) => {
