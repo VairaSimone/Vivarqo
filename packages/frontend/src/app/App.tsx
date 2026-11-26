@@ -109,8 +109,9 @@ export function App() {
   useEffect(() => {
     if (!authRoute || !user) return;
     let active = true;
-    api.get("/auth/me").then(() => {
-      if (active) navigate("/today");
+    api.get("/auth/me").then(async () => {
+      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+      if (active) navigate(configuration.configuredAt ? "/today" : "/setup");
     }).catch((reason: unknown) => {
       if (!active) return;
       if (reason instanceof ApiError && reason.status === 401) {
