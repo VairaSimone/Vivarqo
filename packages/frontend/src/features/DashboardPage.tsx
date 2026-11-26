@@ -125,12 +125,12 @@ export function DashboardPage({ locale, timezone, navigate }: { locale: Locale; 
     const id = task.id;
     const animal = task.animal;
     const category = task.category || "custom";
-    const categoryIcon = category === "feeding" ? "feed" : category === "weighing" ? "weight" : category === "shed_check" ? "leaf" : category === "reproduction" || category === "incubation" ? "egg" : category === "inventory" ? "box" : category === "document" ? "file" : "calendar";
-    const categoryLabel: Record<string, string> = { feeding: locale === "it" ? "Alimentazione" : "Feeding", weighing: locale === "it" ? "Peso" : "Weight", shed_check: locale === "it" ? "Muta" : "Shed", cleaning: locale === "it" ? "Pulizia" : "Cleaning", reproduction: locale === "it" ? "Riproduzione" : "Reproduction", incubation: locale === "it" ? "Incubazione" : "Incubation", document: locale === "it" ? "Documento" : "Document", inventory: locale === "it" ? "Scorte" : "Inventory", custom: locale === "it" ? "Personalizzata" : "Custom" };
+    const categoryIcon = category === "feeding" ? "feed" : category === "weighing" ? "weight" : category === "shed_check" ? "leaf" : category === "reproduction" || category === "incubation" ? "egg" : category === "inventory" ? "box" : category === "document" ? "file" : category === "health" ? "heart" : "calendar";
+    const categoryLabel: Record<string, string> = { feeding: locale === "it" ? "Alimentazione" : "Feeding", weighing: locale === "it" ? "Peso" : "Weight", shed_check: locale === "it" ? "Muta" : "Shed", cleaning: locale === "it" ? "Pulizia" : "Cleaning", reproduction: locale === "it" ? "Riproduzione" : "Reproduction", incubation: locale === "it" ? "Incubazione" : "Incubation", document: locale === "it" ? "Documento" : "Document", inventory: locale === "it" ? "Scorte" : "Inventory", health: locale === "it" ? "Salute e veterinario" : "Health & veterinary", custom: locale === "it" ? "Personalizzata" : "Custom" };
     return <div className={`task-row dashboard-task-row${late ? " task-row-overdue" : ""}${isComplete ? " is-complete" : ""}`} key={id}>
       <button className={`task-check${isComplete ? " muted" : ""}`} aria-label={`${t("completeTask")}: ${task.title}`} disabled={isComplete || completing === id} onClick={() => void complete(id)}><Icon name="check" size={14} /></button>
       <div className="dashboard-task-content">
-        <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(`/tasks/${encodeURIComponent(id)}`)}>
+        <button className="task-main" aria-label={`${t("openTask")}: ${task.title}`} onClick={() => navigate(category === "health" ? "/companion-care" : `/tasks/${encodeURIComponent(id)}`)}>
           <strong>{task.title}</strong>
           <small>{formatDateTime(task.dueAt, locale, timezone)}</small>
         </button>
