@@ -103,8 +103,10 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
       if (!active) return;
       setReadings(readingResult.readings);
       setRanges(rangeResult.ranges);
-      setRangeDraft((current) => {
-        const next = { ...current };
+      setRangeDraft(() => {
+        const next: Record<Parameter, { min: string; max: string }> = {
+          temperatureC: { min: "", max: "" }, ph: { min: "", max: "" }, ghDkh: { min: "", max: "" }, khDkh: { min: "", max: "" }, nitrateMgL: { min: "", max: "" },
+        };
         for (const range of rangeResult.ranges) next[range.parameter] = { min: range.minValue === null ? "" : String(range.minValue), max: range.maxValue === null ? "" : String(range.maxValue) };
         return next;
       });
@@ -197,6 +199,8 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   async function saveBirds(event: FormEvent<HTMLFormElement>) {
     await submit(event, async () => {
       await api.put(`/aviaries/${encodeURIComponent(selectedId)}/birds`, { animalIds: selectedBirdIds });
+      const result = await api.get<{ aviaries: Aviary[] }>("/aviaries");
+      setAviaries(result.aviaries);
       setNotice(italian ? "Assegnazione degli uccelli aggiornata." : "Bird assignment updated.");
     });
   }
