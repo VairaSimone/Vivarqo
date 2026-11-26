@@ -58,6 +58,15 @@ curl http://localhost:3000/readyz
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
 - Sono disponibili le API di account, autenticazione e i moduli di dominio descritti in questa documentazione. Il frontend è in `packages/frontend`; eseguire `pnpm typecheck`, `pnpm test` e `pnpm build` dalla root per verificare l'intero monorepo.
 
+## Configurazione categorie dell'account
+
+Al primo accesso autenticato, i nuovi account completano la configurazione di Vivarqo selezionando una o più categorie: `reptiles`, `fish`, `birds`, `dogs_cats`. La scelta è associata all'account, non al singolo animale, e può essere modificata da Impostazioni → Categorie animali.
+
+- `GET /api/v1/onboarding/configuration`: restituisce le categorie e `configuredAt`; il valore nullo indica che la configurazione iniziale non è stata completata.
+- `POST /api/v1/onboarding/configuration`: salva almeno una categoria valida. Richiede sessione e protezione CSRF.
+- La migrazione `20261126183000_account_animal_categories` assegna `reptiles` agli account già esistenti, preservando il comportamento precedente.
+- La selezione non modifica né converte gli animali o i registri esistenti. Il configuratore costituisce la base per attivare progressivamente i moduli specifici; la selezione di una categoria non implica che tutti i relativi flussi di dominio siano già implementati.
+
 ## Account e autenticazione
 
 Le rotte implementate in questo incremento sono:
