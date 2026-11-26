@@ -3738,6 +3738,81 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
 
+  /api/v1/onboarding/configuration:
+    get:
+      operationId: getOnboardingConfiguration
+      tags: [Onboarding]
+      summary: Legge le categorie animali configurate per l'account
+      responses:
+        '200':
+          description: Configurazione dell'account; configuredAt nullo indica che la scelta iniziale non è stata completata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, configuredAt]
+                properties:
+                  categories:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      enum: [reptiles, fish, birds, dogs_cats]
+                  configuredAt:
+                    type: [string, "null"]
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: saveOnboardingConfiguration
+      tags: [Onboarding]
+      summary: Salva le categorie animali dell'account senza modificare i dati esistenti
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/onboarding/onboarding.routes.ts
+          symbol: configurationSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [categories]
+              properties:
+                categories:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum: [reptiles, fish, birds, dogs_cats]
+      responses:
+        '200':
+          description: Configurazione salvata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, configuredAt]
+                properties:
+                  categories:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      enum: [reptiles, fish, birds, dogs_cats]
+                  configuredAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
   /api/v1/onboarding/progress:
     get:
       operationId: getOnboardingProgress
