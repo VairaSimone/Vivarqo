@@ -7,6 +7,10 @@ type Aquarium = { id: string; name: string; waterType: string; volumeLiters: str
 type Aviary = { id: string; name: string; environment: string; capacity: number | null; _count?: { birds: number } };
 type Bird = { id: string; name: string; species: string; identifier: string | null };
 type Reading = { id: string; measuredAt: string; temperatureC: string | number | null; ph: string | number | null; ghDkh: string | number | null; khDkh: string | number | null; ammoniaMgL: string | number | null; nitriteMgL: string | number | null; nitrateMgL: string | number | null; salinityPpt: string | number | null; tdsPpm: number | null };
+type Parameter = "temperatureC" | "ph" | "ghDkh" | "khDkh" | "nitrateMgL";
+type ParameterRange = { id: string; parameter: Parameter; minValue: string | number | null; maxValue: string | number | null };
+type AviaryMovement = { id: string; occurredAt: string; animal: { id: string; name: string; species: string }; fromAviary: { id: string; name: string } | null; toAviary: { id: string; name: string } | null; notes: string | null };
+type AviaryNote = { id: string; title: string | null; body: string; occurredAt: string };
 
 const inputDateTime = () => {
   const date = new Date();
@@ -21,6 +25,15 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   const [aviaries, setAviaries] = useState<Aviary[]>([]);
   const [birds, setBirds] = useState<Bird[]>([]);
   const [readings, setReadings] = useState<Reading[]>([]);
+  const [ranges, setRanges] = useState<ParameterRange[]>([]);
+  const [rangeDraft, setRangeDraft] = useState<Record<Parameter, { min: string; max: string }>>({
+    temperatureC: { min: "", max: "" }, ph: { min: "", max: "" }, ghDkh: { min: "", max: "" }, khDkh: { min: "", max: "" }, nitrateMgL: { min: "", max: "" },
+  });
+  const [movements, setMovements] = useState<AviaryMovement[]>([]);
+  const [aviaryNotes, setAviaryNotes] = useState<AviaryNote[]>([]);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteBody, setNoteBody] = useState("");
+  const [chartParameter, setChartParameter] = useState<Parameter>("ph");
   const [selectedId, setSelectedId] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedBirdIds, setSelectedBirdIds] = useState<string[]>([]);
@@ -83,9 +96,19 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
   useEffect(() => {
     if (!aquariumMode || !selectedId) { setReadings([]); return; }
     let active = true;
-    api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`)
-      .then((result) => { if (active) setReadings(result.readings); })
-      .catch((reason: unknown) => { if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare le misurazioni." : "Unable to load readings.")); });
+    Promise.all([
+      api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings?take=1000`),
+      api.get<{ ranges: ParameterRange[] }>(`/aquariums/${encodeURIComponent(selectedId)}/ranges`),
+    ]).then(([readingResult, rangeResult]) => {
+      if (!active) return;
+      setReadings(readingResult.readings);
+      setRanges(rangeResult.ranges);
+      setRangeDraft((current) => {
+        const next = { ...current };
+        for (const range of rangeResult.ranges) next[range.parameter] = { min: range.minValue === null ? "" : String(range.minValue), max: range.maxValue === null ? "" : String(range.maxValue) };
+        return next;
+      });
+    }).catch((reason: unknown) => { if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare le misurazioni." : "Unable to load readings.")); });
     return () => { active = false; };
   }, [aquariumMode, selectedId, italian]);
 
