@@ -163,25 +163,27 @@ export function createCompanionCareRouter() {
           else reminderRuleId = (await tx.reminderRule.create({ data: { ...ruleData, userId: auth.userId } })).id;
         }
         await tx.companionCareRecord.update({ where: { id }, data: { reminderRuleId } });
+      } else if (reminderRuleId && !updated.nextDueAt) {
+        await tx.task.updateMany({ where: { reminderRuleId, status: "open" }, data: { status: "dismissed" } });
+        await tx.reminderRule.update({ where: { id: reminderRuleId }, data: { isEnabled: false } });
+        reminderRuleId = null;
+        await tx.companionCareRecord.update({ where: { id }, data: { reminderRuleId: null } });
       } else if (reminderRuleId) {
-        await tx.reminderRule.update({ where: { id: reminderRuleId }, data: { title: updated.title, description: updated.notes, nextDueAt: updated.nextDueAt ?? previous.nextDueAt ?? new Date(), animalId: updated.animalId } });
+        await tx.reminderRule.update({ where: { id: reminderRuleId }, data: { title: updated.title, description: updated.notes, nextDueAt: updated.nextDueAt!, animalId: updated.animalId } });
       }
       const dueTask = await tx.task.findFirst({ where: { companionCareRecordId: id } });
       if (!updated.nextDueAt) {
         if (dueTask?.status === "open") await tx.task.update({ where: { id: dueTask.id }, data: { status: "dismissed" } });
-      } else if (dueTask) {
-        const rescheduled = dueDateChanged;
+      } else if (dueTask?.status === "open") {
         await tx.task.update({ where: { id: dueTask.id }, data: {
           title: updated.title, description: updated.notes, dueAt: updated.nextDueAt,
-          animalId: updated.animalId,
-          reminderRuleId,
-          ...(rescheduled ? { status: "open", completedAt: null } : {}),
+          animalId: updated.animalId, reminderRuleId,
         } });
-      } else {
+      } else if (!dueTask || dueDateChanged) {
         await tx.task.create({ data: {
           userId: auth.userId, animalId: updated.animalId, title: updated.title,
           description: updated.notes, category: "health", dueAt: updated.nextDueAt,
-          companionCareRecordId: updated.id, ...(reminderRuleId ? { reminderRuleId } : {}),
+          ...(dueTask?.status === "completed" ? (reminderRuleId ? { reminderRuleId } : {}) : { companionCareRecordId: updated.id, ...(reminderRuleId ? { reminderRuleId } : {}) }),
         } });
       }
       return updated;
