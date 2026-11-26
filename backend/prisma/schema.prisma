@@ -1205,6 +1205,10 @@ model CompanionCareRecord {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal      Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
   task        Task?
+  clinic      String?   @db.VarChar(160)
+  treatmentStartAt DateTime? @map("treatment_start_at") @db.Timestamptz(6)
+  treatmentEndAt DateTime? @map("treatment_end_at") @db.Timestamptz(6)
+  isOngoing   Boolean   @default(false) @map("is_ongoing")
   @@index([userId, deletedAt, nextDueAt], map: "companion_care_user_due_idx")
   @@index([animalId, occurredAt(sort: Desc)], map: "companion_care_animal_occurred_idx")
   @@map("companion_care_records")
