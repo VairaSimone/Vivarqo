@@ -1169,6 +1169,7 @@ model BirdBreedingPair {
   female         Animal   @relation("BirdPairFemale", fields: [femaleAnimalId], references: [id], onDelete: Restrict)
   male           Animal   @relation("BirdPairMale", fields: [maleAnimalId], references: [id], onDelete: Restrict)
   cycle          ReproductionCycle @relation(fields: [cycleId], references: [id], onDelete: Restrict)
+  @@unique([userId, femaleAnimalId, maleAnimalId], where: raw("\\\"status\\\" = 'active'"), map: "bird_pairs_one_active_pair_unique")
   @@index([userId, status, pairedAt(sort: Desc)], map: "bird_pairs_user_status_date_idx")
   @@index([femaleAnimalId, maleAnimalId], map: "bird_pairs_animals_idx")
   @@map("bird_breeding_pairs")
