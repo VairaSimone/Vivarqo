@@ -1,0 +1,201 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { api, ApiError } from "../lib/api";
+import type { Locale } from "../lib/domain";
+import { Alert, Button, LoadingState } from "../components/ui";
+
+type Aquarium = { id: string; name: string; waterType: string; volumeLiters: string | number; readings?: Array<Record<string, unknown>>; _count?: { readings: number } };
+type Aviary = { id: string; name: string; environment: string; capacity: number | null; _count?: { birds: number } };
+type Bird = { id: string; name: string; species: string; identifier: string | null };
+type Reading = { id: string; measuredAt: string; temperatureC: string | number | null; ph: string | number | null; ammoniaMgL: string | number | null; nitriteMgL: string | number | null; nitrateMgL: string | number | null; tdsPpm: number | null };
+
+const inputDateTime = () => {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+};
+
+export function EcosystemsPage({ locale, path }: { locale: Locale; path: string }) {
+  const italian = locale === "it";
+  const aquariumMode = path.startsWith("/aquariums");
+  const [aquariums, setAquariums] = useState<Aquarium[]>([]);
+  const [aviaries, setAviaries] = useState<Aviary[]>([]);
+  const [birds, setBirds] = useState<Bird[]>([]);
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [selectedBirdIds, setSelectedBirdIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [name, setName] = useState("");
+  const [waterType, setWaterType] = useState("freshwater");
+  const [volumeLiters, setVolumeLiters] = useState("100");
+  const [environment, setEnvironment] = useState("indoor");
+  const [capacity, setCapacity] = useState("");
+  const [measuredAt, setMeasuredAt] = useState(inputDateTime);
+  const [temperatureC, setTemperatureC] = useState("");
+  const [ph, setPh] = useState("");
+  const [ammoniaMgL, setAmmoniaMgL] = useState("");
+  const [nitriteMgL, setNitriteMgL] = useState("");
+  const [nitrateMgL, setNitrateMgL] = useState("");
+  const [tdsPpm, setTdsPpm] = useState("");
+
+  const selectedAquarium = useMemo(() => aquariums.find((item) => item.id === selectedId), [aquariums, selectedId]);
+  const selectedAviary = useMemo(() => aviaries.find((item) => item.id === selectedId), [aviaries, selectedId]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    const load = async () => {
+      try {
+        if (aquariumMode) {
+          const result = await api.get<{ aquariums: Aquarium[] }>("/aquariums");
+          if (!active) return;
+          setAquariums(result.aquariums);
+          setSelectedId(result.aquariums[0]?.id ?? "");
+        } else {
+          const [aviaryResult, birdResult] = await Promise.all([
+            api.get<{ aviaries: Aviary[] }>("/aviaries"),
+            api.get<{ animals: Bird[] }>("/animals?category=birds&status=all&page=1&pageSize=100"),
+          ]);
+          if (!active) return;
+          setAviaries(aviaryResult.aviaries);
+          setBirds(birdResult.animals);
+          setSelectedId(aviaryResult.aviaries[0]?.id ?? "");
+        }
+      } catch (reason) {
+        if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare i dati." : "Unable to load data."));
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [aquariumMode, italian]);
+
+  useEffect(() => {
+    if (!aquariumMode || !selectedId) { setReadings([]); return; }
+    let active = true;
+    api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`)
+      .then((result) => { if (active) setReadings(result.readings); })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare le misurazioni." : "Unable to load readings.")); });
+    return () => { active = false; };
+  }, [aquariumMode, selectedId, italian]);
+
+  useEffect(() => {
+    if (aquariumMode || !selectedId) { setSelectedBirdIds([]); return; }
+    let active = true;
+    api.get<{ birds: Bird[] }>(`/aviaries/${encodeURIComponent(selectedId)}/birds`)
+      .then((result) => { if (active) setSelectedBirdIds(result.birds.map((bird) => bird.id)); })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile caricare gli uccelli." : "Unable to load birds.")); });
+    return () => { active = false; };
+  }, [aquariumMode, selectedId, italian]);
+
+  async function submit(event: FormEvent<HTMLFormElement>, operation: () => Promise<void>) {
+    event.preventDefault();
+    setSaving(true); setError(""); setNotice("");
+    try { await operation(); }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : (italian ? "Operazione non riuscita." : "Operation failed.")); }
+    finally { setSaving(false); }
+  }
+
+  async function createAquarium(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      const result = await api.post<{ aquarium: Aquarium }>("/aquariums", { name, waterType, volumeLiters: Number(volumeLiters) });
+      setAquariums((current) => [...current, result.aquarium].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedId(result.aquarium.id); setName(""); setNotice(italian ? "Acquario creato." : "Aquarium created.");
+    });
+  }
+  async function createAviary(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      const result = await api.post<{ aviary: Aviary }>("/aviaries", { name, environment, capacity: capacity ? Number(capacity) : null });
+      setAviaries((current) => [...current, result.aviary].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedId(result.aviary.id); setName(""); setCapacity(""); setNotice(italian ? "Voliera creata." : "Aviary created.");
+    });
+  }
+  async function createReading(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      await api.post(`/aquariums/${encodeURIComponent(selectedId)}/readings`, {
+        measuredAt: new Date(measuredAt).toISOString(),
+        temperatureC: temperatureC === "" ? null : Number(temperatureC),
+        ph: ph === "" ? null : Number(ph),
+        ammoniaMgL: ammoniaMgL === "" ? null : Number(ammoniaMgL),
+        nitriteMgL: nitriteMgL === "" ? null : Number(nitriteMgL),
+        nitrateMgL: nitrateMgL === "" ? null : Number(nitrateMgL),
+        tdsPpm: tdsPpm === "" ? null : Number(tdsPpm),
+      });
+      const result = await api.get<{ readings: Reading[] }>(`/aquariums/${encodeURIComponent(selectedId)}/readings`);
+      setReadings(result.readings);
+      setTemperatureC(""); setPh(""); setAmmoniaMgL(""); setNitriteMgL(""); setNitrateMgL(""); setTdsPpm("");
+      setNotice(italian ? "Parametri dell'acqua registrati." : "Water parameters recorded.");
+    });
+  }
+  async function saveBirds(event: FormEvent<HTMLFormElement>) {
+    await submit(event, async () => {
+      await api.put(`/aviaries/${encodeURIComponent(selectedId)}/birds`, { animalIds: selectedBirdIds });
+      setNotice(italian ? "Assegnazione degli uccelli aggiornata." : "Bird assignment updated.");
+    });
+  }
+
+  if (loading) return <LoadingState />;
+  return <section className="page ecosys-page">
+    <header className="page-header"><div>
+      <span className="eyebrow">{italian ? "MODULI SPECIALISTICI" : "SPECIALIST MODULES"}</span>
+      <h1>{aquariumMode ? (italian ? "Acquari" : "Aquariums") : (italian ? "Voliere" : "Aviaries")}</h1>
+      <p>{aquariumMode
+        ? (italian ? "Gestisci vasche, volume, tipologia d'acqua e storico dei parametri misurati." : "Manage tanks, volume, water type and measured parameter history.")
+        : (italian ? "Organizza gli spazi e assegna gli uccelli registrati al tuo account." : "Organise habitats and assign birds registered in your account.")}</p>
+    </div></header>
+    {error && <Alert tone="danger">{error}</Alert>}
+    {notice && <Alert tone="success">{notice}</Alert>}
+    <div className="ecosys-layout">
+      <section className="panel ecosys-form-panel">
+        <div className="panel-header"><div><h2>{aquariumMode ? (italian ? "Nuovo acquario" : "New aquarium") : (italian ? "Nuova voliera" : "New aviary")}</h2></div></div>
+        <form className="form-grid" onSubmit={aquariumMode ? createAquarium : createAviary}>
+          <label className="field"><span className="field-label">{italian ? "Nome" : "Name"}</span><input className="control" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
+          {aquariumMode ? <>
+            <label className="field"><span className="field-label">{italian ? "Tipologia acqua" : "Water type"}</span><select className="control" value={waterType} onChange={(e) => setWaterType(e.target.value)}><option value="freshwater">{italian ? "Dolce" : "Freshwater"}</option><option value="saltwater">{italian ? "Marina" : "Saltwater"}</option><option value="brackish">{italian ? "Salmastra" : "Brackish"}</option></select></label>
+            <label className="field"><span className="field-label">{italian ? "Volume (litri)" : "Volume (litres)"}</span><input className="control" type="number" min="0.01" step="0.01" required value={volumeLiters} onChange={(e) => setVolumeLiters(e.target.value)} /></label>
+          </> : <>
+            <label className="field"><span className="field-label">{italian ? "Ambiente" : "Environment"}</span><select className="control" value={environment} onChange={(e) => setEnvironment(e.target.value)}><option value="indoor">{italian ? "Interno" : "Indoor"}</option><option value="outdoor">{italian ? "Esterno" : "Outdoor"}</option><option value="mixed">{italian ? "Misto" : "Mixed"}</option></select></label>
+            <label className="field"><span className="field-label">{italian ? "Capienza" : "Capacity"}</span><input className="control" type="number" min="1" step="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
+          </>}
+          <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{saving ? (italian ? "Salvataggio…" : "Saving…") : (italian ? "Crea" : "Create")}</Button></div>
+        </form>
+      </section>
+      <section className="panel">
+        <div className="panel-header"><div><h2>{aquariumMode ? (italian ? "Acquari registrati" : "Registered aquariums") : (italian ? "Voliere registrate" : "Registered aviaries")}</h2></div></div>
+        {aquariumMode ? aquariums.length === 0 ? <p className="ecosys-empty">{italian ? "Non hai ancora creato acquari." : "No aquariums yet."}</p> :
+          <div className="ecosys-list">{aquariums.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "ecosys-item selected" : "ecosys-item"} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.waterType} · {item.volumeLiters} L</span><small>{item._count?.readings ?? 0} {italian ? "misurazioni" : "readings"}</small></button>)}</div>
+          : aviaries.length === 0 ? <p className="ecosys-empty">{italian ? "Non hai ancora creato voliere." : "No aviaries yet."}</p> :
+          <div className="ecosys-list">{aviaries.map((item) => <button key={item.id} type="button" className={item.id === selectedId ? "ecosys-item selected" : "ecosys-item"} onClick={() => setSelectedId(item.id)}><strong>{item.name}</strong><span>{item.environment}</span><small>{item._count?.birds ?? 0} {italian ? "uccelli" : "birds"}</small></button>)}</div>}
+      </section>
+    </div>
+    {aquariumMode && selectedAquarium && <section className="panel ecosys-details">
+      <div className="panel-header"><div><h2>{italian ? "Nuova misurazione" : "New water reading"}</h2><p>{selectedAquarium.name} · {selectedAquarium.volumeLiters} L</p></div></div>
+      <form className="form-grid" onSubmit={createReading}>
+        <label className="field"><span className="field-label">{italian ? "Data e ora" : "Date and time"}</span><input className="control" type="datetime-local" required value={measuredAt} onChange={(e) => setMeasuredAt(e.target.value)} /></label>
+        <label className="field"><span className="field-label">Temperatura (°C)</span><input className="control" type="number" min="-5" max="60" step="0.1" value={temperatureC} onChange={(e) => setTemperatureC(e.target.value)} /></label>
+        <label className="field"><span className="field-label">pH</span><input className="control" type="number" min="0" max="14" step="0.01" value={ph} onChange={(e) => setPh(e.target.value)} /></label>
+        <label className="field"><span className="field-label">Ammoniaca (mg/L)</span><input className="control" type="number" min="0" step="0.0001" value={ammoniaMgL} onChange={(e) => setAmmoniaMgL(e.target.value)} /></label>
+        <label className="field"><span className="field-label">Nitriti (mg/L)</span><input className="control" type="number" min="0" step="0.0001" value={nitriteMgL} onChange={(e) => setNitriteMgL(e.target.value)} /></label>
+        <label className="field"><span className="field-label">Nitrati (mg/L)</span><input className="control" type="number" min="0" step="0.001" value={nitrateMgL} onChange={(e) => setNitrateMgL(e.target.value)} /></label>
+        <label className="field"><span className="field-label">TDS (ppm)</span><input className="control" type="number" min="0" step="1" value={tdsPpm} onChange={(e) => setTdsPpm(e.target.value)} /></label>
+        <div className="ecosys-form-actions"><Button type="submit" disabled={saving}>{italian ? "Registra parametri" : "Save reading"}</Button></div>
+      </form>
+      <div className="ecosys-history"><h3>{italian ? "Storico recente" : "Recent history"}</h3>
+        {readings.length === 0 ? <p className="ecosys-empty">{italian ? "Nessuna misurazione registrata." : "No readings recorded."}</p> :
+          readings.map((reading) => <div className="ecosys-reading" key={reading.id}><strong>{new Date(reading.measuredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</strong><span>{reading.temperatureC ?? "—"} °C · pH {reading.ph ?? "—"} · NH₃ {reading.ammoniaMgL ?? "—"} · NO₂ {reading.nitriteMgL ?? "—"} · NO₃ {reading.nitrateMgL ?? "—"} · TDS {reading.tdsPpm ?? "—"}</span></div>)}
+      </div>
+    </section>}
+    {!aquariumMode && selectedAviary && <section className="panel ecosys-details">
+      <div className="panel-header"><div><h2>{italian ? "Uccelli nella voliera" : "Birds in this aviary"}</h2><p>{selectedAviary.name}</p></div></div>
+      {birds.length === 0 ? <p className="ecosys-empty">{italian ? "Prima registra gli uccelli nella sezione Animali." : "Add bird records in the Animals section first."}</p> :
+        <form onSubmit={saveBirds} className="ecosys-bird-form">
+          <div className="ecosys-bird-picker">{birds.map((bird) => <label key={bird.id} className="checkbox-field"><input type="checkbox" checked={selectedBirdIds.includes(bird.id)} onChange={(event) => setSelectedBirdIds((current) => event.target.checked ? [...current, bird.id] : current.filter((id) => id !== bird.id))} /><span><strong>{bird.name}</strong><small>{bird.species}</small></span></label>)}</div>
+          <Button type="submit" disabled={saving}>{italian ? "Salva assegnazioni" : "Save assignments"}</Button>
+        </form>}
+    </section>}
+  </section>;
+}

@@ -3892,3 +3892,26 @@ kbd { font-size: 11px; }
   .category-setup-actions { align-items: stretch; flex-direction: column; }
   .category-setup-actions .btn { width: 100%; }
 }
+
+/* Multi-domain habitats: aquarium and aviary workflows */
+.ecosys-page { display:grid; gap:18px; }
+.ecosys-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+.ecosys-form-panel, .ecosys-details { min-width:0; }
+.ecosys-form-actions { display:flex; align-items:end; }
+.ecosys-list { display:grid; gap:8px; }
+.ecosys-item { display:grid; gap:4px; width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--text); text-align:left; cursor:pointer; }
+.ecosys-item.selected { border-color:var(--forest-2); background:var(--surface-soft); }
+.ecosys-item strong { font-size:14px; }
+.ecosys-item span, .ecosys-item small, .ecosys-empty { color:var(--muted); font-size:12px; }
+.ecosys-history { display:grid; gap:8px; margin-top:20px; }
+.ecosys-history h3 { margin:0; font-size:14px; }
+.ecosys-reading { display:grid; gap:4px; padding:10px 0; border-bottom:1px solid var(--border); }
+.ecosys-reading strong { font-size:13px; }
+.ecosys-reading span { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.ecosys-bird-form { display:grid; gap:14px; }
+.ecosys-bird-picker { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.ecosys-bird-picker .checkbox-field { display:flex; align-items:flex-start; min-width:0; padding:10px; border:1px solid var(--border); border-radius:8px; }
+.ecosys-bird-picker .checkbox-field span { display:grid; gap:3px; }
+.ecosys-bird-picker small { color:var(--muted); font-size:11px; }
+@media(max-width:800px) { .ecosys-layout { grid-template-columns:1fr; } }
+@media(max-width:560px) { .ecosys-bird-picker { grid-template-columns:1fr; } }

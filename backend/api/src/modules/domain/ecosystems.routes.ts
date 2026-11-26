@@ -35,6 +35,10 @@ const aviarySchema = z.object({
   notes: z.string().trim().max(10000).nullable().optional(),
 }).strict();
 
+const aviaryBirdAssignmentSchema = z.object({
+  animalIds: z.array(z.string().uuid()).max(500),
+}).strict();
+
 function parseUuid(value: string | string[] | undefined): string {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid id");
@@ -141,9 +145,10 @@ export function createEcosystemRouter() {
     const auth = res.locals.auth as AuthContext;
     await requireCategory(auth.userId, "birds");
     const aviary = await ownedAviary(auth.userId, parseUuid(req.params.id));
-    const input = z.object({ animalIds: z.array(z.string().uuid()).max(500) }).strict().safeParse(req.body);
-    if (!input.success || new Set(input.data?.animalIds ?? []).size !== (input.data?.animalIds.length ?? 0)) {
-      throw new AppError(400, "VALIDATION_ERROR", "Provide a unique list of bird ids");
+    const input = aviaryBirdAssignmentSchema.safeParse(req.body);
+    if (!input.success) throw new AppError(400, "VALIDATION_ERROR", "Provide a list of bird ids", { issues: input.error.issues });
+    if (new Set(input.data.animalIds).size !== input.data.animalIds.length) {
+      throw new AppError(400, "VALIDATION_ERROR", "Bird ids must be unique");
     }
     const ids = input.data.animalIds;
     const birds = await prisma.animal.findMany({ where: { id: { in: ids }, userId: auth.userId, category: "birds" }, select: { id: true } });

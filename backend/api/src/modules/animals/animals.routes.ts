@@ -109,6 +109,7 @@ export function createAnimalRouter() {
     const sex = typeof req.query.sex === "string" ? req.query.sex : undefined;
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
     const species = typeof req.query.species === "string" ? req.query.species.trim().slice(0, 160) : "";
+    const category = typeof req.query.category === "string" ? req.query.category : "";
     const morph = typeof req.query.morph === "string" ? req.query.morph.trim().slice(0, 200) : "";
     const location = typeof req.query.location === "string" ? req.query.location.trim().slice(0, 160) : "";
     const sort = typeof req.query.sort === "string" ? req.query.sort : "updatedAt";
@@ -119,6 +120,9 @@ export function createAnimalRouter() {
     if (sex && !["male", "female", "unknown"].includes(sex)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid sex filter");
     }
+    if (category && !["reptiles", "fish", "birds", "dogs_cats"].includes(category)) {
+      throw new AppError(400, "VALIDATION_ERROR", "Invalid animal category filter");
+    }
     if (!["name", "createdAt", "updatedAt"].includes(sort)) {
       throw new AppError(400, "VALIDATION_ERROR", "Invalid sort option");
     }
@@ -127,6 +131,7 @@ export function createAnimalRouter() {
     if (status && status !== "all") where.status = status;
     else if (!status) where.status = "active";
     if (sex) where.sex = sex;
+    if (category) where.category = category;
     if (species) where.species = { contains: species, mode: "insensitive" };
     if (morph) where.morph = { contains: morph, mode: "insensitive" };
     if (location) where.locationLabel = { contains: location, mode: "insensitive" };

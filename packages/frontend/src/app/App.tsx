@@ -5,6 +5,7 @@ import { AppShell } from "../layouts/AppShell";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
 const AccountCategoriesPage = lazy(() => import("../features/AccountCategoriesPage").then((module) => ({ default: module.AccountCategoriesPage })));
+const EcosystemsPage = lazy(() => import("../features/EcosystemsPage").then((module) => ({ default: module.EcosystemsPage })));
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
 const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
@@ -271,6 +272,7 @@ export function App() {
   let page;
   if (route === "/today" || route === "/") page = <DashboardPage locale={locale} timezone={timezone} navigate={navigate} />;
   else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/aquariums") || matches("/aviaries")) page = <EcosystemsPage locale={locale} path={path} />;
   else if (matches("/feeding")) page = <CarePage locale={locale} path={path} timezone={timezone} />;
   else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;

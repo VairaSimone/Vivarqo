@@ -4596,7 +4596,7 @@ paths:
         required: true
         x-source-validation:
           file: backend/api/src/modules/domain/ecosystems.routes.ts
-          symbol: z.object({ animalIds:
+          symbol: aviaryBirdAssignmentSchema animalIds:
         content:
           application/json:
             schema:

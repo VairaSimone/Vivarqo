@@ -18,37 +18,44 @@ type BeforeInstallPromptEvent = Event & {
 type User = { displayName: string; email: string; locale: Locale };
 type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" | "help" };
 
-const groups: Array<{ title: string; items: NavItem[] }> = [
-  { title: "navWorkspace", items: [
-    { path: "/today", label: "navToday", icon: "home" },
-    { path: "/calendar", label: "navCalendar", icon: "calendar" },
-    { path: "/tasks", label: "navTasks", icon: "check" }
-  ] },
-  { title: "navAnimals", items: [
+function groupsForCategories(categories: string[]): Array<{ title: string; items: NavItem[] }> {
+  const has = (category: string) => categories.includes(category);
+  const animalItems: NavItem[] = [
     { path: "/animals", label: "navAnimals", icon: "snake" },
     { path: "/feeding", label: "navFeeding", icon: "feed" },
-    { path: "/reproduction", label: "navBreeding", icon: "leaf" },
-    { path: "/genetics", label: "navGenetics", icon: "leaf" }
-  ] },
-  { title: "navAdmin", items: [
-    { path: "/inventory", label: "navInventory", icon: "box" },
-    { path: "/documents", label: "navDocuments", icon: "file" },
-    { path: "/finance", label: "navFinance", icon: "wallet" },
-    { path: "/imports", label: "navImports", icon: "file" },
-    { path: "/exports", label: "navExports", icon: "box" }
-  ] },
-  { title: "navPreferences", items: [
-    { path: "/help", label: "navHelp", icon: "help" },
-    { path: "/notifications", label: "navNotifications", icon: "bell" },
-    { path: "/billing", label: "navBilling", icon: "wallet" },
-    { path: "/settings/categories", label: "navCategories", icon: "settings" },
-    { path: "/settings", label: "navSettings", icon: "settings" }
-  ] }
-];
+  ];
+  if (has("reptiles") || has("birds")) animalItems.push({ path: "/reproduction", label: "navBreeding", icon: "leaf" });
+  if (has("reptiles")) animalItems.push({ path: "/genetics", label: "navGenetics", icon: "leaf" });
+  if (has("fish")) animalItems.push({ path: "/aquariums", label: "navAquariums", icon: "box" });
+  if (has("birds")) animalItems.push({ path: "/aviaries", label: "navAviaries", icon: "leaf" });
+  return [
+    { title: "navWorkspace", items: [
+      { path: "/today", label: "navToday", icon: "home" },
+      { path: "/calendar", label: "navCalendar", icon: "calendar" },
+      { path: "/tasks", label: "navTasks", icon: "check" }
+    ] },
+    { title: "navAnimals", items: animalItems },
+    { title: "navAdmin", items: [
+      { path: "/inventory", label: "navInventory", icon: "box" },
+      { path: "/documents", label: "navDocuments", icon: "file" },
+      { path: "/finance", label: "navFinance", icon: "wallet" },
+      { path: "/imports", label: "navImports", icon: "file" },
+      { path: "/exports", label: "navExports", icon: "box" }
+    ] },
+    { title: "navPreferences", items: [
+      { path: "/help", label: "navHelp", icon: "help" },
+      { path: "/notifications", label: "navNotifications", icon: "bell" },
+      { path: "/billing", label: "navBilling", icon: "wallet" },
+      { path: "/settings/categories", label: "navCategories", icon: "settings" },
+      { path: "/settings", label: "navSettings", icon: "settings" }
+    ] }
+  ];
+}
 
 const routeTitles: Record<string, string> = {
   "/today": "navToday", "/calendar": "navCalendar", "/tasks": "navTasks",
   "/animals": "navAnimals", "/feeding": "navFeeding", "/reproduction": "navBreeding",
+  "/aquariums": "navAquariums", "/aviaries": "navAviaries",
   "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding", "/genetics": "navGenetics",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",
@@ -60,6 +67,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   onNavigate: (path: string) => void; onLocaleChange: (locale: Locale) => void;
   onSignOut: () => void; unreadCount?: number;
 }) {
+  const [animalCategories, setAnimalCategories] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -75,6 +83,16 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [iosDevice, setIosDevice] = useState(false);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
+
+  useEffect(() => {
+    let active = true;
+    if (path !== "/settings/categories") {
+      api.get<{ categories: string[] }>("/onboarding/configuration")
+        .then((configuration) => { if (active) setAnimalCategories(configuration.categories); })
+        .catch(() => { if (active) setAnimalCategories([]); });
+    }
+    return () => { active = false; };
+  }, [path]);
 
   useEffect(() => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches
@@ -262,7 +280,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         <span className="brand-copy"><strong>Vivarqo</strong><small>{t("brandTagline")}</small></span>
       </button>
       <div className="nav-scroll">
-        {groups.map((group) => <div className="nav-section" key={group.title}>
+        {groupsForCategories(animalCategories).map((group) => <div className="nav-section" key={group.title}>
           <span className="nav-caption">{group.title === "navAdmin" ? (locale === "it" ? "GESTIONE" : "MANAGEMENT") : group.title === "navPreferences" ? (locale === "it" ? "ACCOUNT" : "ACCOUNT") : t(group.title)}</span>
           {group.items.map(renderItem)}
         </div>)}
