@@ -1488,3 +1488,18 @@ model AquariumReproduction {
   @@index([aquariumId, startedAt(sort: Desc)], map: "aquarium_reproduction_aquarium_started_idx")
   @@map("aquarium_reproductions")
 }
+
+
+model AquariumCompatibilityRule {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  speciesAKey   String   @map("species_a_key") @db.VarChar(180)
+  speciesBKey   String   @map("species_b_key") @db.VarChar(180)
+  compatibility String   @db.VarChar(16)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@unique([userId, speciesAKey, speciesBKey], map: "aquarium_compatibility_user_species_key")
+  @@index([userId, compatibility], map: "aquarium_compatibility_user_status_idx")
+  @@map("aquarium_compatibility_rules")
+}
