@@ -228,7 +228,7 @@ function ImportPage({ locale }: { locale: Locale }) {
         <div className="animal-import-icon"><Icon name="file-spreadsheet" size={22} /></div>
         <div>
           <h2>{locale === "it" ? "Trasferisci i tuoi animali da Excel" : "Bring your animals over from Excel"}</h2>
-          <p>{locale === "it" ? "Carica il tuo archivio CSV o Excel. SnakeBee riconosce le colonne più comuni e ti permette di controllare i dati prima di creare le schede." : "Upload your CSV or Excel file. SnakeBee recognises common columns and lets you review everything before creating profiles."}</p>
+          <p>{locale === "it" ? "Carica il tuo archivio CSV o Excel. Vivarqo riconosce le colonne più comuni e ti permette di controllare i dati prima di creare le schede." : "Upload your CSV or Excel file. Vivarqo recognises common columns and lets you review everything before creating profiles."}</p>
           <div className="animal-import-points">
             <span><Icon name="file-check" size={14} /> CSV / XLSX</span>
             <span><Icon name="scan-search" size={14} /> {locale === "it" ? "Riconoscimento colonne" : "Column matching"}</span>
@@ -245,7 +245,7 @@ function ImportPage({ locale }: { locale: Locale }) {
             <Select value={entity} onChange={(e) => changeEntity(e.target.value)} disabled={busy}>
               {importEntities.map((value) => <option value={value} key={value}>{labels[value]}</option>)}
             </Select>
-            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "snakebee-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello CSV per Excel" : "Download CSV template for Excel"}</Button></div>
+            <div className="row-actions"><Button type="button" variant="secondary" size="sm" onClick={() => void api.download("/imports/templates/" + encodeURIComponent(entity), "vivarqo-" + entity + "-template.csv")}>{locale === "it" ? "Scarica modello CSV per Excel" : "Download CSV template for Excel"}</Button></div>
           </Field>
           <Field label={t("chooseFile")}>
             <Input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
