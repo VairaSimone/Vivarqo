@@ -1197,6 +1197,7 @@ model CompanionCareRecord {
   nextDueAt   DateTime? @map("next_due_at") @db.Timestamptz(6)
   provider    String?   @db.VarChar(160)
   dosage      String?   @db.VarChar(120)
+  frequency   String?   @db.VarChar(120)
   notes       String?
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
   completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
