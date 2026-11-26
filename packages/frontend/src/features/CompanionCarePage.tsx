@@ -131,8 +131,8 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
       </div>
       {records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : new Date(record.nextDueAt).getTime() <= Date.now() + 7 * 86_400_000 ? "imminent" : "future")) === dueFilter).length === 0
         ? <p>{it ? "Nessun evento in questa categoria." : "No records in this category."}</p>
-        : <div className="ecosys-history">{records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming")) === dueFilter).map((record) => {
-          const status = record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : "upcoming");
+        : <div className="ecosys-history">{records.filter((record) => dueFilter === "all" || (record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : new Date(record.nextDueAt).getTime() <= Date.now() + 7 * 86_400_000 ? "imminent" : "future")) === dueFilter).map((record) => {
+          const status = record.dueStatus ?? (record.completedAt ? "completed" : !record.nextDueAt ? "none" : new Date(record.nextDueAt).getTime() < Date.now() ? "overdue" : new Date(record.nextDueAt).getTime() <= Date.now() + 7 * 86_400_000 ? "imminent" : "future");
           return <article className="ecosys-reading" key={record.id}>
             <strong>{record.animal.name} · {record.title}</strong>
             <span>{record.kind.replaceAll("_"," ")} · {new Date(record.occurredAt).toLocaleDateString(it ? "it-IT" : "en-GB")}{record.nextDueAt ? " · " + (it ? "Scadenza: " : "Due: ") + new Date(record.nextDueAt).toLocaleDateString(it ? "it-IT" : "en-GB") : ""}</span>
