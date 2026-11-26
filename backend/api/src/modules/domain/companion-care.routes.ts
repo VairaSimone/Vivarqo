@@ -51,22 +51,39 @@ export function createCompanionCareRouter() {
     await requireDogsCats(auth.userId);
     const animalId = req.query.animalId === undefined ? undefined : parseUuid(req.query.animalId);
     if (animalId) await ownedAnimal(auth.userId, animalId);
+    const now = new Date();
+    const status = typeof req.query.status === "string" ? req.query.status : "all";
+    if (!["all", "overdue", "upcoming", "completed"].includes(status)) throw new AppError(400, "VALIDATION_ERROR", "Invalid care due status");
+    const dueFilter = status === "overdue" ? { completedAt: null, nextDueAt: { not: null, lt: now } }
+      : status === "upcoming" ? { completedAt: null, nextDueAt: { gte: now } }
+      : status === "completed" ? { completedAt: { not: null } } : {};
     const upcomingOnly = req.query.upcomingOnly === "true";
     const records = await prisma.companionCareRecord.findMany({
-      where: { userId: auth.userId, deletedAt: null, ...(animalId ? { animalId } : {}), ...(upcomingOnly ? { nextDueAt: { gte: new Date() } } : {}) },
+      where: { userId: auth.userId, deletedAt: null, ...(animalId ? { animalId } : {}), ...dueFilter,
+        ...(upcomingOnly ? { completedAt: null, nextDueAt: { gte: now } } : {}) },
       include: { animal: { select: { id: true, name: true, species: true } } },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 200,
     });
-    res.status(200).json({ records });
+    res.status(200).json({ records: records.map((record) => ({ ...record, dueStatus: record.completedAt ? "completed" : !record.nextDueAt ? "none" : record.nextDueAt < now ? "overdue" : "upcoming" })) });
   });
   router.post("/companion-care", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     await requireDogsCats(auth.userId);
     const input = parse(companionCareCreateSchema, req.body);
     await ownedAnimal(auth.userId, input.animalId);
-    const record = await prisma.companionCareRecord.create({
-      data: { ...input, userId: auth.userId, occurredAt: new Date(input.occurredAt), nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null },
-      include: { animal: { select: { id: true, name: true, species: true } } },
+    const record = await prisma.$transaction(async (tx) => {
+      const created = await tx.companionCareRecord.create({
+        data: { ...input, userId: auth.userId, occurredAt: new Date(input.occurredAt), nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null },
+        include: { animal: { select: { id: true, name: true, species: true } } },
+      });
+      if (created.nextDueAt) {
+        await tx.task.create({ data: {
+          userId: auth.userId, animalId: created.animalId, title: created.title,
+          description: created.notes, category: "health", dueAt: created.nextDueAt,
+          companionCareRecordId: created.id,
+        } });
+      }
+      return created;
     });
     res.status(201).json({ record });
   });
@@ -76,10 +93,29 @@ export function createCompanionCareRouter() {
     const id = parseUuid(req.params.id);
     await ownedRecord(auth.userId, id);
     const input = parse(companionCarePatchSchema, req.body);
-    const record = await prisma.companionCareRecord.update({
-      where: { id },
-      data: { ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}), ...(input.nextDueAt !== undefined ? { nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null } : {}) },
-      include: { animal: { select: { id: true, name: true, species: true } } },
+    const record = await prisma.$transaction(async (tx) => {
+      const updated = await tx.companionCareRecord.update({
+        where: { id },
+        data: { ...input, ...(input.occurredAt ? { occurredAt: new Date(input.occurredAt) } : {}),
+          ...(input.nextDueAt !== undefined ? { nextDueAt: input.nextDueAt ? new Date(input.nextDueAt) : null, completedAt: null } : {}) },
+        include: { animal: { select: { id: true, name: true, species: true } } },
+      });
+      const dueTask = await tx.task.findFirst({ where: { companionCareRecordId: id } });
+      if (!updated.nextDueAt) {
+        if (dueTask?.status === "open") await tx.task.update({ where: { id: dueTask.id }, data: { status: "dismissed" } });
+      } else if (dueTask) {
+        await tx.task.update({ where: { id: dueTask.id }, data: {
+          title: updated.title, description: updated.notes, dueAt: updated.nextDueAt,
+          animalId: updated.animalId, status: "open", completedAt: null,
+        } });
+      } else {
+        await tx.task.create({ data: {
+          userId: auth.userId, animalId: updated.animalId, title: updated.title,
+          description: updated.notes, category: "health", dueAt: updated.nextDueAt,
+          companionCareRecordId: updated.id,
+        } });
+      }
+      return updated;
     });
     res.status(200).json({ record });
   });
@@ -88,7 +124,10 @@ export function createCompanionCareRouter() {
     await requireDogsCats(auth.userId);
     const id = parseUuid(req.params.id);
     await ownedRecord(auth.userId, id);
-    await prisma.companionCareRecord.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.$transaction(async (tx) => {
+      await tx.companionCareRecord.update({ where: { id }, data: { deletedAt: new Date() } });
+      await tx.task.updateMany({ where: { companionCareRecordId: id, status: "open" }, data: { status: "dismissed" } });
+    });
     res.status(200).json({ deleted: true });
   });
   return router;
