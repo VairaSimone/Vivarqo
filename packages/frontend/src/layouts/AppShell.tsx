@@ -26,15 +26,13 @@ const groups: Array<{ title: string; items: NavItem[] }> = [
   ] },
   { title: "navAnimals", items: [
     { path: "/animals", label: "navAnimals", icon: "snake" },
-    { path: "/feeding", label: "navFeeding", icon: "feed" }
-  ] },
-  { title: "navResources", items: [
+    { path: "/feeding", label: "navFeeding", icon: "feed" },
     { path: "/reproduction", label: "navBreeding", icon: "leaf" },
-    { path: "/genetics", label: "navGenetics", icon: "leaf" },
-    { path: "/inventory", label: "navInventory", icon: "box" },
-    { path: "/documents", label: "navDocuments", icon: "file" }
+    { path: "/genetics", label: "navGenetics", icon: "leaf" }
   ] },
   { title: "navAdmin", items: [
+    { path: "/inventory", label: "navInventory", icon: "box" },
+    { path: "/documents", label: "navDocuments", icon: "file" },
     { path: "/finance", label: "navFinance", icon: "wallet" },
     { path: "/imports", label: "navImports", icon: "file" },
     { path: "/exports", label: "navExports", icon: "box" }
@@ -269,7 +267,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
       </button>
       <div className="nav-scroll">
         {groups.map((group) => <div className="nav-section" key={group.title}>
-          <span className="nav-caption">{t(group.title)}</span>
+          <span className="nav-caption">{group.title === "navAdmin" ? (locale === "it" ? "GESTIONE" : "MANAGEMENT") : group.title === "navPreferences" ? (locale === "it" ? "ACCOUNT" : "ACCOUNT") : t(group.title)}</span>
           {group.items.map(renderItem)}
         </div>)}
       </div>
