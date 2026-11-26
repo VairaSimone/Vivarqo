@@ -69,6 +69,9 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       .expect((res) => { expect(res.body.reading.ghDkh).toBeNull(); expect(res.body.reading.khDkh).toBeNull(); });
     await owner.agent.delete(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
     await owner.agent.get("/api/v1/aquariums").expect(200).expect((res) => expect(res.body.aquariums).toHaveLength(0));
+    await owner.agent.get("/api/v1/aquariums?archived=true").expect(200).expect((res) => expect(res.body.aquariums).toHaveLength(1));
+    await owner.agent.post(`/api/v1/aquariums/${id}/restore`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    await owner.agent.get(`/api/v1/aquariums/${id}/readings`).expect(200).expect((res) => expect(res.body.readings).toHaveLength(1));
   });
 
   it("records dog and cat health events with account isolation", async () => {
@@ -81,7 +84,14 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const created = await owner.agent.post("/api/v1/companion-care").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ animalId: animal.id, kind: "vaccination", title: "Richiamo annuale", occurredAt: new Date().toISOString(), nextDueAt: new Date(Date.now() + 365 * 86400000).toISOString(), provider: "Ambulatorio test" }).expect(201);
     const recordId = created.body.record.id as string;
+    const linkedTask = await prisma.task.findFirstOrThrow({ where: { companionCareRecordId: recordId, userId: owner.userId } });
+    expect(linkedTask.category).toBe("health");
     await owner.agent.get(`/api/v1/companion-care?animalId=${animal.id}`).expect(200).expect((res) => expect(res.body.records).toHaveLength(1));
+    await owner.agent.post(`/api/v1/tasks/${linkedTask.id}/complete`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    await owner.agent.get(`/api/v1/companion-care?animalId=${animal.id}&status=completed`).expect(200).expect((res) => {
+      expect(res.body.records).toHaveLength(1);
+      expect(res.body.records[0].dueStatus).toBe("completed");
+    });
     await other.agent.get(`/api/v1/companion-care?animalId=${animal.id}`).expect(404);
     await other.agent.patch(`/api/v1/companion-care/${recordId}`).set("Origin", origin).set("X-CSRF-Token", other.csrf)
       .send({ title: "Tentativo cross-account" }).expect(404);
@@ -95,7 +105,12 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       .send({ animalIds: [bird.id] }).expect(200).expect((res) => expect(res.body.assignedCount).toBe(1));
     await owner.agent.patch(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Voliera aggiornata", capacity: 15 }).expect(200);
-    await owner.agent.delete(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
+    const aviaryId = aviary.body.aviary.id as string;
+    await owner.agent.delete(`/api/v1/aviaries/${aviaryId}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).expect(204);
     await owner.agent.get("/api/v1/aviaries").expect(200).expect((res) => expect(res.body.aviaries).toHaveLength(0));
+    expect(await prisma.aviaryBird.count({ where: { aviaryId, animalId: bird.id } })).toBe(1);
+    await owner.agent.get("/api/v1/aviaries?archived=true").expect(200).expect((res) => expect(res.body.aviaries).toHaveLength(1));
+    await owner.agent.post(`/api/v1/aviaries/${aviaryId}/restore`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
+    await owner.agent.get(`/api/v1/aviaries/${aviaryId}/birds`).expect(200).expect((res) => expect(res.body.birds.map((item: { id: string }) => item.id)).toContain(bird.id));
   });
 });
