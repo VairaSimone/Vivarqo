@@ -39,6 +39,7 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
         passwordHash: await argon2.hash(password, { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 }),
         displayName: emailPrefix,
         emailVerifiedAt: new Date(),
+        accountConfiguration: { create: { animalCategories: ["reptiles"] } },
       },
     });
     userIds.push(user.id);
