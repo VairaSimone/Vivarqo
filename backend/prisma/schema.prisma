@@ -191,6 +191,7 @@ model Animal {
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
   aviaryAssignments      AviaryBird[]
+  aviaryMovements        AviaryMovement[]
   companionCareRecords   CompanionCareRecord[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
@@ -1087,8 +1088,51 @@ model Aquarium {
   updatedAt    DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   readings     AquariumWaterReading[]
+  parameterRanges AquariumParameterRange[]
   @@index([userId, archivedAt, name], map: "aquariums_user_archived_name_idx")
   @@map("aquariums")
+}
+
+
+model AquariumParameterRange {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId  String   @map("aquarium_id") @db.Uuid
+  parameter   String   @db.VarChar(32)
+  minValue    Decimal? @map("min_value") @db.Decimal(12, 4)
+  maxValue    Decimal? @map("max_value") @db.Decimal(12, 4)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aquarium    Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@unique([aquariumId, parameter], map: "aquarium_parameter_ranges_aquarium_parameter_key")
+  @@map("aquarium_parameter_ranges")
+}
+
+model AviaryMovement {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId    String   @map("animal_id") @db.Uuid
+  fromAviaryId String? @map("from_aviary_id") @db.Uuid
+  toAviaryId  String?  @map("to_aviary_id") @db.Uuid
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  notes       String?
+  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  fromAviary  Aviary?  @relation("AviaryMovementFrom", fields: [fromAviaryId], references: [id], onDelete: SetNull)
+  toAviary    Aviary?  @relation("AviaryMovementTo", fields: [toAviaryId], references: [id], onDelete: SetNull)
+  @@index([animalId, occurredAt(sort: Desc)], map: "aviary_movements_animal_occurred_idx")
+  @@index([fromAviaryId, occurredAt(sort: Desc)], map: "aviary_movements_from_occurred_idx")
+  @@index([toAviaryId, occurredAt(sort: Desc)], map: "aviary_movements_to_occurred_idx")
+  @@map("aviary_movements")
+}
+
+model AviaryNote {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aviaryId   String   @map("aviary_id") @db.Uuid
+  title      String?  @db.VarChar(160)
+  body       String
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aviary     Aviary   @relation(fields: [aviaryId], references: [id], onDelete: Cascade)
+  @@index([aviaryId, occurredAt(sort: Desc)], map: "aviary_notes_aviary_occurred_idx")
+  @@map("aviary_notes")
 }
 
 model AquariumWaterReading {
@@ -1124,6 +1168,9 @@ model Aviary {
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   birds        AviaryBird[]
+  movementsFrom AviaryMovement[] @relation("AviaryMovementFrom")
+  movementsTo AviaryMovement[] @relation("AviaryMovementTo")
+  notesHistory AviaryNote[]
   @@index([userId, archivedAt, name], map: "aviaries_user_archived_name_idx")
   @@map("aviaries")
 }
