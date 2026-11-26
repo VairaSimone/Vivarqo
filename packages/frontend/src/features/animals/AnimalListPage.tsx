@@ -67,9 +67,22 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
 
   useEffect(() => {
     let active = true;
-    api.get<{ categories: string[] }>("/onboarding/configuration")
-      .then((configuration) => { if (active) setEnabledCategories(configuration.categories); })
-      .catch(() => { if (active) setEnabledCategories(["reptiles"]); });
+    // The active workspace, not the collaborator's personal account, defines
+    // which animal categories are available in this view.
+    api.get<{ categories: string[] }>("/collaborators/context")
+      .then((context) => {
+        if (!active) return;
+        const categories = context.categories.filter((value) => ["reptiles", "fish", "birds", "dogs_cats"].includes(value));
+        setEnabledCategories(categories);
+        setCategory((current) => current && categories.includes(current) ? current : "");
+      })
+      .catch(() => {
+        if (!active) return;
+        // Fail closed: never offer categories based on a personal-account
+        // fallback when the active workspace context cannot be determined.
+        setEnabledCategories([]);
+        setCategory("");
+      });
     return () => { active = false; };
   }, []);
 
