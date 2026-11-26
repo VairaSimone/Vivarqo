@@ -5132,6 +5132,191 @@ paths:
           content:
             application/json:
               schema: { type: object, required: [rule], properties: { rule: { type: object } } }
+  /api/v1/aquariums/{id}/ranges:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAquariumParameterRanges
+      tags: [Ecosystems]
+      summary: Elenca gli intervalli dei parametri impostati per l'acquario
+      responses:
+        '200':
+          description: Intervalli configurati.
+          content:
+            application/json:
+              schema: { type: object, required: [ranges], properties: { ranges: { type: array, items: { type: object } } } }
+    put:
+      operationId: replaceAquariumParameterRanges
+      tags: [Ecosystems]
+      summary: Sostituisce gli intervalli dei parametri dell'acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumRangeSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ranges]
+              properties:
+                ranges:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: object
+                    required: [parameter, minValue, maxValue]
+                    properties:
+                      parameter: { type: string, enum: [temperatureC, ph, ghDkh, khDkh, nitrateMgL] }
+                      minValue: { type: [number, 'null'] }
+                      maxValue: { type: [number, 'null'] }
+      responses:
+        '200':
+          description: Intervalli aggiornati.
+          content:
+            application/json:
+              schema: { type: object, required: [ranges], properties: { ranges: { type: array, items: { type: object } } } }
+  /api/v1/aquariums/{id}/export.csv:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: exportAquariumReadingsCsv
+      tags: [Ecosystems]
+      summary: Esporta le misurazioni dell'acquario in CSV
+      responses:
+        '200':
+          description: File CSV delle misurazioni.
+          content:
+            text/csv:
+              schema: { type: string }
+  /api/v1/aquariums/{id}/restore:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: restoreAquarium
+      tags: [Ecosystems]
+      summary: Ripristina un acquario archiviato
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Acquario ripristinato.
+          content:
+            application/json:
+              schema: { type: object, required: [aquarium], properties: { aquarium: { type: object } } }
+  /api/v1/aviaries/{id}/restore:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: restoreAviary
+      tags: [Ecosystems]
+      summary: Ripristina una voliera archiviata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Voliera ripristinata.
+          content:
+            application/json:
+              schema: { type: object, required: [aviary], properties: { aviary: { type: object } } }
+  /api/v1/aviaries/{id}/history:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getAviaryHistory
+      tags: [Ecosystems]
+      summary: Recupera storico movimenti e note della voliera
+      responses:
+        '200':
+          description: Storico voliera.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [movements, notes]
+                properties:
+                  movements: { type: array, items: { type: object } }
+                  notes: { type: array, items: { type: object } }
+  /api/v1/aviaries/{id}/notes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAviaryNote
+      tags: [Ecosystems]
+      summary: Registra una nota o un intervento sulla voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviaryNoteSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                title: { type: [string, 'null'], maxLength: 160 }
+                body: { type: string, minLength: 1, maxLength: 10000 }
+                occurredAt: { type: string, format: date-time }
+      responses:
+        '201':
+          description: Nota registrata.
+          content:
+            application/json:
+              schema: { type: object, required: [note], properties: { note: { type: object } } }
+  /api/v1/aviaries/{id}/notes/{noteId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: noteId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      operationId: deleteAviaryNote
+      tags: [Ecosystems]
+      summary: Elimina una nota della voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Nota eliminata. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/home/today/collection:
+    get:
+      operationId: getTodayCollectionSummary
+      tags: [Dashboard]
+      summary: Recupera il riepilogo delle collezioni e delle scadenze odierne
+      responses:
+        '200':
+          description: Riepilogo dashboard.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
   /api/v1/aviaries/{id}/birds:
     parameters:
       - name: id
