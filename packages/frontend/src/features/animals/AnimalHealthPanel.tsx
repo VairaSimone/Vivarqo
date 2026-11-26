@@ -82,10 +82,10 @@ export function AnimalHealthPanel({ animalId, locale, archived, onDocuments }: {
   const update = (key: keyof FormState, value: string) => setForm(current => ({ ...current, [key]: value }));
   const label = (value: string) => it ? value : ({
     "Sintomo": "Symptom", "Visita veterinaria": "Veterinary visit", "Diagnosi": "Diagnosis",
-    "Sospetto": "Suspected condition", "Trattamento": "Treatment", "Controllo": "Check-up",
+    "Sospetto": "Suspected condition", "Trattamento": "Treatment", "Antiparassitario": "Antiparasitic treatment", "Controllo": "Check-up",
     "In corso": "Ongoing", "Risolto": "Resolved", "Cronico": "Chronic",
   } as Record<string,string>)[value] ?? value;
-  const typeLabels: Record<string,string> = { symptom: label("Sintomo"), visit: label("Visita veterinaria"), diagnosis: label("Diagnosi"), suspicion: label("Sospetto"), treatment: label("Trattamento"), checkup: label("Controllo") };
+  const typeLabels: Record<string,string> = { symptom: label("Sintomo"), visit: label("Visita veterinaria"), diagnosis: label("Diagnosi"), suspicion: label("Sospetto"), treatment: label("Trattamento"), antiparasitic: label("Antiparassitario"), checkup: label("Controllo") };
   const statusLabels = { ongoing: label("In corso"), resolved: label("Risolto"), chronic: label("Cronico") };
   const field = (key: keyof FormState, title: string, type = "text") => <label className="health-field" key={key}><span>{title}</span><input type={type} value={form[key]} onChange={e => update(key, e.target.value)} /></label>;
   return <Panel>
