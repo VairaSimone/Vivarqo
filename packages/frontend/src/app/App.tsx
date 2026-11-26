@@ -253,7 +253,7 @@ export function App() {
 
   if (!authReady) return <div className="app-boot"><span className="brand-mark"><Icon name="leaf" /></span><LoadingState /></div>;
 
-  if (!user && (routeOnly(path) === "/" || routeOnly(path) === "/settings/collaborators")) {
+  if (!user && ["/", "/setup", "/settings/categories", "/settings/collaborators"].includes(routeOnly(path))) {
     return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>);
   }
 
