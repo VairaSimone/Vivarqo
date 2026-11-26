@@ -218,6 +218,18 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
     });
   }
 
+  async function deleteAviaryNote(noteId: string) {
+    if (!window.confirm(italian ? "Eliminare questa nota della voliera?" : "Delete this aviary note?")) return;
+    setSaving(true); setError("");
+    try {
+      await api.delete(`/aviaries/${encodeURIComponent(selectedId)}/notes/${encodeURIComponent(noteId)}`);
+      setAviaryNotes((current) => current.filter((note) => note.id !== noteId));
+      setNotice(italian ? "Nota eliminata." : "Note deleted.");
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : (italian ? "Impossibile eliminare la nota." : "Unable to delete note."));
+    } finally { setSaving(false); }
+  }
+
   async function addAviaryNote(event: FormEvent<HTMLFormElement>) {
     await submit(event, async () => {
       const result = await api.post<{ note: AviaryNote }>(`/aviaries/${encodeURIComponent(selectedId)}/notes`, { title: noteTitle || null, body: noteBody });
@@ -350,7 +362,7 @@ export function EcosystemsPage({ locale, path }: { locale: Locale; path: string 
         {movements.length === 0 ? <p className="ecosys-empty">{italian ? "Nessuno spostamento registrato." : "No movements recorded."}</p> : movements.map((movement) => <div className="ecosys-reading" key={movement.id}><strong>{movement.animal.name} · {movement.fromAviary?.name ?? (italian ? "Esterno" : "Outside")} → {movement.toAviary?.name ?? (italian ? "Uscita" : "Departed")}</strong><span>{new Date(movement.occurredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</span></div>)}
       </div>
       <form className="form-grid" onSubmit={addAviaryNote}><h3>{italian ? "Nota o intervento sulla voliera" : "Aviary note or intervention"}</h3><label className="field"><span className="field-label">{italian ? "Titolo" : "Title"}</span><input className="control" maxLength={160} value={noteTitle} onChange={(event) => setNoteTitle(event.target.value)} /></label><label className="field"><span className="field-label">{italian ? "Descrizione" : "Description"}</span><textarea className="control" required maxLength={10000} value={noteBody} onChange={(event) => setNoteBody(event.target.value)} /></label><Button type="submit" disabled={saving}>{italian ? "Aggiungi nota" : "Add note"}</Button></form>
-      <div className="ecosys-history"><h3>{italian ? "Note e interventi" : "Notes and interventions"}</h3>{aviaryNotes.map((note) => <div className="ecosys-reading" key={note.id}><strong>{note.title || (italian ? "Nota" : "Note")}</strong><span>{new Date(note.occurredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</span><p>{note.body}</p></div>)}</div>
+      <div className="ecosys-history"><h3>{italian ? "Note e interventi" : "Notes and interventions"}</h3>{aviaryNotes.map((note) => <div className="ecosys-reading" key={note.id}><strong>{note.title || (italian ? "Nota" : "Note")}</strong><span>{new Date(note.occurredAt).toLocaleString(italian ? "it-IT" : "en-GB")}</span><p>{note.body}</p><div className="inline-actions"><Button size="sm" variant="danger" disabled={saving} onClick={() => void deleteAviaryNote(note.id)}>{italian ? "Elimina" : "Delete"}</Button></div></div>)}</div>
     </section>}
   </section>;
 }
