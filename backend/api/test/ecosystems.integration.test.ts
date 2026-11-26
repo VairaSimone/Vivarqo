@@ -61,6 +61,13 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
       expect(res.body.readings[0].khDkh).toBeNull();
       expect(res.body.readings[0].nitrateMgL).toBeNull();
     });
+    await owner.agent.put(`/api/v1/aquariums/${id}/ranges`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ ranges: [{ parameter: "ph", minValue: 6.5, maxValue: 7.2 }, { parameter: "temperatureC", minValue: 24, maxValue: 28 }] }).expect(200)
+      .expect((res) => expect(res.body.ranges).toHaveLength(2));
+    await owner.agent.get(`/api/v1/aquariums/${id}/ranges`).expect(200).expect((res) => expect(res.body.ranges).toHaveLength(2));
+    await owner.agent.put(`/api/v1/aquariums/${id}/ranges`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ ranges: [{ parameter: "ph", minValue: 8, maxValue: 6 }] }).expect(400);
+    await owner.agent.get(`/api/v1/aquariums/${id}/export.csv`).expect(200).expect("Content-Type", /text\\/csv/).expect((res) => expect(res.text).toContain("temperatureC"));
     await other.agent.get(`/api/v1/aquariums/${id}/readings`).expect(404);
     await owner.agent.patch(`/api/v1/aquariums/${id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Tropical updated", location: "Living room" }).expect(200);
@@ -103,6 +110,13 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     const bird = await prisma.animal.create({ data: { userId: owner.userId, name: "Cocorita", species: "Melopsittacus undulatus", category: "birds" } });
     await owner.agent.put(`/api/v1/aviaries/${aviary.body.aviary.id}/birds`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ animalIds: [bird.id] }).expect(200).expect((res) => expect(res.body.assignedCount).toBe(1));
+    await owner.agent.post(`/api/v1/aviaries/${aviary.body.aviary.id}/notes`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ title: "Pulizia", body: "Pulizia e disinfezione settimanale" }).expect(201);
+    await owner.agent.get(`/api/v1/aviaries/${aviary.body.aviary.id}/history`).expect(200).expect((res) => {
+      expect(res.body.movements).toHaveLength(1);
+      expect(res.body.notes).toHaveLength(1);
+    });
+    await owner.agent.get("/api/v1/aviaries").expect(200).expect((res) => expect(res.body.aviaries[0].capacityRemaining).toBe(11));
     await owner.agent.patch(`/api/v1/aviaries/${aviary.body.aviary.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ name: "Voliera aggiornata", capacity: 15 }).expect(200);
     const aviaryId = aviary.body.aviary.id as string;
