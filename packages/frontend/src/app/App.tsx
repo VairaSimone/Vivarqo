@@ -4,6 +4,7 @@ import { invalidateAllResourceCache } from "../lib/resourceCache";
 import { AppShell } from "../layouts/AppShell";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
+const AccountCategoriesPage = lazy(() => import("../features/AccountCategoriesPage").then((module) => ({ default: module.AccountCategoriesPage })));
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
 const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
@@ -135,6 +136,10 @@ export function App() {
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
       setAuthError("");
+      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+      if (!active) return;
+      if (!configuration.configuredAt) navigate("/setup");
+      else if (window.location.pathname === "/setup") navigate("/today");
     }).catch((reason: unknown) => {
       if (!active) return;
       setUser(null);
@@ -143,7 +148,7 @@ export function App() {
       if (active) setAuthReady(true);
     });
     return () => { active = false; };
-  }, [isPublic]);
+  }, [isPublic, navigate]);
 
   useEffect(() => {
     const value = accountPrefs.data?.preferences ?? {};
@@ -210,6 +215,11 @@ export function App() {
       const result = await api.get<{ user: User }>("/auth/me");
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
+      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+      if (!configuration.configuredAt) {
+        navigate("/setup");
+        return;
+      }
       const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get("invite");
       const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
       if (inviteToken && routeOnly(window.location.pathname) === "/settings/collaborators") {
@@ -246,6 +256,11 @@ export function App() {
 
   const route = routeOnly(path);
   const matches = (base: string) => route === base || route.startsWith(base + "/");
+  if (route === "/setup") {
+    return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>
+      <AccountCategoriesPage locale={locale} mode="setup" onComplete={() => navigate("/today")} />
+    </Suspense>);
+  }
   let page;
   if (route === "/today" || route === "/") page = <DashboardPage locale={locale} timezone={timezone} navigate={navigate} />;
   else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
