@@ -838,6 +838,16 @@ CREATE TABLE user_preferences (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE account_configurations (
+    user_id           UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    animal_categories VARCHAR(24)[] NOT NULL DEFAULT ARRAY[]::VARCHAR(24)[],
+    configured_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX account_configurations_configured_at_idx
+    ON account_configurations (configured_at);
+
 -- Outbox persistente dei tentativi di consegna Web Push.
 CREATE TABLE push_delivery_attempts (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
