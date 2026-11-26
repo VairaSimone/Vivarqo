@@ -11299,7 +11299,7 @@ components:
       additionalProperties: false
       required: [recordType, status, occurredAt, title]
       properties:
-        recordType: { type: string, enum: [symptom, visit, diagnosis, suspicion, treatment, checkup] }
+        recordType: { type: string, enum: [symptom, visit, diagnosis, suspicion, treatment, checkup, vaccination] }
         status: { type: string, enum: [ongoing, resolved, chronic] }
         occurredAt: { type: string, format: date-time }
         title: { type: string, minLength: 1, maxLength: 160 }
