@@ -130,7 +130,9 @@ export function createHomeCalendarRouter() {
     res.setHeader("Cache-Control", "private, no-store");
     res.status(200).json({
       totals: { active: activeTotal, archived: archivedTotal },
-      categories: enabled.map((category) => ({
+      categories: ["reptiles", "fish", "birds", "dogs_cats"].filter((category) =>
+        enabled.includes(category) || (activeMap.get(category) ?? 0) > 0 || (archivedMap.get(category) ?? 0) > 0,
+      ).map((category) => ({
         category, active: activeMap.get(category) ?? 0, archived: archivedMap.get(category) ?? 0,
       })),
       upcoming: upcomingCare.map((task) => ({
