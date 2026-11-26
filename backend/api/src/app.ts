@@ -23,6 +23,7 @@ import { createAnimalManagementRouter } from "./modules/animals/animal-managemen
 import { createCareRouter } from "./modules/animals/care.routes.js";
 import { createWeightGrowthRouter } from "./modules/animals/weight-growth.routes.js";
 import { createHealthRouter } from "./modules/animals/health.routes.js";
+import { createReptileCareRouter } from "./modules/animals/reptile-care.routes.js";
 import { createImportRouter } from "./modules/animals/import.routes.js";
 import { createTasksRouter } from "./modules/operations/tasks.routes.js";
 import { createHomeCalendarRouter } from "./modules/operations/home-calendar.routes.js";
@@ -118,6 +119,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1", createWeightGrowthRouter());
   app.use("/api/v1", createHealthRouter());
+  app.use("/api/v1", createReptileCareRouter());
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/imports", createDomainImportRouter());
   app.use("/api/v1/imports", createCareImportRouter());
