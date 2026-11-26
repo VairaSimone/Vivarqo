@@ -38,7 +38,7 @@ const aliases: Record<string, string> = {
   acquireddate: "acquiredDate", dataacquisizione: "acquiredDate", acquisizione: "acquiredDate",
   origindescription: "originDescription", provenienza: "originDescription", origine: "originDescription",
   previousbreeder: "previousBreeder", allevatoreprecedente: "previousBreeder",
-  location: "locationLabel", locationlabel: "locationLabel", posizione: "locationLabel", alloggiamento: "locationLabel", rack: "locationLabel", stabulazione: "locationLabel", scaffale: "locationLabel", contenitore: "locationLabel", box: "locationLabel",
+  location: "locationLabel", locationlabel: "locationLabel", posizione: "locationLabel", alloggiamento: "locationLabel", rack: "locationLabel", rackposizione: "locationLabel", racknumero: "locationLabel", stabulazione: "locationLabel", scaffale: "locationLabel", contenitore: "locationLabel", box: "locationLabel",
   status: "status", stato: "status",
   notes: "notes", note: "notes", notedellanimale: "notes",
 };
