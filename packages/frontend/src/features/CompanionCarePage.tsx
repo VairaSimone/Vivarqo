@@ -7,7 +7,7 @@ type CompanionAnimal = { id: string; name: string; species: string };
 type CompanionProfile = { microchip?: string | null; veterinarianName?: string | null; veterinaryClinic?: string | null; veterinaryPhone?: string | null; veterinaryEmail?: string | null; veterinaryAddress?: string | null; allergies?: string | null; chronicConditions?: string | null };
 type Weight = { id: string; measuredAt: string; weightG: string | number; notes: string | null };
 type CompanionDocument = { id: string; originalFilename: string; category: string; sizeBytes: string; createdAt: string };
-type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "imminent" | "future" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; clinic?: string | null; treatmentStartAt?: string | null; treatmentEndAt?: string | null; isOngoing?: boolean; dosage: string | null; frequency?: string | null; notes: string | null; animal: CompanionAnimal };
+type CareRecord = { id: string; animalId: string; kind: string; title: string; occurredAt: string; nextDueAt: string | null; recurrenceIntervalDays?: number | null; completedAt?: string | null; dueStatus?: "none" | "overdue" | "imminent" | "future" | "upcoming" | "completed"; task?: { id: string; status: string } | null; provider: string | null; clinic?: string | null; treatmentStartAt?: string | null; treatmentEndAt?: string | null; isOngoing?: boolean; dosage: string | null; frequency?: string | null; notes: string | null; animal: CompanionAnimal };
 const kinds = ["vaccination", "medication", "vet_visit", "parasite_prevention", "surgery", "grooming", "other"];
 
 export function CompanionCarePage({ locale }: { locale: Locale }) {
@@ -33,6 +33,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
   const [title, setTitle] = useState("");
   const [occurredAt, setOccurredAt] = useState(new Date().toISOString().slice(0, 10));
   const [nextDueAt, setNextDueAt] = useState("");
+  const [recurrenceIntervalDays, setRecurrenceIntervalDays] = useState("");
   const [provider, setProvider] = useState("");
   const [dosage, setDosage] = useState("");
   const [frequency, setFrequency] = useState("");
@@ -121,11 +122,12 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
         animalId, kind, title,
         occurredAt: new Date(occurredAt + "T12:00:00").toISOString(),
         nextDueAt: nextDueAt ? new Date(nextDueAt + "T12:00:00").toISOString() : null,
+        recurrenceIntervalDays: recurrenceIntervalDays ? Number(recurrenceIntervalDays) : null,
         provider: provider || null, clinic: clinic || null, dosage: dosage || null, frequency: frequency || null, notes: notes || null, treatmentStartAt: therapyStartAt ? new Date(therapyStartAt + "T12:00:00").toISOString() : null, treatmentEndAt: therapyEndAt ? new Date(therapyEndAt + "T12:00:00").toISOString() : null, isOngoing,
       };
       if (editingRecordId) {
         await api.patch("/companion-care/" + editingRecordId, {
-          kind, title, occurredAt: payload.occurredAt, nextDueAt: payload.nextDueAt,
+          kind, title, occurredAt: payload.occurredAt, nextDueAt: payload.nextDueAt, recurrenceIntervalDays: payload.recurrenceIntervalDays,
           provider: payload.provider, clinic: payload.clinic, dosage: payload.dosage, frequency: payload.frequency, notes: payload.notes, treatmentStartAt: payload.treatmentStartAt, treatmentEndAt: payload.treatmentEndAt, isOngoing: payload.isOngoing,
         });
       } else {
@@ -133,7 +135,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
       }
       await reload();
       setEditingRecordId(null);
-      setTitle(""); setNextDueAt(""); setProvider(""); setClinic(""); setDosage(""); setFrequency(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false);
+      setTitle(""); setNextDueAt(""); setRecurrenceIntervalDays(""); setProvider(""); setClinic(""); setDosage(""); setFrequency(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false);
       setNotice(it ? (editingRecordId ? "Evento aggiornato." : "Evento registrato correttamente.") : (editingRecordId ? "Care event updated." : "Care event saved."));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : (it ? "Salvataggio non riuscito." : "Unable to save record."));
@@ -147,6 +149,7 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
     setTitle(record.title);
     setOccurredAt(new Date(record.occurredAt).toISOString().slice(0, 10));
     setNextDueAt(record.nextDueAt ? new Date(record.nextDueAt).toISOString().slice(0, 10) : "");
+    setRecurrenceIntervalDays(record.recurrenceIntervalDays ? String(record.recurrenceIntervalDays) : "");
     setProvider(record.provider ?? ""); setClinic(record.clinic ?? ""); setTherapyStartAt(record.treatmentStartAt ? new Date(record.treatmentStartAt).toISOString().slice(0,10) : ""); setTherapyEndAt(record.treatmentEndAt ? new Date(record.treatmentEndAt).toISOString().slice(0,10) : ""); setIsOngoing(Boolean(record.isOngoing));
     setDosage(record.dosage ?? ""); setFrequency(record.frequency ?? "");
     setNotes(record.notes ?? "");
@@ -206,12 +209,13 @@ export function CompanionCarePage({ locale }: { locale: Locale }) {
             <Field label={it ? "Descrizione" : "Title"}><Input required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
             <Field label={it ? "Data evento" : "Event date"}><Input type="date" required value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} /></Field>
             <Field label={it ? "Prossima scadenza" : "Next due date"}><Input type="date" value={nextDueAt} onChange={(e) => setNextDueAt(e.target.value)} /></Field>
+            {(kind === "vaccination" || kind === "parasite_prevention") && <Field label={it ? "Ripeti ogni (giorni)" : "Repeat every (days)"}><Input type="number" min={1} max={3650} placeholder={it ? "Lascia vuoto per un richiamo singolo" : "Leave empty for a one-time reminder"} value={recurrenceIntervalDays} onChange={(e) => setRecurrenceIntervalDays(e.target.value)} /><small>{it ? "Dopo aver completato il richiamo, Vivarqo creerà automaticamente la scadenza successiva." : "After completing the reminder, Vivarqo will automatically schedule the next occurrence."}</small></Field>}
             <Field label={it ? "Veterinario" : "Veterinarian"}><Input maxLength={160} value={provider} onChange={(e) => setProvider(e.target.value)} /></Field><Field label={it ? "Struttura veterinaria" : "Veterinary clinic"}><Input maxLength={160} value={clinic} onChange={(e) => setClinic(e.target.value)} /></Field>
             <Field label={it ? "Dosaggio" : "Dosage"}><Input maxLength={120} value={dosage} onChange={(e) => setDosage(e.target.value)} /></Field>{kind === "medication" && <Field label={it ? "Frequenza" : "Frequency"}><Input maxLength={120} placeholder={it ? "es. 1 volta al giorno" : "e.g. once daily"} value={frequency} onChange={(e) => setFrequency(e.target.value)} /></Field>}{kind === "medication" && <><Field label={it ? "Inizio terapia" : "Therapy start"}><Input type="date" value={therapyStartAt} onChange={(e) => setTherapyStartAt(e.target.value)} /></Field><Field label={it ? "Fine terapia" : "Therapy end"}><Input type="date" value={therapyEndAt} onChange={(e) => setTherapyEndAt(e.target.value)} /></Field><label className="field"><span>{it ? "Terapia continuativa" : "Ongoing therapy"}</span><input type="checkbox" checked={isOngoing} onChange={(e) => setIsOngoing(e.target.checked)} /></label></>}
           </div>
           <Field label={it ? "Note" : "Notes"}><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
           <div className="modal-actions"><Button type="submit" disabled={saving || !animalId}>{saving ? (it ? "Salvataggio…" : "Saving…") : (editingRecordId ? (it ? "Salva modifiche" : "Save changes") : (it ? "Registra evento" : "Save event"))}</Button>
-            {editingRecordId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingRecordId(null); setTitle(""); setNextDueAt(""); setProvider(""); setClinic(""); setDosage(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false); }}>{it ? "Annulla" : "Cancel"}</Button>}</div>
+            {editingRecordId && <Button type="button" variant="secondary" disabled={saving} onClick={() => { setEditingRecordId(null); setTitle(""); setNextDueAt(""); setRecurrenceIntervalDays(""); setProvider(""); setClinic(""); setDosage(""); setNotes(""); setTherapyStartAt(""); setTherapyEndAt(""); setIsOngoing(false); }}>{it ? "Annulla" : "Cancel"}</Button>}</div>
         </form>}
     </Panel>
     {animalId && <>
