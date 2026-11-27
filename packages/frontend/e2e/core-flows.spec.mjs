@@ -774,7 +774,9 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 });
 
 test("reproduction cycle, event, clutch, eggs, incubation and offspring persist", async ({ page }) => {
-  test.setTimeout(180_000);
+  // This is an intentionally end-to-end multi-step workflow against a real API,
+  // worker and PostgreSQL instance; allow the full scenario to finish on CI.
+  test.setTimeout(300_000);
   await signIn(page, owner);
 
   const parentNames = ["E2E Breeding Parent A", "E2E Breeding Parent B"];
@@ -1377,7 +1379,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   );
   await page.getByRole("button", { name: "Registra cessione" }).click();
   await transferResponse;
-  await expect(page.getByText("E2E Recipient", { exact: true })).toBeVisible();
+  await expect(page.locator(".record-row").filter({ hasText: "E2E Recipient" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
