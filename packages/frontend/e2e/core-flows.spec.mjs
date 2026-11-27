@@ -260,7 +260,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   expect(created?.id).toBeTruthy();
 
   await page.reload();
-  await expect(page.getByText(animalName, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(animalName) })).toBeVisible();
 
   const csrfStatus = await page.evaluate(async () => {
     const response = await fetch("/api/v1/animals", {
@@ -742,7 +742,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.goto("/inventory");
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
-  const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
+  const stockItemRow = page.getByRole("row").filter({ hasText: "E2E Food Stock" }).filter({ has: page.getByRole("button", { name: "Movimenti" }) });
   await expect(stockItemRow).toBeVisible();
   await stockItemRow.getByRole("button", { name: "Movimenti" }).click();
   await page.getByLabel("Tipo movimento").selectOption("in");
@@ -838,7 +838,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await clutchDialog.getByLabel("Deposizione").fill("2026-11-01");
   await clutchDialog.getByLabel("Numero uova").fill("2");
   await clutchDialog.getByLabel("Stato").fill("incubating");
-  await clutchDialog.getByLabel("Incubatore").fill("E2E Incubator");
+  await clutchDialog.getByLabel("Etichetta / posizione").fill("E2E Incubator");
   const clutchCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && response.url().includes("/api/v1/clutches") && response.status() === 201
   );
@@ -1327,7 +1327,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await management.getByLabel("Posizione superiore").selectOption({ label: room });
   await management.getByLabel("Nome posizione").fill(rack);
   await management.getByRole("button", { name: "Crea posizione" }).click();
-  await expect(management.getByText(rack, { exact: true })).toBeVisible();
+  await expect(management.getByLabel("Destinazione").locator("option").filter({ hasText: rack })).toHaveCount(1);
 
   const animalRow = management.locator(".record-row").filter({ hasText: name });
   await animalRow.locator('input[type="checkbox"]').check();
