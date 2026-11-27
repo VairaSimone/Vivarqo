@@ -36,7 +36,7 @@ export function PlanUsageSummary({ locale, compact = false, onNavigate }: { loca
   const it = locale === "it";
   const row = (label: string, used: number, max: number | null, percent: number | null) => <div className="plan-usage-row" key={label}>
     <div className="plan-usage-label"><span>{label}</span><strong>{formatNumber(used, locale, 0)} / {quantity(max, locale)}</strong></div>
-    {percent !== null && <div className="plan-usage-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}><span style={{ width: `${percent}%` }} /></div>}
+    {percent !== null && <div className="plan-usage-track" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}><span style={{ width: `${percent}%` }} /></div>}
   </div>;
   return <Panel className={compact ? "plan-usage-panel plan-usage-compact" : "plan-usage-panel"}>
     <PanelHeader title={it ? "Utilizzo del piano" : "Plan usage"} action={<Badge tone={e.plan === "paid" ? "success" : "neutral"}>{e.plan === "paid" ? (it ? "Piano attivo" : "Paid plan") : "Free"}</Badge>} />
@@ -45,7 +45,7 @@ export function PlanUsageSummary({ locale, compact = false, onNavigate }: { loca
       {row(it ? "Documenti" : "Documents", e.documentsUsed, e.maxDocuments, documentPct)}
       <div className="plan-usage-row">
         <div className="plan-usage-label"><span>{it ? "Spazio occupato" : "Storage used"}</span><strong>{storage(e.storageBytesUsed, locale)} / {storage(e.maxStorageBytes, locale)}</strong></div>
-        {storagePct !== null && <div className="plan-usage-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(storagePct)}><span style={{ width: `${storagePct}%` }} /></div>}
+        {storagePct !== null && <div className="plan-usage-track" role="progressbar" aria-label={it ? "Spazio occupato" : "Storage used"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(storagePct)}><span style={{ width: `${storagePct}%` }} /></div>}
       </div>
     </div>
     <div className="plan-usage-features">
