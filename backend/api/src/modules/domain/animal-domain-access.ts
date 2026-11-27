@@ -26,6 +26,9 @@ function matchesPath(path: string, prefix: string) {
 }
 
 export function categoryForAnimalDomainPath(path: string): string | null {
+  if (/^\\/animals\\/[^/]+\\/(?:hatchling-care|genetic-traits|genetic-history|pedigree|inbreeding)$/.test(path)) {
+    return "reptiles";
+  }
   return categoryRoutes.find((item) => item.prefixes.some((prefix) => matchesPath(path, prefix)))?.category ?? null;
 }
 
