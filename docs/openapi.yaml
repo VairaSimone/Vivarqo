@@ -5089,6 +5089,169 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
 
+
+  /api/v1/animals/{animalId}/reptile-care:
+    get:
+      operationId: getReptileCare
+      tags: [Animals]
+      summary: Legge i periodi di digiuno e brumazione di un rettile
+      parameters:
+        - name: animalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Storico di digiuno e brumazione.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fastingPeriods, brumationPeriods]
+                properties:
+                  fastingPeriods: { type: array, items: { type: object, additionalProperties: true } }
+                  brumationPeriods: { type: array, items: { type: object, additionalProperties: true } }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/{animalId}/fasting-periods:
+    post:
+      operationId: createReptileFastingPeriod
+      tags: [Animals]
+      summary: Registra un periodo di digiuno o rifiuto del pasto
+      parameters:
+        - name: animalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/reptile-care.routes.ts
+          symbol: reptileFastingPeriodSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Periodo di digiuno registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [period], properties: { period: { type: object, additionalProperties: true } } }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/fasting-periods/{id}:
+    patch:
+      operationId: updateReptileFastingPeriod
+      tags: [Animals]
+      summary: Aggiorna un periodo di digiuno
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/reptile-care.routes.ts
+          symbol: reptileFastingPeriodPatchSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Periodo aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [period], properties: { period: { type: object, additionalProperties: true } } }
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteReptileFastingPeriod
+      tags: [Animals]
+      summary: Elimina un periodo di digiuno
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Periodo eliminato.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/animals/{animalId}/brumation-periods:
+    post:
+      operationId: createReptileBrumationPeriod
+      tags: [Animals]
+      summary: Registra un periodo di brumazione
+      parameters:
+        - name: animalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/reptile-care.routes.ts
+          symbol: reptileBrumationPeriodSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Periodo di brumazione registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [period], properties: { period: { type: object, additionalProperties: true } } }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/brumation-periods/{id}:
+    patch:
+      operationId: updateReptileBrumationPeriod
+      tags: [Animals]
+      summary: Aggiorna un periodo di brumazione
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/animals/reptile-care.routes.ts
+          symbol: reptileBrumationPeriodPatchSchema
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Periodo aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [period], properties: { period: { type: object, additionalProperties: true } } }
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteReptileBrumationPeriod
+      tags: [Animals]
+      summary: Elimina un periodo di brumazione
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Periodo eliminato.
+        '404':
+          $ref: '#/components/responses/Error'
+
 components:
   securitySchemes:
     sessionCookieDev:
