@@ -1480,9 +1480,9 @@ model AquariumReproduction {
   startedAt       DateTime @map("started_at") @db.Timestamptz(6)
   spawnedAt       DateTime? @map("spawned_at") @db.Timestamptz(6)
   hatchedAt       DateTime? @map("hatched_at") @db.Timestamptz(6)
-  eggsCount       Int?
-  hatchedCount    Int?
-  survivingCount  Int?
+  eggsCount       Int?      @map("eggs_count")
+  hatchedCount    Int?      @map("hatched_count")
+  survivingCount  Int?      @map("surviving_count")
   notes           String?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   aquarium        Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
