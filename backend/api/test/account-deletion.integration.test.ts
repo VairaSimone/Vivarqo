@@ -73,6 +73,18 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
         title: "Deletion fixture health record",
       },
     });
+    const inventoryItem = await prisma.inventoryItem.create({
+      data: { userId: user.id, name: "Deletion fixture stock", category: "food", unit: "unit", quantityOnHand: 1 },
+      select: { id: true },
+    });
+    await prisma.inventoryLot.create({
+      data: {
+        itemId: inventoryItem.id,
+        quantityReceived: 1,
+        quantityRemaining: 1,
+        purchasedAt: new Date(),
+      },
+    });
     await prisma.importJob.createMany({
       data: ["animals", "feedings", "inventory"].map((entityType) => ({
         userId: user.id,
@@ -126,6 +138,8 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(await prisma.importJob.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.animalTransfer.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.healthRecord.count({ where: { animalId: animal.id } })).toBe(0);
+    expect(await prisma.inventoryLot.count({ where: { item: { is: { userId: user.id } } } })).toBe(0);
+    expect(await prisma.inventoryItem.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.animalLocation.count({ where: { userId: user.id } })).toBe(0);
     await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
