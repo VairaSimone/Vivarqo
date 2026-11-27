@@ -107,7 +107,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           <Button type="submit" disabled={saving || (population.movementType === "transfer" && !population.toAquariumId)}>{it?"Registra movimento":"Save movement"}</Button>
         </form>
         <h3>{it ? "Storico movimenti" : "Movement history"}</h3>
-        <div className="ecosys-history">{data.movements.map(row => <div className="ecosys-reading" key={row.id}><strong>{String(row.movementType)} · {String(row.commonName || row.speciesKey)} × {String(row.quantity)}</strong><span>{dateLabel(row.occurredAt,it)} · {String((row.fromAquarium as {name?:string}|null)?.name || (it?"Esterno":"Outside"))} → {String((row.toAquarium as {name?:string}|null)?.name || (it?"Uscita":"Out"))}</span>{row.reason && <small>{String(row.reason)}</small>}</div>)}</div>
+        <div className="ecosys-history">{data.movements.map(row => <div className="ecosys-reading" key={row.id}><strong>{String(row.movementType)} · {String(row.commonName || row.speciesKey)} × {String(row.quantity)}</strong><span>{dateLabel(row.occurredAt,it)} · {String((row.fromAquarium as {name?:string}|null)?.name || (it?"Esterno":"Outside"))} → {String((row.toAquarium as {name?:string}|null)?.name || (it?"Uscita":"Out"))}</span>{row.reason != null && <small>{String(row.reason)}</small>}</div>)}</div>
       </>}
       {section === "water" && <>
         <h3>{it?"Registro cambi d'acqua":"Water change log"}</h3>
@@ -135,7 +135,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           <label className="checkbox-field"><input type="checkbox" checked={filter.materialChanged} onChange={e=>setFilter(p=>({...p,materialChanged:e.target.checked}))}/><span>{it?"Materiale filtrante sostituito":"Filter media replaced"}</span></label>
           <Button type="submit" disabled={saving}>{it?"Registra manutenzione":"Save maintenance"}</Button>
         </form>
-        <div className="ecosys-history">{data.filterMaintenances.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.filterName)} · {String(row.action)}</strong><span>{dateLabel(row.occurredAt,it)} · {String(row.material||"—")} · {row.materialChanged? (it?"sostituito":"replaced"):""}</span>{row.nextDueAt && <small>{it?"Prossima manutenzione":"Next due"}: {dateLabel(row.nextDueAt,it)}</small>}</div>)}</div>
+        <div className="ecosys-history">{data.filterMaintenances.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.filterName)} · {String(row.action)}</strong><span>{dateLabel(row.occurredAt,it)} · {String(row.material||"—")} · {row.materialChanged? (it?"sostituito":"replaced"):""}</span>{row.nextDueAt != null && <small>{it?"Prossima manutenzione":"Next due"}: {dateLabel(String(row.nextDueAt),it)}</small>}</div>)}</div>
       </>}
       {section === "dosing" && <>
         <h3>{it?"Dosaggio fertilizzanti e prodotti":"Fertilizer and product dosing"}</h3>
@@ -207,7 +207,7 @@ export function AquariumManagementPanel({ aquarium, aquariums, locale }: { aquar
           {textarea(it?"Motivazione e condizioni":"Reason and conditions",compatibility.notes,v=>setCompatibility(p=>({...p,notes:v})))}
           <Button type="submit" disabled={saving}>{it?"Salva regola":"Save rule"}</Button>
         </form>
-        <div className="ecosys-history">{data.compatibilityRules.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.speciesAKey)} + {String(row.speciesBKey)} · {String(row.compatibility)}</strong>{row.notes && <span>{String(row.notes)}</span>}</div>)}</div>
+        <div className="ecosys-history">{data.compatibilityRules.map(row=><div className="ecosys-reading" key={row.id}><strong>{String(row.speciesAKey)} + {String(row.speciesBKey)} · {String(row.compatibility)}</strong>{row.notes != null && <span>{String(row.notes)}</span>}</div>)}</div>
       </>}
     </>}
   </section>;
