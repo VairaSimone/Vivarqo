@@ -99,7 +99,13 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.publicShare.deleteMany({ where: { userId } });
     await tx.financeEntry.deleteMany({ where: { userId } });
     await tx.document.deleteMany({ where: { userId } });
+    // These records use RESTRICT foreign keys to animals/cycles. Delete them
+    // explicitly before their parents; relying on User cascades is insufficient
+    // because account deletion keeps an anonymized tombstone row.
+    await tx.animalTransfer.deleteMany({ where: { userId } });
+    await tx.birdBreedingPair.deleteMany({ where: { userId } });
     if (animalIds.length) {
+      await tx.healthRecord.deleteMany({ where: { animalId: { in: animalIds } } });
       await tx.animalGeneticTrait.deleteMany({
         where: { OR: [{ animalId: { in: animalIds } }, { sourceAnimalId: { in: animalIds } }] },
       });
@@ -137,6 +143,22 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.exportJob.deleteMany({ where: { userId } });
     await tx.auditEvent.deleteMany({ where: { userId } });
     await tx.subscription.deleteMany({ where: { userId } });
+    await tx.financeBudget.deleteMany({ where: { userId } });
+    await tx.financeRecurrence.deleteMany({ where: { userId } });
+    await tx.inventorySupplier.deleteMany({ where: { userId } });
+    await tx.speciesBreedingProfile.deleteMany({ where: { userId } });
+    await tx.geneticGene.deleteMany({ where: { userId } });
+    await tx.aquariumCompatibilityRule.deleteMany({ where: { userId } });
+    await tx.aquarium.deleteMany({ where: { userId } });
+    await tx.aviary.deleteMany({ where: { userId } });
+    await tx.incubator.deleteMany({ where: { userId } });
+    await tx.companionPolicy.deleteMany({ where: { userId } });
+    await tx.companionCareLog.deleteMany({ where: { userId } });
+    await tx.companionCareRecord.deleteMany({ where: { userId } });
+    await tx.accountConfiguration.deleteMany({ where: { userId } });
+    await tx.savedAnimalFilter.deleteMany({ where: { userId } });
+    await tx.workspaceMembership.deleteMany({ where: { OR: [{ ownerUserId: userId }, { collaboratorUserId: userId }] } });
+    await tx.workspaceInvitation.deleteMany({ where: { ownerUserId: userId } });
     await tx.authToken.deleteMany({ where: { userId } });
     await tx.userSession.deleteMany({ where: { userId } });
 
