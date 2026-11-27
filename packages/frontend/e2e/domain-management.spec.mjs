@@ -58,9 +58,8 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.getByLabel("Nome").fill(aquariumName);
   await page.getByLabel("Volume (litri)").fill("120");
   await page.getByRole("button", { name: "Crea" }).click();
-  const aquarium = page.getByRole("button", { name: new RegExp(aquariumName) });
+  const aquarium = page.locator(".ecosys-item").filter({ hasText: aquariumName });
   await expect(aquarium).toBeVisible();
-  await aquarium.click();
   await page.getByRole("button", { name: "Modifica acquario" }).click();
   await page.getByLabel("Nome").fill(aquariumName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
@@ -74,9 +73,8 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.getByLabel("Nome").fill(aviaryName);
   await page.getByLabel("Capienza").fill("8");
   await page.getByRole("button", { name: "Crea" }).click();
-  const aviary = page.getByRole("button", { name: new RegExp(aviaryName) });
+  const aviary = page.locator(".ecosys-item").filter({ hasText: aviaryName });
   await expect(aviary).toBeVisible();
-  await aviary.click();
   await page.getByRole("button", { name: "Modifica voliera" }).click();
   await page.getByLabel("Nome").fill(aviaryName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
