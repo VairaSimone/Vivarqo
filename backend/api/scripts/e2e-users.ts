@@ -74,6 +74,7 @@ async function cleanAccounts() {
 
     // Inventory movements restrict deleting their item.
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId: { in: userIds } } } } });
+    await tx.inventoryLot.deleteMany({ where: { item: { is: { userId: { in: userIds } } } } });
     await tx.inventoryItem.deleteMany({ where: { userId: { in: userIds } } });
 
     // Transfer history is intentionally RESTRICT-linked to animals. Remove only
