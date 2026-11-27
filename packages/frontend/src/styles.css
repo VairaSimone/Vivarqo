@@ -3933,3 +3933,10 @@ kbd { font-size: 11px; }
   .ecosys-monitoring .panel-header .inline-actions select { min-width: 0; flex: 1; }
   .ecosys-ranges .inline-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Keep dashboard status variants readable against their darker terracotta/red surfaces. */
+.dashboard-intro-attention .eyebrow,
+.dashboard-intro-critical .eyebrow,
+.dashboard-intro-attention p,
+.dashboard-intro-critical p { color: #fff; }
