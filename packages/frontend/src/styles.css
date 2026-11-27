@@ -2613,7 +2613,7 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .animal-editor-section-heading h3 { margin: 0 0 3px; color: var(--text); font-size: 14px; font-weight: 750; letter-spacing: -.015em; }
 .animal-editor-section-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .animal-editor-required, .animal-editor-optional { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 650; white-space: nowrap; }
-.animal-editor-required { color: var(--accent-clay); }
+.animal-editor-required { color: var(--terracotta); }
 .animal-editor-photo { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 13px; border: 1px dashed var(--border-strong); border-radius: 11px; background: var(--surface-soft); }
 .animal-editor-photo > img, .animal-editor-photo-placeholder { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 64px; border-radius: 10px; object-fit: cover; background: var(--accent-teal-bg); color: var(--forest-2); }
 .animal-editor-photo-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
