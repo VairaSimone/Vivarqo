@@ -30,10 +30,35 @@ export const reptileBrumationPeriodSchema = z.object({
 }).strict().superRefine((v, ctx) => {
   if (v.endedAt && v.endedAt < v.startedAt) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
-export const reptileFastingPeriodPatchSchema = reptileFastingPeriodSchema.partial().strict()
-  .refine(value => Object.keys(value).length > 0, "At least one field is required");
-export const reptileBrumationPeriodPatchSchema = reptileBrumationPeriodSchema.partial().strict()
-  .refine(value => Object.keys(value).length > 0, "At least one field is required");
+export const reptileFastingPeriodPatchSchema = z.object({
+  periodType: z.enum(["fasting", "refusal"]).optional(),
+  startedAt: date.optional(),
+  endedAt: date.nullable().optional(),
+  lastAcceptedMealAt: date.nullable().optional(),
+  refusedMealsCount: z.coerce.number().int().min(0).max(10000).optional(),
+  reason: z.string().trim().max(240).nullable().optional(),
+  startWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
+  endWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
+  notes: z.string().trim().max(20000).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.endedAt && value.startedAt && Date.parse(value.endedAt) < Date.parse(value.startedAt)) {
+    ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
+  }
+}).refine(value => Object.keys(value).length > 0, "At least one field is required");
+export const reptileBrumationPeriodPatchSchema = z.object({
+  startedAt: date.optional(),
+  endedAt: date.nullable().optional(),
+  startWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
+  endWeightG: z.coerce.number().positive().max(10000000).nullable().optional(),
+  temperatureC: z.coerce.number().min(-20).max(60).nullable().optional(),
+  humidityPct: z.coerce.number().min(0).max(100).nullable().optional(),
+  conditions: z.string().trim().max(10000).nullable().optional(),
+  notes: z.string().trim().max(20000).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.endedAt && value.startedAt && value.endedAt < value.startedAt) {
+    ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
+  }
+}).refine(value => Object.keys(value).length > 0, "At least one field is required");
 
 function idOf(value: string | string[] | undefined) {
   const id = Array.isArray(value) ? value[0] : value;
