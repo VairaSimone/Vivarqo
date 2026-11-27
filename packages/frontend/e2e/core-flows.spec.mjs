@@ -671,7 +671,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
     mealDate.setMinutes(mealDate.getMinutes() - mealDate.getTimezoneOffset());
     await preyDialog.getByLabel("Data e ora").fill(mealDate.toISOString().slice(0, 16));
     await preyDialog.getByLabel("Esito").selectOption(outcome);
-    await preyDialog.getByLabel("Alimento").fill("Rat");
+    await preyDialog.getByLabel("Alimento", { exact: true }).fill("Rat");
     await preyDialog.getByLabel(/Peso alimento/).fill("120");
     await preyDialog.getByLabel("Stato della preda").selectOption("thawed");
     const inventorySelect = preyDialog.getByLabel("Collega preda all'inventario");
@@ -797,10 +797,10 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Nuovo ciclo" }).first().click();
   const cycleDialog = page.getByRole("dialog");
   await cycleDialog.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
-  await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);
-  await cycleDialog.getByRole("combobox", { name: "Genitore A" }).selectOption(parentA.id);
-  await cycleDialog.getByLabel("Cerca genitore b").fill(parentNames[1]);
-  await cycleDialog.getByRole("combobox", { name: "Genitore B" }).selectOption(parentB.id);
+  await cycleDialog.getByLabel("Cerca madre (femmina)").fill(parentNames[0]);
+  await cycleDialog.getByRole("combobox", { name: "Madre (femmina)" }).selectOption(parentA.id);
+  await cycleDialog.getByLabel("Cerca padre (maschio)").fill(parentNames[1]);
+  await cycleDialog.getByRole("combobox", { name: "Padre (maschio)" }).selectOption(parentB.id);
   const cycleCreatePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/reproduction-cycles") && response.request().method() === "POST"
   );
@@ -1320,7 +1320,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await management.getByLabel("Livello").selectOption("room");
   await management.getByLabel("Nome posizione").fill(room);
   await management.getByRole("button", { name: "Crea posizione" }).click();
-  await expect(management.getByText(room, { exact: true })).toBeVisible();
+  await expect(management.getByLabel("Destinazione").locator("option").filter({ hasText: room })).toHaveCount(1);
 
   await management.getByLabel("Livello").selectOption("rack");
   await management.getByLabel("Posizione superiore").selectOption({ label: room });
