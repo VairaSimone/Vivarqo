@@ -122,7 +122,7 @@ export function createCompanionCareExtrasRouter() {
       const updated = await tx.companionPolicy.update({ where: { id }, data: {
         ...input, ...(input.startsAt !== undefined ? { startsAt: input.startsAt ? new Date(input.startsAt + "T12:00:00.000Z") : null } : {}),
         ...(input.expiresAt ? { expiresAt: new Date(input.expiresAt + "T12:00:00.000Z") } : {}),
-      }, include: { animal: { select: { id: true, name: true, species: true } } });
+      }, include: { animal: { select: { id: true, name: true, species: true } } } });
       const openTask = existing.taskId ? await tx.task.findFirst({ where: { id: existing.taskId, userId: auth.userId, status: "open" } }) : null;
       if (openTask) await tx.task.update({ where: { id: openTask.id }, data: {
         title: "Scadenza: " + updated.title, description: updated.notes,
