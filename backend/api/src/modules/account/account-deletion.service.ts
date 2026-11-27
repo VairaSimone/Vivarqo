@@ -59,7 +59,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     prisma.animal.findMany({ where: { userId }, select: { id: true, photoKey: true } }),
     prisma.reproductionCycle.findMany({ where: { userId }, select: { id: true } }),
     prisma.egg.findMany({
-      where: { clutch: { is: { cycle: { is: { userId } } } },
+      where: { clutch: { is: { cycle: { is: { userId } } } } },
       select: { photoKey: true },
     }),
     prisma.document.findMany({ where: { userId }, select: { storageKey: true } }),
