@@ -85,6 +85,17 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
         purchasedAt: new Date(),
       },
     });
+    const [female, male] = await Promise.all([
+      prisma.animal.create({ data: { userId: user.id, name: "Deletion fixture female", species: "Budgerigar", category: "birds", sex: "female" }, select: { id: true } }),
+      prisma.animal.create({ data: { userId: user.id, name: "Deletion fixture male", species: "Budgerigar", category: "birds", sex: "male" }, select: { id: true } }),
+    ]);
+    const cycle = await prisma.reproductionCycle.create({
+      data: { userId: user.id, parentAAnimalId: female.id, parentBAnimalId: male.id, name: "Deletion fixture cycle", startedOn: new Date() },
+      select: { id: true },
+    });
+    await prisma.birdBreedingPair.create({
+      data: { userId: user.id, femaleAnimalId: female.id, maleAnimalId: male.id, cycleId: cycle.id, pairedAt: new Date() },
+    });
     await prisma.importJob.createMany({
       data: ["animals", "feedings", "inventory"].map((entityType) => ({
         userId: user.id,
@@ -140,6 +151,7 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(await prisma.healthRecord.count({ where: { animalId: animal.id } })).toBe(0);
     expect(await prisma.inventoryLot.count({ where: { item: { is: { userId: user.id } } } })).toBe(0);
     expect(await prisma.inventoryItem.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.birdBreedingPair.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.animalLocation.count({ where: { userId: user.id } })).toBe(0);
     await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
