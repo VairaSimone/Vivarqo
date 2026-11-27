@@ -14,6 +14,12 @@ async function signIn(page) {
   const response = await responsePromise;
   expect(response.status(), await response.text()).toBe(200);
   await page.waitForURL(/\/today(?:\?.*)?$/);
+  // Dismiss the required-only cookie acknowledgement so it cannot intercept
+  // clicks in the authenticated E2E flows.
+  const cookieNotice = page.getByRole("region", { name: "Informativa sui cookie" });
+  if (await cookieNotice.isVisible()) {
+    await cookieNotice.getByRole("button", { name: "Ho capito" }).click();
+  }
 }
 
 async function enableAllCategories(page) {
