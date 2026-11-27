@@ -17,16 +17,15 @@ export function signalProcessTree(child, force = false, platform = process.platf
 
 export async function terminateProcessTree(child, timeoutMs = 5000, platform = process.platform) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  const waitForExit = () => child.exitCode !== null || child.signalCode !== null
+    ? Promise.resolve()
+    : new Promise(resolve => child.once("exit", resolve));
+  const gracefulExit = waitForExit();
   signalProcessTree(child, false, platform);
-  await Promise.race([
-    new Promise(resolve => child.once("close", resolve)),
-    delay(timeoutMs)
-  ]);
+  await Promise.race([gracefulExit, delay(timeoutMs)]);
   if (child.exitCode === null && child.signalCode === null) {
+    const forcedExit = waitForExit();
     signalProcessTree(child, true, platform);
-    await Promise.race([
-      new Promise(resolve => child.once("close", resolve)),
-      delay(2000)
-    ]);
+    await Promise.race([forcedExit, delay(2000)]);
   }
 }
