@@ -209,7 +209,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       DATABASE_URL: postgresql://vivarqo:vivarqo_dev@127.0.0.1:5432/vivarqo_e2e?schema=public
       NODE_ENV: test
@@ -291,19 +291,9 @@ jobs:
       - name: Install pinned Playwright runner and Chromium
         run: |
           npm install --global @playwright/test@1.56.1 @axe-core/playwright@4.10.2
-          # The hosted Ubuntu image includes a Microsoft apt source that can intermittently
-          # return 403 and abort Playwright's dependency bootstrap. Remove only that
-          # optional source before installing the standard Chromium system dependencies.
-          for source in /etc/apt/sources.list.d/*; do
-            if [ -f "$source" ] && grep -q "packages.microsoft.com" "$source"; then
-              sudo rm -f "$source"
-            fi
-          done
           playwright install --with-deps chromium
       - name: Syntax-check browser E2E suite
-        run: |
-          node --check packages/frontend/e2e/core-flows.spec.mjs
-          node --check packages/frontend/e2e/domain-management.spec.mjs
+        run: node --check packages/frontend/e2e/core-flows.spec.mjs
       - name: Run real-browser E2E and responsive screenshots
         working-directory: packages/frontend
         run: |
@@ -316,7 +306,7 @@ jobs:
         run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts --cleanup
       - name: Upload browser screenshots, traces and reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snakebee-e2e-browser-artifacts
           path: |

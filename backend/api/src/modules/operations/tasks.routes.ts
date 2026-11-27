@@ -243,6 +243,19 @@ export function createTasksRouter() {
         });
         if (rule) {
           nextDueAt = nextOccurrenceAt(existing.dueAt, rule.intervalDays, now, auth.timezone);
+          if (!existing.companionCareRecordId) {
+            const template = await tx.companionCareRecord.findFirst({ where: { userId: auth.userId, reminderRuleId: rule.id, deletedAt: null } });
+            if (template) {
+              await tx.companionCareRecord.create({ data: {
+                userId: auth.userId, animalId: existing.animalId!, kind: template.kind,
+                title: template.title, occurredAt: now, nextDueAt, completedAt: now,
+                provider: template.provider, clinic: template.clinic, dosage: template.dosage,
+                frequency: template.frequency, notes: template.notes,
+                treatmentStartAt: template.treatmentStartAt, treatmentEndAt: template.treatmentEndAt,
+                isOngoing: false,
+              } });
+            }
+          }
           await tx.reminderRule.update({
             where: { id: rule.id },
             data: { nextDueAt },
