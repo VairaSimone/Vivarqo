@@ -783,6 +783,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
     await page.getByRole("button", { name: "Nuovo animale" }).click();
     await page.locator(".animal-editor").locator('input[required]').first().fill(name);
     await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
+    await page.getByRole("dialog").getByLabel("Sesso").selectOption(name === parentNames[0] ? "female" : "male");
     await page.getByRole("button", { name: "Salva modifiche" }).click();
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
