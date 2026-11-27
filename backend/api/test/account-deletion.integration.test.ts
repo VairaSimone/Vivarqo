@@ -45,8 +45,26 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
 
     const photoKey = await storePrivateObject("animal-photos", "jpg", Buffer.from([0xff, 0xd8, 0xff, 0x00]));
     photoKeys.add(photoKey);
-    await prisma.animal.create({
+    const animal = await prisma.animal.create({
       data: { userId: user.id, name: "Photo cleanup", species: "Test species", photoKey },
+      select: { id: true },
+    });
+    await prisma.animalTransfer.create({
+      data: {
+        userId: user.id,
+        animalId: animal.id,
+        transferType: "sale",
+        recipientName: "Deletion fixture",
+        transferredAt: new Date(),
+      },
+    });
+    await prisma.healthRecord.create({
+      data: {
+        animalId: animal.id,
+        recordType: "visit",
+        occurredAt: new Date(),
+        title: "Deletion fixture health record",
+      },
     });
     await prisma.importJob.createMany({
       data: ["animals", "feedings", "inventory"].map((entityType) => ({
@@ -99,6 +117,8 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(tombstone?.deletedAt).toBeInstanceOf(Date);
     expect(await prisma.userSession.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.importJob.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.animalTransfer.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.healthRecord.count({ where: { animalId: animal.id } })).toBe(0);
     await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
 });
