@@ -25,9 +25,13 @@ function matchesPath(path: string, prefix: string) {
   return path === prefix || path.startsWith(prefix + "/");
 }
 
+export function categoryForAnimalDomainPath(path: string): string | null {
+  return categoryRoutes.find((item) => item.prefixes.some((prefix) => matchesPath(path, prefix)))?.category ?? null;
+}
+
 /** Category access is account-scoped and intentionally separate from commercial entitlements. */
 export const animalDomainAccessGuard: RequestHandler = async (req, res, next) => {
-  const categoryRoute = categoryRoutes.find((item) => item.prefixes.some((prefix) => matchesPath(req.path, prefix)));
+  const requiredCategory = categoryForAnimalDomainPath(req.path);
   const isGeneralAnimalRoute = generalAnimalRoutes.some((prefix) => matchesPath(req.path, prefix));
   if (!categoryRoute && !isGeneralAnimalRoute) { next(); return; }
 
@@ -40,9 +44,9 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
   });
   const categories = configuration?.animalCategories ?? [];
 
-  if (categoryRoute && !categories.includes(categoryRoute.category)) {
+  if (requiredCategory && !categories.includes(requiredCategory)) {
     next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This animal domain is not enabled for the account", {
-      category: categoryRoute.category,
+      category: requiredCategory,
       settingsPath: "/settings/categories",
     }));
     return;
