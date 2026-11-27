@@ -301,8 +301,10 @@ jobs:
           export AXE_PLAYWRIGHT_MODULE="$(npm root -g)/@axe-core/playwright/dist/index.js"
           playwright test -c playwright.config.mjs
       - name: Clean isolated E2E accounts
+        # Cleanup is part of the CI contract: fail the job if fixture-owned rows
+        # cannot be removed, so leaked test data and restrictive FK regressions
+        # are surfaced instead of silently accumulating between runs.
         if: always()
-        continue-on-error: true
         run: pnpm --filter @vivarqo/api exec tsx scripts/e2e-users.ts --cleanup
       - name: Upload browser screenshots, traces and reports
         if: always()
