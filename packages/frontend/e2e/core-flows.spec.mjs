@@ -136,7 +136,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(page.getByRole("heading", { name: "In ritardo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Da fare oggi" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nei prossimi 7 giorni" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Registra alimentazione" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registra pesi" })).toBeVisible();
 
   // Create a real task due in two days and verify that the dashboard surfaces
   // it in the upcoming section and opens its own task detail when selected.
@@ -248,7 +248,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(saveAnimalButton).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(closeDialogButton).toBeFocused();
-  await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -311,7 +311,7 @@ test("responsive fixture: create an animal for detail-route coverage", async ({ 
   const animalName = "E2E Responsive Python Regius";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -371,7 +371,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   }, { timeout: 90_000, intervals: [1000, 2000, 3000] }).toBe("completed");
 
   await page.goto("/animals");
-  await expect(page.getByText("E2E Imported Python", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E Imported Python", { exact: true }).first()).toBeVisible();
 });
 
 
@@ -531,7 +531,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const animalName = "E2E Domain Python Regius";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -781,7 +781,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.goto("/animals");
   for (const name of parentNames) {
     await page.getByRole("button", { name: "Nuovo animale" }).click();
-    await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(name);
+    await page.locator(".animal-editor").locator('input[required]').first().fill(name);
     await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
     await page.getByRole("button", { name: "Salva modifiche" }).click();
     await expect(page.getByText(name, { exact: true })).toBeVisible();
@@ -923,7 +923,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   const animalName = "E2E Document Python";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createAnimalResponsePromise = page.waitForResponse((response) =>
     response.url().endsWith("/api/v1/animals") && response.request().method() === "POST"
@@ -1305,7 +1305,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
 
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByRole("dialog").getByLabel("Nome", { exact: true }).fill(name);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(name);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createdResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
