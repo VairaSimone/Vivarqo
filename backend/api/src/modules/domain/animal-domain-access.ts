@@ -33,7 +33,7 @@ export function categoryForAnimalDomainPath(path: string): string | null {
 export const animalDomainAccessGuard: RequestHandler = async (req, res, next) => {
   const requiredCategory = categoryForAnimalDomainPath(req.path);
   const isGeneralAnimalRoute = generalAnimalRoutes.some((prefix) => matchesPath(req.path, prefix));
-  if (!categoryRoute && !isGeneralAnimalRoute) { next(); return; }
+  if (!requiredCategory && !isGeneralAnimalRoute) { next(); return; }
 
   const auth = res.locals.auth as { userId: string } | undefined;
   if (!auth) { next(); return; }
