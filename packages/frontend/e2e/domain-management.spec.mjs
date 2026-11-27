@@ -61,7 +61,7 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   const aquarium = page.locator(".ecosys-item").filter({ hasText: aquariumName });
   await expect(aquarium).toBeVisible();
   await page.getByRole("button", { name: "Modifica acquario" }).click();
-  await page.getByLabel("Nome").fill(aquariumName + " updated");
+  await page.locator(".ecosys-form-panel").getByLabel("Nome", { exact: true }).fill(aquariumName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aquariumName + " updated", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
@@ -76,7 +76,7 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   const aviary = page.locator(".ecosys-item").filter({ hasText: aviaryName });
   await expect(aviary).toBeVisible();
   await page.getByRole("button", { name: "Modifica voliera" }).click();
-  await page.getByLabel("Nome").fill(aviaryName + " updated");
+  await page.locator(".ecosys-form-panel").getByLabel("Nome", { exact: true }).fill(aviaryName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
