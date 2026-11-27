@@ -137,6 +137,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.task.deleteMany({ where: { userId } });
     await tx.reminderRule.deleteMany({ where: { userId } });
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId } } } });
+    await tx.inventoryLot.deleteMany({ where: { item: { is: { userId } } } });
     await tx.inventoryItem.deleteMany({ where: { userId } });
     await tx.animal.deleteMany({ where: { userId } });
     await tx.animalLocationMove.deleteMany({ where: { userId } });
