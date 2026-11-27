@@ -786,7 +786,13 @@ async function shutdown(reason) {
   for (const s of services.values()) { s.child = null; s.state = "stopped"; }
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
-  if (dashboardServer) await new Promise(resolve => dashboardServer.close(resolve));
+  if (dashboardServer) {
+    // close() waits for every keep-alive connection. The SSE response is ended
+    // above; explicitly close remaining idle/half-open sockets so shutdown
+    // cannot hang when a dashboard client disconnects slowly.
+    dashboardServer.closeAllConnections?.();
+    await new Promise(resolve => dashboardServer.close(resolve));
+  }
   await log("INFO", "MANAGER", process.env.VIVARQO_MANAGER_MODE === "production"
     ? "Manager arrestato; i container Docker di produzione restano attivi."
     : "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
