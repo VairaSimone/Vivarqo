@@ -3940,3 +3940,8 @@ kbd { font-size: 11px; }
 .dashboard-intro-critical .eyebrow,
 .dashboard-intro-attention p,
 .dashboard-intro-critical p { color: #fff; }
+
+
+/* The dashboard tone can be normal, attention or critical. Keep every intro text token readable on the actual forest/terracotta surface. */
+.dashboard-intro .eyebrow,
+.dashboard-intro p { color: #fff; }
