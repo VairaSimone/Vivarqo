@@ -832,10 +832,21 @@ CREATE TABLE user_preferences (
     date_format           VARCHAR(16) NOT NULL DEFAULT 'locale',
     default_landing_page  VARCHAR(40) NOT NULL DEFAULT 'today',
     compact_tables        BOOLEAN NOT NULL DEFAULT FALSE,
+    dashboard_layout      JSONB NOT NULL DEFAULT '{}'::jsonb,
     theme                 VARCHAR(16) NOT NULL DEFAULT 'system',
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE account_configurations (
+    user_id           UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    animal_categories VARCHAR(24)[] NOT NULL DEFAULT ARRAY[]::VARCHAR(24)[],
+    configured_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX account_configurations_configured_at_idx
+    ON account_configurations (configured_at);
 
 -- Outbox persistente dei tentativi di consegna Web Push.
 CREATE TABLE push_delivery_attempts (
@@ -1213,6 +1224,81 @@ DO $schema$ BEGIN
   END IF;
 END $schema$;
 
+
+-- ---------------------------------------------------------------------------
+-- 2b. Multi-domain animal and habitat management
+-- ---------------------------------------------------------------------------
+ALTER TABLE animals
+  ADD COLUMN category VARCHAR(24) NOT NULL DEFAULT 'reptiles',
+  ADD COLUMN domain_profile JSONB;
+CREATE INDEX animals_user_category_status_idx ON animals (user_id, category, status);
+
+CREATE TABLE aquariums (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  water_type VARCHAR(16) NOT NULL,
+  volume_liters NUMERIC(10,2) NOT NULL,
+  setup_date DATE,
+  location VARCHAR(160),
+  notes TEXT,
+  archived_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT aquariums_water_type_check CHECK (water_type IN ('freshwater', 'saltwater', 'brackish')),
+  CONSTRAINT aquariums_volume_positive_check CHECK (volume_liters > 0)
+);
+CREATE INDEX aquariums_user_archived_name_idx ON aquariums (user_id, archived_at, name);
+
+CREATE TABLE aquarium_water_readings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  aquarium_id UUID NOT NULL REFERENCES aquariums(id) ON DELETE CASCADE,
+  measured_at TIMESTAMPTZ NOT NULL,
+  temperature_c NUMERIC(5,2),
+  ph NUMERIC(4,2),
+  gh_dkh NUMERIC(6,2),
+  kh_dkh NUMERIC(6,2),
+  ammonia_mg_l NUMERIC(8,4),
+  nitrite_mg_l NUMERIC(8,4),
+  nitrate_mg_l NUMERIC(8,3),
+  salinity_ppt NUMERIC(7,3),
+  tds_ppm INTEGER,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT aquarium_water_readings_temperature_check CHECK (temperature_c IS NULL OR temperature_c BETWEEN -5 AND 60),
+  CONSTRAINT aquarium_water_readings_ph_check CHECK (ph IS NULL OR ph BETWEEN 0 AND 14),
+  CONSTRAINT aquarium_water_readings_gh_check CHECK (gh_dkh IS NULL OR gh_dkh >= 0),
+  CONSTRAINT aquarium_water_readings_kh_check CHECK (kh_dkh IS NULL OR kh_dkh >= 0),
+  CONSTRAINT aquarium_water_readings_ammonia_check CHECK (ammonia_mg_l IS NULL OR ammonia_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_nitrite_check CHECK (nitrite_mg_l IS NULL OR nitrite_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_nitrate_check CHECK (nitrate_mg_l IS NULL OR nitrate_mg_l >= 0),
+  CONSTRAINT aquarium_water_readings_salinity_check CHECK (salinity_ppt IS NULL OR salinity_ppt >= 0),
+  CONSTRAINT aquarium_water_readings_tds_check CHECK (tds_ppm IS NULL OR tds_ppm >= 0)
+);
+CREATE INDEX aquarium_water_readings_aquarium_measured_idx ON aquarium_water_readings (aquarium_id, measured_at DESC);
+
+CREATE TABLE aviaries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  environment VARCHAR(16) NOT NULL CHECK (environment IN ('indoor', 'outdoor', 'mixed')),
+  location VARCHAR(160),
+  capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+  notes TEXT,
+  archived_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aviaries_user_archived_name_idx ON aviaries (user_id, archived_at, name);
+
+CREATE TABLE aviary_birds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  aviary_id UUID NOT NULL REFERENCES aviaries(id) ON DELETE CASCADE,
+  animal_id UUID NOT NULL UNIQUE REFERENCES animals(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX aviary_birds_aviary_idx ON aviary_birds (aviary_id);
+
 COMMIT;
 
 -- Verifica rapida dopo l'esecuzione:
@@ -1559,4 +1645,188 @@ CREATE UNIQUE INDEX finance_entries_source_transfer_unique ON finance_entries(so
 DROP INDEX IF EXISTS finance_entries_source_stock_movement_unique;
 CREATE UNIQUE INDEX finance_entries_source_stock_movement_unique ON finance_entries(source_stock_movement_id);
 
+
+CREATE TABLE IF NOT EXISTS companion_care_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  animal_id UUID NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+  kind VARCHAR(32) NOT NULL CHECK (kind IN ('vaccination','medication','vet_visit','parasite_prevention','surgery','grooming','other')),
+  title VARCHAR(160) NOT NULL,
+  occurred_at TIMESTAMPTZ(6) NOT NULL,
+  next_due_at TIMESTAMPTZ(6),
+  provider VARCHAR(160),
+  dosage VARCHAR(120),
+  notes TEXT,
+  deleted_at TIMESTAMPTZ(6),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS companion_care_user_due_idx ON companion_care_records(user_id, deleted_at, next_due_at);
+CREATE INDEX IF NOT EXISTS companion_care_animal_occurred_idx ON companion_care_records(animal_id, occurred_at DESC);
+
 COMMIT;
+
+
+-- ---------------------------------------------------------------------------
+-- 11. Aquarium ranges, aviary history and companion-care extensions
+-- Keep this consolidated schema aligned with the versioned migrations through
+-- 2026-11-27. These statements are safe after the base schema above.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS aquarium_parameter_ranges (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  aquarium_id UUID NOT NULL,
+  parameter VARCHAR(32) NOT NULL,
+  min_value DECIMAL(12,4),
+  max_value DECIMAL(12,4),
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT aquarium_parameter_ranges_pkey PRIMARY KEY (id),
+  CONSTRAINT aquarium_parameter_ranges_aquarium_id_fkey FOREIGN KEY (aquarium_id) REFERENCES aquariums(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT aquarium_parameter_ranges_bounds_check CHECK (min_value IS NULL OR max_value IS NULL OR min_value <= max_value),
+  CONSTRAINT aquarium_parameter_ranges_has_bound_check CHECK (min_value IS NOT NULL OR max_value IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS aquarium_parameter_ranges_aquarium_parameter_key
+  ON aquarium_parameter_ranges(aquarium_id, parameter);
+
+CREATE TABLE IF NOT EXISTS aviary_movements (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  animal_id UUID NOT NULL,
+  from_aviary_id UUID,
+  to_aviary_id UUID,
+  occurred_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
+  CONSTRAINT aviary_movements_pkey PRIMARY KEY (id),
+  CONSTRAINT aviary_movements_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT aviary_movements_from_aviary_id_fkey FOREIGN KEY (from_aviary_id) REFERENCES aviaries(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT aviary_movements_to_aviary_id_fkey FOREIGN KEY (to_aviary_id) REFERENCES aviaries(id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS aviary_movements_animal_occurred_idx ON aviary_movements(animal_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS aviary_movements_from_occurred_idx ON aviary_movements(from_aviary_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS aviary_movements_to_occurred_idx ON aviary_movements(to_aviary_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS aviary_notes (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  aviary_id UUID NOT NULL,
+  title VARCHAR(160),
+  body TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT aviary_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT aviary_notes_aviary_id_fkey FOREIGN KEY (aviary_id) REFERENCES aviaries(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS aviary_notes_aviary_occurred_idx ON aviary_notes(aviary_id, occurred_at DESC);
+
+INSERT INTO aviary_movements (animal_id, from_aviary_id, to_aviary_id, occurred_at)
+SELECT animal_id, NULL, aviary_id, created_at
+FROM aviary_birds
+WHERE NOT EXISTS (
+  SELECT 1 FROM aviary_movements movement
+  WHERE movement.animal_id = aviary_birds.animal_id
+    AND movement.from_aviary_id IS NULL
+    AND movement.to_aviary_id = aviary_birds.aviary_id
+    AND movement.occurred_at = aviary_birds.created_at
+);
+
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS companion_care_record_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS tasks_companion_care_record_id_key ON tasks(companion_care_record_id);
+DO $companion_task_fk$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_companion_care_record_id_fkey') THEN
+    ALTER TABLE tasks ADD CONSTRAINT tasks_companion_care_record_id_fkey
+      FOREIGN KEY (companion_care_record_id) REFERENCES companion_care_records(id)
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END;
+$companion_task_fk$;
+
+ALTER TABLE companion_care_records
+  ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS clinic VARCHAR(160),
+  ADD COLUMN IF NOT EXISTS treatment_start_at TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS treatment_end_at TIMESTAMPTZ(6),
+  ADD COLUMN IF NOT EXISTS is_ongoing BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS frequency VARCHAR(120),
+  ADD COLUMN IF NOT EXISTS reminder_rule_id UUID;
+DO $companion_care_constraints$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companion_care_records_treatment_dates_check') THEN
+    ALTER TABLE companion_care_records ADD CONSTRAINT companion_care_records_treatment_dates_check
+      CHECK (treatment_start_at IS NULL OR treatment_end_at IS NULL OR treatment_end_at >= treatment_start_at);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companion_care_records_ongoing_medication_check') THEN
+    ALTER TABLE companion_care_records ADD CONSTRAINT companion_care_records_ongoing_medication_check
+      CHECK (NOT is_ongoing OR (kind = 'medication' AND treatment_end_at IS NULL));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'companion_care_records_reminder_rule_id_fkey') THEN
+    ALTER TABLE companion_care_records ADD CONSTRAINT companion_care_records_reminder_rule_id_fkey
+      FOREIGN KEY (reminder_rule_id) REFERENCES reminder_rules(id) ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END;
+$companion_care_constraints$;
+CREATE INDEX IF NOT EXISTS companion_care_records_animal_ongoing_idx
+  ON companion_care_records(animal_id, is_ongoing)
+  WHERE deleted_at IS NULL AND is_ongoing = true;
+CREATE UNIQUE INDEX IF NOT EXISTS companion_care_records_reminder_rule_id_key
+  ON companion_care_records(reminder_rule_id);
+
+CREATE TABLE IF NOT EXISTS companion_care_logs (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  animal_id UUID NOT NULL,
+  kind VARCHAR(16) NOT NULL,
+  occurred_at TIMESTAMPTZ(6) NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  food_type VARCHAR(120),
+  quantity DECIMAL(10,2),
+  quantity_unit VARCHAR(16),
+  duration_minutes INTEGER,
+  distance_km DECIMAL(8,2),
+  mood VARCHAR(40),
+  notes TEXT,
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT companion_care_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT companion_care_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT companion_care_logs_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT companion_care_logs_kind_check CHECK (kind IN ('feeding','behavior','walk')),
+  CONSTRAINT companion_care_logs_quantity_check CHECK (quantity IS NULL OR quantity > 0),
+  CONSTRAINT companion_care_logs_duration_check CHECK (duration_minutes IS NULL OR duration_minutes BETWEEN 1 AND 1440),
+  CONSTRAINT companion_care_logs_distance_check CHECK (distance_km IS NULL OR distance_km > 0)
+);
+CREATE INDEX IF NOT EXISTS companion_care_logs_user_animal_kind_occurred_idx
+  ON companion_care_logs(user_id, animal_id, kind, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS companion_policies (
+  id UUID NOT NULL DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  animal_id UUID NOT NULL,
+  kind VARCHAR(20) NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  provider VARCHAR(160),
+  reference VARCHAR(120),
+  starts_at DATE,
+  expires_at DATE NOT NULL,
+  reminder_days INTEGER NOT NULL DEFAULT 30,
+  reminder_rule_id UUID,
+  task_id UUID,
+  notes TEXT,
+  created_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT companion_policies_pkey PRIMARY KEY (id),
+  CONSTRAINT companion_policies_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT companion_policies_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES animals(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT companion_policies_reminder_rule_id_fkey FOREIGN KEY (reminder_rule_id) REFERENCES reminder_rules(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT companion_policies_task_id_fkey FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT companion_policies_kind_check CHECK (kind IN ('insurance','document')),
+  CONSTRAINT companion_policies_reminder_days_check CHECK (reminder_days BETWEEN 0 AND 365),
+  CONSTRAINT companion_policies_dates_check CHECK (starts_at IS NULL OR starts_at <= expires_at)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS companion_policies_reminder_rule_id_key ON companion_policies(reminder_rule_id);
+CREATE UNIQUE INDEX IF NOT EXISTS companion_policies_task_id_key ON companion_policies(task_id);
+CREATE INDEX IF NOT EXISTS companion_policies_user_animal_expires_idx
+  ON companion_policies(user_id, animal_id, expires_at);
+
+ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_category_check;
+ALTER TABLE tasks ADD CONSTRAINT tasks_category_check
+  CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'incubation', 'document', 'inventory', 'health', 'custom'));

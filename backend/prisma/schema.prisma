@@ -34,6 +34,12 @@ model User {
   tasks                   Task[]
   notificationPreferences NotificationPreferences?
   userPreference           UserPreference?
+  accountConfiguration    AccountConfiguration?
+  aquariums               Aquarium[]
+  aviaries                Aviary[]
+  companionCareRecords    CompanionCareRecord[]
+  companionCareLogs       CompanionCareLog[]
+  companionPolicies       CompanionPolicy[]
   pushSubscriptions       PushSubscription[]
   pushDeliveryAttempts    PushDeliveryAttempt[]
   notifications           Notification[]
@@ -133,6 +139,8 @@ model Animal {
   identifier             String?               @db.Citext
   species                String                @db.VarChar(160)
   sex                    String                @default("unknown") @db.VarChar(12)
+  category               String                @default("reptiles") @db.VarChar(24)
+  domainProfile          Json?                 @map("domain_profile") @db.JsonB
   morph                  String?               @db.VarChar(200)
   motherAnimalId         String?               @map("mother_animal_id") @db.Uuid
   fatherAnimalId         String?               @map("father_animal_id") @db.Uuid
@@ -184,8 +192,14 @@ model Animal {
   geneticTraitHistory    AnimalGeneticTraitHistory[]
   hatchlingCare          HatchlingCare?
   hatchedEgg             Egg?                  @relation("EggOffspring")
+  aviaryAssignments      AviaryBird[]
+  aviaryMovements        AviaryMovement[]
+  companionCareRecords   CompanionCareRecord[]
+  companionCareLogs      CompanionCareLog[]
+  companionPolicies      CompanionPolicy[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
   @@unique([userId, identifier], where: raw("\"identifier\" IS NOT NULL"), map: "animals_user_identifier_unique")
+  @@index([userId, category, status], map: "animals_user_category_status_idx")
   @@index([userId, status], map: "animals_user_status_idx")
   @@index([userId, name], map: "animals_user_name_idx")
   @@index([userId, species], map: "animals_user_species_idx")
@@ -292,6 +306,8 @@ model ReminderRule {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal       Animal?   @relation(fields: [animalId], references: [id], onDelete: Restrict)
   tasks        Task[]
+  companionCareRecord CompanionCareRecord?
+  companionPolicy CompanionPolicy?
   @@unique([id, userId], map: "reminder_rules_id_user_id_unique")
   @@index([userId, nextDueAt], where: { isEnabled: true }, map: "reminder_rules_user_next_due_idx")
   @@index([animalId], map: "reminder_rules_animal_idx")
@@ -308,14 +324,17 @@ model Task {
   dueAt          DateTime      @map("due_at") @db.Timestamptz(6)
   status         String        @default("open") @db.VarChar(16)
   completedAt    DateTime?     @map("completed_at") @db.Timestamptz(6)
+  companionPolicy CompanionPolicy?
   reminderRuleId String?       @map("reminder_rule_id") @db.Uuid
   healthRecordId String?       @unique @map("health_record_id") @db.Uuid
+  companionCareRecordId String? @unique @map("companion_care_record_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal         Animal?       @relation(fields: [animalId], references: [id], onDelete: Restrict)
   reminderRule   ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
   healthRecord   HealthRecord? @relation(fields: [healthRecordId], references: [id], onDelete: Cascade)
+  companionCareRecord CompanionCareRecord? @relation(fields: [companionCareRecordId], references: [id], onDelete: Cascade)
   @@index([userId, status, dueAt], map: "tasks_user_status_due_idx")
   @@index([animalId], map: "tasks_animal_idx")
   @@index([reminderRuleId], map: "tasks_reminder_rule_idx")
@@ -1040,6 +1059,7 @@ model UserPreference {
   dateFormat          String   @default("locale") @map("date_format") @db.VarChar(16)
   defaultLandingPage  String   @default("today") @map("default_landing_page") @db.VarChar(40)
   compactTables       Boolean  @default(false) @map("compact_tables")
+  dashboardLayout     Json     @default("{}") @map("dashboard_layout") @db.JsonB
   theme               String   @default("system") @db.VarChar(16)
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1048,6 +1068,207 @@ model UserPreference {
   @@map("user_preferences")
 }
 
+
+model AccountConfiguration {
+  userId       String   @id @map("user_id") @db.Uuid
+  animalCategories String[] @default([]) @map("animal_categories") @db.VarChar(24)
+  configuredAt DateTime @default(now()) @map("configured_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([configuredAt], map: "account_configurations_configured_at_idx")
+  @@map("account_configurations")
+}
+
+
+model Aquarium {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String                 @map("user_id") @db.Uuid
+  name         String                 @db.VarChar(120)
+  waterType    String                 @map("water_type") @db.VarChar(16)
+  volumeLiters Decimal                @map("volume_liters") @db.Decimal(10, 2)
+  setupDate    DateTime?              @map("setup_date") @db.Date
+  location     String?                @db.VarChar(160)
+  notes        String?
+  archivedAt   DateTime?              @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readings     AquariumWaterReading[]
+  parameterRanges AquariumParameterRange[]
+  @@index([userId, archivedAt, name], map: "aquariums_user_archived_name_idx")
+  @@map("aquariums")
+}
+
+
+model AquariumParameterRange {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId  String   @map("aquarium_id") @db.Uuid
+  parameter   String   @db.VarChar(32)
+  minValue    Decimal? @map("min_value") @db.Decimal(12, 4)
+  maxValue    Decimal? @map("max_value") @db.Decimal(12, 4)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  aquarium    Aquarium @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@unique([aquariumId, parameter], map: "aquarium_parameter_ranges_aquarium_parameter_key")
+  @@map("aquarium_parameter_ranges")
+}
+
+model AviaryMovement {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId    String   @map("animal_id") @db.Uuid
+  fromAviaryId String? @map("from_aviary_id") @db.Uuid
+  toAviaryId  String?  @map("to_aviary_id") @db.Uuid
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  notes       String?
+  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  fromAviary  Aviary?  @relation("AviaryMovementFrom", fields: [fromAviaryId], references: [id], onDelete: SetNull)
+  toAviary    Aviary?  @relation("AviaryMovementTo", fields: [toAviaryId], references: [id], onDelete: SetNull)
+  @@index([animalId, occurredAt(sort: Desc)], map: "aviary_movements_animal_occurred_idx")
+  @@index([fromAviaryId, occurredAt(sort: Desc)], map: "aviary_movements_from_occurred_idx")
+  @@index([toAviaryId, occurredAt(sort: Desc)], map: "aviary_movements_to_occurred_idx")
+  @@map("aviary_movements")
+}
+
+model AviaryNote {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aviaryId   String   @map("aviary_id") @db.Uuid
+  title      String?  @db.VarChar(160)
+  body       String
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aviary     Aviary   @relation(fields: [aviaryId], references: [id], onDelete: Cascade)
+  @@index([aviaryId, occurredAt(sort: Desc)], map: "aviary_notes_aviary_occurred_idx")
+  @@map("aviary_notes")
+}
+
+model AquariumWaterReading {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aquariumId     String    @map("aquarium_id") @db.Uuid
+  measuredAt     DateTime  @map("measured_at") @db.Timestamptz(6)
+  temperatureC   Decimal?  @map("temperature_c") @db.Decimal(5, 2)
+  ph             Decimal?  @db.Decimal(4, 2)
+  ghDkh          Decimal?  @map("gh_dkh") @db.Decimal(6, 2)
+  khDkh          Decimal?  @map("kh_dkh") @db.Decimal(6, 2)
+  ammoniaMgL     Decimal?  @map("ammonia_mg_l") @db.Decimal(8, 4)
+  nitriteMgL     Decimal?  @map("nitrite_mg_l") @db.Decimal(8, 4)
+  nitrateMgL     Decimal?  @map("nitrate_mg_l") @db.Decimal(8, 3)
+  salinityPpt    Decimal?  @map("salinity_ppt") @db.Decimal(7, 3)
+  tdsPpm         Int?      @map("tds_ppm")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  aquarium       Aquarium  @relation(fields: [aquariumId], references: [id], onDelete: Cascade)
+  @@index([aquariumId, measuredAt(sort: Desc)], map: "aquarium_water_readings_aquarium_measured_idx")
+  @@map("aquarium_water_readings")
+}
+
+model Aviary {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  name         String       @db.VarChar(120)
+  environment  String       @db.VarChar(16)
+  location     String?      @db.VarChar(160)
+  capacity     Int?
+  notes        String?
+  archivedAt   DateTime?    @map("archived_at") @db.Timestamptz(6)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birds        AviaryBird[]
+  movementsFrom AviaryMovement[] @relation("AviaryMovementFrom")
+  movementsTo AviaryMovement[] @relation("AviaryMovementTo")
+  notesHistory AviaryNote[]
+  @@index([userId, archivedAt, name], map: "aviaries_user_archived_name_idx")
+  @@map("aviaries")
+}
+
+model AviaryBird {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aviaryId   String   @map("aviary_id") @db.Uuid
+  animalId   String   @unique(map: "aviary_birds_animal_id_key") @map("animal_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aviary     Aviary   @relation(fields: [aviaryId], references: [id], onDelete: Cascade)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([aviaryId], map: "aviary_birds_aviary_idx")
+  @@map("aviary_birds")
+}
+
+
+model CompanionCareLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  animalId        String   @map("animal_id") @db.Uuid
+  kind            String   @db.VarChar(16)
+  occurredAt      DateTime @map("occurred_at") @db.Timestamptz(6)
+  title           String   @db.VarChar(160)
+  foodType        String?  @map("food_type") @db.VarChar(120)
+  quantity        Decimal? @db.Decimal(10, 2)
+  quantityUnit    String?  @map("quantity_unit") @db.VarChar(16)
+  durationMinutes Int?     @map("duration_minutes")
+  distanceKm      Decimal? @map("distance_km") @db.Decimal(8, 2)
+  mood            String?  @db.VarChar(40)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal          Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  @@index([userId, animalId, kind, occurredAt(sort: Desc)], map: "companion_care_logs_user_animal_kind_occurred_idx")
+  @@map("companion_care_logs")
+}
+
+model CompanionPolicy {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  animalId     String   @map("animal_id") @db.Uuid
+  kind         String   @db.VarChar(20)
+  title        String   @db.VarChar(160)
+  provider     String?  @db.VarChar(160)
+  reference    String?  @db.VarChar(120)
+  startsAt     DateTime? @map("starts_at") @db.Date
+  expiresAt    DateTime @map("expires_at") @db.Date
+  notes        String?
+  reminderDays Int      @default(30) @map("reminder_days")
+  reminderRuleId String? @unique @map("reminder_rule_id") @db.Uuid
+  taskId         String?  @unique @map("task_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal       Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  reminderRule ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+  task         Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  @@index([userId, animalId, expiresAt], map: "companion_policies_user_animal_expires_idx")
+  @@map("companion_policies")
+}
+
+model CompanionCareRecord {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  animalId    String    @map("animal_id") @db.Uuid
+  kind        String    @db.VarChar(32)
+  title       String    @db.VarChar(160)
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz(6)
+  nextDueAt   DateTime? @map("next_due_at") @db.Timestamptz(6)
+  provider    String?   @db.VarChar(160)
+  dosage      String?   @db.VarChar(120)
+  frequency   String?   @db.VarChar(120)
+  notes       String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal      Animal    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  task        Task?
+  clinic      String?   @db.VarChar(160)
+  treatmentStartAt DateTime? @map("treatment_start_at") @db.Timestamptz(6)
+  treatmentEndAt DateTime? @map("treatment_end_at") @db.Timestamptz(6)
+  isOngoing   Boolean   @default(false) @map("is_ongoing")
+  reminderRuleId String? @unique @map("reminder_rule_id") @db.Uuid
+  reminderRule ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+  @@index([userId, deletedAt, nextDueAt], map: "companion_care_user_due_idx")
+  @@index([animalId, occurredAt(sort: Desc)], map: "companion_care_animal_occurred_idx")
+  @@map("companion_care_records")
+}
 
 model PushDeliveryAttempt {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

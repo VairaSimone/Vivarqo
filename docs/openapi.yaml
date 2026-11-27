@@ -27,6 +27,7 @@ tags:
   - name: Exports
   - name: Billing
   - name: Onboarding
+  - name: Ecosystems
 security:
   - sessionCookieDev: []
   - sessionCookieProd: []
@@ -353,6 +354,9 @@ paths:
         - name: species
           in: query
           schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
         - name: sex
           in: query
           schema: { type: string, enum: [male, female, unknown] }
@@ -1257,6 +1261,91 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HomeTodayResponse'
+  /api/v1/home/today/tasks:
+    get:
+      operationId: getHomeTodayTasks
+      tags: [Operations]
+      summary: Carica le attività e le priorità della dashboard
+      responses:
+        '200':
+          description: Attività e conteggi per il widget delle priorità.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  timezone: { type: string }
+                  tasks: { type: object, additionalProperties: true }
+                  counts: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+                  truncated: { type: object, additionalProperties: { type: boolean } }
+                required: [date, timezone, tasks, counts, truncated]
+  /api/v1/home/today/reminders:
+    get:
+      operationId: getHomeTodayReminders
+      tags: [Operations]
+      summary: Carica i promemoria della dashboard
+      responses:
+        '200':
+          description: Promemoria imminenti e indicatore di troncamento.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+                  count: { type: integer, minimum: 0 }
+                  truncated: { type: boolean }
+                required: [items, count, truncated]
+  /api/v1/home/today/feeding-alerts:
+    get:
+      operationId: getHomeTodayFeedingAlerts
+      tags: [Operations]
+      summary: Carica gli avvisi di alimentazione degli animali
+      responses:
+        '200':
+          description: Animali prossimi o oltre l'intervallo di alimentazione.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object, additionalProperties: true } }
+                required: [items]
+  /api/v1/home/today/overview:
+    get:
+      operationId: getHomeTodayOverview
+      tags: [Operations]
+      summary: Carica gli indicatori generali e le scorte
+      responses:
+        '200':
+          description: Conteggi e materiali sotto la soglia minima.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activeAnimals: { type: integer, minimum: 0 }
+                  feedingsToday: { type: integer, minimum: 0 }
+                  lowStockItems: { type: array, items: { type: object, additionalProperties: true } }
+                  lowStockCount: { type: integer, minimum: 0 }
+                required: [activeAnimals, feedingsToday, lowStockItems, lowStockCount]
+  /api/v1/home/today/recent:
+    get:
+      operationId: getHomeTodayRecent
+      tags: [Operations]
+      summary: Carica la cronologia e i suggerimenti della dashboard
+      responses:
+        '200':
+          description: Eventi recenti e suggerimenti operativi.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: { type: array, items: { type: object, additionalProperties: true } }
+                  smartSuggestions: { type: array, items: { type: object, additionalProperties: true } }
+                required: [events, smartSuggestions]
   /api/v1/calendar:
     get:
       operationId: getCalendar
@@ -3343,6 +3432,67 @@ paths:
                   workspaces: { type: array, items: { type: object } }
                   activeWorkspaceOwnerId: { type: [string, 'null'], format: uuid }
                   premiumEnabled: { type: boolean }
+  /api/v1/aviaries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateAviary
+      tags: [Ecosystems]
+      summary: Modifica i dettagli di una voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviaryPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                environment: { type: string, enum: [indoor, outdoor, mixed] }
+                location: { type: [string, 'null'], maxLength: 160 }
+                capacity: { type: [integer, 'null'], minimum: 1, maximum: 100000 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200': { description: Voliera aggiornata. }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: archiveAviary
+      tags: [Ecosystems]
+      summary: Archivia una voliera e rimuove le assegnazioni, senza eliminare le schede degli uccelli
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Voliera archiviata. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/collaborators/context:
+    get:
+      operationId: getActiveWorkspaceContext
+      tags: [Collaboration]
+      summary: Restituisce categorie e ruolo del workspace attivo
+      responses:
+        '200':
+          description: Contesto effettivo del workspace, personale o condiviso.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, activeWorkspaceOwnerId, role, ownerName, isPersonalWorkspace]
+                properties:
+                  categories:
+                    type: array
+                    items: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
+                  activeWorkspaceOwnerId: { type: [string, 'null'], format: uuid }
+                  role: { type: [string, 'null'], enum: [admin, operator, breeding, viewer] }
+                  ownerName: { type: string }
+                  isPersonalWorkspace: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
   /api/v1/collaborators/invitations:
     post:
       operationId: inviteWorkspaceCollaborator
@@ -3653,6 +3803,81 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
 
+  /api/v1/onboarding/configuration:
+    get:
+      operationId: getOnboardingConfiguration
+      tags: [Onboarding]
+      summary: Legge le categorie animali configurate per l'account
+      responses:
+        '200':
+          description: Configurazione dell'account; configuredAt nullo indica che la scelta iniziale non è stata completata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, configuredAt]
+                properties:
+                  categories:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      enum: [reptiles, fish, birds, dogs_cats]
+                  configuredAt:
+                    type: [string, "null"]
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: saveOnboardingConfiguration
+      tags: [Onboarding]
+      summary: Salva le categorie animali dell'account senza modificare i dati esistenti
+      security:
+        - csrfHeader: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/onboarding/onboarding.routes.ts
+          symbol: configurationSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [categories]
+              properties:
+                categories:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum: [reptiles, fish, birds, dogs_cats]
+      responses:
+        '200':
+          description: Configurazione salvata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories, configuredAt]
+                properties:
+                  categories:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      enum: [reptiles, fish, birds, dogs_cats]
+                  configuredAt:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
   /api/v1/onboarding/progress:
     get:
       operationId: getOnboardingProgress
@@ -4230,6 +4455,807 @@ paths:
         '204': { description: Foto eliminata. }
         '404': { description: Uovo non trovato. }
 
+
+  /api/v1/aquariums:
+    get:
+      operationId: listAquariums
+      tags: [Ecosystems]
+      summary: Elenca gli acquari dell'account con ultima misurazione
+      responses:
+        '200':
+          description: Acquari dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aquariums]
+                properties:
+                  aquariums:
+                    type: array
+                    items:
+                      type: object
+    post:
+      operationId: createAquarium
+      tags: [Ecosystems]
+      summary: Crea un acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, waterType, volumeLiters]
+              properties:
+                name: { type: string, maxLength: 120 }
+                waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+                volumeLiters: { type: number, exclusiveMinimum: 0 }
+                setupDate: { type: [string, 'null'], format: date }
+                location: { type: [string, 'null'], maxLength: 160 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Acquario creato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aquarium]
+                properties:
+                  aquarium: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateAquarium
+      tags: [Ecosystems]
+      summary: Modifica i dettagli di un acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+                volumeLiters: { type: number, exclusiveMinimum: 0 }
+                setupDate: { type: [string, 'null'], format: date }
+                location: { type: [string, 'null'], maxLength: 160 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '200': { description: Acquario aggiornato. }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: archiveAquarium
+      tags: [Ecosystems]
+      summary: Archivia un acquario conservando lo storico delle misurazioni
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Acquario archiviato. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/aquariums/{id}/readings:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAquariumWaterReadings
+      tags: [Ecosystems]
+      summary: Elenca le misurazioni dei parametri dell'acqua
+      responses:
+        '200':
+          description: Storico misurazioni.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [readings]
+                properties:
+                  readings:
+                    type: array
+                    items: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Registra una misurazione dei parametri dell'acqua
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: readingSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [measuredAt]
+              properties:
+                measuredAt: { type: string, format: date-time }
+                temperatureC: { type: [number, 'null'], minimum: -5, maximum: 60 }
+                ph: { type: [number, 'null'], minimum: 0, maximum: 14 }
+                ghDkh: { type: [number, 'null'], minimum: 0 }
+                khDkh: { type: [number, 'null'], minimum: 0 }
+                ammoniaMgL: { type: [number, 'null'], minimum: 0 }
+                nitriteMgL: { type: [number, 'null'], minimum: 0 }
+                nitrateMgL: { type: [number, 'null'], minimum: 0 }
+                salinityPpt: { type: [number, 'null'], minimum: 0 }
+                tdsPpm: { type: [integer, 'null'], minimum: 0 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Misurazione registrata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reading]
+                properties:
+                  reading: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries:
+    get:
+      operationId: listAviaries
+      tags: [Ecosystems]
+      summary: Elenca le voliere dell'account
+      responses:
+        '200':
+          description: Voliere dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aviaries]
+                properties:
+                  aviaries:
+                    type: array
+                    items: { type: object }
+    post:
+      operationId: createAviary
+      tags: [Ecosystems]
+      summary: Crea una voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviarySchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, environment]
+              properties:
+                name: { type: string, maxLength: 120 }
+                environment: { type: string, enum: [indoor, outdoor, mixed] }
+                location: { type: [string, 'null'], maxLength: 160 }
+                capacity: { type: [integer, 'null'], minimum: 1 }
+                notes: { type: [string, 'null'] }
+      responses:
+        '201':
+          description: Voliera creata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aviary]
+                properties:
+                  aviary: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}/readings/{readingId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: readingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Modifica una misurazione dei parametri dell'acqua
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: readingPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                measuredAt: { type: string, format: date-time }
+                temperatureC: { type: [number, 'null'], minimum: -5, maximum: 60 }
+                ph: { type: [number, 'null'], minimum: 0, maximum: 14 }
+                ghDkh: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                khDkh: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                ammoniaMgL: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+                nitriteMgL: { type: [number, 'null'], minimum: 0, maximum: 1000 }
+                nitrateMgL: { type: [number, 'null'], minimum: 0, maximum: 10000 }
+                salinityPpt: { type: [number, 'null'], minimum: 0, maximum: 100 }
+                tdsPpm: { type: [integer, 'null'], minimum: 0, maximum: 100000 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200': { description: Misurazione aggiornata. }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAquariumWaterReading
+      tags: [Ecosystems]
+      summary: Elimina una misurazione errata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204': { description: Misurazione eliminata. }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/aviaries/{id}/birds:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: listAviaryBirds
+      tags: [Ecosystems]
+      summary: Elenca gli uccelli assegnati alla voliera
+      responses:
+        '200':
+          description: Uccelli della voliera.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [birds]
+                properties:
+                  birds:
+                    type: array
+                    items: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: assignAviaryBirds
+      tags: [Ecosystems]
+      summary: Sostituisce l'assegnazione degli uccelli alla voliera
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviaryBirdAssignmentSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [animalIds]
+              properties:
+                animalIds:
+                  type: array
+                  maxItems: 500
+                  uniqueItems: true
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Assegnazioni aggiornate.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignedCount]
+                properties:
+                  assignedCount: { type: integer, minimum: 0 }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+
+  /api/v1/companion-care:
+    get:
+      operationId: listCompanionCareRecords
+      tags: [Animals]
+      summary: Elenca vaccinazioni, farmaci, visite e scadenze di cani e gatti
+      parameters:
+        - name: animalId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: upcomingOnly
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Storico cura e salute dell'account.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [records]
+                properties:
+                  records:
+                    type: array
+                    items: { type: object }
+    post:
+      operationId: createCompanionCareRecord
+      tags: [Animals]
+      summary: Registra un evento sanitario o di cura per un cane o gatto
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care.routes.ts
+          symbol: companionCareCreateSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [animalId, kind, title, occurredAt]
+              properties:
+                animalId: { type: string, format: uuid }
+                kind: { type: string, enum: [vaccination, medication, vet_visit, parasite_prevention, surgery, grooming, other] }
+                title: { type: string, minLength: 1, maxLength: 160 }
+                occurredAt: { type: string, format: date-time }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                provider: { type: [string, 'null'], maxLength: 160 }
+                dosage: { type: [string, 'null'], maxLength: 120 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Evento sanitario registrato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record]
+                properties:
+                  record: { type: object }
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/companion-care/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateCompanionCareRecord
+      tags: [Animals]
+      summary: Modifica un evento sanitario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care.routes.ts
+          symbol: companionCarePatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: string, enum: [vaccination, medication, vet_visit, parasite_prevention, surgery, grooming, other] }
+                title: { type: string, minLength: 1, maxLength: 160 }
+                occurredAt: { type: string, format: date-time }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                provider: { type: [string, 'null'], maxLength: 160 }
+                dosage: { type: [string, 'null'], maxLength: 120 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '200':
+          description: Evento aggiornato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [record]
+                properties:
+                  record: { type: object }
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteCompanionCareRecord
+      tags: [Animals]
+      summary: Archivia un evento sanitario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Evento archiviato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean, const: true }
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/companion-care/logs:
+    get:
+      operationId: listCompanionCareLogs
+      tags: [Care]
+      summary: Elenca alimentazione, diario comportamentale e attività di un animale
+      parameters:
+        - name: animalId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Registrazioni dell'animale.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [logs]
+                properties:
+                  logs:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+    post:
+      operationId: createCompanionCareLog
+      tags: [Care]
+      summary: Registra alimentazione, comportamento o passeggiata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care-extras.routes.ts
+          symbol: logSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [animalId, kind, occurredAt, title]
+              properties:
+                animalId: { type: string, format: uuid }
+                kind: { type: string, enum: [feeding, behavior, walk] }
+                occurredAt: { type: string, format: date-time }
+                title: { type: string, maxLength: 160 }
+                foodType: { type: [string, 'null'], maxLength: 120 }
+                quantity: { type: [number, 'null'], exclusiveMinimum: 0 }
+                quantityUnit: { type: [string, 'null'], enum: [g, kg, ml, l, portion, null] }
+                durationMinutes: { type: [integer, 'null'], minimum: 1, maximum: 1440 }
+                distanceKm: { type: [number, 'null'], exclusiveMinimum: 0 }
+                mood: { type: [string, 'null'], maxLength: 40 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Registrazione creata.
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/companion-care/logs/{id}:
+    delete:
+      operationId: deleteCompanionCareLog
+      tags: [Care]
+      summary: Elimina una registrazione di cura
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Registrazione eliminata.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/companion-care/policies:
+    get:
+      operationId: listCompanionCarePolicies
+      tags: [Care]
+      summary: Elenca assicurazioni e documenti in scadenza
+      parameters:
+        - name: animalId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Scadenze dell'animale.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policies]
+                properties:
+                  policies:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+    post:
+      operationId: createCompanionCarePolicy
+      tags: [Care]
+      summary: Registra una polizza o un documento con promemoria di scadenza
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care-extras.routes.ts
+          symbol: policySchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [animalId, kind, title, expiresAt]
+              properties:
+                animalId: { type: string, format: uuid }
+                kind: { type: string, enum: [insurance, document] }
+                title: { type: string, maxLength: 160 }
+                provider: { type: [string, 'null'], maxLength: 160 }
+                reference: { type: [string, 'null'], maxLength: 120 }
+                startsAt: { type: [string, 'null'], format: date }
+                expiresAt: { type: string, format: date }
+                reminderDays: { type: integer, minimum: 0, maximum: 365, default: 30 }
+                notes: { type: [string, 'null'], maxLength: 5000 }
+      responses:
+        '201':
+          description: Scadenza creata e promemoria programmato.
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/companion-care/policies/{id}:
+    patch:
+      operationId: updateCompanionCarePolicy
+      tags: [Care]
+      summary: Modifica una polizza o una scadenza
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-care-extras.routes.ts
+          symbol: policyPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Scadenza aggiornata.
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteCompanionCarePolicy
+      tags: [Care]
+      summary: Elimina una scadenza e chiude il promemoria aperto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Scadenza eliminata.
+        '404':
+          $ref: '#/components/responses/Error'
+
+
+  /api/v1/aquariums/{id}/export.csv:
+    get:
+      operationId: exportAquariumCsv
+      tags: [Ecosystems]
+      summary: Esporta letture e dati dell'acquario in CSV
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: File CSV dell'acquario.
+          content:
+            text/csv:
+              schema: { type: string }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}/ranges:
+    get:
+      operationId: listAquariumParameterRanges
+      tags: [Ecosystems]
+      summary: Elenca gli intervalli dei parametri dell'acquario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Intervalli configurati.
+          content:
+            application/json:
+              schema: { type: object, required: [ranges], properties: { ranges: { type: array, items: { type: object } } } }
+    put:
+      operationId: replaceAquariumParameterRanges
+      tags: [Ecosystems]
+      summary: Sostituisce gli intervalli dei parametri dell'acquario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aquariumRangeSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ranges]
+              properties:
+                ranges:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: object
+                    required: [parameter, minValue, maxValue]
+                    properties:
+                      parameter: { type: string, enum: [temperatureC, ph, ghDkh, khDkh, nitrateMgL] }
+                      minValue: { type: [number, 'null'] }
+                      maxValue: { type: [number, 'null'] }
+      responses:
+        '200':
+          description: Intervalli aggiornati.
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/aquariums/{id}/restore:
+    post:
+      operationId: restoreAquarium
+      tags: [Ecosystems]
+      summary: Ripristina un acquario archiviato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Acquario ripristinato.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries/{id}/history:
+    get:
+      operationId: getAviaryHistory
+      tags: [Ecosystems]
+      summary: Recupera lo storico dei movimenti della voliera
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Storico movimenti.
+          content:
+            application/json:
+              schema: { type: object, required: [movements], properties: { movements: { type: array, items: { type: object } } } }
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries/{id}/notes:
+    post:
+      operationId: createAviaryNote
+      tags: [Ecosystems]
+      summary: Aggiunge una nota alla voliera
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/ecosystems.routes.ts
+          symbol: aviaryNoteSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                title: { type: [string, 'null'], maxLength: 160 }
+                body: { type: string, minLength: 1, maxLength: 10000 }
+                occurredAt: { type: string, format: date-time }
+      responses:
+        '201':
+          description: Nota creata.
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries/{id}/notes/{noteId}:
+    delete:
+      operationId: deleteAviaryNote
+      tags: [Ecosystems]
+      summary: Elimina una nota della voliera
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: noteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Nota eliminata.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/aviaries/{id}/restore:
+    post:
+      operationId: restoreAviary
+      tags: [Ecosystems]
+      summary: Ripristina una voliera archiviata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Voliera ripristinata.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/home/today/collection:
+    get:
+      operationId: getTodayCollection
+      tags: [Operations]
+      summary: Restituisce riepilogo categorie, attività e note recenti
+      responses:
+        '200':
+          description: Riepilogo della collezione.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
 components:
   securitySchemes:
     sessionCookieDev:
@@ -4344,6 +5370,40 @@ components:
         email: { type: string, format: email, maxLength: 254 }
         currentPassword: { type: string, minLength: 1, maxLength: 128 }
         newPassword: { type: string, minLength: 12, maxLength: 128 }
+    AnimalDomainProfile:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            enclosure: { type: [string, 'null'], maxLength: 120 }
+            brumation: { type: string, enum: [not_applicable, planned, in_progress, completed] }
+            feedingNotes: { type: [string, 'null'], maxLength: 2000 }
+        - type: object
+          additionalProperties: false
+          properties:
+            aquariumId: { type: [string, 'null'], format: uuid }
+            waterType: { type: string, enum: [freshwater, saltwater, brackish] }
+            temperament: { type: [string, 'null'], maxLength: 120 }
+            maxSizeCm: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 500 }
+            shoaling: { type: boolean }
+            diet: { type: [string, 'null'], maxLength: 160 }
+        - type: object
+          additionalProperties: false
+          properties:
+            ringNumber: { type: [string, 'null'], maxLength: 80 }
+            aviaryId: { type: [string, 'null'], format: uuid }
+            diet: { type: [string, 'null'], maxLength: 160 }
+            tameness: { type: string, enum: [wild, socialized, tame] }
+            flightStatus: { type: string, enum: [full_flight, clipped, unknown] }
+        - type: object
+          additionalProperties: false
+          properties:
+            breed: { type: [string, 'null'], maxLength: 160 }
+            microchip: { type: [string, 'null'], maxLength: 40 }
+            sterilized: { type: boolean }
+            vaccinationStatus: { type: string, enum: [unknown, not_up_to_date, up_to_date] }
+            coatColor: { type: [string, 'null'], maxLength: 120 }
+            weightKg: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 250 }
     AnimalWrite:
       type: object
       additionalProperties: false
@@ -4352,6 +5412,8 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
+        category: { type: string, enum: [reptiles, fish, birds, dogs_cats], default: reptiles }
+        domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
         sex: { type: string, enum: [male, female, unknown], default: unknown }
         morph: { type: [string, 'null'], maxLength: 200 }
         geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
@@ -4372,6 +5434,8 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
+        category: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
+        domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
         sex: { type: string, enum: [male, female, unknown] }
         morph: { type: [string, 'null'], maxLength: 200 }
         geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
@@ -6097,6 +7161,16 @@ components:
           "species": {
             "type": "string"
           },
+          "category": {
+            "type": "string",
+            "enum": ["reptiles", "fish", "birds", "dogs_cats"]
+          },
+          "domainProfile": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/AnimalDomainProfile" },
+              { "type": "null" }
+            ]
+          },
           "sex": {
             "type": "string",
             "enum": [
@@ -6221,6 +7295,10 @@ components:
           },
           "species": {
             "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["reptiles", "fish", "birds", "dogs_cats"]
           },
           "status": {
             "type": "string",

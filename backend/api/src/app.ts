@@ -39,6 +39,10 @@ import { createBackupRestoreRouter } from "./modules/domain/backup-restore.route
 import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
+import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
+import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
+import { createCompanionCareExtrasRouter } from "./modules/domain/companion-care-extras.routes.js";
+import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
 
 export interface AppDependencies {
   checkDatabase?: () => Promise<void>;
@@ -101,7 +105,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", csrfProtection);
   app.use("/api/v1", loadOptionalSession);
   app.use("/api/v1", createCollaboratorRouter(dependencies.emailSender, dependencies.premiumEntitlement));
+  // Resolve the effective workspace identity before checking account-scoped animal categories.
   app.use("/api/v1", createWorkspaceAccessGuard(dependencies.premiumEntitlement));
+  app.use("/api/v1", animalDomainAccessGuard);
   app.use("/api/v1", subscriptionAccessGuard);
   app.use("/api/v1/auth", createAuthRouter(dependencies.emailSender));
   app.use("/api/v1/account", createAccountRouter(dependencies.emailSender));
@@ -122,6 +128,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createInventoryRouter());
   app.use("/api/v1", createDocumentShareRouter());
   app.use("/api/v1", createGeneticTraitsRouter());
+  app.use("/api/v1", createEcosystemRouter());
+  app.use("/api/v1", createCompanionCareRouter());
+  app.use("/api/v1", createCompanionCareExtrasRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());
   app.use("/api/v1", createBillingRouter(dependencies.billing));

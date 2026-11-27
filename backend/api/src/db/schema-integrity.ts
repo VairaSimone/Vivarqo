@@ -201,6 +201,10 @@ function normalizeSqlExpression(value: string): string {
   normalized = normalized
     .replace(/\bpublic\./g, "")
     .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\([^)]*\))?/g, "")
+    // PostgreSQL may render boolean predicates as a bare truthy column and
+    // add grouping around atomic comparisons in pg_get_expr().
+    .replace(/\s*=\s*true\b/gi, "")
+    .replace(/\(([^()]*(?:\bIS\s+(?:NOT\s+)?NULL\b|[=<>])[^()]*)\)/gi, "$1")
     // Remove grouping around a bare identifier, but not the parentheses that
     // delimit a function call such as lower(code).
     .replace(/(?<![A-Za-z0-9_$])\(([A-Za-z_][A-Za-z0-9_$]*)\)(?!\s*\()/g, "$1")
@@ -281,7 +285,7 @@ function databaseType(prismaType: string, isList: boolean, attributes: string): 
   }
   return {
     pgType: isList ? "_" + baseType : baseType,
-    ...(override?.[1] === "VarChar" || override?.[1] === "Char" ? { maxLength: args[0] } : {}),
+    ...(!isList && (override?.[1] === "VarChar" || override?.[1] === "Char") ? { maxLength: args[0] } : {}),
     ...(override?.[1] === "Decimal" ? { precision: args[0], scale: args[1] } : {}),
   };
 }
@@ -371,10 +375,13 @@ const initialMigrationName = expectedSchema.migrations[0]!;
 export async function inspectDatabaseSchema(): Promise<SchemaIntegrityReport> {
   const [columns, indexes, constraints, triggers, functions, extensions] = await Promise.all([
     prisma.$queryRawUnsafe<SchemaRows[]>(
-      "SELECT table_name AS \"tableName\", column_name AS \"columnName\", udt_name AS \"udtName\", " +
-      "is_nullable AS \"isNullable\", character_maximum_length AS \"characterMaximumLength\", " +
-      "numeric_precision AS \"numericPrecision\", numeric_scale AS \"numericScale\" " +
-      "FROM information_schema.columns WHERE table_schema = 'public'",
+      "SELECT c.table_name AS \"tableName\", c.column_name AS \"columnName\", c.udt_name AS \"udtName\", " +
+      "c.is_nullable AS \"isNullable\", COALESCE(c.character_maximum_length, e.character_maximum_length) AS \"characterMaximumLength\", " +
+      "c.numeric_precision AS \"numericPrecision\", c.numeric_scale AS \"numericScale\" " +
+      "FROM information_schema.columns c LEFT JOIN information_schema.element_types e " +
+      "ON c.table_catalog = e.object_catalog AND c.table_schema = e.object_schema AND c.table_name = e.object_name " +
+      "AND e.object_type = 'TABLE' AND c.dtd_identifier = e.collection_type_identifier " +
+      "WHERE c.table_schema = 'public'",
     ),
     prisma.$queryRawUnsafe<Array<{
       indexName: string;
