@@ -5089,6 +5089,425 @@ paths:
             application/json:
               schema: { type: object, additionalProperties: true }
 
+  /api/v1/aquariums/{id}/management:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getAquariumManagement
+      tags: [Ecosystems]
+      summary: Recupera registri di gestione e popolazione dell'acquario
+      responses:
+        '200':
+          description: Registri di manutenzione, popolazione, quarantena, trattamenti e riproduzione.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [waterChanges, filterMaintenances, productDosages, populations, movements, quarantines, treatments, reproductions, compatibilityRules]
+                properties:
+                  waterChanges: { type: array, items: { type: object } }
+                  filterMaintenances: { type: array, items: { type: object } }
+                  productDosages: { type: array, items: { type: object } }
+                  populations: { type: array, items: { type: object } }
+                  movements: { type: array, items: { type: object } }
+                  quarantines: { type: array, items: { type: object } }
+                  treatments: { type: array, items: { type: object } }
+                  reproductions: { type: array, items: { type: object } }
+                  compatibilityRules: { type: array, items: { type: object } }
+  /api/v1/aquariums/{id}/water-change-calculator:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: calculateAquariumWaterChange
+      tags: [Ecosystems]
+      summary: Calcola i litri da sostituire in base alla percentuale scelta
+      parameters:
+        - name: percentage
+          in: query
+          required: true
+          schema: { type: number, exclusiveMinimum: 0, maximum: 100 }
+      responses:
+        '200':
+          description: Volume calcolato.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aquariumVolumeLiters, percentage, waterToChangeLiters]
+                properties:
+                  aquariumVolumeLiters: { type: number }
+                  percentage: { type: number }
+                  waterToChangeLiters: { type: number }
+  /api/v1/aquarium-treatments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateAquariumTreatment
+      tags: [Ecosystems]
+      summary: Aggiorna o conclude un trattamento
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: treatmentPatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                endedAt: { type: [string, 'null'], format: date-time }
+                outcome: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200':
+          description: Trattamento aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [treatment], properties: { treatment: { type: object } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/quarantines/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      operationId: updateAquariumQuarantine
+      tags: [Ecosystems]
+      summary: Aggiorna lo stato o conclude una quarantena
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: quarantinePatchSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                destinationAquariumId: { type: string, format: uuid }
+                status: { type: string, enum: [quarantine, released, isolated, lost] }
+                endedAt: { type: [string, 'null'], format: date-time }
+                observations: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200':
+          description: Stato quarantena aggiornato.
+          content:
+            application/json:
+              schema: { type: object, required: [quarantine], properties: { quarantine: { type: object } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/aquariums/{id}/filter-maintenance:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumFilterMaintenance
+      tags: [Ecosystems]
+      summary: Registra manutenzione di un filtro o materiale filtrante
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: filterSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurredAt, filterName, action]
+              properties:
+                occurredAt: { type: string, format: date-time }
+                filterName: { type: string, minLength: 1, maxLength: 160 }
+                action: { type: string, enum: [cleaning, replacement, inspection, other] }
+                material: { type: [string, 'null'], maxLength: 160 }
+                materialChanged: { type: boolean }
+                nextDueAt: { type: [string, 'null'], format: date-time }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Manutenzione registrata.
+          content:
+            application/json:
+              schema: { type: object, required: [maintenance], properties: { maintenance: { type: object } } }
+  /api/v1/aquariums/{id}/population-movements:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumPopulationMovement
+      tags: [Ecosystems]
+      summary: Registra introduzione, uscita, mortalità o trasferimento di pesci aggiornando le popolazioni in modo atomico
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: populationMovementSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [movementType, speciesKey, quantity, occurredAt]
+              properties:
+                movementType: { type: string, enum: [introduction, removal, transfer, mortality] }
+                speciesKey: { type: string, minLength: 1, maxLength: 180 }
+                commonName: { type: [string, 'null'], maxLength: 160 }
+                scientificName: { type: [string, 'null'], maxLength: 180 }
+                quantity: { type: integer, minimum: 1 }
+                occurredAt: { type: string, format: date-time }
+                fromAquariumId: { type: [string, 'null'], format: uuid }
+                toAquariumId: { type: [string, 'null'], format: uuid }
+                reason: { type: [string, 'null'], maxLength: 240 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Movimento registrato e popolazione aggiornata.
+          content:
+            application/json:
+              schema: { type: object, required: [movement], properties: { movement: { type: object } } }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/aquariums/{id}/product-dosages:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumProductDosing
+      tags: [Ecosystems]
+      summary: Registra il dosaggio di fertilizzanti o prodotti per acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: dosingSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurredAt, productName, productType, doseAmount, doseUnit]
+              properties:
+                occurredAt: { type: string, format: date-time }
+                productName: { type: string, minLength: 1, maxLength: 160 }
+                productType: { type: string, enum: [fertilizer, conditioner, mineral, bacteria, other] }
+                doseAmount: { type: number, exclusiveMinimum: 0 }
+                doseUnit: { type: string, minLength: 1, maxLength: 32 }
+                targetVolumeL: { type: [number, 'null'], exclusiveMinimum: 0 }
+                reason: { type: [string, 'null'], maxLength: 240 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Dosaggio registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [dosage], properties: { dosage: { type: object } } }
+  /api/v1/aquariums/{id}/quarantines:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumQuarantine
+      tags: [Ecosystems]
+      summary: Registra nuovi pesci in quarantena
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: quarantineSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [speciesKey, quantity, startedAt]
+              properties:
+                speciesKey: { type: string, minLength: 1, maxLength: 180 }
+                commonName: { type: [string, 'null'], maxLength: 160 }
+                scientificName: { type: [string, 'null'], maxLength: 180 }
+                quantity: { type: integer, minimum: 1 }
+                startedAt: { type: string, format: date-time }
+                endedAt: { type: [string, 'null'], format: date-time }
+                source: { type: [string, 'null'], maxLength: 180 }
+                status: { type: string, enum: [quarantine, released, isolated, lost] }
+                observations: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Quarantena registrata.
+          content:
+            application/json:
+              schema: { type: object, required: [quarantine], properties: { quarantine: { type: object } } }
+  /api/v1/aquariums/{id}/reproductions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumReproduction
+      tags: [Ecosystems]
+      summary: Registra riproduzione, deposizione, schiuse e sopravvivenza
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: reproductionSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [speciesKey, startedAt]
+              properties:
+                speciesKey: { type: string, minLength: 1, maxLength: 180 }
+                commonName: { type: [string, 'null'], maxLength: 160 }
+                startedAt: { type: string, format: date-time }
+                spawnedAt: { type: [string, 'null'], format: date-time }
+                hatchedAt: { type: [string, 'null'], format: date-time }
+                eggsCount: { type: [integer, 'null'], minimum: 0 }
+                hatchedCount: { type: [integer, 'null'], minimum: 0 }
+                survivingCount: { type: [integer, 'null'], minimum: 0 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Evento riproduttivo registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [reproduction], properties: { reproduction: { type: object } } }
+  /api/v1/aquariums/{id}/treatments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumTreatment
+      tags: [Ecosystems]
+      summary: Registra un trattamento o medicinale somministrato nell'acquario
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: treatmentSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startedAt, treatmentType, productName]
+              properties:
+                startedAt: { type: string, format: date-time }
+                endedAt: { type: [string, 'null'], format: date-time }
+                treatmentType: { type: string, enum: [medication, antiparasitic, other] }
+                productName: { type: string, minLength: 1, maxLength: 160 }
+                activeIngredient: { type: [string, 'null'], maxLength: 160 }
+                doseAmount: { type: [number, 'null'], exclusiveMinimum: 0 }
+                doseUnit: { type: [string, 'null'], maxLength: 32 }
+                targetSpecies: { type: [string, 'null'], maxLength: 180 }
+                instructions: { type: [string, 'null'], maxLength: 10000 }
+                outcome: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Trattamento registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [treatment], properties: { treatment: { type: object } } }
+  /api/v1/aquariums/{id}/water-changes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: createAquariumWaterChange
+      tags: [Ecosystems]
+      summary: Registra un cambio d'acqua
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: waterChangeSchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurredAt, volumeLiters]
+              properties:
+                occurredAt: { type: string, format: date-time }
+                volumeLiters: { type: number, exclusiveMinimum: 0 }
+                percentage: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 100 }
+                waterSource: { type: [string, 'null'], maxLength: 120 }
+                conditioner: { type: [string, 'null'], maxLength: 160 }
+                temperatureC: { type: [number, 'null'], minimum: -5, maximum: 60 }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '201':
+          description: Cambio d'acqua registrato.
+          content:
+            application/json:
+              schema: { type: object, required: [waterChange], properties: { waterChange: { type: object } } }
+  /api/v1/aquariums/{id}/compatibility-rules:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      operationId: upsertAquariumCompatibilityRule
+      tags: [Ecosystems]
+      summary: Salva una regola di compatibilità tra due specie
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/aquarium-management.routes.ts
+          symbol: compatibilitySchema
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [speciesAKey, speciesBKey, compatibility]
+              properties:
+                speciesAKey: { type: string, minLength: 1, maxLength: 180 }
+                speciesBKey: { type: string, minLength: 1, maxLength: 180 }
+                compatibility: { type: string, enum: [compatible, caution, incompatible] }
+                notes: { type: [string, 'null'], maxLength: 10000 }
+      responses:
+        '200':
+          description: Regola di compatibilità salvata.
+          content:
+            application/json:
+              schema: { type: object, required: [rule], properties: { rule: { type: object } } }
+
 components:
   securitySchemes:
     sessionCookieDev:
