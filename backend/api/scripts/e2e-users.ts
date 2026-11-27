@@ -72,6 +72,9 @@ async function cleanAccounts() {
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId: { in: userIds } } } } });
     await tx.inventoryItem.deleteMany({ where: { userId: { in: userIds } } });
 
+    // Transfer history is intentionally RESTRICT-linked to animals. Remove only
+    // fixture-owned transfer rows before deleting the corresponding test animals.
+    await tx.animalTransfer.deleteMany({ where: { userId: { in: userIds } } });
     await tx.animal.deleteMany({ where: ownedAnimals });
     await tx.user.deleteMany({ where: { id: { in: userIds } } });
   });
