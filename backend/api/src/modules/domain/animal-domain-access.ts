@@ -4,7 +4,8 @@ import { AppError } from "../../errors/app-error.js";
 
 const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
   { prefixes: ["/aquariums"], category: "fish" },
-  { prefixes: ["/aviaries"], category: "birds" },
+  { prefixes: ["/aviaries", "/birds", "/bird-breeding-pairs", "/aviary-maintenance"], category: "birds" },
+  { prefixes: ["/quarantines", "/aquarium-treatments"], category: "fish" },
   { prefixes: ["/companion-care"], category: "dogs_cats" },
   {
     prefixes: [
