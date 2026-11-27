@@ -9,7 +9,7 @@ const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
   { prefixes: ["/companion-care"], category: "dogs_cats" },
   {
     prefixes: [
-      "/reproduction", "/reproduction-pairs", "/species-breeding-profiles", "/reproduction-statistics",
+      "/reproduction", "/reproduction-pairs", "/reproduction-cycles", "/species-breeding-profiles", "/reproduction-statistics",
       "/incubators", "/clutches", "/eggs", "/offspring-batches", "/reproductive-events",
       "/incubation-logs", "/genetic-traits",
     ],
