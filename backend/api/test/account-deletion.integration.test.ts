@@ -49,6 +49,13 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
       data: { userId: user.id, name: "Photo cleanup", species: "Test species", photoKey },
       select: { id: true },
     });
+    const room = await prisma.animalLocation.create({
+      data: { userId: user.id, kind: "room", name: "Deletion fixture room" },
+      select: { id: true },
+    });
+    await prisma.animalLocation.create({
+      data: { userId: user.id, parentId: room.id, kind: "rack", name: "Deletion fixture rack" },
+    });
     await prisma.animalTransfer.create({
       data: {
         userId: user.id,
@@ -119,6 +126,7 @@ describe.skipIf(!integrationEnabled)("Self-service account deletion PostgreSQL i
     expect(await prisma.importJob.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.animalTransfer.count({ where: { userId: user.id } })).toBe(0);
     expect(await prisma.healthRecord.count({ where: { animalId: animal.id } })).toBe(0);
+    expect(await prisma.animalLocation.count({ where: { userId: user.id } })).toBe(0);
     await expect(readPrivateObject(photoKey)).rejects.toMatchObject({ statusCode: 404 });
   }, 45_000);
 });
