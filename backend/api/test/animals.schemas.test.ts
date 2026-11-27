@@ -1,5 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { createAnimalSchema, patchAnimalSchema, feedingEntrySchema, patchFeedingEntrySchema, bulkCareRecordsSchema } from "../src/modules/animals/animals.schemas.js";
+import { createAnimalSchema, patchAnimalSchema, feedingEntrySchema, patchFeedingEntrySchema, bulkCareRecordsSchema, validateAnimalDomainProfile } from "../src/modules/animals/animals.schemas.js";
+
+
+describe("dog and cat medical profile validation", () => {
+  it("accepts microchip, veterinary contacts, allergies and chronic conditions", () => {
+    const result = validateAnimalDomainProfile("dogs_cats", {
+      microchip: "380260000000001",
+      veterinarianName: "Dott.ssa Rossi",
+      veterinaryClinic: "Ambulatorio Centro",
+      veterinaryPhone: "+39 011 1234567",
+      veterinaryEmail: "vet@example.it",
+      veterinaryAddress: "Torino",
+      allergies: "Pollo",
+      chronicConditions: "Dermatite cronica",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed veterinary email and oversized microchip values", () => {
+    expect(validateAnimalDomainProfile("dogs_cats", { veterinaryEmail: "not-an-email" }).success).toBe(false);
+    expect(validateAnimalDomainProfile("dogs_cats", { microchip: "x".repeat(41) }).success).toBe(false);
+  });
+});
 
 describe("animal calendar date validation", () => {
   it("rejects impossible calendar dates on create and patch", () => {

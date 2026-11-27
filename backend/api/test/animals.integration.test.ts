@@ -142,6 +142,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
         passwordHash: await argon2.hash(password, { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 }),
         displayName: "Animal Integration",
         emailVerifiedAt: new Date(),
+        accountConfiguration: { create: { animalCategories: ["reptiles"] } },
       },
     });
     userIds.push(user.id);
@@ -198,6 +199,30 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(active.body.animals.some((item: { id: string }) => item.id === animal.id)).toBe(false);
     const archived = await owner.agent.get("/api/v1/animals?status=archived").expect(200);
     expect(archived.body.animals.some((item: { id: string }) => item.id === animal.id)).toBe(true);
+  });
+
+  it("rejects genealogy links to a different animal category or species on create and update", async () => {
+    const owner = await account();
+    await prisma.accountConfiguration.update({
+      where: { userId: owner.userId },
+      data: { animalCategories: ["reptiles", "fish"] },
+    });
+    const mother = await createAnimal(owner, "Boa mother", "PARENT-BOA-1");
+    const fatherResult = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Boa father", species: "Python regius", identifier: "PARENT-BOA-2", sex: "male" }).expect(201);
+    const fishParent = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Fish parent", species: "Betta splendens", category: "fish", sex: "female" }).expect(201);
+
+    await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Invalid offspring", species: "Python regius", category: "reptiles", motherAnimalId: fishParent.body.animal.id })
+      .expect(400).expect((res) => expect(res.body.error?.code ?? res.body.code).toBe("INCOMPATIBLE_ANIMAL_PARENT"));
+
+    const offspring = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Boa offspring", species: "Python regius", category: "reptiles", motherAnimalId: mother.id, fatherAnimalId: fatherResult.body.animal.id })
+      .expect(201);
+    await owner.agent.patch(`/api/v1/animals/${offspring.body.animal.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ species: "Boa constrictor" })
+      .expect(400).expect((res) => expect(res.body.error?.code ?? res.body.code).toBe("INCOMPATIBLE_ANIMAL_PARENT"));
   });
 
   it("enforces case-insensitive animal identifier uniqueness in PostgreSQL", async () => {

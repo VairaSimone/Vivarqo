@@ -4,6 +4,9 @@ import { invalidateAllResourceCache } from "../lib/resourceCache";
 import { AppShell } from "../layouts/AppShell";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { CookieConsentBanner } from "../components/CookieConsentBanner";
+const AccountCategoriesPage = lazy(() => import("../features/AccountCategoriesPage").then((module) => ({ default: module.AccountCategoriesPage })));
+const EcosystemsPage = lazy(() => import("../features/EcosystemsPage").then((module) => ({ default: module.EcosystemsPage })));
+const CompanionCarePage = lazy(() => import("../features/CompanionCarePage").then((module) => ({ default: module.CompanionCarePage })));
 const AuthPage = lazy(() => import("../features/AuthPage").then((module) => ({ default: module.AuthPage })));
 const DashboardPage = lazy(() => import("../features/DashboardPage").then((module) => ({ default: module.DashboardPage })));
 const AnimalsPage = lazy(() => import("../features/AnimalsPage").then((module) => ({ default: module.AnimalsPage })));
@@ -108,8 +111,9 @@ export function App() {
   useEffect(() => {
     if (!authRoute || !user) return;
     let active = true;
-    api.get("/auth/me").then(() => {
-      if (active) navigate("/today");
+    api.get("/auth/me").then(async () => {
+      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+      if (active) navigate(configuration.configuredAt ? "/today" : "/setup");
     }).catch((reason: unknown) => {
       if (!active) return;
       if (reason instanceof ApiError && reason.status === 401) {
@@ -117,7 +121,7 @@ export function App() {
         setUser(null);
       } else {
         setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
-        navigate("/today");
+        navigate("/setup");
       }
     });
     return () => { active = false; };
@@ -130,11 +134,21 @@ export function App() {
     }
     let active = true;
     setAuthReady(false);
-    api.get<{ user: User }>("/auth/me").then((result) => {
+    api.get<{ user: User }>("/auth/me").then(async (result) => {
       if (!active) return;
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
       setAuthError("");
+      try {
+        const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+        if (!active) return;
+        if (!configuration.configuredAt && window.location.pathname !== "/setup") navigate("/setup");
+        else if (configuration.configuredAt && window.location.pathname === "/setup") navigate("/today");
+      } catch (reason) {
+        if (!active) return;
+        setAuthError(reason instanceof ApiError ? reason.message : t("operationFailed"));
+        navigate("/setup");
+      }
     }).catch((reason: unknown) => {
       if (!active) return;
       setUser(null);
@@ -143,7 +157,7 @@ export function App() {
       if (active) setAuthReady(true);
     });
     return () => { active = false; };
-  }, [isPublic]);
+  }, [isPublic, navigate]);
 
   useEffect(() => {
     const value = accountPrefs.data?.preferences ?? {};
@@ -210,6 +224,11 @@ export function App() {
       const result = await api.get<{ user: User }>("/auth/me");
       setUser(result.user);
       setLocale(result.user.locale === "en" ? "en" : "it");
+      const configuration = await api.get<{ categories: string[]; configuredAt: string | null }>("/onboarding/configuration");
+      if (!configuration.configuredAt) {
+        navigate("/setup");
+        return;
+      }
       const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get("invite");
       const preferenceResult = await api.get<AccountPreferences>("/account/preferences").catch(() => null);
       if (inviteToken && routeOnly(window.location.pathname) === "/settings/collaborators") {
@@ -236,7 +255,7 @@ export function App() {
 
   if (!authReady) return <div className="app-boot"><span className="brand-mark"><Icon name="leaf" /></span><LoadingState /></div>;
 
-  if (!user && (routeOnly(path) === "/" || routeOnly(path) === "/settings/collaborators")) {
+  if (!user && ["/", "/setup", "/settings/categories", "/settings/collaborators"].includes(routeOnly(path))) {
     return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}><AuthPage mode="login" locale={locale} onSuccess={() => void loginSuccess()} navigate={navigate} onLocaleChange={setLocale} /></Suspense>);
   }
 
@@ -246,18 +265,26 @@ export function App() {
 
   const route = routeOnly(path);
   const matches = (base: string) => route === base || route.startsWith(base + "/");
+  if (route === "/setup") {
+    return withCookieBanner(<Suspense fallback={<div className="app-boot" role="status"><LoadingState /></div>}>
+      <AccountCategoriesPage locale={locale} mode="setup" onComplete={() => navigate("/today")} />
+    </Suspense>);
+  }
   let page;
   if (route === "/today" || route === "/") page = <DashboardPage locale={locale} timezone={timezone} navigate={navigate} />;
   else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
+  else if (matches("/aquariums") || matches("/aviaries")) page = <EcosystemsPage locale={locale} path={path} />;
+  else if (matches("/companion-care")) page = <CompanionCarePage locale={locale} />;
   else if (matches("/feeding")) page = <CarePage locale={locale} path={path} timezone={timezone} />;
   else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/genetics")) page = <GeneticsPage locale={locale} />;
   else if (matches("/inventory") || matches("/documents")) page = <InventoryDocumentsPage locale={locale} path={path} navigate={navigate} />;
-  else if (matches("/finance")) page = <FinancePage locale={locale} />;
+  else if (matches("/finance")) page = <FinancePage locale={locale} path={path} />;
   else if (matches("/help")) page = <HelpCenterPage locale={locale} navigate={navigate} />;
   else if (matches("/imports")) page = <DataTransferPage locale={locale} mode="import" />;
   else if (matches("/exports")) page = <DataTransferPage locale={locale} mode="export" />;
+  else if (matches("/settings/categories")) page = <AccountCategoriesPage locale={locale} mode="settings" onComplete={() => navigate("/settings")} />;
   else if (matches("/notifications") || matches("/settings") || matches("/billing")) page = <SettingsPage locale={locale} path={path} user={user} onLocaleChange={changeLocale} onUserUpdated={setUser} onThemeChange={setThemePreference}
       onDisplayPreferencesChange={(next) => setDisplayPreferencesState((current) => ({ ...current, ...next, timezone }))}
       navigate={navigate} />;

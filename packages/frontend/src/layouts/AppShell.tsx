@@ -18,42 +18,49 @@ type BeforeInstallPromptEvent = Event & {
 type User = { displayName: string; email: string; locale: Locale };
 type NavItem = { path: string; label: string; icon: "home" | "calendar" | "check" | "snake" | "feed" | "leaf" | "box" | "file" | "wallet" | "settings" | "bell" | "help" };
 
-const groups: Array<{ title: string; items: NavItem[] }> = [
-  { title: "navWorkspace", items: [
-    { path: "/today", label: "navToday", icon: "home" },
-    { path: "/calendar", label: "navCalendar", icon: "calendar" },
-    { path: "/tasks", label: "navTasks", icon: "check" }
-  ] },
-  { title: "navAnimals", items: [
+function groupsForCategories(categories: string[], sharedWorkspace = false): Array<{ title: string; items: NavItem[] }> {
+  const has = (category: string) => categories.includes(category);
+  const animalItems: NavItem[] = [
     { path: "/animals", label: "navAnimals", icon: "snake" },
-    { path: "/feeding", label: "navFeeding", icon: "feed" }
-  ] },
-  { title: "navResources", items: [
-    { path: "/reproduction", label: "navBreeding", icon: "leaf" },
-    { path: "/genetics", label: "navGenetics", icon: "leaf" },
-    { path: "/inventory", label: "navInventory", icon: "box" },
-    { path: "/documents", label: "navDocuments", icon: "file" }
-  ] },
-  { title: "navAdmin", items: [
-    { path: "/finance", label: "navFinance", icon: "wallet" },
-    { path: "/imports", label: "navImports", icon: "file" },
-    { path: "/exports", label: "navExports", icon: "box" }
-  ] },
-  { title: "navPreferences", items: [
-    { path: "/help", label: "navHelp", icon: "help" },
-    { path: "/notifications", label: "navNotifications", icon: "bell" },
-    { path: "/billing", label: "navBilling", icon: "wallet" },
-    { path: "/settings", label: "navSettings", icon: "settings" }
-  ] }
-];
+    { path: "/feeding", label: "navFeeding", icon: "feed" },
+  ];
+  if (has("reptiles")) animalItems.push({ path: "/reproduction", label: "navBreeding", icon: "leaf" });
+  if (has("reptiles")) animalItems.push({ path: "/genetics", label: "navGenetics", icon: "leaf" });
+  if (has("fish")) animalItems.push({ path: "/aquariums", label: "navAquariums", icon: "box" });
+  if (has("birds")) animalItems.push({ path: "/aviaries", label: "navAviaries", icon: "leaf" });
+  if (has("dogs_cats")) animalItems.push({ path: "/companion-care", label: "navCompanionCare", icon: "check" });
+  return [
+    { title: "navWorkspace", items: [
+      { path: "/today", label: "navToday", icon: "home" },
+      { path: "/calendar", label: "navCalendar", icon: "calendar" },
+      { path: "/tasks", label: "navTasks", icon: "check" }
+    ] },
+    { title: "navAnimals", items: animalItems },
+    { title: "navAdmin", items: [
+      { path: "/inventory", label: "navInventory", icon: "box" },
+      { path: "/documents", label: "navDocuments", icon: "file" },
+      { path: "/finance", label: "navFinance", icon: "wallet" },
+      { path: "/imports", label: "navImports", icon: "file" },
+      { path: "/exports", label: "navExports", icon: "box" }
+    ] },
+    { title: "navPreferences", items: [
+      { path: "/help", label: "navHelp", icon: "help" },
+      { path: "/notifications", label: "navNotifications", icon: "bell" },
+      { path: "/billing", label: "navBilling", icon: "wallet" },
+      ...(!sharedWorkspace ? [{ path: "/settings/categories", label: "navCategories", icon: "settings" as const }] : []),
+      { path: "/settings", label: "navSettings", icon: "settings" }
+    ] }
+  ];
+}
 
 const routeTitles: Record<string, string> = {
   "/today": "navToday", "/calendar": "navCalendar", "/tasks": "navTasks",
   "/animals": "navAnimals", "/feeding": "navFeeding", "/reproduction": "navBreeding",
+  "/aquariums": "navAquariums", "/aviaries": "navAviaries", "/companion-care": "navCompanionCare",
   "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding", "/genetics": "navGenetics",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",
-  "/billing": "navBilling", "/settings": "navSettings", "/help": "navHelp"
+  "/billing": "navBilling", "/settings/categories": "navCategories", "/settings": "navSettings", "/help": "navHelp"
 };
 
 export function AppShell({ children, path, user, locale, onNavigate, onLocaleChange, onSignOut, unreadCount = 0 }: {
@@ -61,6 +68,8 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   onNavigate: (path: string) => void; onLocaleChange: (locale: Locale) => void;
   onSignOut: () => void; unreadCount?: number;
 }) {
+  const [animalCategories, setAnimalCategories] = useState<string[]>([]);
+  const [sharedWorkspace, setSharedWorkspace] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -76,6 +85,22 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   const [iosDevice, setIosDevice] = useState(false);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const t = (key: string) => translate(locale, key);
+
+  useEffect(() => {
+    let active = true;
+    api.get<{ categories: string[]; isPersonalWorkspace: boolean }>("/collaborators/context")
+      .then((configuration) => {
+        if (!active) return;
+        setAnimalCategories(configuration.categories);
+        setSharedWorkspace(!configuration.isPersonalWorkspace);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAnimalCategories([]);
+        setSharedWorkspace(false);
+      });
+    return () => { active = false; };
+  }, [path]);
 
   useEffect(() => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches
@@ -126,11 +151,6 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   }
   const route = path.split("?")[0] || "/today";
   const titleKey = Object.entries(routeTitles).find(([prefix]) => route === prefix || route.startsWith(prefix + "/"))?.[1] ?? "navToday";
-
-  useEffect(() => {
-    try { setShowTour(localStorage.getItem("snakebee:onboarding:v1") !== "completed"); }
-    catch { setShowTour(false); }
-  }, []);
 
   useEffect(() => {
     if (!mobileMenu) return;
@@ -195,15 +215,19 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         api.get<{ tasks: TaskDto[] }>("/tasks" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
         api.get<{ documents: DocumentDto[] }>("/documents" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
         api.get<{ cycles: ReproductionCycleSummaryDto[] }>("/reproduction-cycles" + queryString({ page: 1, pageSize: 5, status: "all", q: query }), { signal: controller.signal }),
+        api.get<{ sessions: Array<Record<string, unknown>> }>("/feeding-sessions" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
+        api.get<{ items: Array<Record<string, unknown>> }>("/inventory/items" + queryString({ page: 1, pageSize: 5, active: "all", q: query }), { signal: controller.signal }),
+        api.get<{ entries: Array<Record<string, unknown>> }>("/finance/entries" + queryString({ page: 1, pageSize: 5, q: query }), { signal: controller.signal }),
+        api.get<{ genes: Array<Record<string, unknown>> }>("/genetics/catalog", { signal: controller.signal }),
       ]);
       if (!active || controller.signal.aborted) return;
-      const [animalResponse, taskResponse, documentResponse, cycleResponse] = requests;
+      const [animalResponse, taskResponse, documentResponse, cycleResponse, feedingResponse, inventoryResponse, financeResponse, geneticsResponse] = requests;
       const results = [
         ...(animalResponse.status === "fulfilled" ? animalResponse.value.animals.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "species"), group: t("navAnimals"), path: "/animals/" + getString(item, "id")
         })) : []),
         ...(taskResponse.status === "fulfilled" ? taskResponse.value.tasks.map((item) => ({
-          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks?q=" + encodeURIComponent(query)
+          id: getString(item, "id"), title: getString(item, "title"), subtitle: getString(item.animal, "name") || getString(item, "status"), group: t("navTasks"), path: "/tasks/" + getString(item, "id")
         })) : []),
         ...(documentResponse.status === "fulfilled" ? documentResponse.value.documents.map((item) => ({
           id: getString(item, "id"), title: getString(item, "originalFilename"), subtitle: getString(item, "category"), group: t("navDocuments"), path: "/documents?q=" + encodeURIComponent(query)
@@ -211,7 +235,24 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         ...(cycleResponse.status === "fulfilled" ? cycleResponse.value.cycles.map((item) => ({
           id: getString(item, "id"), title: getString(item, "name") || t("cycles"), subtitle: getString(item, "status"), group: t("navBreeding"), path: "/reproduction-cycles/" + getString(item, "id")
         })) : []),
-      ].filter((item) => item.id && item.title).slice(0, 20);
+        ...(feedingResponse.status === "fulfilled" ? feedingResponse.value.sessions.map((item) => {
+          const entries = Array.isArray(item.entries) ? item.entries as Array<Record<string, unknown>> : [];
+          const firstEntry = entries[0];
+          const animal = firstEntry?.animal;
+          return { id: getString(item, "id"), title: entries.length === 1 ? getString(animal, "name") : (locale === "it" ? "Sessione di alimentazione" : "Feeding session"), subtitle: getString(firstEntry, "foodType") || getString(item, "performedAt"), group: t("navFeeding"), path: "/feeding?q=" + encodeURIComponent(query) };
+        }) : []),
+        ...(inventoryResponse.status === "fulfilled" ? inventoryResponse.value.items.map((item) => ({
+          id: getString(item, "id"), title: getString(item, "name"), subtitle: getString(item, "category"), group: t("navInventory"), path: "/inventory?q=" + encodeURIComponent(query)
+        })) : []),
+        ...(financeResponse.status === "fulfilled" ? financeResponse.value.entries.map((item) => ({
+          id: getString(item, "id"), title: getString(item, "description") || getString(item, "category"), subtitle: getString(item, "occurredOn"), group: t("navFinance"), path: "/finance?q=" + encodeURIComponent(query)
+        })) : []),
+        ...(geneticsResponse.status === "fulfilled" ? geneticsResponse.value.genes
+          .filter((gene) => [getString(gene, "name"), getString(gene, "symbol"), getString(gene, "species")].some((value) => value.toLocaleLowerCase().includes(query.toLocaleLowerCase())))
+          .slice(0, 5).map((gene) => ({
+            id: getString(gene, "id"), title: getString(gene, "name"), subtitle: getString(gene, "species") + " · " + getString(gene, "symbol"), group: t("navGenetics"), path: "/genetics"
+          })) : []),
+      ].filter((item) => item.id && item.title).slice(0, 30);
       setSearchResults(results);
       setSearchFailed(requests.every((result) => result.status === "rejected"));
       setSearchLoading(false);
@@ -242,13 +283,13 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
   return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#main-content">{locale === "en" ? "Skip to main content" : "Vai al contenuto principale"}</a>
     <aside id="application-sidebar" className={`sidebar ${mobileMenu ? "mobile-open" : ""}`} aria-label={locale === "it" ? "Navigazione principale" : "Main navigation"} role={mobileMenu ? "dialog" : undefined} aria-modal={mobileMenu || undefined} tabIndex={mobileMenu ? -1 : undefined}>
-      <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Snakebee home">
-        <span className="brand-mark"><Icon name="leaf" size={21} /></span>
-        <span className="brand-copy"><strong>SnakeBee</strong><small>{t("brandTagline")}</small></span>
+      <button className="brand-lockup" onClick={() => onNavigate("/today")} aria-label="Vivarqo home">
+        <span className="brand-mark"><Icon name="brand" size={23} /></span>
+        <span className="brand-copy"><strong>Vivarqo</strong><small>{t("brandTagline")}</small></span>
       </button>
       <div className="nav-scroll">
-        {groups.map((group) => <div className="nav-section" key={group.title}>
-          <span className="nav-caption">{t(group.title)}</span>
+        {groupsForCategories(animalCategories, sharedWorkspace).map((group) => <div className="nav-section" key={group.title}>
+          <span className="nav-caption">{group.title === "navAdmin" ? (locale === "it" ? "GESTIONE" : "MANAGEMENT") : group.title === "navPreferences" ? (locale === "it" ? "ACCOUNT" : "ACCOUNT") : t(group.title)}</span>
           {group.items.map(renderItem)}
         </div>)}
       </div>
@@ -281,7 +322,7 @@ export function AppShell({ children, path, user, locale, onNavigate, onLocaleCha
         </div>
       </header>
       <main id="main-content" className="page-content" tabIndex={-1}>{children}</main>
-      <footer className="app-footer"><span>SnakeBee · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><button type="button" onClick={() => onNavigate("/settings/privacy")}>{locale === "it" ? "Centro privacy" : "Privacy centre"}</button><button type="button" onClick={() => onNavigate("/legal/privacy")}>Privacy</button><button type="button" onClick={() => onNavigate("/legal/cookies")}>Cookie</button><button type="button" onClick={openCookiePreferences}>{locale === "it" ? "Preferenze cookie" : "Cookie preferences"}</button><button type="button" onClick={() => onNavigate("/legal/terms")}>{locale === "it" ? "Termini" : "Terms"}</button><button type="button" onClick={() => onNavigate("/legal/accessibility")}>{locale === "it" ? "Accessibilità" : "Accessibility"}</button></nav></footer>
+      <footer className="app-footer"><span>Vivarqo · {new Date().getFullYear()}</span><nav aria-label={locale === "it" ? "Informazioni legali" : "Legal information"}><button type="button" onClick={() => onNavigate("/settings/privacy")}>{locale === "it" ? "Centro privacy" : "Privacy centre"}</button><button type="button" onClick={() => onNavigate("/legal/privacy")}>Privacy</button><button type="button" onClick={() => onNavigate("/legal/cookies")}>Cookie</button><button type="button" onClick={openCookiePreferences}>{locale === "it" ? "Preferenze cookie" : "Cookie preferences"}</button><button type="button" onClick={() => onNavigate("/legal/terms")}>{locale === "it" ? "Termini" : "Terms"}</button><button type="button" onClick={() => onNavigate("/legal/accessibility")}>{locale === "it" ? "Accessibilità" : "Accessibility"}</button></nav></footer>
     </div>
     <nav className="mobile-bottom-nav" aria-label={t("navWorkspace")} inert={mobileMenu}>
       {[

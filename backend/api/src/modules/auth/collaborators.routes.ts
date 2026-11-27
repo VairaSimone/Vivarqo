@@ -55,6 +55,45 @@ export function createCollaboratorRouter(sender?: EmailSender, hasPremium: (owne
   const router = Router();
   const emailSender = sender ?? createConfiguredEmailSender();
 
+  router.get("/collaborators/context", requireSession, async (_req, res) => {
+    const auth = res.locals.auth as AuthContext;
+    const session = await prisma.userSession.findFirst({
+      where: { id: auth.sessionId, userId: auth.userId },
+      select: { activeWorkspaceOwnerId: true },
+    });
+    const ownerUserId = session?.activeWorkspaceOwnerId ?? auth.userId;
+    let role: string | null = null;
+    let ownerName = auth.displayName;
+    if (ownerUserId !== auth.userId) {
+      const membership = await prisma.workspaceMembership.findFirst({
+        where: { ownerUserId, collaboratorUserId: auth.userId, revokedAt: null },
+        select: { role: true, owner: { select: { displayName: true } } },
+      });
+      if (!membership) {
+        await prisma.userSession.updateMany({
+          where: { id: auth.sessionId, userId: auth.userId, activeWorkspaceOwnerId: ownerUserId },
+          data: { activeWorkspaceOwnerId: null },
+        });
+        throw new AppError(403, "WORKSPACE_ACCESS_REVOKED", "Access to this workspace is no longer available");
+      }
+      await assertPremium(ownerUserId, hasPremium);
+      role = membership.role;
+      ownerName = membership.owner.displayName;
+    }
+    const configuration = await prisma.accountConfiguration.findUnique({
+      where: { userId: ownerUserId },
+      select: { animalCategories: true },
+    });
+    res.setHeader("Cache-Control", "private, no-store");
+    res.status(200).json({
+      categories: configuration?.animalCategories ?? [],
+      activeWorkspaceOwnerId: session?.activeWorkspaceOwnerId ?? null,
+      role,
+      ownerName,
+      isPersonalWorkspace: ownerUserId === auth.userId,
+    });
+  });
+
   router.get("/collaborators", requireSession, async (_req, res) => {
     const auth = res.locals.auth as AuthContext;
     const [memberships, invitations, session, premiumEnabled] = await Promise.all([

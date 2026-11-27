@@ -8,6 +8,7 @@ type Collaborator = { id: string; role: Role; createdAt: string; user: { id: str
 type Invitation = { id: string; email: string; role: Role; expiresAt: string; createdAt: string };
 type Workspace = { ownerUserId: string; role: Role; owner: { id: string; displayName: string; email: string }; active: boolean };
 type Data = { collaborators: Collaborator[]; invitations: Invitation[]; workspaces: Workspace[]; activeWorkspaceOwnerId: string | null };
+type WorkspaceContext = { categories: string[]; isPersonalWorkspace: boolean; ownerName: string; role: Role | null };
 
 const roleNames: Record<Role, { it: string; en: string }> = {
   admin: { it: "Amministratore", en: "Administrator" },
@@ -27,6 +28,7 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
   const en = locale === "en";
   const [data, setData] = useState<Data | null>(null);
   const [premium, setPremium] = useState(false);
+  const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContext | null>(null);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("operator");
   const [busy, setBusy] = useState(false);
@@ -34,9 +36,13 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
-    const result = await api.get<Data & { premiumEnabled: boolean }>("/collaborators");
+    const [result, context] = await Promise.all([
+      api.get<Data & { premiumEnabled: boolean }>("/collaborators"),
+      api.get<WorkspaceContext>("/collaborators/context"),
+    ]);
     setData(result);
     setPremium(result.premiumEnabled);
+    setWorkspaceContext(context);
   }, []);
 
   useEffect(() => {
@@ -129,6 +135,15 @@ export function CollaboratorsPage({ locale, navigate }: { locale: Locale; naviga
       </div>
     </Panel>
 
+    {workspaceContext && <Panel>
+      <PanelHeader title={en ? "Active workspace animal domains" : "Categorie del workspace attivo"}
+        description={workspaceContext.isPersonalWorkspace
+          ? (en ? "These categories control which specialist modules are available in your personal workspace." : "Queste categorie determinano i moduli specialistici disponibili nel tuo workspace personale.")
+          : (en ? `You are working in ${workspaceContext.ownerName}'s workspace. Its categories apply to your access.` : `Stai lavorando nel workspace di ${workspaceContext.ownerName}. Le categorie del proprietario determinano i moduli accessibili.`)} />
+      <div className="role-summary"><div><Badge tone="info">{workspaceContext.isPersonalWorkspace ? (en ? "Personal workspace" : "Workspace personale") : roleNames[workspaceContext.role ?? "viewer"][en ? "en" : "it"]}</Badge>
+        <p>{workspaceContext.categories.map((category) => ({ reptiles: en ? "Reptiles" : "Rettili", fish: en ? "Fish" : "Pesci", birds: en ? "Birds" : "Uccelli", dogs_cats: en ? "Dogs & cats" : "Cani e gatti" } as Record<string,string>)[category] ?? category).join(" · ") || (en ? "No animal categories configured" : "Nessuna categoria configurata")}</p></div></div>
+      {!workspaceContext.isPersonalWorkspace && <p className="muted-note">{en ? "Only the workspace owner can change these categories. Switch to your personal workspace to edit your own setup." : "Solo il proprietario può modificare queste categorie. Torna al workspace personale per modificare la tua configurazione."}</p>}
+    </Panel>}
     <Panel>
       <PanelHeader title={en ? "Invite a collaborator" : "Invita un collaboratore"} description={en ? "Invitations always belong to your personal workspace, not the shared workspace currently selected." : "Gli inviti vengono sempre associati al tuo workspace personale, non a quello condiviso attualmente selezionato."} />
       {!premium ? <Alert tone="warning">{en ? "Collaborators are a Premium feature. Activate Premium to send invitations." : "I collaboratori sono una funzione Premium. Attiva Premium per inviare inviti."} <button className="text-link" onClick={() => navigate("/billing")}>{en ? "View plans" : "Vai all'abbonamento"}</button></Alert> :

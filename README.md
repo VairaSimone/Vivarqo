@@ -1,6 +1,6 @@
-# Snakebee
+# Vivarqo
 
-Snakebee è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene un backend Node.js con PostgreSQL/Prisma e un frontend React/Vite in italiano e inglese, con layout responsive e una PWA installabile. Il client utilizza sessioni cookie, token CSRF e API same-origin.
+Vivarqo è un gestionale mobile-first per piccoli e medi allevatori di rettili. Il repository contiene un backend Node.js con PostgreSQL/Prisma e un frontend React/Vite in italiano e inglese, con layout responsive e una PWA installabile. Il client utilizza sessioni cookie, token CSRF e API same-origin.
 
 ## Stack e prerequisiti
 - Node.js **24.11+** (linea LTS; vedi `.nvmrc`).
@@ -10,7 +10,7 @@ Snakebee è un gestionale mobile-first per piccoli e medi allevatori di rettili.
 
 ## Dev Manager (Windows) e VPS Linux
 
-Per installare e avviare il supervisore, gestire gli avvii successivi, consultare dashboard/log, arrestare il servizio e configurare systemd su una VPS, segui la [guida operativa del Snakebee Manager](docs/dev-manager.md). Per DNS, TLS, segreti, storage S3 e backup di produzione consulta anche la [guida di deployment production/staging](backend/docs/production-deployment.md).
+Per installare e avviare il supervisore, gestire gli avvii successivi, consultare dashboard/log, arrestare il servizio e configurare systemd su una VPS, segui la [guida operativa del Vivarqo Manager](docs/dev-manager.md). Per DNS, TLS, segreti, storage S3 e backup di produzione consulta anche la [guida di deployment production/staging](backend/docs/production-deployment.md).
 
 ## Avvio locale manuale
 Dalla root del repository:
@@ -57,6 +57,15 @@ curl http://localhost:3000/readyz
 - `GET /healthz`: liveness, non dipende da PostgreSQL.
 - `GET /readyz`: readiness, restituisce 200 solo quando PostgreSQL risponde; altrimenti 503 senza dettagli interni.
 - Sono disponibili le API di account, autenticazione e i moduli di dominio descritti in questa documentazione. Il frontend è in `packages/frontend`; eseguire `pnpm typecheck`, `pnpm test` e `pnpm build` dalla root per verificare l'intero monorepo.
+
+## Configurazione categorie dell'account
+
+Al primo accesso autenticato, i nuovi account completano la configurazione di Vivarqo selezionando una o più categorie: `reptiles`, `fish`, `birds`, `dogs_cats`. La scelta è associata all'account, non al singolo animale, e può essere modificata da Impostazioni → Categorie animali.
+
+- `GET /api/v1/onboarding/configuration`: restituisce le categorie e `configuredAt`; il valore nullo indica che la configurazione iniziale non è stata completata.
+- `POST /api/v1/onboarding/configuration`: salva almeno una categoria valida. Richiede sessione e protezione CSRF.
+- La migrazione `20261126183000_account_animal_categories` assegna `reptiles` agli account già esistenti, preservando il comportamento precedente.
+- La selezione non modifica né converte gli animali o i registri esistenti. Il configuratore costituisce la base per attivare progressivamente i moduli specifici; la selezione di una categoria non implica che tutti i relativi flussi di dominio siano già implementati.
 
 ## Account e autenticazione
 
@@ -119,6 +128,17 @@ Prima del lancio restano da completare o validare: configurazione dei provider r
 La PWA include manifest, icona e service worker. Per scelta di sicurezza la cache contiene soltanto la shell HTML e gli asset statici: le API e i dati privati non vengono memorizzati offline. Non sono ancora implementate modifiche offline né sincronizzazione automatica. La checklist [sicurezza e conformità](backend/docs/security-and-compliance-readiness.md) mantiene separati i controlli di codice da quelli operativi e legali.
 
 Il contratto API versionato e verificato dalla CI è in [docs/openapi.yaml](docs/openapi.yaml). Le decisioni tecniche sono annotate in [backend/docs/architecture-decisions.md](backend/docs/architecture-decisions.md); la specifica di riferimento è in [backend/docs/specification.md](backend/docs/specification.md).
+
+## Moduli animali indipendenti dal piano commerciale
+
+### Cura e salute di cani e gatti
+
+La categoria `dogs_cats` abilita schede dedicate e il registro `companion-care`. Gli eventi supportano vaccinazioni, farmaci, visite veterinarie, prevenzione parassiti, interventi, toelettatura e altre attività, con data evento, prossima scadenza, professionista/struttura, dosaggio e note. Gli eventi sono associati all'animale e all'account, con soft-delete.
+
+
+Le categorie selezionate in `account_configurations.animal_categories` determinano quali domini animali sono attivi per l'account. La disponibilità dei moduli di dominio (schede animali, cura, riproduzione/genetica, acquari e voliere) non viene dedotta dal piano commerciale. I piani continuano a governare le quote già previste, come il numero massimo di animali e i limiti documentali: non decidono quali categorie l'account può gestire.
+
+Le API di dominio verificano la categoria abilitata sull'account e l'appartenenza dei record all'utente. La selezione di una categoria non abilita automaticamente funzionalità non ancora implementate: ogni modulo diventa visibile solo quando la relativa schermata e API sono disponibili.
 
 ## Anagrafiche animali e registri di cura
 

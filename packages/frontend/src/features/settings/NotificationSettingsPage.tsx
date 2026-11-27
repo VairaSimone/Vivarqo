@@ -1,16 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
-import { formatDate, formatDateTime, getArray, getString } from "../../lib/domain";
+import { formatDate, formatDateTime, getArray, getString, queryString } from "../../lib/domain";
 import type { DateFormat, Locale, TemperatureUnit, WeightUnit } from "../../lib/domain";
 import type { AccountPreferencesDto, BillingEntitlementsDto, BillingSubscriptionDto, NotificationDto, NotificationPreferencesDto, PushSubscriptionDto, SettingsUserDto } from "@vivarqo/contracts/settings";
 
 import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
-import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
+import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
 export function NotificationSettingsPage({ locale }: { locale: Locale }) {
   const t = (key: string) => translate(locale, key);
   const prefs = useResource<{ preferences: NotificationPreferencesDto }>("/notification-preferences");
   const subscriptions = useResource<{ subscriptions: PushSubscriptionDto[] }>("/push-subscriptions");
+  const [attemptPage, setAttemptPage] = useState(1);
+  const [attemptStatus, setAttemptStatus] = useState("");
+  const attempts = useResource<{ attempts: Array<{ id: string; attemptNumber: number; status: string; scheduledAt: string; attemptedAt: string | null; sentAt: string | null; nextAttemptAt: string | null; httpStatus: number | null; errorCode: string | null; createdAt: string }>; pagination: { page: number; totalPages: number; total: number } }>(`/push-delivery-attempts${queryString({ page: attemptPage, pageSize: 25, status: attemptStatus })}`);
   const [values, setValues] = useState<{ inAppEnabled: boolean; pushEnabled: boolean; quietHoursStart: string; quietHoursEnd: string; categories: Record<string, boolean> }>({ inAppEnabled: true, pushEnabled: false, quietHoursStart: "", quietHoursEnd: "", categories: {} });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -101,6 +104,7 @@ export function NotificationSettingsPage({ locale }: { locale: Locale }) {
     finally { setBusy(false); }
   }
   const categories = Object.keys(values.categories);
+  const attemptStatusLabel = (status: string) => ({ queued: locale === "it" ? "In coda" : "Queued", processing: locale === "it" ? "In elaborazione" : "Processing", retry_scheduled: locale === "it" ? "Nuovo tentativo" : "Retry scheduled", sent: locale === "it" ? "Inviato" : "Sent", failed: locale === "it" ? "Fallito" : "Failed", subscription_gone: locale === "it" ? "Sottoscrizione non valida" : "Subscription gone" }[status] ?? status);
   return <div className="page-stack">
     <PageHeader eyebrow={t("navPreferences")} title={t("notificationPreferences")} description={t("pushExplanation")} />
     {prefs.error && <ErrorState message={prefs.error.message} retry={prefs.reload} />}{error && <Alert tone="danger">{error}</Alert>}
@@ -117,6 +121,16 @@ export function NotificationSettingsPage({ locale }: { locale: Locale }) {
       <div className="inline-actions">{values.pushEnabled ? <Button variant="secondary" onClick={() => void disablePush()} disabled={busy}>{t("disablePush")}</Button> : <Button onClick={() => void enablePush()} disabled={busy}><Icon name="bell" />{t("enablePush")}</Button>}<Button variant="secondary" onClick={() => void testPush()} disabled={busy || !values.pushEnabled}>{t("testPush")}</Button></div>
       <div className="panel-separator" /><PanelHeader title={locale === "it" ? "Browser registrati" : "Registered browsers"} />
       {subscriptions.loading && !subscriptions.data ? <LoadingState /> : subscriptions.error ? <ErrorState message={subscriptions.error.message} retry={subscriptions.reload} /> : subscriptions.data?.subscriptions.length ? <div className="record-list">{subscriptions.data.subscriptions.map((item) => <div className="record-row" key={getString(item, "id")}><div><strong>{getString(item, "userAgent") || "Browser"}</strong><small>{formatDateTime(getString(item, "createdAt"), locale)}</small></div><IconButton label={t("delete")} onClick={() => void removeSubscription(item)}><Icon name="trash" /></IconButton></div>)}</div> : <EmptyState title={t("emptyHint")} />}
+    </Panel>
+    <Panel>
+      <PanelHeader title={locale === "it" ? "Diagnostica invii Web Push" : "Web Push delivery diagnostics"} description={locale === "it" ? "Cronologia dei tentativi di consegna, con stato, codice HTTP ed eventuale motivo di errore. I dati sono limitati al tuo account." : "Delivery attempt history, including status, HTTP code and any error reason. Data is scoped to your account."} action={<Button size="sm" variant="secondary" onClick={attempts.reload} disabled={attempts.loading}><Icon name="refresh" size={14} />{locale === "it" ? "Aggiorna" : "Refresh"}</Button>} />
+      <div className="filter-row"><Field label={locale === "it" ? "Filtra per stato" : "Filter by status"}><Select value={attemptStatus} onChange={(event) => { setAttemptStatus(event.target.value); setAttemptPage(1); }}><option value="">{locale === "it" ? "Tutti gli stati" : "All statuses"}</option><option value="queued">Queued</option><option value="processing">Processing</option><option value="retry_scheduled">{locale === "it" ? "Nuovo tentativo programmato" : "Retry scheduled"}</option><option value="sent">{locale === "it" ? "Inviato" : "Sent"}</option><option value="failed">{locale === "it" ? "Fallito" : "Failed"}</option><option value="subscription_gone">{locale === "it" ? "Sottoscrizione non valida" : "Subscription gone"}</option></Select></Field></div>
+      {attempts.loading && !attempts.data ? <LoadingState /> : attempts.error ? <ErrorState message={attempts.error.message} retry={attempts.reload} /> : attempts.data?.attempts.length ? <DataTable
+        headers={[locale === "it" ? "Creato" : "Created", locale === "it" ? "Stato" : "Status", locale === "it" ? "Tentativo" : "Attempt", "HTTP", locale === "it" ? "Programmato" : "Scheduled", locale === "it" ? "Tentato" : "Attempted", locale === "it" ? "Inviato" : "Sent", locale === "it" ? "Prossimo tentativo" : "Next retry", locale === "it" ? "Errore" : "Error"]}
+        rows={attempts.data.attempts.map((item) => [formatDateTime(item.createdAt, locale), <Badge tone={item.status === "sent" ? "success" : item.status === "failed" || item.status === "subscription_gone" ? "danger" : "neutral"}>{attemptStatusLabel(item.status)}</Badge>, item.attemptNumber, item.httpStatus ?? "—", formatDateTime(item.scheduledAt, locale), item.attemptedAt ? formatDateTime(item.attemptedAt, locale) : "—", item.sentAt ? formatDateTime(item.sentAt, locale) : "—", item.nextAttemptAt ? formatDateTime(item.nextAttemptAt, locale) : "—", item.errorCode || "—"])}
+        empty={locale === "it" ? "Nessun tentativo di invio registrato." : "No delivery attempts recorded."}
+      /> : <EmptyState title={locale === "it" ? "Nessun tentativo di invio" : "No delivery attempts"} description={locale === "it" ? "Gli invii compariranno qui quando il sistema avrà accodato una notifica Web Push." : "Delivery attempts will appear here after the system queues a Web Push notification."} />}
+      {attempts.data?.pagination && <Pagination page={attempts.data.pagination.page} totalPages={attempts.data.pagination.totalPages} onChange={setAttemptPage} label={locale === "it" ? "Pagina" : "Page"} />}
     </Panel>
     {toast}
   </div>;

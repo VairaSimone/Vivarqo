@@ -10,6 +10,7 @@ export const taskCategories = [
   "incubation",
   "document",
   "inventory",
+  "health",
   "custom",
 ] as const;
 

@@ -37,12 +37,13 @@ export interface CalendarItemDto {
 
 
 const dashboardTaskSchema = z.object({
-  id: z.string(), title: z.string(), dueAt: z.string(), status: z.string(),
-  animal: z.object({ id: z.string(), name: z.string() }).passthrough().nullable().optional(),
+  id: z.string(), title: z.string(), category: z.string(), dueAt: z.string(), status: z.string(),
+  animal: z.object({ id: z.string(), name: z.string(), species: z.string().optional(), photoUrl: z.string().nullable().optional() }).passthrough().nullable().optional(),
+  recurrence: z.object({ ruleId: z.string(), intervalDays: z.number().int().positive(), nextDueAt: z.string(), enabled: z.boolean() }).nullable().optional(),
 }).passthrough();
 const dashboardReminderSchema = z.object({ id: z.string(), title: z.string(), nextDueAt: z.string() }).passthrough();
 const dashboardRecentEventSchema = z.object({
-  type: z.enum(["feeding", "weight", "shed", "note", "reproduction"]),
+  type: z.enum(["feeding", "weight", "shed", "note", "reproduction", "birth", "incubation", "animal_update"]),
   occurredAt: z.string(), title: z.string(), targetPath: z.string(),
 }).passthrough();
 
@@ -62,13 +63,23 @@ export const dashboardTodayResponseSchema = z.object({
     completedToday: z.number().int().nonnegative(),
     upcoming: z.number().int().nonnegative().default(0),
     imminentReminders: z.number().int().nonnegative(),
+    activeAnimals: z.number().int().nonnegative().optional(),
+    feedingsToday: z.number().int().nonnegative().optional(),
+    lowStock: z.number().int().nonnegative().optional(),
   }),
+  overview: z.object({
+    activeAnimals: z.number().int().nonnegative(),
+    feedingsToday: z.number().int().nonnegative(),
+    lowStockItems: z.array(z.object({ id: z.string(), name: z.string(), quantityOnHand: z.string(), minimumQuantity: z.string(), unit: z.string() })),
+    lowStockCount: z.number().int().nonnegative(),
+  }).optional(),
+  smartSuggestions: z.array(z.object({ id: z.string(), type: z.string(), title: z.string(), dueAt: z.string().nullable(), targetPath: z.string() })).optional(),
   truncated: z.object({
     dueToday: z.boolean(), overdue: z.boolean(),
     completedToday: z.boolean(), upcoming: z.boolean().default(false), imminentReminders: z.boolean(),
   }),
   imminentReminders: z.array(dashboardReminderSchema),
-  feedingAlerts: z.array(z.object({ id: z.string(), name: z.string(), species: z.string(), lastMealAt: z.string().nullable(), daysSinceLastMeal: z.number().int().nonnegative(), feedingIntervalDays: z.number().int().positive() }).passthrough()).default([]),
+  feedingAlerts: z.array(z.object({ id: z.string(), name: z.string(), species: z.string(), photoUrl: z.string().nullable().optional(), lastMealAt: z.string().nullable(), daysSinceLastMeal: z.number().int().nonnegative(), feedingIntervalDays: z.number().int().positive(), feedingStatus: z.enum(["no_history", "overdue", "due_soon"]) }).passthrough()).default([]),
   quickActions: z.array(z.object({ key: z.string(), label: z.string(), targetPath: z.string() })).optional(),
   recentEvents: z.array(dashboardRecentEventSchema),
 }).passthrough();

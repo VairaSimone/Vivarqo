@@ -8,7 +8,7 @@ const validDashboard = {
   date: "2026-11-12",
   timezone: "Europe/Rome",
   tasks: {
-    dueToday: [{ id: "task-1", title: "Feed", dueAt: "2026-11-12T10:00:00.000Z", status: "open", animal: { id: "animal-1", name: "Nala" } }],
+    dueToday: [{ id: "task-1", title: "Feed", category: "feeding", dueAt: "2026-11-12T10:00:00.000Z", status: "open", animal: { id: "animal-1", name: "Nala" } }],
     overdue: [],
     completedToday: [],
   },

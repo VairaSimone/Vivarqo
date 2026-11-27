@@ -7,7 +7,7 @@ import { translate } from "../../lib/i18n";
 import { useResource } from "../../hooks/useResource";
 import { RemoteSelect } from "../../components/RemoteSelect";
 import { Alert, Badge, Button, EmptyState, ErrorState, Field, Icon, IconButton, Input, ListToolbar, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, Textarea, useToast } from "../../components/ui";
-const categories = ["feeding", "weighing", "shed_check", "cleaning", "reproduction", "incubation", "document", "inventory", "custom"] as const;
+const categories = ["feeding", "weighing", "shed_check", "cleaning", "reproduction", "incubation", "document", "inventory", "health", "custom"] as const;
 
 export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale; path: string; timezone: string; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
@@ -128,7 +128,7 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
           onClearFilters={() => { setQ(""); setStatus("open"); setCategory(""); setPage(1); }}
           resultCount={tasks.data?.pagination.total} onRefresh={tasks.reload} loading={tasks.loading} />
         {tasks.loading && !tasks.data ? <LoadingState /> : tasks.error ? <ErrorState message={tasks.error.message} retry={tasks.reload} /> :
-          <div className="task-list">{list.length ? list.map((task) => <TaskRow key={getString(task, "id")} task={task} locale={locale} timezone={timezone} onComplete={() => void updateTask(task, "complete")} onDismiss={() => void updateTask(task, "dismiss")} onEdit={() => openEdit(task)} onDelete={() => void updateTask(task, "delete")} onOpen={() => navigate("/tasks/" + getString(task, "id"))} t={t} />) : <EmptyState title={t("noTasksList")} description={t("emptyHint")} action={<Button onClick={openCreate}>{t("addTask")}</Button>} />}</div>}
+          <div className="task-list">{list.length ? list.map((task) => <TaskRow key={getString(task, "id")} task={task} locale={locale} timezone={timezone} onComplete={() => void updateTask(task, "complete")} onDismiss={() => void updateTask(task, "dismiss")} onEdit={() => openEdit(task)} onDelete={() => void updateTask(task, "delete")} onOpen={() => navigate(getString(task, "category") === "health" ? "/companion-care" : "/tasks/" + getString(task, "id"))} t={t} />) : <EmptyState title={t("noTasksList")} description={t("emptyHint")} action={<Button onClick={openCreate}>{t("addTask")}</Button>} />}</div>}
         {tasks.data?.pagination && <Pagination page={tasks.data.pagination.page} totalPages={tasks.data.pagination.totalPages} onChange={setPage} label={t("page")} />}
       </Panel>
     </> : <Panel><PanelHeader title={t("reminders")} action={<Button onClick={() => openReminder()}><Icon name="plus" />{t("createReminder")}</Button>} />
@@ -168,11 +168,13 @@ export function TasksPage({ locale, path, timezone, navigate }: { locale: Locale
 
 function TaskRow({ task, locale, timezone, onComplete, onDismiss, onEdit, onDelete, onOpen, t }: { task: TaskDto; locale: Locale; timezone: string; onComplete: () => void; onDismiss: () => void; onEdit: () => void; onDelete: () => void; onOpen: () => void; t: (key: string) => string }) {
   const status = getString(task, "status");
+  const managedByCareRecord = getString(task, "category") === "health";
   const animal = task.animal;
   return <div className="task-row">
     <button className="task-check" disabled={status !== "open"} aria-label={t("completed")} onClick={onComplete}>{status === "completed" ? <Icon name="checkCircle" /> : <Icon name="check" size={14} />}</button>
     <button className="task-main" onClick={onOpen}><strong>{getString(task, "title")}</strong><small>{getString(animal, "name") || getString(task, "category")} · {formatDateTime(getString(task, "dueAt"), locale, timezone)}</small></button>
     <Badge tone={status === "open" ? "info" : status === "completed" ? "success" : "neutral"}>{t(status)}</Badge>
-    <div className="row-actions"><IconButton label={t("edit")} onClick={onEdit}><Icon name="edit" /></IconButton>{status === "open" && <IconButton label={t("dismissed")} onClick={onDismiss}><Icon name="close" /></IconButton>}<IconButton label={t("delete")} onClick={onDelete}><Icon name="trash" /></IconButton></div>
+    {!managedByCareRecord && <div className="row-actions"><IconButton label={t("edit")} onClick={onEdit}><Icon name="edit" /></IconButton>{status === "open" && <IconButton label={t("dismissed")} onClick={onDismiss}><Icon name="close" /></IconButton>}<IconButton label={t("delete")} onClick={onDelete}><Icon name="trash" /></IconButton></div>}
+    {managedByCareRecord && <span className="muted-note">{locale === "it" ? "Gestisci dalla scheda Cura e salute" : "Manage from Health & care"}</span>}
   </div>;
 }

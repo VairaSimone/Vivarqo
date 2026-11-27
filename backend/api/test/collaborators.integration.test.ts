@@ -31,7 +31,7 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
     await prisma.$disconnect();
   });
 
-  async function account(emailPrefix: string) {
+  async function account(emailPrefix: string, categories: string[] = ["reptiles"]) {
     const email = `${emailPrefix}-${randomUUID()}@example.com`;
     const user = await prisma.user.create({
       data: {
@@ -39,6 +39,7 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
         passwordHash: await argon2.hash(password, { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 }),
         displayName: emailPrefix,
         emailVerifiedAt: new Date(),
+        accountConfiguration: { create: { animalCategories: categories } },
       },
     });
     userIds.push(user.id);
@@ -129,6 +130,34 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
     expect(session?.activeWorkspaceOwnerId).toBeNull();
     const afterRevocation = await collaborator.agent.get("/api/v1/animals").expect(200);
     expect(afterRevocation.body.animals.map((item: { id: string }) => item.id)).not.toContain(animal.id);
+  });
+
+  it("uses the owner's enabled animal domains inside a shared workspace", async () => {
+    const owner = await account("multi-domain-owner", ["fish", "birds", "dogs_cats"]);
+    const collaborator = await account("reptile-only-collaborator", ["reptiles"]);
+    premiumOwners.add(owner.id);
+    const aquarium = await owner.agent.post("/api/v1/aquariums")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Shared aquarium", waterType: "freshwater", volumeLiters: 80 }).expect(201);
+    await owner.agent.post("/api/v1/collaborators/invitations")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ email: collaborator.email, role: "operator" }).expect(201);
+    await collaborator.agent.post("/api/v1/collaborators/accept")
+      .set("Origin", origin).set("X-CSRF-Token", collaborator.csrf)
+      .send({ token: invitationToken() }).expect(200);
+    await collaborator.agent.post("/api/v1/collaborators/active-workspace")
+      .set("Origin", origin).set("X-CSRF-Token", collaborator.csrf)
+      .send({ ownerUserId: owner.id }).expect(200);
+
+    await collaborator.agent.get("/api/v1/aquariums").expect(200).expect((res) => {
+      expect(res.body.aquariums.map((item: { id: string }) => item.id)).toContain(aquarium.body.aquarium.id);
+    });
+    const context = await collaborator.agent.get("/api/v1/collaborators/context").expect(200);
+    expect(context.body.categories).toEqual(["fish", "birds", "dogs_cats"]);
+    expect(context.body.activeWorkspaceOwnerId).toBe(owner.id);
+    await collaborator.agent.post("/api/v1/aquariums")
+      .set("Origin", origin).set("X-CSRF-Token", collaborator.csrf)
+      .send({ name: "Operator aquarium", waterType: "freshwater", volumeLiters: 40 }).expect(201);
   });
 
   it("does not allow workspace access after the owner's Premium entitlement is lost", async () => {

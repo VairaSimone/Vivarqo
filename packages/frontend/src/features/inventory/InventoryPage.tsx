@@ -21,12 +21,13 @@ function parseInventorySummary(value: unknown): InventorySummaryDto {
 }
 const inventoryCategories = ["food", "substrate", "material", "equipment", "other"] as const;
 
-export function InventoryPage({ locale }: { locale: Locale }) {
+export function InventoryPage({ locale, path }: { locale: Locale; path: string }) {
   const t = (key: string) => translate(locale, key);
+  const initialQuery = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [active, setActive] = useState("true");
-  const [lowStock, setLowStock] = useState(false);
+  const [lowStock, setLowStock] = useState(initialQuery.get("lowStock") === "true");
   const [category, setCategory] = useState("");
   const [itemModal, setItemModal] = useState(false);
   const [editing, setEditing] = useState<InventoryItemDto | null>(null);

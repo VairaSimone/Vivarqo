@@ -9,12 +9,12 @@ import { useResource } from "../hooks/useResource";
 import { RemoteSelect } from "../components/RemoteSelect";
 import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, IconButton, Input, LoadingState, Modal, PageHeader, Pagination, Panel, PanelHeader, Select, useToast } from "../components/ui";
 
-export function FinancePage({ locale }: { locale: Locale }) {
+export function FinancePage({ locale, path }: { locale: Locale; path: string }) {
   const t = (key: string) => translate(locale, key);
   const [page, setPage] = useState(1);
   const [entryType, setEntryType] = useState("");
   const [category, setCategory] = useState("");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "").get("q") ?? "");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [modal, setModal] = useState(false);
