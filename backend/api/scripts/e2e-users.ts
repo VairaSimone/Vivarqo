@@ -94,6 +94,20 @@ try {
         accountStatus: "active",
       })),
     });
+
+    // A successful login must land on /today, not /setup. The application
+    // treats a missing AccountConfiguration as an incomplete onboarding flow.
+    const users = await prisma.user.findMany({
+      where: { email: { in: accounts.map((account) => account.email) } },
+      select: { id: true },
+    });
+    await prisma.accountConfiguration.createMany({
+      data: users.map((user) => ({
+        userId: user.id,
+        animalCategories: ["reptiles"],
+      })),
+    });
+
     process.stdout.write("Two isolated E2E accounts seeded.\\n");
   }
 } finally {
