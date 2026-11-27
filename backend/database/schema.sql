@@ -1024,7 +1024,7 @@ CREATE INDEX IF NOT EXISTS egg_history_egg_occurred_idx ON egg_history(egg_id, o
 -- La categoria incubation viene usata dai task automatici dei controlli.
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_category_check;
 ALTER TABLE tasks ADD CONSTRAINT tasks_category_check
-    CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'incubation', 'document', 'inventory', 'custom'));
+    CHECK (category IN ('feeding', 'weighing', 'shed_check', 'cleaning', 'reproduction', 'incubation', 'document', 'inventory', 'health', 'custom'));
 
 
 -- ---------------------------------------------------------------------------
