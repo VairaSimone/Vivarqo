@@ -36,7 +36,7 @@ const notificationTimes = new Map();
 const notificationProcesses = new Set();
 const commandProcesses = new Set();
 let dashboardServer;
-const STOP = { requested: false };
+const STOP = { requested: false, controller: new AbortController() };
 const services = new Map();
 const windows = process.platform === "win32";
 let packageManager = "pnpm";
@@ -572,7 +572,7 @@ async function monitor() {
   await log("INFO", "MANAGER", "Health check API/frontend ogni " + intervalMs + " ms; primo controllo dopo l'intervallo iniziale.");
   // waitHttp already performed the immediate startup checks. Do not duplicate
   // them as soon as the monitor starts.
-  await delay(intervalMs);
+  await delay(intervalMs, undefined, { signal: STOP.controller.signal }).catch(() => {});
   const checks = [{ name: "api", url: API_URL }, { name: "frontend", url: WEB_URL }];
   const misses = new Map(checks.map(x => [x.name, 0]));
   while (!STOP.requested) {
@@ -600,7 +600,7 @@ async function monitor() {
       }
     }
     broadcast({ type: "state", services: serviceSnapshot(), diagnostics: summarizeDiagnostics(diagnosticEvents) });
-    await delay(intervalMs);
+    await delay(intervalMs, undefined, { signal: STOP.controller.signal }).catch(() => {});
   }
 }
 async function prepareProduction() {
@@ -777,6 +777,7 @@ function status() {
 async function shutdown(reason) {
   if (STOP.requested) return;
   STOP.requested = true;
+  STOP.controller.abort();
   await log("INFO", "MANAGER", "Arresto richiesto: " + reason + ".");
   const serviceChildren = [...services.values()].filter(s => s.child).map(s => { s.state = "stopping"; return s.child; });
   const children = [...new Set([...serviceChildren, ...commandProcesses, ...notificationProcesses])];
@@ -786,7 +787,13 @@ async function shutdown(reason) {
   for (const s of services.values()) { s.child = null; s.state = "stopped"; }
   for (const client of eventClients) { try { client.end(); } catch {} }
   eventClients.clear();
-  if (dashboardServer) await new Promise(resolve => dashboardServer.close(resolve));
+  if (dashboardServer) {
+    // close() waits for every keep-alive connection. The SSE response is ended
+    // above; explicitly close remaining idle/half-open sockets so shutdown
+    // cannot hang when a dashboard client disconnects slowly.
+    dashboardServer.closeAllConnections?.();
+    await new Promise(resolve => dashboardServer.close(resolve));
+  }
   await log("INFO", "MANAGER", process.env.VIVARQO_MANAGER_MODE === "production"
     ? "Manager arrestato; i container Docker di produzione restano attivi."
     : "Processi applicativi arrestati. PostgreSQL resta attivo e i dati non vengono rimossi.");
