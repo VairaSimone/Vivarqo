@@ -26,6 +26,11 @@ describe("workspace role permissions", () => {
     expect(() => assertRolePermission("operator", "PATCH", "/aquariums/00000000-0000-4000-8000-000000000001")).not.toThrow();
     expect(() => assertRolePermission("operator", "DELETE", "/aviaries/00000000-0000-4000-8000-000000000001")).not.toThrow();
     expect(() => assertRolePermission("operator", "POST", "/companion-care")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/birds/00000000-0000-4000-8000-000000000001/profile")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/aviary-maintenance/00000000-0000-4000-8000-000000000001")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/quarantines/00000000-0000-4000-8000-000000000001")).not.toThrow();
+    expect(() => assertRolePermission("operator", "PATCH", "/aquarium-treatments/00000000-0000-4000-8000-000000000001")).not.toThrow();
+    expectDenied("operator", "POST", "/bird-breeding-pairs");
     expectDenied("viewer", "PATCH", "/aquariums/00000000-0000-4000-8000-000000000001");
     expectDenied("breeding", "DELETE", "/aviaries/00000000-0000-4000-8000-000000000001");
     expect(() => assertRolePermission("operator", "PATCH", "/animals/123/weights")).not.toThrow();
@@ -42,6 +47,7 @@ describe("workspace role permissions", () => {
 
   it("limits breeding collaborators to reproduction and genetics changes", () => {
     expect(() => assertRolePermission("breeding", "POST", "/reproduction-cycles")).not.toThrow();
+    expect(() => assertRolePermission("breeding", "POST", "/bird-breeding-pairs")).not.toThrow();
     expect(() => assertRolePermission("breeding", "POST", "/genetics/calculate")).not.toThrow();
     expect(() => assertRolePermission("breeding", "PATCH", "/animals/123/genetic-traits")).not.toThrow();
     expectDenied("breeding", "PATCH", "/animals/123");
