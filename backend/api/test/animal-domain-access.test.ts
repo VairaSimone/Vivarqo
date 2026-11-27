@@ -16,6 +16,8 @@ describe("animal domain route category coverage", () => {
     ["/animals/00000000-0000-4000-8000-000000000001/genetic-traits", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/pedigree", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/inbreeding", "reptiles"],
+    ["/genetics/calculate", "reptiles"],
+    ["/genetics/calculate-pairing", "reptiles"],
   ])("requires the %s route to have category %s", (path, category) => {
     expect(categoryForAnimalDomainPath(path)).toBe(category);
   });
