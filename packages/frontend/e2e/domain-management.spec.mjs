@@ -65,7 +65,7 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aquariumName + " updated", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Archivia", exact: true }).click();
+  await aquarium.getByRole("button", { name: "Archivia", exact: true }).click();
   await expect(page.getByText(aquariumName + " updated", { exact: true })).toHaveCount(0);
 
   const aviaryName = "E2E Aviary " + Date.now();
@@ -80,7 +80,7 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Archivia" }).click();
+  await aviary.getByRole("button", { name: "Archivia", exact: true }).click();
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toHaveCount(0);
 
   const animalName = "E2E Companion " + Date.now();
