@@ -30,6 +30,11 @@ export const reptileBrumationPeriodSchema = z.object({
 }).strict().superRefine((v, ctx) => {
   if (v.endedAt && v.endedAt < v.startedAt) ctx.addIssue({ code: "custom", path: ["endedAt"], message: "End date cannot precede start date" });
 });
+export const reptileFastingPeriodPatchSchema = reptileFastingPeriodSchema.partial().strict()
+  .refine(value => Object.keys(value).length > 0, "At least one field is required");
+export const reptileBrumationPeriodPatchSchema = reptileBrumationPeriodSchema.partial().strict()
+  .refine(value => Object.keys(value).length > 0, "At least one field is required");
+
 function idOf(value: string | string[] | undefined) {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid id");
@@ -78,10 +83,12 @@ export function createReptileCareRouter() {
     const existing = await prisma.reptileFastingPeriod.findFirst({ where: { id, animal: { is: { userId: auth.userId } } }, select: { id: true, animalId: true } });
     if (!existing) throw new AppError(404, "FASTING_PERIOD_NOT_FOUND", "Fasting period not found");
     await animal(auth.userId, existing.animalId, true);
-    const input = bodyOf(fastingSchema, req.body);
+    const input = bodyOf(reptileFastingPeriodPatchSchema, req.body);
     const updated = await prisma.reptileFastingPeriod.update({ where: { id }, data: {
-      ...input, startedAt: new Date(input.startedAt), endedAt: input.endedAt ? new Date(input.endedAt) : null,
-      lastAcceptedMealAt: input.lastAcceptedMealAt ? new Date(input.lastAcceptedMealAt) : null,
+      ...input,
+      ...(input.startedAt !== undefined ? { startedAt: new Date(input.startedAt) } : {}),
+      ...(input.endedAt !== undefined ? { endedAt: input.endedAt ? new Date(input.endedAt) : null } : {}),
+      ...(input.lastAcceptedMealAt !== undefined ? { lastAcceptedMealAt: input.lastAcceptedMealAt ? new Date(input.lastAcceptedMealAt) : null } : {}),
     } });
     res.status(200).json({ period: updated });
   });
@@ -108,9 +115,11 @@ export function createReptileCareRouter() {
     const existing = await prisma.reptileBrumationPeriod.findFirst({ where: { id, animal: { is: { userId: auth.userId } } }, select: { id: true, animalId: true } });
     if (!existing) throw new AppError(404, "BRUMATION_PERIOD_NOT_FOUND", "Brumation period not found");
     await animal(auth.userId, existing.animalId, true);
-    const input = bodyOf(brumationSchema, req.body);
+    const input = bodyOf(reptileBrumationPeriodPatchSchema, req.body);
     const updated = await prisma.reptileBrumationPeriod.update({ where: { id }, data: {
-      ...input, startedAt: new Date(input.startedAt), endedAt: input.endedAt ? new Date(input.endedAt) : null,
+      ...input,
+      ...(input.startedAt !== undefined ? { startedAt: new Date(input.startedAt) } : {}),
+      ...(input.endedAt !== undefined ? { endedAt: input.endedAt ? new Date(input.endedAt) : null } : {}),
     } });
     res.status(200).json({ period: updated });
   });
