@@ -23,6 +23,7 @@ import { createAnimalManagementRouter } from "./modules/animals/animal-managemen
 import { createCareRouter } from "./modules/animals/care.routes.js";
 import { createWeightGrowthRouter } from "./modules/animals/weight-growth.routes.js";
 import { createHealthRouter } from "./modules/animals/health.routes.js";
+import { createReptileCareRouter } from "./modules/animals/reptile-care.routes.js";
 import { createImportRouter } from "./modules/animals/import.routes.js";
 import { createTasksRouter } from "./modules/operations/tasks.routes.js";
 import { createHomeCalendarRouter } from "./modules/operations/home-calendar.routes.js";
@@ -40,6 +41,8 @@ import { createCareImportRouter } from "./modules/domain/care-import.routes.js";
 import { createDomainImportRouter } from "./modules/domain/domain-import.routes.js";
 import { createGeneticTraitsRouter } from "./modules/domain/genetic-traits.routes.js";
 import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
+import { createAquariumManagementRouter } from "./modules/domain/aquarium-management.routes.js";
+import { createBirdManagementRouter } from "./modules/domain/bird-management.routes.js";
 import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
 import { createCompanionCareExtrasRouter } from "./modules/domain/companion-care-extras.routes.js";
 import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
@@ -119,6 +122,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createCareRouter());
   app.use("/api/v1", createWeightGrowthRouter());
   app.use("/api/v1", createHealthRouter());
+  app.use("/api/v1", createReptileCareRouter());
   app.use("/api/v1/imports", createImportRouter());
   app.use("/api/v1/imports", createDomainImportRouter());
   app.use("/api/v1/imports", createCareImportRouter());
@@ -129,6 +133,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createDocumentShareRouter());
   app.use("/api/v1", createGeneticTraitsRouter());
   app.use("/api/v1", createEcosystemRouter());
+  app.use("/api/v1", createAquariumManagementRouter());
+  app.use("/api/v1", createBirdManagementRouter());
   app.use("/api/v1", createCompanionCareRouter());
   app.use("/api/v1", createCompanionCareExtrasRouter());
   app.use("/api/v1", createFinanceRouter());

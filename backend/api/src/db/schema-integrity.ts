@@ -201,10 +201,10 @@ function normalizeSqlExpression(value: string): string {
   normalized = normalized
     .replace(/\bpublic\./g, "")
     .replace(/::(?:text|varchar|character varying|bpchar|boolean|bool|smallint|integer|int|bigint|uuid|date|timestamp(?: with| without)? time zone|numeric)(?:\([^)]*\))?/g, "")
-    // PostgreSQL may render boolean predicates as a bare truthy column and
-    // add grouping around atomic comparisons in pg_get_expr().
-    .replace(/\s*=\s*true\b/gi, "")
-    .replace(/\(([^()]*(?:\bIS\s+(?:NOT\s+)?NULL\b|[=<>])[^()]*)\)/gi, "$1")
+    // PostgreSQL may render a boolean predicate as "column = true" or as
+    // the equivalent bare boolean column, and may parenthesize IS NULL terms.
+    .replace(/\b([A-Za-z_][A-Za-z0-9_$]*)\s*=\s*true\b/g, "$1")
+    .replace(/\(([A-Za-z_][A-Za-z0-9_$]*\s+is\s+(?:not\s+)?null)\)/g, "$1")
     // Remove grouping around a bare identifier, but not the parentheses that
     // delimit a function call such as lower(code).
     .replace(/(?<![A-Za-z0-9_$])\(([A-Za-z_][A-Za-z0-9_$]*)\)(?!\s*\()/g, "$1")

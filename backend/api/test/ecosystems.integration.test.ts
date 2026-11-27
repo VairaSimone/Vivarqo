@@ -16,6 +16,9 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
   beforeAll(() => { app = createApp({ checkDatabase: async () => undefined }); });
   afterAll(async () => {
     await prisma.companionCareRecord.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.healthRecord.deleteMany({ where: { animal: { is: { userId: { in: userIds } } } } });
+    await prisma.birdBreedingPair.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.reproductionCycle.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aquarium.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.aviary.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.animal.deleteMany({ where: { userId: { in: userIds } } });
@@ -137,4 +140,47 @@ describe.skipIf(!enabled)("Aquarium and aviary PostgreSQL integration", () => {
     await owner.agent.post(`/api/v1/aviaries/${aviaryId}/restore`).set("Origin", origin).set("X-CSRF-Token", owner.csrf).send({}).expect(200);
     await owner.agent.get(`/api/v1/aviaries/${aviaryId}/birds`).expect(200).expect((res) => expect(res.body.birds.map((item: { id: string }) => item.id)).toContain(bird.id));
   });
+
+  it("manages bird identification, breeding cycles, health and aviary maintenance with account isolation", async () => {
+    const owner = await account(["birds"]);
+    const other = await account(["birds"]);
+    const female = await prisma.animal.create({ data: { userId: owner.userId, name: "Luna", species: "Melopsittacus undulatus", sex: "female", category: "birds" } });
+    const male = await prisma.animal.create({ data: { userId: owner.userId, name: "Rio", species: "Melopsittacus undulatus", sex: "male", category: "birds" } });
+    const aviary = await owner.agent.post("/api/v1/aviaries").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Riproduzione", environment: "indoor", capacity: 8 }).expect(201);
+    const aviaryId = aviary.body.aviary.id as string;
+
+    await owner.agent.put(`/api/v1/birds/${female.id}/profile`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ ringType: "closed", ringNumber: "IT-26-001", ringYear: 2026, citesNumber: "CITES-TEST-001", citesAnnex: "B", citesAuthority: "Autorità test", citesIssuedAt: "2026-01-01", citesExpiresAt: "2027-01-01" })
+      .expect(200).expect((res) => { expect(res.body.profile.ringNumber).toBe("IT-26-001"); expect(res.body.profile.citesNumber).toBe("CITES-TEST-001"); });
+    await other.agent.get(`/api/v1/birds/${female.id}/profile`).expect(404);
+    await owner.agent.put(`/api/v1/birds/${female.id}/profile`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ ringType: "closed", ringNumber: "IT-26-001", citesIssuedAt: "2027-01-01", citesExpiresAt: "2026-01-01" }).expect(400);
+
+    const pair = await owner.agent.post("/api/v1/bird-breeding-pairs").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ femaleAnimalId: female.id, maleAnimalId: male.id, pairedAt: "2026-11-01", notes: "Prima stagione" }).expect(201);
+    const cycleId = pair.body.pair.cycleId as string;
+    await owner.agent.get("/api/v1/bird-breeding-pairs").expect(200).expect((res) => {
+      expect(res.body.pairs).toHaveLength(1);
+      expect(res.body.pairs[0].cycle.id).toBe(cycleId);
+    });
+    await other.agent.get("/api/v1/bird-breeding-pairs").expect(200).expect((res) => expect(res.body.pairs).toHaveLength(0));
+    await owner.agent.get(`/api/v1/reproduction-cycles/${cycleId}/clutches`).expect(200)
+      .expect((res) => expect(res.body.clutches).toHaveLength(0));
+
+    await owner.agent.post(`/api/v1/animals/${female.id}/health-records`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ recordType: "vaccination", status: "ongoing", occurredAt: new Date().toISOString(), title: "Controllo veterinario", veterinarian: "Dott.ssa Test", clinic: "Ambulatorio test" }).expect(201);
+    await owner.agent.get(`/api/v1/animals/${female.id}/health-records`).expect(200).expect((res) => expect(res.body.records).toHaveLength(1));
+
+    await owner.agent.post(`/api/v1/aviaries/${aviaryId}/maintenance`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ occurredAt: new Date().toISOString(), action: "disinfection", area: "Posatoi e griglie", products: "Disinfettante idoneo", nextDueAt: new Date(Date.now() + 30 * 86400000).toISOString() }).expect(201);
+    await owner.agent.get(`/api/v1/aviaries/${aviaryId}/maintenance`).expect(200).expect((res) => {
+      expect(res.body.records).toHaveLength(1);
+      expect(res.body.records[0].action).toBe("disinfection");
+    });
+    await other.agent.get(`/api/v1/aviaries/${aviaryId}/maintenance`).expect(404);
+    await owner.agent.patch(`/api/v1/bird-breeding-pairs/${pair.body.pair.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ status: "completed", separatedAt: "2026-11-20" }).expect(200);
+  });
+
 });
