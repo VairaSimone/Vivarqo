@@ -11,7 +11,7 @@ const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
     prefixes: [
       "/reproduction", "/reproduction-pairs", "/reproduction-cycles", "/species-breeding-profiles", "/reproduction-statistics",
       "/incubators", "/clutches", "/eggs", "/offspring-batches", "/reproductive-events",
-      "/incubation-logs", "/genetic-traits",
+      "/incubation-logs", "/genetics", "/genetic-traits",
     ],
     category: "reptiles",
   },
