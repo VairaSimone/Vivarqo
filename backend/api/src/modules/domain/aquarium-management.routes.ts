@@ -251,7 +251,9 @@ export function createAquariumManagementRouter() {
     const auth = res.locals.auth as AuthContext; await requireFishCategory(auth.userId);
     await ownedAquarium(auth.userId, parseUuid(req.params.id));
     const v = parse(compatibilitySchema, req.body);
-    const [speciesAKey, speciesBKey] = [v.speciesAKey.toLocaleLowerCase("en").trim(), v.speciesBKey.toLocaleLowerCase("en").trim()].sort();
+    const normalizedSpeciesKeys: [string, string] = [v.speciesAKey.toLocaleLowerCase("en").trim(), v.speciesBKey.toLocaleLowerCase("en").trim()];
+    normalizedSpeciesKeys.sort();
+    const [speciesAKey, speciesBKey] = normalizedSpeciesKeys;
     const rule = await prisma.aquariumCompatibilityRule.upsert({
       where: { userId_speciesAKey_speciesBKey: { userId: auth.userId, speciesAKey, speciesBKey } },
       create: { userId: auth.userId, speciesAKey, speciesBKey, compatibility: v.compatibility, notes: v.notes ?? null },
