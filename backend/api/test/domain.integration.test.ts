@@ -52,6 +52,13 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.inventorySupplier.deleteMany({ where: { userId: ids } });
     await prisma.incubationLog.deleteMany({ where: { clutchId: { in: clutchIds } } });
     await prisma.egg.deleteMany({ where: { clutchId: { in: clutchIds } } });
+    // Hatchling provenance deliberately uses restrictive foreign keys. Detach
+    // test-owned offspring from their batch and clutch before deleting those
+    // parent records; the animals themselves are removed later in teardown.
+    await prisma.animal.updateMany({
+      where: { userId: ids, OR: [{ originClutchId: { not: null } }, { originOffspringBatchId: { not: null } }] },
+      data: { originClutchId: null, originOffspringBatchId: null },
+    });
     await prisma.offspringBatch.deleteMany({ where: { cycleId: { in: cycleIds } } });
     await prisma.clutch.deleteMany({ where: { id: { in: clutchIds } } });
     await prisma.reproductiveEvent.deleteMany({ where: { cycleId: { in: cycleIds } } });
