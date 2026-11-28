@@ -902,10 +902,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Crea schede animali" }).click();
   const conversionDialog = page.getByRole("dialog");
   await expect(conversionDialog).toBeVisible();
-  await conversionDialog.getByLabel("Specie").fill("Python regius");
-  await conversionDialog.getByLabel("Nome 1").fill("E2E Baby 1");
-  await conversionDialog.getByRole("button", { name: "Aggiungi un nome" }).click();
-  await conversionDialog.getByLabel("Nome 2").fill("E2E Baby 2");
+  const firstOffspring = conversionDialog.locator(".animal-editor-section").first();
+  await firstOffspring.getByLabel("Specie").fill("Python regius");
+  await firstOffspring.getByLabel("Nome").fill("E2E Baby 1");
+  await conversionDialog.getByRole("button", { name: "Aggiungi piccolo" }).click();
+  const secondOffspring = conversionDialog.locator(".animal-editor-section").last();
+  await secondOffspring.getByLabel("Specie").fill("Python regius");
+  await secondOffspring.getByLabel("Nome").fill("E2E Baby 2");
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") &&
     response.request().method() === "POST" &&
