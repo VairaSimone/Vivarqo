@@ -325,7 +325,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       await api.patch(`/animals/${encodeURIComponent(id)}/hatchling-care`, {
         firstFeedingAt: toIso(hatchlingCareForm.firstFeedingAt),
         firstFeedingAccepted: hatchlingCareForm.firstFeedingAccepted === "" ? null : hatchlingCareForm.firstFeedingAccepted === "yes",
-        ...(animal.category === "reptiles" ? { firstShedAt: toIso(hatchlingCareForm.firstShedAt) } : {}),
+        ...(animal?.category === "reptiles" ? { firstShedAt: toIso(hatchlingCareForm.firstShedAt) } : {}),
         readyForRehomingAt: toIso(hatchlingCareForm.readyForRehomingAt),
         availabilityStatus: hatchlingCareForm.availabilityStatus,
         healthStatus: hatchlingCareForm.healthStatus,
