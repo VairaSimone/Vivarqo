@@ -2093,3 +2093,69 @@ CREATE INDEX IF NOT EXISTS "companion_care_records_animal_ongoing_idx"
   ON "companion_care_records"("animal_id", "is_ongoing")
   WHERE "deleted_at" IS NULL AND "is_ongoing";
 
+
+
+-- Reconcile the consolidated baseline with the latest domain-category migration.
+
+ALTER TABLE "bird_profiles"
+  DROP CONSTRAINT IF EXISTS "bird_profiles_ring_type_check";
+
+ALTER TABLE "bird_profiles"
+  ADD CONSTRAINT "bird_profiles_ring_type_check"
+  CHECK ("ring_type" IN ('none','unspecified','closed','open','microchip'));
+
+UPDATE "bird_profiles"
+SET "ring_type" = 'unspecified'
+WHERE "ring_number" IS NOT NULL AND "ring_type" = 'none';
+
+CREATE TABLE IF NOT EXISTS "companion_reproductions" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "user_id" UUID NOT NULL,
+  "female_animal_id" UUID NOT NULL,
+  "male_animal_id" UUID NOT NULL,
+  "mated_at" DATE NOT NULL,
+  "pregnancy_confirmed_at" DATE,
+  "expected_due_at" DATE,
+  "delivered_at" DATE,
+  "status" VARCHAR(16) NOT NULL DEFAULT 'mated',
+  "total_born" INTEGER,
+  "live_born" INTEGER,
+  "stillborn" INTEGER,
+  "notes" TEXT,
+  "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "companion_reproductions_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "companion_reproductions_user_id_fkey"
+    FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "companion_reproductions_female_animal_id_fkey"
+    FOREIGN KEY ("female_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "companion_reproductions_male_animal_id_fkey"
+    FOREIGN KEY ("male_animal_id") REFERENCES "animals"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "companion_reproductions_distinct_parents_check"
+    CHECK ("female_animal_id" <> "male_animal_id"),
+  CONSTRAINT "companion_reproductions_status_check"
+    CHECK ("status" IN ('mated', 'pregnant', 'delivered', 'unsuccessful', 'cancelled')),
+  CONSTRAINT "companion_reproductions_counts_check"
+    CHECK (
+      ("total_born" IS NULL OR "total_born" BETWEEN 0 AND 100)
+      AND ("live_born" IS NULL OR "live_born" BETWEEN 0 AND 100)
+      AND ("stillborn" IS NULL OR "stillborn" BETWEEN 0 AND 100)
+      AND ("total_born" IS NOT NULL OR ("live_born" IS NULL AND "stillborn" IS NULL))
+      AND ("total_born" IS NULL OR COALESCE("live_born", 0) + COALESCE("stillborn", 0) <= "total_born")
+    ),
+  CONSTRAINT "companion_reproductions_chronology_check"
+    CHECK (
+      ("pregnancy_confirmed_at" IS NULL OR "pregnancy_confirmed_at" >= "mated_at")
+      AND ("expected_due_at" IS NULL OR "expected_due_at" >= COALESCE("pregnancy_confirmed_at", "mated_at"))
+      AND ("delivered_at" IS NULL OR "delivered_at" >= "mated_at")
+      AND ("status" <> 'pregnant' OR "pregnancy_confirmed_at" IS NOT NULL)
+      AND ("status" <> 'delivered' OR "delivered_at" IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS "companion_reproductions_user_status_mated_idx"
+  ON "companion_reproductions"("user_id", "status", "mated_at" DESC);
+CREATE INDEX IF NOT EXISTS "companion_reproductions_female_mated_idx"
+  ON "companion_reproductions"("female_animal_id", "mated_at" DESC);
+CREATE INDEX IF NOT EXISTS "companion_reproductions_male_mated_idx"
+  ON "companion_reproductions"("male_animal_id", "mated_at" DESC);
