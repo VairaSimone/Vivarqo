@@ -71,6 +71,14 @@ function asDateOnly(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
+function parseRouteId(value: string | string[] | undefined): string {
+  const id = Array.isArray(value) ? value[0] : value;
+  if (!id || !z.string().uuid().safeParse(id).success) {
+    throw new AppError(400, "INVALID_ID", "Invalid id");
+  }
+  return id;
+}
+
 function validateTimeline(value: {
   matedAt: string;
   pregnancyConfirmedAt: string | null;
@@ -175,8 +183,7 @@ export function createCompanionReproductionRouter() {
 
   router.patch("/companion-reproductions/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const id = req.params.id!;
-    if (!z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid id");
+    const id = parseRouteId(req.params.id);
     const input = parse(companionReproductionPatchSchema, req.body);
     const existing = await prisma.companionReproduction.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "COMPANION_REPRODUCTION_NOT_FOUND", "Reproduction record not found");
@@ -216,8 +223,7 @@ export function createCompanionReproductionRouter() {
 
   router.delete("/companion-reproductions/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
-    const id = req.params.id!;
-    if (!z.string().uuid().safeParse(id).success) throw new AppError(400, "INVALID_ID", "Invalid id");
+    const id = parseRouteId(req.params.id);
     const deleted = await prisma.companionReproduction.deleteMany({ where: { id, userId: auth.userId } });
     if (deleted.count === 0) throw new AppError(404, "COMPANION_REPRODUCTION_NOT_FOUND", "Reproduction record not found");
     res.status(204).send();
