@@ -436,7 +436,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
       .set("Content-Type", "text/csv")
-      .send(Buffer.from("name,category\\nReptile without species,reptiles\\n"))
+      .send(Buffer.from("name,category\nReptile without species,reptiles\n"))
       .expect(201);
     expect(missingSpecies.body.missingFields).toEqual([]);
     expect(missingSpecies.body.validRows).toBe(0);
