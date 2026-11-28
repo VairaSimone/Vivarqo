@@ -381,7 +381,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .send(csv)
       .expect(201);
     expect(incomplete.body.validRows).toBe(0);
-    expect(incomplete.body.missingFields).toEqual([["name"], ["species"]]);
+    expect(incomplete.body.missingFields).toEqual([["name"]]);
     await owner.agent
       .post("/api/v1/imports/" + incomplete.body.importId + "/confirm")
       .set("Origin", origin)
@@ -428,6 +428,26 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       where: { userId: owner.userId, name: "Manual mapped animal" },
     });
     expect(imported.identifier).toBeNull();
+
+    // Species stays required for reptiles, but is validated per row after the
+    // category has been mapped instead of being a universal mapping requirement.
+    const missingSpecies = await owner.agent
+      .post("/api/v1/imports?entity=animals")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .set("Content-Type", "text/csv")
+      .send(Buffer.from("name,category\\nReptile without species,reptiles\\n"))
+      .expect(201);
+    expect(missingSpecies.body.missingFields).toEqual([]);
+    expect(missingSpecies.body.validRows).toBe(0);
+    expect(missingSpecies.body.invalidRows).toBe(1);
+    expect(missingSpecies.body.errors[0]).toMatchObject({ column: "species" });
+    await owner.agent
+      .post("/api/v1/imports/" + missingSpecies.body.importId + "/confirm")
+      .set("Origin", origin)
+      .set("X-CSRF-Token", owner.csrf)
+      .send({})
+      .expect(409);
   });
 
   it("allows manual mapping for animal care imports before validating and confirming", async () => {
