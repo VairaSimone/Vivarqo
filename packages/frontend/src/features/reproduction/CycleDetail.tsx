@@ -213,7 +213,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
         animals: drafts.map(({ photo: _photo, ...animal }) => ({
           ...animal, identifier: animal.identifier || null, morph: animal.morph || null,
           geneticsNotes: animal.geneticsNotes || null, notes: animal.notes || null,
-          locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn,
+          locationLabel: animal.locationLabel || null, birthDate: animal.birthDate || conversionBatch.bornOn.slice(0, 10),
           acquiredDate: animal.acquiredDate || null, originDescription: animal.originDescription || null,
           eggId: animal.eggId || null,
           initialWeightG: animal.initialWeightG.trim() ? Number(animal.initialWeightG) : null,

@@ -37,6 +37,7 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
 }) {
   const t = (key: string) => translate(locale, key);
   const maximum = Math.max(1, Math.min(500, batch.count || 1));
+  const batchBornOn = batch.bornOn.slice(0, 10);
   const [animals, setAnimals] = useState<OffspringAnimalDraft[]>([emptyAnimal()]);
   const clutchResource = useResource<{ clutch: ClutchDetailDto }>(batch.clutchId ? `/clutches/${encodeURIComponent(batch.clutchId)}` : null);
   const availableEggs = (clutchResource.data?.clutch.eggs ?? []).filter((egg) => !egg.offspringAnimalId);
@@ -45,7 +46,7 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
     setAnimals((current) => current.map((animal, i) => i === index ? { ...animal, ...patch } : animal));
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const clean = animals.map((animal) => ({ ...animal, name: animal.name.trim(), species: animal.species.trim() }));
+    const clean = animals.map((animal) => ({ ...animal, name: animal.name.trim(), species: animal.species.trim(), birthDate: animal.birthDate || batchBornOn }));
     if (clean.some((animal) => !animal.name || !animal.species)) {
       setError(locale === "it" ? "Nome e specie sono obbligatori per ogni piccolo." : "Name and species are required for every offspring.");
       return;
@@ -81,7 +82,7 @@ export function OffspringConversionModal({ batch, locale, busy, onClose, onSubmi
           </Select></Field>
           <Field label={t("morph")}><Input maxLength={200} value={animal.morph} onChange={(e) => update(index, { morph: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Peso iniziale (g)" : "Initial weight (g)"}><Input type="number" min="0.01" max="100000" step="0.01" value={animal.initialWeightG} onChange={(e) => update(index, { initialWeightG: e.target.value })} /></Field>
-          <Field label={t("birthDate")}><Input type="date" value={animal.birthDate || batch.bornOn} onChange={(e) => update(index, { birthDate: e.target.value })} /></Field>
+          <Field label={t("birthDate")}><Input type="date" value={animal.birthDate || batchBornOn} onChange={(e) => update(index, { birthDate: e.target.value })} /></Field>
           <Field label={t("location")}><Input maxLength={160} value={animal.locationLabel} onChange={(e) => update(index, { locationLabel: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Data acquisizione" : "Acquired date"}><Input type="date" value={animal.acquiredDate} onChange={(e) => update(index, { acquiredDate: e.target.value })} /></Field>
           <Field label={locale === "it" ? "Uovo di origine" : "Source egg"}><Select value={animal.eggId} disabled={!batch.clutchId || clutchResource.loading} onChange={(e) => update(index, { eggId: e.target.value })}>

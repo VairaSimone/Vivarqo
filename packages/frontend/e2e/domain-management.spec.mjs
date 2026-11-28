@@ -64,9 +64,8 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.locator(".ecosys-form-panel").getByLabel("Nome", { exact: true }).fill(aquariumName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aquariumName + " updated", { exact: true })).toBeVisible();
-  const updatedAquarium = page.locator(".ecosys-item").filter({ hasText: aquariumName + " updated" });
   page.once("dialog", (dialog) => dialog.accept());
-  await updatedAquarium.getByRole("button", { name: "Archivia", exact: true }).click();
+  await page.getByRole("button", { name: "Archivia", exact: true }).click();
   await expect(page.getByText(aquariumName + " updated", { exact: true })).toHaveCount(0);
 
   const aviaryName = "E2E Aviary " + Date.now();
@@ -80,9 +79,8 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await page.locator(".ecosys-form-panel").getByLabel("Nome", { exact: true }).fill(aviaryName + " updated");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toBeVisible();
-  const updatedAviary = page.locator(".ecosys-item").filter({ hasText: aviaryName + " updated" });
   page.once("dialog", (dialog) => dialog.accept());
-  await updatedAviary.getByRole("button", { name: "Archivia", exact: true }).click();
+  await page.getByRole("button", { name: "Archivia", exact: true }).click();
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toHaveCount(0);
 
   const animalName = "E2E Companion " + Date.now();
