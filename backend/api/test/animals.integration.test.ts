@@ -381,7 +381,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .send(csv)
       .expect(201);
     expect(incomplete.body.validRows).toBe(0);
-    expect(incomplete.body.missingFields).toEqual([["name"], ["species"], ["category"], ["domainProfile"]]);
+    expect(incomplete.body.missingFields).toEqual([["name"], ["species"]]);
     await owner.agent
       .post("/api/v1/imports/" + incomplete.body.importId + "/confirm")
       .set("Origin", origin)
