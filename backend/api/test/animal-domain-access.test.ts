@@ -27,5 +27,6 @@ describe("animal domain route category coverage", () => {
     // Cycle routes resolve their enabled category from their actual parent animals.
     expect(categoryForAnimalDomainPath("/reproduction-cycles")).toBeNull();
     expect(categoryForAnimalDomainPath("/reproduction-cycles/00000000-0000-4000-8000-000000000001/clutches")).toBeNull();
+    expect(categoryForAnimalDomainPath("/clutches/00000000-0000-4000-8000-000000000001/eggs")).toBeNull();
   });
 });
