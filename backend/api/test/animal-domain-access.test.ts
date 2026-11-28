@@ -11,7 +11,6 @@ describe("animal domain route category coverage", () => {
     ["/aviaries", "birds"],
     ["/aquariums", "fish"],
     ["/companion-care", "dogs_cats"],
-    ["/animals/00000000-0000-4000-8000-000000000001/hatchling-care", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/genetic-traits", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/pedigree", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/inbreeding", "reptiles"],
@@ -19,6 +18,15 @@ describe("animal domain route category coverage", () => {
     ["/genetics/calculate-pairing", "reptiles"],
   ])("requires the %s route to have category %s", (path, category) => {
     expect(categoryForAnimalDomainPath(path)).toBe(category);
+  });
+
+  it("leaves shared reproduction and offspring routes to record-scoped category checks", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    expect(categoryForAnimalDomainPath("/incubators")).toBeNull();
+    expect(categoryForAnimalDomainPath("/offspring-batches")).toBeNull();
+    expect(categoryForAnimalDomainPath("/offspring-batches/" + id + "/animals")).toBeNull();
+    expect(categoryForAnimalDomainPath("/reproductive-events/" + id)).toBeNull();
+    expect(categoryForAnimalDomainPath("/animals/" + id + "/hatchling-care")).toBeNull();
   });
 
   it("does not apply an animal category gate to unrelated personal routes", () => {

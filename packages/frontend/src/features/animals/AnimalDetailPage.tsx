@@ -66,11 +66,12 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
   const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(feedingEditEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
-  const traits = useResource<{ traits: GeneticTraitDto[] }>(animal && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
+  const traits = useResource<{ traits: GeneticTraitDto[] }>(animal?.category === "reptiles" && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; availabilityStatus: "not_available" | "available" | "reserved" | "transferred"; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
 
   useEffect(() => {
+    setTab("overview");
     setFeedingPage(1);
     setFeedingEditEntry(null);
   }, [id]);
@@ -352,7 +353,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const latestFeedingEntry = latestFeedingSession?.entries.find((entry) => getString(entry, "animalId") === id);
   const tabItems = [
     ["overview", t("overview")], ["history", t("careHistory")], ["health", locale === "it" ? "Salute" : "Health"], ...(animal.category === "reptiles" ? [["reptile-care", locale === "it" ? "Cura rettili" : "Reptile care"]] : []), ["documents", t("documentsTab")],
-    ["traits", t("traits")], ["share", t("publicShare")]
+    ...(animal.category === "reptiles" ? [["traits", t("traits")]] : []), ["share", t("publicShare")]
   ];
 
   async function downloadInternalQr() {
@@ -511,7 +512,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <div className="row-actions"><IconButton label={t("download")} onClick={() => void api.download(`/documents/${getString(doc, "id")}/download`, getString(doc, "originalFilename", "document"))}><Icon name="download" /></IconButton></div>
       ])} empty={t("noDocuments")} /> : <EmptyState title={t("noDocuments")} description={t("emptyHint")} />}</Panel>}
 
-    {tab === "traits" && <Panel>
+    {tab === "traits" && animal.category === "reptiles" && <Panel>
       <PanelHeader title={t("traits")} action={!isArchived ? <Button onClick={() => openGeneticTrait()}><Icon name="plus" size={15} />{t("addGeneticTrait")}</Button> : undefined} />
       {traits.loading && !traits.data ? <LoadingState /> : traits.error ? <ErrorState message={traits.error.message} retry={traits.reload} /> : traits.data?.traits?.length ? traits.data.traits.map((trait) => (
         <div className="simple-row genetic-trait-row" key={trait.id}>

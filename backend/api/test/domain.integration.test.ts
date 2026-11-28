@@ -55,6 +55,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.offspringBatch.deleteMany({ where: { cycleId: { in: cycleIds } } });
     await prisma.clutch.deleteMany({ where: { id: { in: clutchIds } } });
     await prisma.reproductiveEvent.deleteMany({ where: { cycleId: { in: cycleIds } } });
+    await prisma.birdBreedingPair.deleteMany({ where: { userId: ids } });
     await prisma.reproductionCycle.deleteMany({ where: { id: { in: cycleIds } } });
     await prisma.animalNote.deleteMany({ where: { animalId: { in: animalIds } } });
     await prisma.weightMeasurement.deleteMany({ where: { animalId: { in: animalIds } } });
@@ -73,7 +74,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
     await prisma.$disconnect();
   });
 
-  async function account() {
+  async function account(animalCategories: string[] = ["reptiles"]) {
     const email = `domains-${randomUUID()}@example.com`;
     const user = await prisma.user.create({
       data: {
@@ -81,7 +82,7 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
         passwordHash: await argon2.hash(password, { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 }),
         displayName: "Domain Integration",
         emailVerifiedAt: new Date(),
-        accountConfiguration: { create: { animalCategories: ["reptiles"] } },
+        accountConfiguration: { create: { animalCategories } },
       },
     });
     userIds.push(user.id);
@@ -133,6 +134,79 @@ describe.skipIf(!enabled)("Remaining domain modules PostgreSQL integration", () 
       .send({ recordedAt: "2026-10-28T10:00:00.000Z", temperatureC: 31.5, humidityPct: 80, eventType: "routine_check" })
       .expect(201);
     expect((await owner.agent.get(`/api/v1/clutches/${clutch.body.clutch.id}`).expect(200)).body.clutch.incubationLogs).toHaveLength(1);
+  });
+
+
+  it("supports bird-only incubation and offspring conversion without reptile defaults", async () => {
+    const owner = await account(["birds"]);
+    const female = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Bird mother", species: "Nymphicus hollandicus", category: "birds", sex: "female" },
+    });
+    const male = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Bird father", species: "Nymphicus hollandicus", category: "birds", sex: "male" },
+    });
+
+    const pair = await owner.agent.post("/api/v1/bird-breeding-pairs")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ femaleAnimalId: female.id, maleAnimalId: male.id, pairedAt: "2026-11-01" })
+      .expect(201);
+    const cycleId = pair.body.pair.cycleId as string;
+
+    const cycle = await owner.agent.get(`/api/v1/reproduction-cycles/${cycleId}`).expect(200);
+    expect(cycle.body.cycle.parentA.category).toBe("birds");
+    expect(cycle.body.cycle.parentB.category).toBe("birds");
+
+    const incubator = await owner.agent.post("/api/v1/incubators")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ name: "Bird incubator" })
+      .expect(201);
+    expect(incubator.body.incubator.name).toBe("Bird incubator");
+    expect((await owner.agent.get("/api/v1/incubators").expect(200)).body.incubators)
+      .toEqual([expect.objectContaining({ id: incubator.body.incubator.id })]);
+
+    const clutch = await owner.agent.post("/api/v1/clutches")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ cycleId, laidOn: "2026-11-10", eggCount: 1, incubatorId: incubator.body.incubator.id })
+      .expect(201);
+    await owner.agent.post(`/api/v1/clutches/${clutch.body.clutch.id}/incubation-logs`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ recordedAt: "2026-11-10T10:00:00.000Z", temperatureC: 37, humidityPct: 55, eventType: "routine_check" })
+      .expect(201);
+
+    const event = await owner.agent.post(`/api/v1/reproduction-cycles/${cycleId}/events`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ eventType: "laying", occurredAt: "2026-11-10T09:00:00.000Z" })
+      .expect(201);
+    await owner.agent.patch(`/api/v1/reproductive-events/${event.body.event.id}`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ details: "Bird laying event" })
+      .expect(200);
+
+    const batch = await owner.agent.post("/api/v1/offspring-batches")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ cycleId, clutchId: clutch.body.clutch.id, bornOn: "2026-11-25", count: 1 })
+      .expect(201);
+    const batches = await owner.agent.get(`/api/v1/offspring-batches?cycleId=${cycleId}`).expect(200);
+    expect(batches.body.offspringBatches.map((item: { id: string }) => item.id)).toContain(batch.body.offspringBatch.id);
+
+    const converted = await owner.agent.post(`/api/v1/offspring-batches/${batch.body.offspringBatch.id}/animals`)
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ animals: [{ name: "Bird chick", species: "Nymphicus hollandicus", sex: "unknown" }] })
+      .expect(201);
+    const offspring = converted.body.animals[0] as { id: string; category: string; motherAnimalId: string; fatherAnimalId: string };
+    expect(offspring.category).toBe("birds");
+    expect(offspring.motherAnimalId).toBe(female.id);
+    expect(offspring.fatherAnimalId).toBe(male.id);
+    await owner.agent.get(`/api/v1/animals/${offspring.id}/hatchling-care`).expect(200);
+
+    const reptileParent = await prisma.animal.create({
+      data: { userId: owner.userId, name: "Disabled reptile parent", species: "Python regius", category: "reptiles", sex: "male" },
+    });
+    const mixedCategoryCycle = await owner.agent.post("/api/v1/reproduction-cycles")
+      .set("Origin", origin).set("X-CSRF-Token", owner.csrf)
+      .send({ startedOn: "2026-11-26", parentAAnimalId: female.id, parentBAnimalId: reptileParent.id })
+      .expect(400);
+    expect(mixedCategoryCycle.body.code).toBe("INCOMPATIBLE_ANIMAL_PARENT_CATEGORIES");
   });
 
   it("locks stock rows and applies inbound, outbound and count-adjustment movements atomically", async () => {

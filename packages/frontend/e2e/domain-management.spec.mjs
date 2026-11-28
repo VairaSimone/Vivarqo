@@ -48,6 +48,35 @@ async function createAnimal(page, name) {
   return result.body.animal;
 }
 
+
+test("animal list supports multi-selection and atomic bulk weight records", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+
+  const firstName = "E2E Bulk animal A " + Date.now();
+  const secondName = "E2E Bulk animal B " + Date.now();
+  await createAnimal(page, firstName);
+  await createAnimal(page, secondName);
+
+  await page.goto("/animals");
+  await page.getByLabel("Seleziona " + firstName).check();
+  await page.getByLabel("Seleziona " + secondName).check();
+  const bulkAction = page.getByRole("button", { name: "Registra su 2 animali" });
+  await expect(bulkAction).toBeVisible();
+  await bulkAction.click();
+
+  await page.getByRole("dialog").locator('input[type="number"]').last().fill("1250");
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/care-records/bulk"
+  );
+  await page.getByRole("dialog").getByRole("button", { name: "Registra", exact: true }).click();
+  const response = await responsePromise;
+  expect(response.status(), await response.text()).toBe(201);
+  expect((await response.json()).createdCount).toBe(2);
+  await expect(page.getByRole("button", { name: "Registra su 2 animali" })).toHaveCount(0);
+});
+
 test("aquariums, aviaries and companion-care records support editing and archival", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page);

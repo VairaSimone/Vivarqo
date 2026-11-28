@@ -40,7 +40,7 @@ export function CycleDetail({ id, locale, navigate }: { id: string; locale: Loca
     geneticOutcomeCombinationsTruncated: boolean;
     geneticModelAssumptions: string[];
     history: { cycleCount: number; pairingCount: number; firstPairingAt: string | null; lastPairingAt: string | null; clutchCount: number; offspringBatchCount: number; outcomes: Array<{ type: string; occurredAt: string; details: string | null }> };
-  } }>(cycle?.parentAAnimalId && cycle?.parentBAnimalId
+  } }>(cycle?.parentA?.category === "reptiles" && cycle?.parentB?.category === "reptiles" && cycle?.parentAAnimalId && cycle?.parentBAnimalId
     ? `/reproduction-pairs/insights?motherId=${encodeURIComponent(cycle.parentAAnimalId)}&fatherId=${encodeURIComponent(cycle.parentBAnimalId)}`
     : null);
   const eventsPageResource = useResource<{ events: ReproductiveEventDto[]; pagination: { page: number; totalPages: number; total: number } }>(cycle ? `/reproduction-cycles/${encodeURIComponent(id)}/events?page=${eventsPage}&pageSize=25` : null);

@@ -238,6 +238,7 @@ export interface AnimalSummaryDto {
   name: string;
   identifier?: string | null;
   species?: string;
+  category?: "reptiles" | "fish" | "birds" | "dogs_cats";
 }
 
 export interface ReproductiveEventDto {

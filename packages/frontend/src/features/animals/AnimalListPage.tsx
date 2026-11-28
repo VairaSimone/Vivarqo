@@ -49,6 +49,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickError, setQuickError] = useState("");
   const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
+  const [selectedAnimalCategories, setSelectedAnimalCategories] = useState<Record<string, string>>({});
   const [bulkCareModal, setBulkCareModal] = useState(false);
   const [bulkCareKind, setBulkCareKind] = useState<"weight" | "shed">("weight");
   const [bulkCareDate, setBulkCareDate] = useState(todayDate());
@@ -101,6 +102,13 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const resource = useResource<{ animals: AnimalDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(url);
   const animals = resource.data?.animals ?? [];
   const pager = resource.data?.pagination;
+  const selectableAnimals = animals.filter((animal) => animal.status === "active");
+  const allVisibleAnimalsSelected = selectableAnimals.length > 0 && selectableAnimals.every((animal) => selectedAnimalIds.includes(animal.id));
+  const canBulkShed = selectedAnimalIds.length > 0 && selectedAnimalIds.every((id) => selectedAnimalCategories[id] === "reptiles");
+
+  useEffect(() => {
+    if (!canBulkShed) setBulkCareKind("weight");
+  }, [canBulkShed]);
   const savedFiltersResource = useResource<{ filters: Array<{ id: string; name: string; filters: Record<string, unknown> }> }>("/animals/filters");
 
   async function saveCurrentFilter() {
@@ -230,6 +238,35 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     setPhotoFile(file);
   }
 
+  function updateAnimalSelection(animal: AnimalDto, checked: boolean) {
+    if (checked) {
+      setSelectedAnimalIds((current) => current.includes(animal.id) ? current : [...current, animal.id]);
+      setSelectedAnimalCategories((current) => ({ ...current, [animal.id]: animal.category }));
+      return;
+    }
+    setSelectedAnimalIds((current) => current.filter((id) => id !== animal.id));
+    setSelectedAnimalCategories((current) => {
+      const next = { ...current };
+      delete next[animal.id];
+      return next;
+    });
+  }
+
+  function updatePageSelection(checked: boolean) {
+    const pageIds = new Set(selectableAnimals.map((animal) => animal.id));
+    setSelectedAnimalIds((current) => checked
+      ? [...new Set([...current, ...pageIds])]
+      : current.filter((id) => !pageIds.has(id)));
+    setSelectedAnimalCategories((current) => {
+      const next = { ...current };
+      for (const animal of selectableAnimals) {
+        if (checked) next[animal.id] = animal.category;
+        else delete next[animal.id];
+      }
+      return next;
+    });
+  }
+
   async function updateStatus(animal: AnimalDto, action: "archive" | "restore" | "delete") {
     const label = action === "archive" ? t("confirmArchive") : t("confirmDelete");
     if (!window.confirm(label)) return;
@@ -237,13 +274,21 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       if (action === "delete") await api.delete(`/animals/${getString(animal, "id")}`);
       else await api.post(`/animals/${getString(animal, "id")}/${action}`);
       resource.reload();
+      if (action === "archive" || action === "delete") updateAnimalSelection(animal, false);
       show(action === "archive" ? t("animalArchived") : action === "restore" ? t("animalRestored") : t("animalDeleted"));
     } catch (reason) { show(reason instanceof ApiError ? reason.message : t("operationFailed")); }
   }
 
   const rows = animals.map((animal) => {
-    const id = getString(animal, "id");
+    const id = animal.id;
     return [
+      <input
+        type="checkbox"
+        aria-label={locale === "it" ? `Seleziona ${animal.name}` : `Select ${animal.name}`}
+        checked={selectedAnimalIds.includes(id)}
+        disabled={animal.status !== "active"}
+        onChange={(event) => updateAnimalSelection(animal, event.target.checked)}
+      />,
       <button className="animal-name-cell" onClick={() => navigate(`/animals/${id}`)}><span className="animal-avatar">{getString(animal, "photoUrl") ? <img className="animal-avatar-image" src={getString(animal, "photoUrl")} alt="" loading="lazy" /> : <Icon name="snake" size={16} />}</span><span><strong>{getString(animal, "name")}</strong><small>{getString(animal, "identifier") || getString(animal, "species")}</small></span></button>,
       <span>{getString(animal, "species")}</span>,
       <span>{getString(animal, "morph") || "—"}</span>,
@@ -269,6 +314,12 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         activeFilterCount={[q, category, status !== "active" ? status : "", sex, species, morph, location].filter(Boolean).length}
         onClearFilters={() => { setSearch(""); setQ(""); setCategory(""); setStatus("active"); setSex(""); setSpecies(""); setMorph(""); setLocation(""); setSort("updatedAt"); setPage(1); }}
         resultCount={pager?.total ?? 0} onRefresh={resource.reload} loading={resource.loading} />
+      {animals.length > 0 && <label className="checkbox-field animal-select-page">
+        <input type="checkbox" checked={allVisibleAnimalsSelected} disabled={selectableAnimals.length === 0} onChange={(event) => updatePageSelection(event.target.checked)} />
+        {locale === "it"
+          ? `Seleziona tutti gli animali attivi in questa pagina (${selectableAnimals.length})`
+          : `Select all active animals on this page (${selectableAnimals.length})`}
+      </label>}
       {resource.loading && !resource.data ? <LoadingState /> : resource.error ? <ErrorState message={resource.error.message} retry={resource.reload} /> :
         rows.length === 0 && (pager?.total ?? 0) === 0 && !q && !species && !morph && !location && !sex && status === "active"
           ? <EmptyState title={locale === "it" ? "Non hai ancora aggiunto animali" : "You haven't added any animals yet"} description={locale === "it" ? "Crea la scheda del primo esemplare oppure importa la tua collezione da Excel per iniziare a gestire alimentazioni, pesi e mute." : "Create your first animal profile or import your collection from Excel to start tracking feedings, weights and sheds."} action={<Button onClick={openCreate} disabled={enabledCategories.length === 0}><Icon name="plus" size={15} />{t("animalNew")}</Button>} />
@@ -298,6 +349,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           const result = await api.post<{ createdCount: number }>("/care-records/bulk", payload);
           setBulkCareModal(false);
           setSelectedAnimalIds([]);
+          setSelectedAnimalCategories({});
           setBulkCareWeight("");
           setBulkCareNotes("");
           show(locale === "it" ? `Registrazione salvata atomicamente su ${result.createdCount} animali.` : `Record saved atomically for ${result.createdCount} animals.`);
@@ -309,7 +361,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       }}>
         {bulkCareError && <Alert tone="danger">{bulkCareError}</Alert>}
         <p>{locale === "it" ? `L'operazione verrà applicata a ${selectedAnimalIds.length} animali selezionati. La registrazione è atomica: se il server rifiuta la richiesta, non viene salvato alcun record.` : `This operation applies to ${selectedAnimalIds.length} selected animals. The operation is atomic: if the server rejects the request, no records are saved.`}</p>
-        <Field label={locale === "it" ? "Tipo di registrazione" : "Record type"}><Select value={bulkCareKind} onChange={(event) => setBulkCareKind(event.target.value as "weight" | "shed")}><option value="weight">{locale === "it" ? "Pesatura" : "Weight"}</option><option value="shed">{locale === "it" ? "Muta" : "Shed"}</option></Select></Field>
+        <Field label={locale === "it" ? "Tipo di registrazione" : "Record type"}><Select value={bulkCareKind} onChange={(event) => setBulkCareKind(event.target.value as "weight" | "shed")}><option value="weight">{locale === "it" ? "Pesatura" : "Weight"}</option>{canBulkShed && <option value="shed">{locale === "it" ? "Muta" : "Shed"}</option>}</Select></Field>
         <Field label={locale === "it" ? "Data" : "Date"}><Input type="date" required value={bulkCareDate} onChange={(event) => setBulkCareDate(event.target.value)} /></Field>
         {bulkCareKind === "weight" ? <Field label={`${t("weight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" max="100000000" step="0.01" required value={bulkCareWeight} onChange={(event) => setBulkCareWeight(event.target.value)} /></Field> : <Field label={locale === "it" ? "Esito muta" : "Shed outcome"}><Select value={bulkCareOutcome} onChange={(event) => setBulkCareOutcome(event.target.value)}><option value="complete">{locale === "it" ? "Completa" : "Complete"}</option><option value="partial">{locale === "it" ? "Parziale" : "Partial"}</option><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option></Select></Field>}
         <Field label={t("notes")}><Textarea rows={2} value={bulkCareNotes} onChange={(event) => setBulkCareNotes(event.target.value)} /></Field>

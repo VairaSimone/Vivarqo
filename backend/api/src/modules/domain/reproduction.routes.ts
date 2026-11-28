@@ -54,13 +54,40 @@ async function assertOwnedAnimals(userId: string, ids: Array<string | null | und
   const rows = await prisma.animal.findMany({ where: { userId, id: { in: expected } }, select: { id: true } });
   if (rows.length !== expected.length) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more animals were not found");
 }
-async function assertCycleParentSexes(userId: string, motherId?: string | null, fatherId?: string | null) {
+async function assertCycleParentSexes(userId: string, motherId?: string | null, fatherId?: string | null): Promise<string | null> {
   const ids = [...new Set([motherId, fatherId].filter((id): id is string => Boolean(id)))];
-  if (!ids.length) return;
-  const animals = await prisma.animal.findMany({ where: { userId, id: { in: ids } }, select: { id: true, sex: true } });
+  if (!ids.length) return null;
+  const animals = await prisma.animal.findMany({ where: { userId, id: { in: ids } }, select: { id: true, sex: true, category: true } });
   if (animals.length !== ids.length) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more breeding animals were not found");
   if (motherId && animals.find((animal) => animal.id === motherId)?.sex === "male") throw new AppError(400, "INVALID_MOTHER_SEX", "The mother must be female or have unknown sex");
   if (fatherId && animals.find((animal) => animal.id === fatherId)?.sex === "female") throw new AppError(400, "INVALID_FATHER_SEX", "The father must be male or have unknown sex");
+  const parentCategories = [...new Set(animals.map((animal) => animal.category))];
+  if (parentCategories.length > 1) {
+    throw new AppError(400, "INCOMPATIBLE_ANIMAL_PARENT_CATEGORIES", "Reproduction parents must belong to the same animal category", {
+      categories: parentCategories,
+    });
+  }
+  const category = parentCategories[0] ?? null;
+  if (category && category !== "reptiles" && category !== "birds") {
+    throw new AppError(400, "UNSUPPORTED_REPRODUCTION_CATEGORY", "Egg and offspring workflows currently support reptiles and birds only", {
+      category,
+    });
+  }
+  return category;
+}
+
+async function assertReproductionCategoryEnabled(userId: string, category: string | null) {
+  if (!category) return;
+  const configuration = await prisma.accountConfiguration.findUnique({
+    where: { userId },
+    select: { animalCategories: true },
+  });
+  if (!configuration?.animalCategories.includes(category)) {
+    throw new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "The selected animal category is not enabled for this account", {
+      category,
+      settingsPath: "/settings/categories",
+    });
+  }
 }
 async function ownedCycle(userId: string, cycleId: string) {
   const cycle = await prisma.reproductionCycle.findFirst({ where: { id: cycleId, userId } });
@@ -573,8 +600,8 @@ export function createReproductionRouter() {
         where, orderBy: [{ startedOn: "desc" }, { createdAt: "desc" }],
         skip: (page.page - 1) * page.pageSize, take: page.pageSize,
         include: {
-          parentA: { select: { id: true, name: true, identifier: true, species: true } },
-          parentB: { select: { id: true, name: true, identifier: true, species: true } },
+          parentA: { select: { id: true, name: true, identifier: true, species: true, category: true } },
+          parentB: { select: { id: true, name: true, identifier: true, species: true, category: true } },
           _count: { select: { events: true, clutches: true, offspringBatches: true } },
         },
       }),
@@ -586,7 +613,8 @@ export function createReproductionRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(createCycleSchema, req.body);
     await assertOwnedAnimals(auth.userId, [input.parentAAnimalId, input.parentBAnimalId]);
-    await assertCycleParentSexes(auth.userId, input.parentAAnimalId, input.parentBAnimalId);
+    const parentCategory = await assertCycleParentSexes(auth.userId, input.parentAAnimalId, input.parentBAnimalId);
+    await assertReproductionCategoryEnabled(auth.userId, parentCategory);
     const cycle = await prisma.$transaction(async (tx) => {
       const created = await tx.reproductionCycle.create({
         data: {
@@ -607,8 +635,8 @@ export function createReproductionRouter() {
     const cycle = await prisma.reproductionCycle.findFirst({
       where: { id: cycleId, userId: auth.userId },
       include: {
-        parentA: { select: { id: true, name: true, identifier: true, species: true } },
-        parentB: { select: { id: true, name: true, identifier: true, species: true } },
+        parentA: { select: { id: true, name: true, identifier: true, species: true, category: true } },
+        parentB: { select: { id: true, name: true, identifier: true, species: true, category: true } },
         // Details are deliberately bounded. Full history is available through
         // the paginated child endpoints below.
         events: { orderBy: [{ occurredAt: "desc" }, { id: "desc" }], take: 100, include: { animal: { select: { id: true, name: true } } } },
@@ -662,7 +690,8 @@ export function createReproductionRouter() {
     if (parentA && parentA === parentB) {
       throw new AppError(400, "VALIDATION_ERROR", "Parents must be different animals");
     }
-    await assertCycleParentSexes(auth.userId, parentA, parentB);
+    const parentCategory = await assertCycleParentSexes(auth.userId, parentA, parentB);
+    await assertReproductionCategoryEnabled(auth.userId, parentCategory);
     const data: Record<string, unknown> = { ...input };
     if (input.startedOn) data.startedOn = validDate(input.startedOn);
     if (input.endedOn !== undefined) data.endedOn = input.endedOn ? validDate(input.endedOn) : null;
@@ -1140,10 +1169,15 @@ export function createReproductionRouter() {
       const animals = [];
       for (const [index, animal] of input.animals.entries()) {
         await assertOwnedAnimals(auth.userId, [animal.motherAnimalId, animal.fatherAnimalId]);
-        await assertCycleParentSexes(auth.userId, animal.motherAnimalId ?? batch.cycle.parentAAnimalId, animal.fatherAnimalId ?? batch.cycle.parentBAnimalId);
+        const category = await assertCycleParentSexes(
+          auth.userId,
+          animal.motherAnimalId ?? batch.cycle.parentAAnimalId,
+          animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
+        ) ?? "reptiles";
+        await assertReproductionCategoryEnabled(auth.userId, category);
         const createdAnimal = await tx.animal.create({
           data: {
-            userId: auth.userId, originOffspringBatchId: batchId, name: animal.name,
+            userId: auth.userId, category, originOffspringBatchId: batchId, name: animal.name,
             // Stable, sequential, human-readable ID. The full batch UUID prevents collisions
             // between separate clutches/batches; caller-supplied identifiers remain untouched.
             identifier: animal.identifier?.trim() || `OFF-${batchId}-${String(index + 1).padStart(3, "0")}`, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
