@@ -9,7 +9,7 @@ const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
   { prefixes: ["/companion-care"], category: "dogs_cats" },
   {
     prefixes: [
-      "/reproduction", "/reproduction-pairs", "/reproduction-cycles", "/species-breeding-profiles", "/reproduction-statistics",
+      "/reproduction", "/reproduction-pairs", "/species-breeding-profiles", "/reproduction-statistics",
       "/incubators", "/clutches", "/eggs", "/offspring-batches", "/reproductive-events",
       "/incubation-logs", "/genetics", "/genetic-traits",
     ],
@@ -46,6 +46,37 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
     select: { animalCategories: true },
   });
   const categories = configuration?.animalCategories ?? [];
+
+  // Bird breeding pairs also use ReproductionCycle for shared clutch/egg history.
+  // Resolve the category from the cycle's actual parents instead of treating every
+  // cycle as a reptile-only record.
+  const cycleMatch = req.path.match(/^\\/reproduction-cycles(?:\\/([^/]+))?/);
+  if (cycleMatch) {
+    let cycleCategories: string[] = ["reptiles", "birds"];
+    if (cycleMatch[1]) {
+      const cycle = await prisma.reproductionCycle.findFirst({
+        where: { id: cycleMatch[1], userId: auth.userId },
+        select: { parentA: { select: { category: true } }, parentB: { select: { category: true } } },
+      });
+      if (cycle) {
+        cycleCategories = [cycle.parentA?.category, cycle.parentB?.category].filter((value): value is string => Boolean(value));
+        if (cycleCategories.length === 0) cycleCategories = ["reptiles"];
+      }
+    }
+    if (cycleMatch[1] && cycleCategories.length > 0 && !cycleCategories.some((category) => categories.includes(category))) {
+      next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This reproduction cycle belongs to a disabled animal category", {
+        category: cycleCategories[0],
+        settingsPath: "/settings/categories",
+      }));
+      return;
+    }
+    if (!cycleMatch[1] && !cycleCategories.some((category) => categories.includes(category))) {
+      next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "Enable reptiles or birds to use reproduction cycles", {
+        settingsPath: "/settings/categories",
+      }));
+      return;
+    }
+  }
 
   if (requiredCategory && !categories.includes(requiredCategory)) {
     next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This animal domain is not enabled for the account", {
