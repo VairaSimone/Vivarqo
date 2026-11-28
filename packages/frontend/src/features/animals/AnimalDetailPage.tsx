@@ -61,10 +61,12 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const summaryWeights = useResource<{ weights: WeightDto[] }>(animal && tab === "overview" ? `/animals/${id}/weights?page=1&pageSize=1` : null);
   const summaryFeedings = useResource<FeedingSessionsResponseDto>(animal && tab === "overview" ? "/feeding-sessions" + queryString({ animalId: id, page: 1, pageSize: 1 }) : null, parseFeedingSessionsResponse);
   const weights = useResource<{ weights: WeightDto[] }>(animal && tab === "history" ? `/animals/${id}/weights?page=1&pageSize=100` : null);
-  const sheds = useResource<{ sheds: ShedDto[] }>(animal && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
+  const sheds = useResource<{ sheds: ShedDto[] }>(animal?.category === "reptiles" && tab === "history" ? `/animals/${id}/sheds?page=1&pageSize=100` : null);
   const notes = useResource<{ notes: AnimalNoteDto[] }>(animal && tab === "history" ? `/animals/${id}/notes?page=1&pageSize=100` : null);
   const feedings = useResource<FeedingSessionsResponseDto>(animal && tab === "history" ? "/feeding-sessions" + queryString({ animalId: id, page: feedingPage, pageSize: 10 }) : null, parseFeedingSessionsResponse);
-  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(feedingEditEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
+  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(
+    animal?.category === "reptiles" && feedingEditEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null
+  );
   const documents = useResource<{ documents: AnimalDocumentDto[] }>(animal && tab === "documents" ? `/documents?animalId=${encodeURIComponent(id)}&page=1&pageSize=100` : null);
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal?.category === "reptiles" && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; availabilityStatus: "not_available" | "available" | "reserved" | "transferred"; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
@@ -133,6 +135,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   }
 
   function openRecord(kind: "weight" | "shed" | "note", existing?: CareRecordDto) {
+    if (kind === "shed" && animal?.category !== "reptiles") return;
     setRecordKind(kind); setRecordEdit(existing ?? null); setFormError("");
     setRecordForm({
       date: existing ? dateForInput(getString(existing, kind === "weight" ? "measuredAt" : "occurredAt")) : todayDate(),
@@ -154,6 +157,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         const payload = { measuredAt: dateTimeInputToUtc(recordForm.date + "T12:00"), weightG: weightToGrams(recordForm.weight), notes: recordForm.notes || null };
         if (isEdit) await api.patch(`/weights/${recordId}`, payload); else await api.post(`/animals/${id}/weights`, payload);
       } else if (recordKind === "shed") {
+        if (animal?.category !== "reptiles") throw new Error("Shed records are only available for reptiles");
         const payload = { occurredAt: dateTimeInputToUtc(recordForm.date + "T12:00"), outcome: recordForm.outcome, notes: recordForm.notes || null };
         if (isEdit) await api.patch(`/sheds/${recordId}`, payload); else await api.post(`/animals/${id}/sheds`, payload);
       } else if (recordKind === "note") {
@@ -201,9 +205,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         foodType: feedingEditForm.foodType || null,
         foodSize: feedingEditForm.foodSize || null,
         foodWeightG: feedingEditForm.foodWeightG ? weightToGrams(feedingEditForm.foodWeightG) : null,
-        preyState: feedingEditForm.preyState,
-        inventoryItemId: feedingEditForm.inventoryItemId || null,
-        inventoryQuantity: feedingEditForm.inventoryItemId && feedingEditForm.inventoryQuantity ? Number(feedingEditForm.inventoryQuantity) : null,
+        ...(animal?.category === "reptiles" ? {
+          preyState: feedingEditForm.preyState,
+          inventoryItemId: feedingEditForm.inventoryItemId || null,
+          inventoryQuantity: feedingEditForm.inventoryItemId && feedingEditForm.inventoryQuantity ? Number(feedingEditForm.inventoryQuantity) : null,
+        } : {}),
         notes: feedingEditForm.notes || null,
       });
       setFeedingEditEntry(null);
@@ -319,7 +325,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       await api.patch(`/animals/${encodeURIComponent(id)}/hatchling-care`, {
         firstFeedingAt: toIso(hatchlingCareForm.firstFeedingAt),
         firstFeedingAccepted: hatchlingCareForm.firstFeedingAccepted === "" ? null : hatchlingCareForm.firstFeedingAccepted === "yes",
-        firstShedAt: toIso(hatchlingCareForm.firstShedAt),
+        ...(animal.category === "reptiles" ? { firstShedAt: toIso(hatchlingCareForm.firstShedAt) } : {}),
         readyForRehomingAt: toIso(hatchlingCareForm.readyForRehomingAt),
         availabilityStatus: hatchlingCareForm.availabilityStatus,
         healthStatus: hatchlingCareForm.healthStatus,
@@ -410,7 +416,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     <div className="animal-profile-actions animal-quick-actions">
       <Button variant="secondary" disabled={isArchived} onClick={() => navigate(`/feeding?animalId=${encodeURIComponent(id)}&create=1`)}><Icon name="feed" size={15} />{t("newFeeding")}</Button>
       <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("weight")}><Icon name="weight" size={15} />{t("addWeight")}</Button>
-      <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("shed")}><Icon name="refresh" size={15} />{t("addShed")}</Button>
+      {animal.category === "reptiles" && <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("shed")}><Icon name="refresh" size={15} />{t("addShed")}</Button>}
       <Button variant="secondary" disabled={isArchived} onClick={() => openRecord("note")}><Icon name="file" size={15} />{t("addNote")}</Button>
     </div>
     <div className="tabs-line" role="tablist">{tabItems.map(([key, label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>
@@ -422,11 +428,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <div className="detail-fields">
           <Detail label={locale === "it" ? "Prime alimentazioni" : "Feedings"} value={hatchlingCare.data ? `${hatchlingCare.data.acceptedFeedings}/${hatchlingCare.data.feedingCount} ${locale === "it" ? "accettate" : "accepted"}` : "—"} />
           <Detail label={locale === "it" ? "Misurazioni peso" : "Weight records"} value={String(hatchlingCare.data?.weights.length ?? 0)} />
-          <Detail label={locale === "it" ? "Mute registrate" : "Sheds recorded"} value={String(hatchlingCare.data?.sheds.length ?? 0)} />
+          {animal.category === "reptiles" && <Detail label={locale === "it" ? "Mute registrate" : "Sheds recorded"} value={String(hatchlingCare.data?.sheds.length ?? 0)} />}
           <Detail label={locale === "it" ? "Disponibilità cessione" : "Rehoming status"} value={locale === "it" ? ({ not_available: "Non disponibile", available: "Disponibile", reserved: "Riservato", transferred: "Ceduto" }[hatchlingCare.data?.care?.availabilityStatus ?? "not_available"]) : ({ not_available: "Not available", available: "Available", reserved: "Reserved", transferred: "Transferred" }[hatchlingCare.data?.care?.availabilityStatus ?? "not_available"])} />
           <Detail label={locale === "it" ? "Prima alimentazione" : "First feeding"} value={formatDate(hatchlingCare.data?.care?.firstFeedingAt ?? "", locale)} />
           <Detail label={locale === "it" ? "Prima alimentazione accettata" : "First feeding accepted"} value={hatchlingCare.data?.care?.firstFeedingAccepted == null ? "—" : hatchlingCare.data.care.firstFeedingAccepted ? (locale === "it" ? "Sì" : "Yes") : (locale === "it" ? "No" : "No")} />
-          <Detail label={locale === "it" ? "Prima muta" : "First shed"} value={formatDate(hatchlingCare.data?.care?.firstShedAt ?? "", locale)} />
+          {animal.category === "reptiles" && <Detail label={locale === "it" ? "Prima muta" : "First shed"} value={formatDate(hatchlingCare.data?.care?.firstShedAt ?? "", locale)} />}
           <Detail label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming"} value={formatDate(hatchlingCare.data?.care?.readyForRehomingAt ?? "", locale)} />
           <Detail label={locale === "it" ? "Stato di salute" : "Health status"} value={({ unknown: locale === "it" ? "Non valutato" : "Unknown", healthy: locale === "it" ? "Regolare" : "Healthy", monitoring: locale === "it" ? "Da monitorare" : "Monitoring", treatment: locale === "it" ? "In trattamento" : "Under treatment" } as Record<string,string>)[hatchlingCare.data?.care?.healthStatus ?? "unknown"]} />
         </div>
@@ -473,8 +479,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
                   <div className="feeding-detail">
                     <span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>
                     {foodWeight ? <small>{formatWeight(foodWeight, locale)}</small> : null}
-                    <small>{({ unknown: locale === "it" ? "Stato preda non specificato" : "Prey condition unspecified", frozen: locale === "it" ? "Congelata" : "Frozen", thawed: locale === "it" ? "Scongelata" : "Thawed", live: locale === "it" ? "Viva" : "Live" } as Record<string, string>)[getString(entry, "preyState", "unknown")]}</small>
-                    {getString(entry, "inventoryItemId") && <small>{Boolean(entry.inventoryDeducted) ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino · non scaricata" : "Linked to inventory · not deducted")}</small>}
+                    {animal.category === "reptiles" && <>
+                      <small>{({ unknown: locale === "it" ? "Stato preda non specificato" : "Prey condition unspecified", frozen: locale === "it" ? "Congelata" : "Frozen", thawed: locale === "it" ? "Scongelata" : "Thawed", live: locale === "it" ? "Viva" : "Live" } as Record<string, string>)[getString(entry, "preyState", "unknown")]}</small>
+                      {getString(entry, "inventoryItemId") && <small>{Boolean(entry.inventoryDeducted) ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino · non scaricata" : "Linked to inventory · not deducted")}</small>}
+                    </>}
                   </div>
                   {!isArchived && <div className="row-actions">
                     <IconButton label={t("edit")} onClick={() => openFeedingEdit(session, entry)}><Icon name="edit" size={15} /></IconButton>
@@ -493,9 +501,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <WeightGrowthPanel animalId={id} locale={locale} readOnly={isArchived} />
           <RecordList readOnly={isArchived} records={weights.data?.weights ?? []} kind="weight" locale={locale} onEdit={(record) => openRecord("weight", record)} onDelete={(record) => void deleteRecord("weight", record)} />
         </Panel>
-        <Panel><PanelHeader title={t("addShed")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
+        {animal.category === "reptiles" && <Panel><PanelHeader title={t("addShed")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("shed")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
           <RecordList readOnly={isArchived} records={sheds.data?.sheds ?? []} kind="shed" locale={locale} onEdit={(record) => openRecord("shed", record)} onDelete={(record) => void deleteRecord("shed", record)} />
-        </Panel>
+        </Panel>}
         <Panel><PanelHeader title={t("animalNotes")} action={!isArchived ? <Button size="sm" onClick={() => openRecord("note")}><Icon name="plus" size={14} />{t("add")}</Button> : undefined} />
           <RecordList readOnly={isArchived} records={notes.data?.notes ?? []} kind="note" locale={locale} onEdit={(record) => openRecord("note", record)} onDelete={(record) => void deleteRecord("note", record)} />
         </Panel>
@@ -538,7 +546,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       <form className="form-stack" onSubmit={saveHatchlingCare}>
         <Field label={locale === "it" ? "Data prima alimentazione" : "First feeding date"}><Input type="date" value={hatchlingCareForm.firstFeedingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAt: e.target.value })} /></Field>
         <Field label={locale === "it" ? "Prima alimentazione accettata?" : "First feeding accepted?"}><Select value={hatchlingCareForm.firstFeedingAccepted} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstFeedingAccepted: e.target.value })}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="yes">{locale === "it" ? "Sì" : "Yes"}</option><option value="no">{locale === "it" ? "No" : "No"}</option></Select></Field>
-        <Field label={locale === "it" ? "Data prima muta" : "First shed date"}><Input type="date" value={hatchlingCareForm.firstShedAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstShedAt: e.target.value })} /></Field>
+        {animal.category === "reptiles" && <Field label={locale === "it" ? "Data prima muta" : "First shed date"}><Input type="date" value={hatchlingCareForm.firstShedAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, firstShedAt: e.target.value })} /></Field>}
         <Field label={locale === "it" ? "Pronto per cessione dal" : "Ready for rehoming from"}><Input type="date" value={hatchlingCareForm.readyForRehomingAt} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, readyForRehomingAt: e.target.value })} /></Field>
         <Field label={locale === "it" ? "Disponibilità alla cessione" : "Rehoming availability"}><Select value={hatchlingCareForm.availabilityStatus} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, availabilityStatus: e.target.value })}><option value="not_available">{locale === "it" ? "Non disponibile" : "Not available"}</option><option value="available">{locale === "it" ? "Disponibile" : "Available"}</option><option value="reserved">{locale === "it" ? "Riservato" : "Reserved"}</option><option value="transferred">{locale === "it" ? "Ceduto" : "Transferred"}</option></Select></Field>
         <Field label={locale === "it" ? "Stato di salute" : "Health status"}><Select value={hatchlingCareForm.healthStatus} onChange={(e) => setHatchlingCareForm({ ...hatchlingCareForm, healthStatus: e.target.value })}><option value="unknown">{locale === "it" ? "Non valutato" : "Unknown"}</option><option value="healthy">{locale === "it" ? "Regolare" : "Healthy"}</option><option value="monitoring">{locale === "it" ? "Da monitorare" : "Monitoring"}</option><option value="treatment">{locale === "it" ? "In trattamento" : "Under treatment"}</option></Select></Field>
@@ -609,9 +617,12 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Field label={t("foodType")}><Input maxLength={120} value={feedingEditForm.foodType} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input maxLength={120} value={feedingEditForm.foodSize} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodSize: e.target.value })} /></Field>
         <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={feedingEditForm.foodWeightG} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, foodWeightG: e.target.value })} /></Field>
-        <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={feedingEditForm.preyState} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
-        <Field label={locale === "it" ? "Scarica dal magazzino" : "Deduct from inventory"} hint={locale === "it" ? "La giacenza viene scaricata se la preda è offerta (mangiata o rifiutata). Per kg e g la quantità suggerita deriva dal peso della preda." : "Stock is deducted when prey is offered (eaten or refused). For kg and g, the suggested quantity is derived from prey weight."}><Select value={feedingEditForm.inventoryItemId} onChange={(e) => { const selectedItem = preyInventory.data?.items.find((item) => item.id === e.target.value); setFeedingEditForm({ ...feedingEditForm, inventoryItemId: e.target.value, foodType: selectedItem && !feedingEditForm.foodType ? selectedItem.name : feedingEditForm.foodType, inventoryQuantity: selectedItem ? suggestedInventoryQuantity(selectedItem.unit, feedingEditForm.foodWeightG ? weightToGrams(feedingEditForm.foodWeightG) : null) : "" }); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
-        {feedingEditForm.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={feedingEditForm.inventoryQuantity} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, inventoryQuantity: e.target.value })} /></Field>}
+        {animal.category === "reptiles" && <>
+          <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={feedingEditForm.preyState} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+          <Field label={locale === "it" ? "Scarica dal magazzino" : "Deduct from inventory"} hint={locale === "it" ? "La giacenza viene scaricata se la preda è offerta (mangiata o rifiutata). Per kg e g la quantità suggerita deriva dal peso della preda." : "Stock is deducted when prey is offered (eaten or refused). For kg and g, the suggested quantity is derived from prey weight."}><Select value={feedingEditForm.inventoryItemId} onChange={(e) => { const selectedItem = preyInventory.data?.items.find((item) => item.id === e.target.value); setFeedingEditForm({ ...feedingEditForm, inventoryItemId: e.target.value, foodType: selectedItem && !feedingEditForm.foodType ? selectedItem.name : feedingEditForm.foodType, inventoryQuantity: selectedItem ? suggestedInventoryQuantity(selectedItem.unit, feedingEditForm.foodWeightG ? weightToGrams(feedingEditForm.foodWeightG) : null) : "" }); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+          {feedingEditForm.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={feedingEditForm.inventoryQuantity} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, inventoryQuantity: e.target.value })} /></Field>}
+        </>}
+
         <Field label={t("notes")}><Textarea rows={3} value={feedingEditForm.notes} onChange={(e) => setFeedingEditForm({ ...feedingEditForm, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setFeedingEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={feedingBusy}>{feedingBusy ? t("loading") : t("save")}</Button></div>
       </form>

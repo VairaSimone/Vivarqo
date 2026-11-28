@@ -32,6 +32,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const [animalPage, setAnimalPage] = useState(1);
   const [selected, setSelected] = useState<string[]>(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
   const [selectedNames, setSelectedNames] = useState<Record<string, string>>({});
+  const [selectedCategories, setSelectedCategories] = useState<Record<string, string>>({});
   const [entries, setEntries] = useState<Record<string, { outcome: string; foodType: string; foodSize: string; foodWeightG: string; preyState: string; inventoryItemId: string; inventoryQuantity: string; notes: string }>>({});
   const [editEntry, setEditEntry] = useState<FeedingEntryDto | null>(null);
   const [editData, setEditData] = useState({ outcome: "ate", foodType: "", foodSize: "", foodWeightG: "", preyState: "unknown", inventoryItemId: "", inventoryQuantity: "", notes: "" });
@@ -42,7 +43,11 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
   const animalsResource = useResource<{ animals: AnimalOption[]; pagination: { total: number; page: number; totalPages: number } }>(
     modal ? "/animals" + queryString({ page: animalPage, pageSize: 25, q: animalSearch, species: animalSpecies, location: animalLocation, status: "active", sort: "name" }) : null
   );
-  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(modal || editEntry ? "/inventory/items?page=1&pageSize=100&category=food" : null);
+  const selectedHasReptiles = selected.some((id) => selectedCategories[id] === "reptiles");
+  const editingReptileEntry = getString(editEntry?.animal, "category") === "reptiles";
+  const preyInventory = useResource<{ items: Array<{ id: string; name: string; unit: string; quantityOnHand: string | number }> }>(
+    (modal && selectedHasReptiles) || (Boolean(editEntry) && editingReptileEntry) ? "/inventory/items?page=1&pageSize=100&category=food" : null
+  );
 
   useEffect(() => { if (animalSearch) setAnimalPage(1); }, [animalSearch]);
 
@@ -50,6 +55,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
     if (queryParams.get("create") === "1" || queryParams.get("bulk") === "1") {
       setBulk(queryParams.get("bulk") === "1" || (queryParams.get("create") === "1" && !queryParams.get("animalId")));
       setSelected(queryParams.get("animalId") ? [queryParams.get("animalId")!] : []);
+      setSelectedCategories({});
       setPerformedAt(localDateTimeValue(new Date(), timezone));
       setModal(true);
     }
@@ -57,15 +63,27 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
 
   function openNew(isBulk: boolean) {
     setBulk(isBulk); setModal(true); setError(""); setFormDirty(false); setSelected(animalId ? [animalId] : []);
-    setEntries({}); setSelectedNames({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalSpecies(""); setAnimalLocation(""); setAnimalPage(1);
+    setEntries({}); setSelectedNames({}); setSelectedCategories({}); setPerformedAt(localDateTimeValue(new Date(), timezone)); setSessionNotes(""); setAnimalSearch(""); setAnimalSpecies(""); setAnimalLocation(""); setAnimalPage(1);
   }
 
   function toggleAnimal(id: string) {
     setFormDirty(true);
     setError("");
     const animal = animalResults.find((item) => item.id === id);
-    if (animal) setSelectedNames((current) => ({ ...current, [id]: animal.name }));
-    setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+    if (selected.includes(id)) {
+      setSelected((current) => current.filter((value) => value !== id));
+      setSelectedCategories((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    if (animal) {
+      setSelectedNames((current) => ({ ...current, [id]: animal.name }));
+      setSelectedCategories((current) => ({ ...current, [id]: animal.category }));
+    }
+    setSelected((current) => current.includes(id) ? current : [...current, id]);
   }
 
   function updateEntry(id: string, field: string, value: string) {
@@ -97,9 +115,11 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
             foodType: entry.foodType || null,
             foodSize: entry.foodSize || null,
             foodWeightG: entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null,
-            preyState: entry.preyState || "unknown",
-            inventoryItemId: entry.inventoryItemId || null,
-            inventoryQuantity: entry.inventoryItemId && entry.inventoryQuantity ? Number(entry.inventoryQuantity) : null,
+            ...(selectedCategories[id] === "reptiles" ? {
+              preyState: entry.preyState || "unknown",
+              inventoryItemId: entry.inventoryItemId || null,
+              inventoryQuantity: entry.inventoryItemId && entry.inventoryQuantity ? Number(entry.inventoryQuantity) : null,
+            } : {}),
             notes: entry.notes || null
           };
         })
@@ -121,8 +141,12 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
     const payload = {
       outcome: editData.outcome, foodType: editData.foodType || null, foodSize: editData.foodSize || null,
       foodWeightG: editData.foodWeightG ? weightToGrams(editData.foodWeightG) : null,
-      preyState: editData.preyState, inventoryItemId: editData.inventoryItemId || null,
-      inventoryQuantity: editData.inventoryItemId && editData.inventoryQuantity ? Number(editData.inventoryQuantity) : null, notes: editData.notes || null
+      ...(editingReptileEntry ? {
+        preyState: editData.preyState,
+        inventoryItemId: editData.inventoryItemId || null,
+        inventoryQuantity: editData.inventoryItemId && editData.inventoryQuantity ? Number(editData.inventoryQuantity) : null,
+      } : {}),
+      notes: editData.notes || null
     };
     try { await api.patch(`/feeding-entries/${getString(editEntry, "id")}`, payload); setEditEntry(null); resource.reload(); show(t("saveSuccess")); }
     catch (reason) { setError(reason instanceof ApiError ? reason.message : t("operationFailed")); }
@@ -137,6 +161,29 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
 
   const animalResults = animalsResource.data?.animals ?? [];
   const totalPagesAnimals = animalsResource.data?.pagination?.totalPages ?? 1;
+  const selectedKey = selected.join("|");
+  useEffect(() => {
+    if (!modal || !selectedKey) return;
+    let active = true;
+    const missingIds = selectedKey.split("|").filter(Boolean).filter((id) => !selectedCategories[id]);
+    if (missingIds.length === 0) return;
+    void Promise.all(missingIds.map(async (id) => {
+      try {
+        const result = await api.get<{ animal: AnimalOption }>(`/animals/${encodeURIComponent(id)}`);
+        return result.animal;
+      } catch {
+        return null;
+      }
+    })).then((resolved) => {
+      if (!active) return;
+      const found = resolved.filter((animal): animal is AnimalOption => Boolean(animal));
+      if (found.length) setSelectedCategories((current) => ({
+        ...current,
+        ...Object.fromEntries(found.map((animal) => [animal.id, animal.category])),
+      }));
+    });
+    return () => { active = false; };
+  }, [modal, selectedKey, path, selectedCategories]);
   const sessions = resource.data?.sessions ?? [];
   const pager = resource.data?.pagination;
 
@@ -159,7 +206,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
               const outcomeValue = getString(entry, "outcome");
               return <div className="feeding-entry" key={getString(entry, "id")}>
                 <div className="animal-mini"><span className="animal-avatar"><Icon name="snake" size={14} /></span><span><strong>{getString(animal, "name") || t("noRecords")}</strong><small>{getString(animal, "species")}</small></span></div>
-                <div className="feeding-detail"><Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge><span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>{entry.foodWeightG ? <small>{formatWeight(String(entry.foodWeightG), locale)}</small> : null}<small>{({ unknown: locale === "it" ? "Stato non specificato" : "Condition unspecified", frozen: locale === "it" ? "Congelata" : "Frozen", thawed: locale === "it" ? "Scongelata" : "Thawed", live: locale === "it" ? "Viva" : "Live" } as Record<string, string>)[getString(entry, "preyState", "unknown")]}</small>{Boolean(entry.inventoryItemId) && <small>{Boolean(entry.inventoryDeducted) ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino" : "Linked to inventory")}</small>}</div>
+                <div className="feeding-detail"><Badge tone={outcomeValue === "ate" ? "success" : outcomeValue === "refused" ? "warning" : "neutral"}>{t(outcomeValue === "unknown" ? "feedingUnknown" : outcomeValue)}</Badge><span>{getString(entry, "foodType") || "—"} · {getString(entry, "foodSize") || "—"}</span>{entry.foodWeightG ? <small>{formatWeight(String(entry.foodWeightG), locale)}</small> : null}{getString(animal, "category") === "reptiles" && <><small>{({ unknown: locale === "it" ? "Stato non specificato" : "Condition unspecified", frozen: locale === "it" ? "Congelata" : "Frozen", thawed: locale === "it" ? "Scongelata" : "Thawed", live: locale === "it" ? "Viva" : "Live" } as Record<string, string>)[getString(entry, "preyState", "unknown")]}</small>{Boolean(entry.inventoryItemId) && <small>{Boolean(entry.inventoryDeducted) ? (locale === "it" ? "Scaricata dal magazzino" : "Deducted from inventory") : (locale === "it" ? "Collegata al magazzino" : "Linked to inventory")}</small>}</>}</div>
                 <div className="row-actions"><IconButton label={t("edit")} onClick={() => {
                   setError("");
                   const foodWeightValue = getString(entry, "foodWeightG");
@@ -198,6 +245,7 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
           <Button type="button" size="sm" variant="secondary" disabled={!animalResults.length} onClick={() => {
             setSelected((current) => [...new Set([...current, ...animalResults.map((animal) => animal.id)])]);
             setSelectedNames((current) => ({ ...current, ...Object.fromEntries(animalResults.map((animal) => [animal.id, animal.name])) }));
+            setSelectedCategories((current) => ({ ...current, ...Object.fromEntries(animalResults.map((animal) => [animal.id, animal.category])) }));
             setFormDirty(true);
           }}>{locale === "it" ? "Seleziona pagina" : "Select page"}</Button>
         </div>}
@@ -217,9 +265,11 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
                 <Field label={t("foodType")}><Input value={entry.foodType} onChange={(e) => updateEntry(id, "foodType", e.target.value)} /></Field>
                 <Field label={t("foodSize")}><Input value={entry.foodSize} onChange={(e) => updateEntry(id, "foodSize", e.target.value)} /></Field>
                 <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={entry.foodWeightG} onChange={(e) => updateEntry(id, "foodWeightG", e.target.value)} /></Field>
-                <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={entry.preyState} onChange={(e) => updateEntry(id, "preyState", e.target.value)}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
-                <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"} hint={locale === "it" ? "La giacenza viene scaricata se la preda è offerta (mangiata o rifiutata). Per kg e g la quantità suggerita deriva dal peso della preda." : "Stock is deducted when prey is offered (eaten or refused). For kg and g, the suggested quantity is derived from prey weight."}><Select value={entry.inventoryItemId} onChange={(e) => { const selectedItem = preyInventory.data?.items.find((item) => item.id === e.target.value); updateEntry(id, "inventoryItemId", e.target.value); updateEntry(id, "inventoryQuantity", selectedItem ? suggestedInventoryQuantity(selectedItem.unit, entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null) : ""); if (selectedItem && !entry.foodType) updateEntry(id, "foodType", selectedItem.name); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
-                {entry.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={entry.inventoryQuantity} onChange={(e) => updateEntry(id, "inventoryQuantity", e.target.value)} /></Field>}
+                {selectedCategories[id] === "reptiles" && <>
+                  <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={entry.preyState} onChange={(e) => updateEntry(id, "preyState", e.target.value)}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+                  <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"} hint={locale === "it" ? "La giacenza viene scaricata se la preda è offerta (mangiata o rifiutata). Per kg e g la quantità suggerita deriva dal peso della preda." : "Stock is deducted when prey is offered (eaten or refused). For kg and g, the suggested quantity is derived from prey weight."}><Select value={entry.inventoryItemId} onChange={(e) => { const selectedItem = preyInventory.data?.items.find((item) => item.id === e.target.value); updateEntry(id, "inventoryItemId", e.target.value); updateEntry(id, "inventoryQuantity", selectedItem ? suggestedInventoryQuantity(selectedItem.unit, entry.foodWeightG ? weightToGrams(entry.foodWeightG) : null) : ""); if (selectedItem && !entry.foodType) updateEntry(id, "foodType", selectedItem.name); }}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+                  {entry.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={entry.inventoryQuantity} onChange={(e) => updateEntry(id, "inventoryQuantity", e.target.value)} /></Field>}
+                </>}
               </div>
             </div>;
           })}
@@ -234,9 +284,11 @@ export function CarePage({ locale, path, timezone }: { locale: Locale; path: str
         <Field label={t("foodType")}><Input value={editData.foodType} onChange={(e) => setEditData({ ...editData, foodType: e.target.value })} /></Field>
         <Field label={t("foodSize")}><Input value={editData.foodSize} onChange={(e) => setEditData({ ...editData, foodSize: e.target.value })} /></Field>
         <Field label={`${t("foodWeight")} (${weightUnitLabel()})`}><Input type="number" min="0.01" step="0.01" value={editData.foodWeightG} onChange={(e) => setEditData({ ...editData, foodWeightG: e.target.value })} /></Field>
-        <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={editData.preyState} onChange={(e) => setEditData({ ...editData, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
-        <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={editData.inventoryItemId} onChange={(e) => setEditData({ ...editData, inventoryItemId: e.target.value, inventoryQuantity: e.target.value ? (editData.inventoryQuantity || "1") : "" })}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
-        {editData.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={editData.inventoryQuantity} onChange={(e) => setEditData({ ...editData, inventoryQuantity: e.target.value })} /></Field>}
+        {editingReptileEntry && <>
+          <Field label={locale === "it" ? "Stato della preda" : "Prey condition"}><Select value={editData.preyState} onChange={(e) => setEditData({ ...editData, preyState: e.target.value })}><option value="unknown">{locale === "it" ? "Non specificato" : "Unspecified"}</option><option value="frozen">{locale === "it" ? "Congelata" : "Frozen"}</option><option value="thawed">{locale === "it" ? "Scongelata" : "Thawed"}</option><option value="live">{locale === "it" ? "Viva" : "Live"}</option></Select></Field>
+          <Field label={locale === "it" ? "Collega preda all'inventario" : "Link prey to inventory"}><Select value={editData.inventoryItemId} onChange={(e) => setEditData({ ...editData, inventoryItemId: e.target.value, inventoryQuantity: e.target.value ? (editData.inventoryQuantity || "1") : "" })}><option value="">{locale === "it" ? "Nessun collegamento" : "No inventory link"}</option>{(preyInventory.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.quantityOnHand} {item.unit}</option>)}</Select></Field>
+          {editData.inventoryItemId && <Field label={locale === "it" ? "Quantità da scaricare" : "Quantity to deduct"}><Input type="number" min="0.001" step="0.001" value={editData.inventoryQuantity} onChange={(e) => setEditData({ ...editData, inventoryQuantity: e.target.value })} /></Field>}
+        </>}
         <Field label={t("notes")}><Textarea rows={3} value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></Field>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setEditEntry(null)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{t("save")}</Button></div>
       </form>

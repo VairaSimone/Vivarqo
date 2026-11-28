@@ -175,7 +175,7 @@ export function createCareRouter() {
             where: requestedAnimalId
               ? { animalId: requestedAnimalId, animal: { is: { userId: auth.userId } } }
               : { animal: { is: { userId: auth.userId } } },
-            include: { animal: { select: { id: true, name: true, identifier: true, species: true, status: true } } },
+            include: { animal: { select: { id: true, name: true, identifier: true, species: true, category: true, status: true } } },
           },
         },
       }),
@@ -305,7 +305,7 @@ export function createCareRouter() {
         include: {
           entries: {
             where: { animal: { is: { userId: auth.userId } } },
-            include: { animal: { select: { id: true, name: true, identifier: true, species: true } } },
+            include: { animal: { select: { id: true, name: true, identifier: true, species: true, category: true } } },
           },
         },
       });
@@ -321,7 +321,7 @@ export function createCareRouter() {
       include: {
         entries: {
           where: { animal: { is: { userId: auth.userId } } },
-          include: { animal: { select: { id: true, name: true, identifier: true, species: true } } },
+          include: { animal: { select: { id: true, name: true, identifier: true, species: true, category: true } } },
         },
       },
     });

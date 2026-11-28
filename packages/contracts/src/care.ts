@@ -23,6 +23,7 @@ export const feedingEntryResponseSchema = z.object({
     name: z.string(),
     identifier: z.string().nullable(),
     species: z.string(),
+    category: z.string().optional(),
     status: z.string(),
   }).passthrough().nullable().optional(),
 }).passthrough();

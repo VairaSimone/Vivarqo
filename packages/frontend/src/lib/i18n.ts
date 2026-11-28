@@ -189,8 +189,8 @@ const messages = {
     status_preview: "Anteprima",
     accountDeleted: "Account eliminato.",
     bulkCreateAnimals: "Crea animali multipli", bulkAnimalRows: "Animali da creare",
-    bulkInputHint: "Una riga per animale: Nome | Specie | Sesso (male/female/unknown) | Morph | Identificativo. Gli ultimi tre campi sono facoltativi.",
-    bulkFormatError: "Ogni riga deve contenere almeno nome e specie, separati dal carattere |.",
+    bulkInputHint: "Una riga per animale. Formato storico (2-5 campi): Nome | Specie | Sesso | Morfologia | Identificativo; usa la categoria predefinita. Formato completo (6 campi): Nome | Specie | Categoria (reptiles/fish/birds/dogs_cats) | Sesso | Morfologia | Identificativo.",
+    bulkFormatError: "Ogni riga deve contenere nome e specie. Usa 2-5 campi nel formato storico oppure 6 campi includendo una categoria abilitata.",
     bulkAnimalsCreated: "{count} animali creati.", sort: "Ordinamento", recentlyUpdated: "Modificati di recente", recentlyCreated: "Creati di recente",
     reference: "Riferimento"
   },
@@ -382,8 +382,8 @@ const messages = {
     status_preview: "Preview",
     accountDeleted: "Account deleted.",
     bulkCreateAnimals: "Create multiple animals", bulkAnimalRows: "Animals to create",
-    bulkInputHint: "One animal per line: Name | Species | Sex (male/female/unknown) | Morph | Identifier. The last three fields are optional.",
-    bulkFormatError: "Each row must include at least a name and a species, separated by the | character.",
+    bulkInputHint: "One animal per line. Legacy format (2-5 columns): Name | Species | Sex | Morph | Identifier; the default category is used. Full format (6 columns): Name | Species | Category (reptiles/fish/birds/dogs_cats) | Sex | Morph | Identifier.",
+    bulkFormatError: "Each row must include a name and species. Use 2-5 columns in the legacy format or 6 columns including an enabled category.",
     bulkAnimalsCreated: "{count} animals created.", sort: "Sort", recentlyUpdated: "Recently updated", recentlyCreated: "Recently created",
     reference: "Reference",
   }

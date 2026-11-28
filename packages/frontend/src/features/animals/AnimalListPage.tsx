@@ -39,6 +39,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [modal, setModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [bulkDefaultCategory, setBulkDefaultCategory] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkError, setBulkError] = useState("");
   const [weightQuickModal, setWeightQuickModal] = useState(false);
@@ -75,6 +76,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         if (!active) return;
         const categories = context.categories.filter((value) => ["reptiles", "fish", "birds", "dogs_cats"].includes(value));
         setEnabledCategories(categories);
+        setBulkDefaultCategory((current) => current && categories.includes(current) ? current : categories[0] ?? "");
         setCategory((current) => current && categories.includes(current) ? current : "");
         setForm((current) => ({ ...current, category: current.category && categories.includes(current.category) ? current.category : categories[0] ?? "" }));
       })
@@ -372,13 +374,31 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
       <form className="form-stack" onSubmit={async (event) => {
         event.preventDefault(); setBulkBusy(true); setBulkError("");
         const parsed = bulkText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => line.split("|").map((value) => value.trim()));
-        if (parsed.some((parts) => parts.length < 2 || !parts[0] || !parts[1])) {
-          setBulkError(t("bulkFormatError")); setBulkBusy(false); return;
+        const invalidRow = parsed.findIndex((parts) => {
+          if (parts.length < 2 || parts.length > 6 || !parts[0] || !parts[1]) return true;
+          const rowCategory = parts.length === 6 ? parts[2] : bulkDefaultCategory;
+          return !enabledCategories.includes(rowCategory);
+        });
+        if (invalidRow >= 0) {
+          setBulkError(locale === "it"
+            ? `Riga ${invalidRow + 1} non valida: controlla il numero di campi e che la categoria sia abilitata.`
+            : `Row ${invalidRow + 1} is invalid: check the number of columns and make sure its category is enabled.`);
+          setBulkBusy(false);
+          return;
         }
-        const payload = parsed.map(([name, animalSpecies, animalSex, animalMorph, identifier]) => ({
-          name, species: animalSpecies, category: enabledCategories[0] ?? "", domainProfile: {}, sex: animalSex || "unknown",
-          morph: animalMorph || null, identifier: identifier || null
-        }));
+        const payload = parsed.map((parts) => {
+          const [name, animalSpecies, third, fourth, fifth, sixth] = parts;
+          const hasCategory = parts.length === 6;
+          return {
+            name,
+            species: animalSpecies,
+            category: hasCategory ? third : bulkDefaultCategory,
+            domainProfile: {},
+            sex: (hasCategory ? fourth : third) || "unknown",
+            morph: (hasCategory ? fifth : fourth) || null,
+            identifier: (hasCategory ? sixth : fifth) || null,
+          };
+        });
         try {
           await api.post("/animals/bulk", { animals: payload });
           setBulkModal(false); setBulkText(""); resource.reload(); show(t("bulkAnimalsCreated", { count: payload.length }));
@@ -386,7 +406,12 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         finally { setBulkBusy(false); }
       }}>
         {bulkError && <Alert tone="danger">{bulkError}</Alert>}
-        <Field label={t("bulkAnimalRows")} hint={t("bulkInputHint")}><Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Nala | Python regius | female | Pastel | A-001" /></Field>
+        <Field label={locale === "it" ? "Categoria predefinita per il formato storico" : "Default category for legacy rows"}>
+          <Select value={bulkDefaultCategory} onChange={(e) => setBulkDefaultCategory(e.target.value)}>
+            {enabledCategories.map((value) => <option key={value} value={value}>{value === "dogs_cats" ? (locale === "it" ? "Cani e gatti" : "Dogs and cats") : value === "reptiles" ? (locale === "it" ? "Rettili" : "Reptiles") : value === "fish" ? (locale === "it" ? "Pesci" : "Fish") : (locale === "it" ? "Uccelli" : "Birds")}</option>)}
+          </Select>
+        </Field>
+        <Field label={t("bulkAnimalRows")} hint={t("bulkInputHint")}><Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Nala | Python regius | reptiles | female | Pastel | A-001" /></Field>
         <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setBulkModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={bulkBusy || enabledCategories.length === 0}>{bulkBusy ? t("loading") : t("create")}</Button></div>
       </form>
     </Modal>}

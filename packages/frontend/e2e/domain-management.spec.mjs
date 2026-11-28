@@ -77,6 +77,65 @@ test("animal list supports multi-selection and atomic bulk weight records", asyn
   await expect(page.getByRole("button", { name: "Registra su 2 animali" })).toHaveCount(0);
 });
 
+
+test("bulk animal creation respects each row category", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+  await page.goto("/animals");
+  await page.getByRole("button", { name: "Crea animali multipli" }).click();
+
+  const stamp = Date.now();
+  const rows = [
+    "E2E Bulk reptile " + stamp + " | Python regius | reptiles | female | Pastel |",
+    "E2E Bulk fish " + stamp + " | Betta splendens | fish | unknown | |"
+  ].join("\n");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Animali da creare").fill(rows);
+
+  const requestPromise = page.waitForRequest((request) =>
+    request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/animals/bulk"
+  );
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/v1/animals/bulk"
+  );
+  await dialog.getByRole("button", { name: "Crea", exact: true }).click();
+  const request = await requestPromise;
+  const response = await responsePromise;
+  expect(response.status(), await response.text()).toBe(201);
+  expect(request.postDataJSON().animals.map((animal) => animal.category)).toEqual(["reptiles", "fish"]);
+});
+
+test("companion animals do not expose reptile prey fields or shed actions", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+  const dog = await createAnimal(page, "E2E Companion care " + Date.now());
+
+  await page.goto("/feeding?create=1&animalId=" + encodeURIComponent(dog.id));
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Stato della preda", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("Collega preda all'inventario", { exact: true })).toHaveCount(0);
+
+  const requestPromise = page.waitForRequest((request) =>
+    request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/feeding-sessions"
+  );
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/v1/feeding-sessions"
+  );
+  await dialog.getByRole("button", { name: "Registra alimentazione", exact: true }).click();
+  const request = await requestPromise;
+  const response = await responsePromise;
+  expect(response.status(), await response.text()).toBe(201);
+  const entry = request.postDataJSON().entries[0];
+  expect(entry).not.toHaveProperty("preyState");
+  expect(entry).not.toHaveProperty("inventoryItemId");
+
+  await page.goto("/animals/" + encodeURIComponent(dog.id));
+  await expect(page.getByRole("button", { name: "Registra muta", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Storico cure" }).click();
+  await expect(page.getByRole("heading", { name: "Registra muta", exact: true })).toHaveCount(0);
+});
+
 test("aquariums, aviaries and companion-care records support editing and archival", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page);
