@@ -122,7 +122,7 @@ test("companion animals do not expose reptile prey fields or shed actions", asyn
   const responsePromise = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/v1/feeding-sessions"
   );
-  await dialog.getByRole("button", { name: "Registra alimentazione", exact: true }).click();
+  await dialog.getByRole("button", { name: "Registra sessione", exact: true }).click();
   const request = await requestPromise;
   const response = await responsePromise;
   expect(response.status(), await response.text()).toBe(201);
