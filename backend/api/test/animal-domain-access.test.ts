@@ -11,7 +11,6 @@ describe("animal domain route category coverage", () => {
     ["/aviaries", "birds"],
     ["/aquariums", "fish"],
     ["/companion-care", "dogs_cats"],
-    ["/reproduction-cycles", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/hatchling-care", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/genetic-traits", "reptiles"],
     ["/animals/00000000-0000-4000-8000-000000000001/pedigree", "reptiles"],
@@ -25,5 +24,8 @@ describe("animal domain route category coverage", () => {
   it("does not apply an animal category gate to unrelated personal routes", () => {
     expect(categoryForAnimalDomainPath("/notifications")).toBeNull();
     expect(categoryForAnimalDomainPath("/finance/entries")).toBeNull();
+    // Cycle routes resolve their enabled category from their actual parent animals.
+    expect(categoryForAnimalDomainPath("/reproduction-cycles")).toBeNull();
+    expect(categoryForAnimalDomainPath("/reproduction-cycles/00000000-0000-4000-8000-000000000001/clutches")).toBeNull();
   });
 });
