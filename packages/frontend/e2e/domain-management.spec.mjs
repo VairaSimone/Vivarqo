@@ -258,8 +258,8 @@ test("dogs and cats can track mating, pregnancy and litter outcomes", async ({ p
   const maleSelect = page.getByLabel("Maschio / padre");
   await expect(femaleSelect.locator(`option[value="${female.id}"]`)).toHaveCount(1);
   await expect(maleSelect.locator(`option[value="${male.id}"]`)).toHaveCount(1);
-  await expect(maleSelect.locator(`option[value="${differentSpeciesMale.id}"]`)).toHaveCount(0);
   await femaleSelect.selectOption(female.id);
+  await expect(maleSelect.locator(`option[value="${differentSpeciesMale.id}"]`)).toHaveCount(0);
   await maleSelect.selectOption(male.id);
   await page.getByLabel("Data accoppiamento").fill("2026-11-20");
   await page.getByLabel("Stato").selectOption("pregnant");

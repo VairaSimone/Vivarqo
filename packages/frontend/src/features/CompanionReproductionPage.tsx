@@ -61,6 +61,14 @@ export function CompanionReproductionPage({ locale }: { locale: Locale }) {
   const records = useResource<{ records: ReproductionRecord[] }>("/companion-reproductions");
   const females = useResource<{ animals: AnimalOption[] }>("/animals?category=dogs_cats&sex=female&status=active&page=1&pageSize=100");
   const males = useResource<{ animals: AnimalOption[] }>("/animals?category=dogs_cats&sex=male&status=active&page=1&pageSize=100");
+  const selectedFemale = females.data?.animals.find((animal) => animal.id === form.femaleAnimalId);
+  const selectedMale = males.data?.animals.find((animal) => animal.id === form.maleAnimalId);
+  const sameSpecies = (first: string, second: string) =>
+    first.trim().toLocaleLowerCase("it-IT") === second.trim().toLocaleLowerCase("it-IT");
+  const femaleOptions = (females.data?.animals ?? []).filter((animal) =>
+    !selectedMale || sameSpecies(animal.species, selectedMale.species));
+  const maleOptions = (males.data?.animals ?? []).filter((animal) =>
+    !selectedFemale || sameSpecies(animal.species, selectedFemale.species));
 
   function editRecord(record: ReproductionRecord) {
     setEditing(record.id);
@@ -156,15 +164,33 @@ export function CompanionReproductionPage({ locale }: { locale: Locale }) {
       <form className="form-stack" onSubmit={save}>
         <div className="form-grid">
           <Field label={it ? "Femmina / madre" : "Female / mother"}>
-            <Select required disabled={Boolean(editing)} value={form.femaleAnimalId} onChange={(event) => setForm((current) => ({ ...current, femaleAnimalId: event.target.value }))}>
+            <Select required disabled={Boolean(editing)} value={form.femaleAnimalId} onChange={(event) => {
+              const nextFemale = females.data?.animals.find((animal) => animal.id === event.target.value);
+              setForm((current) => ({
+                ...current,
+                femaleAnimalId: event.target.value,
+                maleAnimalId: current.maleAnimalId && nextFemale &&
+                  !sameSpecies(males.data?.animals.find((animal) => animal.id === current.maleAnimalId)?.species ?? "", nextFemale.species)
+                  ? "" : current.maleAnimalId,
+              }));
+            }}>
               <option value="">{it ? "Seleziona femmina" : "Select female"}</option>
-              {(females.data?.animals ?? []).map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}
+              {femaleOptions.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}
             </Select>
           </Field>
           <Field label={it ? "Maschio / padre" : "Male / father"}>
-            <Select required disabled={Boolean(editing)} value={form.maleAnimalId} onChange={(event) => setForm((current) => ({ ...current, maleAnimalId: event.target.value }))}>
+            <Select required disabled={Boolean(editing)} value={form.maleAnimalId} onChange={(event) => {
+              const nextMale = males.data?.animals.find((animal) => animal.id === event.target.value);
+              setForm((current) => ({
+                ...current,
+                maleAnimalId: event.target.value,
+                femaleAnimalId: current.femaleAnimalId && nextMale &&
+                  !sameSpecies(females.data?.animals.find((animal) => animal.id === current.femaleAnimalId)?.species ?? "", nextMale.species)
+                  ? "" : current.femaleAnimalId,
+              }));
+            }}>
               <option value="">{it ? "Seleziona maschio" : "Select male"}</option>
-              {(males.data?.animals ?? []).map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}
+              {maleOptions.map((animal) => <option key={animal.id} value={animal.id}>{animal.name} · {animal.species}</option>)}
             </Select>
           </Field>
           <Field label={it ? "Data accoppiamento" : "Mating date"}>
