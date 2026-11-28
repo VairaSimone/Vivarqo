@@ -274,7 +274,7 @@ export function createAnimalRouter() {
       auth.userId,
       input.motherAnimalId !== undefined ? input.motherAnimalId : existing.motherAnimalId,
       input.fatherAnimalId !== undefined ? input.fatherAnimalId : existing.fatherAnimalId,
-      resultingCategory,
+      existing.category,
       resultingSpecies,
       id,
     );
