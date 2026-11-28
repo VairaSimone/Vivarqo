@@ -345,11 +345,11 @@ function parseExpectedSchema(): ExpectedSchema {
   // historical declarations falsely treats intentionally removed constraints
   // as current schema requirements.
   const constraintChanges = [
-    ...[...allSql.matchAll(/^\\s*CONSTRAINT\\s+"?([A-Za-z_]\\w*)"?\\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\\b/gim)]
+    ...[...allSql.matchAll(/^\s*CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)]
       .map((match) => ({ index: match.index!, name: match[1]!, action: "add" as const })),
-    ...[...allSql.matchAll(/^\\s*ADD\\s+CONSTRAINT\\s+"?([A-Za-z_]\\w*)"?\\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\\b/gim)]
+    ...[...allSql.matchAll(/^\s*ADD\s+CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)]
       .map((match) => ({ index: match.index!, name: match[1]!, action: "add" as const })),
-    ...[...allSql.matchAll(/\\bDROP\\s+CONSTRAINT(?:\\s+IF\\s+EXISTS)?\\s+"?([A-Za-z_]\\w*)"?/gim)]
+    ...[...allSql.matchAll(/\bDROP\s+CONSTRAINT(?:\s+IF\s+EXISTS)?\s+"?([A-Za-z_]\w*)"?/gim)]
       .map((match) => ({ index: match.index!, name: match[1]!, action: "drop" as const })),
   ].sort((left, right) => left.index - right.index);
   const constraints = new Set<string>();
