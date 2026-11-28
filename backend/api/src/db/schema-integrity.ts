@@ -340,10 +340,23 @@ function parseExpectedSchema(): ExpectedSchema {
     }
   }
 
-  const constraints = [
-    ...[...allSql.matchAll(/^\s*CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)].map((match) => match[1]!),
-    ...[...allSql.matchAll(/^\s*ADD\s+CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)].map((match) => match[1]!),
-  ];
+  // Reconstruct the final constraint set in migration order, applying both
+  // declarations and later DROP CONSTRAINT statements. Looking only at all
+  // historical declarations falsely treats intentionally removed constraints
+  // as current schema requirements.
+  const constraintChanges = [
+    ...[...allSql.matchAll(/^\s*CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)]
+      .map((match) => ({ index: match.index!, name: match[1]!, action: "add" as const })),
+    ...[...allSql.matchAll(/^\s*ADD\s+CONSTRAINT\s+"?([A-Za-z_]\w*)"?\s+(?:PRIMARY KEY|UNIQUE|FOREIGN KEY|CHECK)\b/gim)]
+      .map((match) => ({ index: match.index!, name: match[1]!, action: "add" as const })),
+    ...[...allSql.matchAll(/\bDROP\s+CONSTRAINT(?:\s+IF\s+EXISTS)?\s+"?([A-Za-z_]\w*)"?/gim)]
+      .map((match) => ({ index: match.index!, name: match[1]!, action: "drop" as const })),
+  ].sort((left, right) => left.index - right.index);
+  const constraints = new Set<string>();
+  for (const change of constraintChanges) {
+    if (change.action === "add") constraints.add(change.name);
+    else constraints.delete(change.name);
+  }
   for (const match of modelBlocks) {
     const body = match[2]!;
     const tableName = body.match(/^\s*@@map\("([^"]+)"\)/m)?.[1];
@@ -351,17 +364,17 @@ function parseExpectedSchema(): ExpectedSchema {
     const compositePrimaryKey = body.match(/@@id\([^\n]*map:\s*"([^"]+)"/)?.[1];
     if (compositePrimaryKey) {
       indexes.set(compositePrimaryKey, { name: compositePrimaryKey, unique: true });
-      constraints.push(compositePrimaryKey);
+      constraints.add(compositePrimaryKey);
     } else if (/@id\b/.test(body)) {
       indexes.set(tableName + "_pkey", { name: tableName + "_pkey", unique: true });
-      constraints.push(tableName + "_pkey");
+      constraints.add(tableName + "_pkey");
     }
   }
 
   return {
     models,
     indexes: [...indexes.values()],
-    constraints: unique(constraints),
+    constraints: [...constraints],
     triggers: unique([...allSql.matchAll(/CREATE\s+TRIGGER\s+"?([A-Za-z_]\w*)"?/gi)].map((match) => match[1]!)),
     functions: unique([...allSql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+"?([A-Za-z_]\w*)"?/gi)].map((match) => match[1]!)),
     migrations: migrations.map((migration) => migration.name),

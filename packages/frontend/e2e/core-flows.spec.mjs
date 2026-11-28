@@ -88,7 +88,7 @@ test("WCAG 2.2 AA automated accessibility and keyboard interaction baseline", as
 
   // Modal naming, focus wrapping, Escape handling and focus restoration.
   await page.goto("/animals");
-  const createAnimalTrigger = page.getByRole("button", { name: "Nuovo animale" });
+  const createAnimalTrigger = page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" });
   await createAnimalTrigger.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
@@ -239,7 +239,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
 
   const animalName = "E2E Python Regius";
   await page.goto("/animals");
-  const createAnimalButton = page.getByRole("button", { name: "Nuovo animale" });
+  const createAnimalButton = page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" });
   await createAnimalButton.click();
   const closeDialogButton = page.getByRole("button", { name: "Chiudi" });
   const saveAnimalButton = page.getByRole("button", { name: "Salva modifiche" });
@@ -310,7 +310,7 @@ test("responsive fixture: create an animal for detail-route coverage", async ({ 
   await signIn(page, owner);
   const animalName = "E2E Responsive Python Regius";
   await page.goto("/animals");
-  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" }).click();
   await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
@@ -530,7 +530,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 
   const animalName = "E2E Domain Python Regius";
   await page.goto("/animals");
-  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" }).click();
   await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
@@ -782,7 +782,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   const parentNames = ["E2E Breeding Parent A", "E2E Breeding Parent B"];
   await page.goto("/animals");
   for (const name of parentNames) {
-    await page.getByRole("button", { name: "Nuovo animale" }).click();
+    await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" }).click();
     await page.locator(".animal-editor").locator('input[required]').first().fill(name);
     await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
     await page.getByRole("dialog").getByLabel("Sesso").selectOption(name === parentNames[0] ? "female" : "male");
@@ -911,12 +911,15 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await secondOffspring.getByLabel("Nome").fill("E2E Baby 2");
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") &&
-    response.request().method() === "POST" &&
-    response.status() === 201
+    response.request().method() === "POST"
   );
   await conversionDialog.getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
-  expect(babiesResponse.status()).toBe(201);
+  expect(babiesResponse.status(), await babiesResponse.text()).toBe(201);
+  const converted = await babiesResponse.json();
+  expect(converted.animals).toHaveLength(2);
+  expect(converted.animals.map((animal) => animal.originOffspringBatchId)).toEqual([batch.id, batch.id]);
+  expect(converted.animals.map((animal) => animal.originClutchId)).toEqual([clutch.id, clutch.id]);
   const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
   const babyNames = (await animalsAfterConversion.json()).animals.map((item) => item.name);
   expect(babyNames).toEqual(expect.arrayContaining(["E2E Baby 1", "E2E Baby 2"]));
@@ -928,7 +931,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
 
   const animalName = "E2E Document Python";
   await page.goto("/animals");
-  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" }).click();
   await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createAnimalResponsePromise = page.waitForResponse((response) =>
@@ -1310,7 +1313,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await signIn(page, owner);
 
   await page.goto("/animals");
-  await page.getByRole("button", { name: "Nuovo animale" }).click();
+  await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale" }).click();
   await page.locator(".animal-editor").locator('input[required]').first().fill(name);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createdResponse = page.waitForResponse((response) =>

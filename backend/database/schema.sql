@@ -343,10 +343,6 @@ ALTER TABLE animals
     ADD CONSTRAINT animals_origin_offspring_batch_fk
     FOREIGN KEY (origin_offspring_batch_id) REFERENCES offspring_batches(id) ON DELETE RESTRICT;
 
-ALTER TABLE animals
-    ADD CONSTRAINT animals_single_origin_check
-    CHECK (origin_clutch_id IS NULL OR origin_offspring_batch_id IS NULL);
-
 -- ---------------------------------------------------------------------------
 -- 5. Inventario e movimenti
 -- ---------------------------------------------------------------------------
