@@ -10,7 +10,7 @@ const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
   {
     prefixes: [
       "/reproduction", "/reproduction-pairs", "/species-breeding-profiles", "/reproduction-statistics",
-      "/incubators", "/clutches", "/eggs", "/offspring-batches", "/reproductive-events",
+      "/incubators", "/offspring-batches", "/reproductive-events",
       "/incubation-logs", "/genetics", "/genetic-traits",
     ],
     category: "reptiles",
@@ -37,7 +37,8 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
   const requiredCategory = categoryForAnimalDomainPath(req.path);
   const isGeneralAnimalRoute = generalAnimalRoutes.some((prefix) => matchesPath(req.path, prefix));
   const isReproductionCycleRoute = matchesPath(req.path, "/reproduction-cycles");
-  if (!requiredCategory && !isGeneralAnimalRoute && !isReproductionCycleRoute) { next(); return; }
+  const isClutchRoute = matchesPath(req.path, "/clutches");
+  if (!requiredCategory && !isGeneralAnimalRoute && !isReproductionCycleRoute && !isClutchRoute) { next(); return; }
 
   const auth = res.locals.auth as { userId: string } | undefined;
   if (!auth) { next(); return; }
@@ -50,10 +51,14 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
 
   // Bird breeding pairs also use ReproductionCycle for shared clutch/egg history.
   // Resolve the category from the cycle's actual parents instead of treating every
-  // cycle as a reptile-only record.
+  // cycle or clutch as a reptile-only record.
   const cycleMatch = req.path.match(/^\/reproduction-cycles(?:\/([^/]+))?/);
+  const clutchMatch = req.path.match(/^\/clutches(?:\/([^/]+))?/);
+  let cycleCategories: string[] | null = null;
+  let scopedRecord = false;
   if (cycleMatch) {
-    let cycleCategories: string[] = ["reptiles", "birds"];
+    scopedRecord = true;
+    cycleCategories = ["reptiles", "birds"];
     if (cycleMatch[1]) {
       const cycle = await prisma.reproductionCycle.findFirst({
         where: { id: cycleMatch[1], userId: auth.userId },
@@ -64,15 +69,25 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
         if (cycleCategories.length === 0) cycleCategories = ["reptiles"];
       }
     }
-    if (cycleMatch[1] && cycleCategories.length > 0 && !cycleCategories.some((category) => categories.includes(category))) {
-      next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This reproduction cycle belongs to a disabled animal category", {
-        category: cycleCategories[0],
-        settingsPath: "/settings/categories",
-      }));
-      return;
+  } else if (clutchMatch) {
+    scopedRecord = true;
+    cycleCategories = ["reptiles", "birds"];
+    if (clutchMatch[1]) {
+      const clutch = await prisma.clutch.findFirst({
+        where: { id: clutchMatch[1], cycle: { is: { userId: auth.userId } } },
+        select: { cycle: { select: { parentA: { select: { category: true } }, parentB: { select: { category: true } } } } },
+      });
+      if (clutch) {
+        cycleCategories = [clutch.cycle.parentA?.category, clutch.cycle.parentB?.category].filter((value): value is string => Boolean(value));
+        if (cycleCategories.length === 0) cycleCategories = ["reptiles"];
+      }
     }
-    if (!cycleMatch[1] && !cycleCategories.some((category) => categories.includes(category))) {
-      next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "Enable reptiles or birds to use reproduction cycles", {
+  }
+  if (scopedRecord && cycleCategories) {
+    const allowed = cycleCategories.some((category) => categories.includes(category));
+    if (!allowed) {
+      next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "This reproduction record belongs to a disabled animal category", {
+        category: cycleCategories[0],
         settingsPath: "/settings/categories",
       }));
       return;
