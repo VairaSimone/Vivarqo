@@ -28,6 +28,7 @@ describe("animal calendar date validation", () => {
     expect(createAnimalSchema.safeParse({
       name: "Nala",
       species: "Python regius",
+      domainProfile: { brumation: "not_applicable" },
       birthDate: "2024-02-31",
     }).success).toBe(false);
 
@@ -39,6 +40,7 @@ describe("animal calendar date validation", () => {
     expect(createAnimalSchema.safeParse({
       name: "Nala",
       species: "Python regius",
+      domainProfile: { brumation: "not_applicable" },
       birthDate: "2024-02-29",
     }).success).toBe(true);
 

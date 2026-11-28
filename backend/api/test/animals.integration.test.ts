@@ -163,7 +163,10 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .post("/api/v1/animals")
       .set("Origin", origin)
       .set("X-CSRF-Token", accountInfo.csrf)
-      .send({ name, species: "Python regius", identifier, sex: "female" });
+      .send({
+        name, species: "Python regius", category: "reptiles", identifier, sex: "female",
+        domainProfile: { brumation: "not_applicable" },
+      });
     expect(result.status).toBe(201);
     return result.body.animal as { id: string; name: string; identifier: string };
   }
@@ -209,16 +212,28 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     });
     const mother = await createAnimal(owner, "Boa mother", "PARENT-BOA-1");
     const fatherResult = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Boa father", species: "Python regius", identifier: "PARENT-BOA-2", sex: "male" }).expect(201);
+      .send({
+        name: "Boa father", species: "Python regius", category: "reptiles",
+        identifier: "PARENT-BOA-2", sex: "male", domainProfile: { brumation: "not_applicable" },
+      }).expect(201);
     const fishParent = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Fish parent", species: "Betta splendens", category: "fish", sex: "female" }).expect(201);
+      .send({
+        name: "Fish parent", species: "Betta splendens", category: "fish", sex: "female",
+        domainProfile: { waterType: "freshwater" },
+      }).expect(201);
 
     await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Invalid offspring", species: "Python regius", category: "reptiles", motherAnimalId: fishParent.body.animal.id })
+      .send({
+        name: "Invalid offspring", species: "Python regius", category: "reptiles",
+        domainProfile: { brumation: "not_applicable" }, motherAnimalId: fishParent.body.animal.id,
+      })
       .expect(400).expect((res) => expect(res.body.error?.code ?? res.body.code).toBe("INCOMPATIBLE_ANIMAL_PARENT"));
 
     const offspring = await owner.agent.post("/api/v1/animals").set("Origin", origin).set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Boa offspring", species: "Python regius", category: "reptiles", motherAnimalId: mother.id, fatherAnimalId: fatherResult.body.animal.id })
+      .send({
+        name: "Boa offspring", species: "Python regius", category: "reptiles",
+        domainProfile: { brumation: "not_applicable" }, motherAnimalId: mother.id, fatherAnimalId: fatherResult.body.animal.id,
+      })
       .expect(201);
     await owner.agent.patch(`/api/v1/animals/${offspring.body.animal.id}`).set("Origin", origin).set("X-CSRF-Token", owner.csrf)
       .send({ species: "Boa constrictor" })
@@ -233,7 +248,10 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .post("/api/v1/animals")
       .set("Origin", origin)
       .set("X-CSRF-Token", owner.csrf)
-      .send({ name: "Case duplicate", species: "Python regius", identifier: "nALA-01", sex: "female" })
+      .send({
+        name: "Case duplicate", species: "Python regius", category: "reptiles",
+        identifier: "nALA-01", sex: "female", domainProfile: { brumation: "not_applicable" },
+      })
       .expect(409);
 
     expect(duplicate.body.code).toBe("ANIMAL_IDENTIFIER_CONFLICT");
@@ -247,8 +265,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("X-CSRF-Token", owner.csrf)
       .send({
         animals: [
-          { name: "Bulk one", species: "Boa constrictor", identifier: "BULK-1" },
-          { name: "Bulk two", species: "Boa constrictor", identifier: "BULK-2", sex: "male" },
+          { name: "Bulk one", species: "Boa constrictor", category: "reptiles", identifier: "BULK-1", domainProfile: { brumation: "not_applicable" } },
+          { name: "Bulk two", species: "Boa constrictor", category: "reptiles", identifier: "BULK-2", sex: "male", domainProfile: { brumation: "not_applicable" } },
         ],
       })
       .expect(201);
@@ -260,8 +278,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("X-CSRF-Token", owner.csrf)
       .send({
         animals: [
-          { name: "Valid", species: "Boa constrictor", identifier: "BULK-3" },
-          { name: "", species: "Boa constrictor", identifier: "BULK-4" },
+          { name: "Valid", species: "Boa constrictor", category: "reptiles", identifier: "BULK-3", domainProfile: { brumation: "not_applicable" } },
+          { name: "", species: "Boa constrictor", category: "reptiles", identifier: "BULK-4", domainProfile: { brumation: "not_applicable" } },
         ],
       })
       .expect(400);
@@ -273,8 +291,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .set("X-CSRF-Token", owner.csrf)
       .send({
         animals: [
-          { name: "Duplicate 1", species: "Boa constrictor", identifier: "SAME" },
-          { name: "Duplicate 2", species: "Boa constrictor", identifier: "SAME" },
+          { name: "Duplicate 1", species: "Boa constrictor", category: "reptiles", identifier: "SAME", domainProfile: { brumation: "not_applicable" } },
+          { name: "Duplicate 2", species: "Boa constrictor", category: "reptiles", identifier: "SAME", domainProfile: { brumation: "not_applicable" } },
         ],
       })
       .expect(400);
@@ -284,9 +302,9 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
   it("imports CSV and XLSX through a private preview and explicit atomic confirmation", async () => {
     const owner = await account();
     const csv = Buffer.from([
-      "Nome,Specie,Identificativo,Sesso,Data di nascita,Posizione",
-      "CSV animal,Python regius,CSV-1,female,2024-03-01,Rack 1",
-      "Invalid animal,,CSV-2,male,,Rack 2",
+      "Nome,Specie,Identificativo,Sesso,Data di nascita,Posizione,Categoria,Profilo categoria (JSON)",
+      'CSV animal,Python regius,CSV-1,female,2024-03-01,Rack 1,reptiles,{"brumation":"not_applicable"}',
+      'Invalid animal,,CSV-2,male,,Rack 2,reptiles,{"brumation":"not_applicable"}',
     ].join("\n"));
     const preview = await owner.agent
       .post("/api/v1/imports?entity=animals")
@@ -313,8 +331,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
     expect(completed.body.errorCount).toBe(1);
 
     const xlsx = makeXlsx([
-      ["name", "species", "identifier", "sex"],
-      ["XLSX animal", "Boa constrictor", "XLSX-1", "male"],
+      ["name", "species", "identifier", "sex", "category", "domainProfile"],
+      ["XLSX animal", "Boa constrictor", "XLSX-1", "male", "reptiles", '{"brumation":"not_applicable"}'],
     ]);
     const xlsxPreview = await owner.agent
       .post("/api/v1/imports?entity=animals")
@@ -351,8 +369,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
   it("allows manual mapping for animal imports and keeps explicitly ignored columns unmapped", async () => {
     const owner = await account();
     const csv = Buffer.from([
-      "Nome rettile,Specie animale,Identificativo,Colonna extra",
-      "Manual mapped animal,Python regius,MANUAL-IMPORT-1,ignore me",
+      'Nome rettile,Specie animale,Identificativo,Colonna extra,Categoria,Profilo categoria (JSON)',
+      'Manual mapped animal,Python regius,MANUAL-IMPORT-1,ignore me,reptiles,{"brumation":"not_applicable"}',
     ].join("\n"));
 
     const incomplete = await owner.agent
@@ -363,7 +381,7 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .send(csv)
       .expect(201);
     expect(incomplete.body.validRows).toBe(0);
-    expect(incomplete.body.missingFields).toEqual([["name"], ["species"]]);
+    expect(incomplete.body.missingFields).toEqual([["name"], ["species"], ["category"], ["domainProfile"]]);
     await owner.agent
       .post("/api/v1/imports/" + incomplete.body.importId + "/confirm")
       .set("Origin", origin)
@@ -375,6 +393,8 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       fields: {
         name: "Nome rettile",
         species: "Specie animale",
+        category: "Categoria",
+        domainProfile: "Profilo categoria (JSON)",
       },
       ignoredHeaders: ["Identificativo"],
     };
@@ -387,7 +407,12 @@ describe.skipIf(!integrationEnabled)("Animals and care records PostgreSQL integr
       .expect(201);
     expect(preview.body.validRows).toBe(1);
     expect(preview.body.missingFields).toEqual([]);
-    expect(preview.body.mappedHeaders).toMatchObject({ name: "Nome rettile", species: "Specie animale" });
+    expect(preview.body.mappedHeaders).toMatchObject({
+      name: "Nome rettile",
+      species: "Specie animale",
+      category: "Categoria",
+      domainProfile: "Profilo categoria (JSON)",
+    });
     expect(preview.body.unmappedHeaders).toContain("Identificativo");
 
     await owner.agent

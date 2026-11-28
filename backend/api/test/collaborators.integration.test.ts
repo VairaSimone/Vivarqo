@@ -56,7 +56,10 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
   async function createAnimal(user: Awaited<ReturnType<typeof account>>, name: string) {
     const response = await user.agent.post("/api/v1/animals")
       .set("Origin", origin).set("X-CSRF-Token", user.csrf)
-      .send({ name, species: "Python regius", sex: "female" }).expect(201);
+      .send({
+        name, species: "Python regius", category: "reptiles", sex: "female",
+        domainProfile: { brumation: "not_applicable" },
+      }).expect(201);
     return response.body.animal as { id: string; name: string };
   }
 
@@ -121,7 +124,10 @@ describe.skipIf(!enabled)("Premium workspace collaboration PostgreSQL integratio
 
     await collaborator.agent.post("/api/v1/animals")
       .set("Origin", origin).set("X-CSRF-Token", collaborator.csrf)
-      .send({ name: "Operator animal", species: "Python regius" }).expect(201);
+      .send({
+        name: "Operator animal", species: "Python regius", category: "reptiles",
+        domainProfile: { brumation: "not_applicable" },
+      }).expect(201);
     await collaborator.agent.get("/api/v1/finance/entries").expect(403);
 
     await owner.agent.delete(`/api/v1/collaborators/${membership.id}`)
