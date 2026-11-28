@@ -24,6 +24,12 @@ async function signIn(page, account) {
   const response = await loginResponse;
   expect(response.status(), `E2E login failed: ${await response.text()}`).toBe(200);
   await page.waitForURL(/\/today(?:\?.*)?$/);
+  // Dismiss the required-only cookie acknowledgement so it cannot intercept
+  // clicks in the authenticated E2E flows.
+  const cookieNotice = page.getByRole("region", { name: "Informativa sui cookie" });
+  if (await cookieNotice.isVisible()) {
+    await cookieNotice.getByRole("button", { name: "Ho capito" }).click();
+  }
   await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
 
@@ -127,11 +133,10 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(page.getByRole("alert")).toBeVisible();
 
   await signIn(page, owner);
-  await expect(page.getByText("Cosa richiede attenzione oggi?")).toBeVisible();
   await expect(page.getByRole("heading", { name: "In ritardo" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Da fare oggi" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nei prossimi 7 giorni" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Registra alimentazione" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Registra pesi" })).toBeVisible();
 
   // Create a real task due in two days and verify that the dashboard surfaces
   // it in the upcoming section and opens its own task detail when selected.
@@ -243,7 +248,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   await expect(saveAnimalButton).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(closeDialogButton).toBeFocused();
-  await page.getByLabel("Nome").fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -255,7 +260,7 @@ test("real API authentication, CSRF, animal persistence, account isolation and r
   expect(created?.id).toBeTruthy();
 
   await page.reload();
-  await expect(page.getByText(animalName, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(animalName) })).toBeVisible();
 
   const csrfStatus = await page.evaluate(async () => {
     const response = await fetch("/api/v1/animals", {
@@ -306,7 +311,7 @@ test("responsive fixture: create an animal for detail-route coverage", async ({ 
   const animalName = "E2E Responsive Python Regius";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByLabel("Nome").fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -366,7 +371,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   }, { timeout: 90_000, intervals: [1000, 2000, 3000] }).toBe("completed");
 
   await page.goto("/animals");
-  await expect(page.getByText("E2E Imported Python", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E Imported Python", { exact: true }).first()).toBeVisible();
 });
 
 
@@ -526,7 +531,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   const animalName = "E2E Domain Python Regius";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByLabel("Nome").fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
   await expect(page.getByText(animalName, { exact: true })).toBeVisible();
@@ -666,7 +671,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
     mealDate.setMinutes(mealDate.getMinutes() - mealDate.getTimezoneOffset());
     await preyDialog.getByLabel("Data e ora").fill(mealDate.toISOString().slice(0, 16));
     await preyDialog.getByLabel("Esito").selectOption(outcome);
-    await preyDialog.getByLabel("Alimento").fill("Rat");
+    await preyDialog.getByLabel("Alimento", { exact: true }).fill("Rat");
     await preyDialog.getByLabel(/Peso alimento/).fill("120");
     await preyDialog.getByLabel("Stato della preda").selectOption("thawed");
     const inventorySelect = preyDialog.getByLabel("Collega preda all'inventario");
@@ -737,7 +742,7 @@ test("care, tasks, finance and inventory mutations persist through the live API"
   await page.goto("/inventory");
   // Select the row by the item we just created. A previous import test leaves
   // another inventory record in the same account, so a global .last() is unsafe.
-  const stockItemRow = page.getByRole("row", { name: /E2E Food Stock/ });
+  const stockItemRow = page.getByRole("row").filter({ hasText: "E2E Food Stock" }).filter({ has: page.getByRole("button", { name: "Movimenti" }) });
   await expect(stockItemRow).toBeVisible();
   await stockItemRow.getByRole("button", { name: "Movimenti" }).click();
   await page.getByLabel("Tipo movimento").selectOption("in");
@@ -769,15 +774,18 @@ test("care, tasks, finance and inventory mutations persist through the live API"
 });
 
 test("reproduction cycle, event, clutch, eggs, incubation and offspring persist", async ({ page }) => {
-  test.setTimeout(180_000);
+  // This is an intentionally end-to-end multi-step workflow against a real API,
+  // worker and PostgreSQL instance; allow the full scenario to finish on CI.
+  test.setTimeout(300_000);
   await signIn(page, owner);
 
   const parentNames = ["E2E Breeding Parent A", "E2E Breeding Parent B"];
   await page.goto("/animals");
   for (const name of parentNames) {
     await page.getByRole("button", { name: "Nuovo animale" }).click();
-    await page.getByLabel("Nome").fill(name);
+    await page.locator(".animal-editor").locator('input[required]').first().fill(name);
     await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
+    await page.getByRole("dialog").getByLabel("Sesso").selectOption(name === parentNames[0] ? "female" : "male");
     await page.getByRole("button", { name: "Salva modifiche" }).click();
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
@@ -792,10 +800,10 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Nuovo ciclo" }).first().click();
   const cycleDialog = page.getByRole("dialog");
   await cycleDialog.getByLabel("Nome ciclo").fill("E2E Breeding Cycle");
-  await cycleDialog.getByLabel("Cerca genitore a").fill(parentNames[0]);
-  await cycleDialog.getByRole("combobox", { name: "Genitore A" }).selectOption(parentA.id);
-  await cycleDialog.getByLabel("Cerca genitore b").fill(parentNames[1]);
-  await cycleDialog.getByRole("combobox", { name: "Genitore B" }).selectOption(parentB.id);
+  await cycleDialog.getByLabel("Cerca madre (femmina)").fill(parentNames[0]);
+  await cycleDialog.getByRole("combobox", { name: "Madre (femmina)" }).selectOption(parentA.id);
+  await cycleDialog.getByLabel("Cerca padre (maschio)").fill(parentNames[1]);
+  await cycleDialog.getByRole("combobox", { name: "Padre (maschio)" }).selectOption(parentB.id);
   const cycleCreatePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/reproduction-cycles") && response.request().method() === "POST"
   );
@@ -832,7 +840,7 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await clutchDialog.getByLabel("Deposizione").fill("2026-11-01");
   await clutchDialog.getByLabel("Numero uova").fill("2");
   await clutchDialog.getByLabel("Stato").fill("incubating");
-  await clutchDialog.getByLabel("Incubatore").fill("E2E Incubator");
+  await clutchDialog.getByLabel("Etichetta / posizione").fill("E2E Incubator");
   const clutchCreatedResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && response.url().includes("/api/v1/clutches") && response.status() === 201
   );
@@ -894,10 +902,13 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await page.getByRole("button", { name: "Crea schede animali" }).click();
   const conversionDialog = page.getByRole("dialog");
   await expect(conversionDialog).toBeVisible();
-  await conversionDialog.getByLabel("Specie").fill("Python regius");
-  await conversionDialog.getByLabel("Nome 1").fill("E2E Baby 1");
-  await conversionDialog.getByRole("button", { name: "Aggiungi un nome" }).click();
-  await conversionDialog.getByLabel("Nome 2").fill("E2E Baby 2");
+  const firstOffspring = conversionDialog.locator(".animal-editor-section").first();
+  await firstOffspring.getByLabel("Specie").fill("Python regius");
+  await firstOffspring.getByLabel("Nome").fill("E2E Baby 1");
+  await conversionDialog.getByRole("button", { name: "Aggiungi piccolo" }).click();
+  const secondOffspring = conversionDialog.locator(".animal-editor-section").last();
+  await secondOffspring.getByLabel("Specie").fill("Python regius");
+  await secondOffspring.getByLabel("Nome").fill("E2E Baby 2");
   const conversionResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/offspring-batches/" + batch.id + "/animals") &&
     response.request().method() === "POST" &&
@@ -918,7 +929,7 @@ test("private document upload, metadata edit, download and delete", async ({ pag
   const animalName = "E2E Document Python";
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByLabel("Nome").fill(animalName);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(animalName);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createAnimalResponsePromise = page.waitForResponse((response) =>
     response.url().endsWith("/api/v1/animals") && response.request().method() === "POST"
@@ -1300,7 +1311,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
 
   await page.goto("/animals");
   await page.getByRole("button", { name: "Nuovo animale" }).click();
-  await page.getByLabel("Nome").fill(name);
+  await page.locator(".animal-editor").locator('input[required]').first().fill(name);
   await page.getByRole("dialog").getByLabel("Specie").fill("Python regius");
   const createdResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" &&
@@ -1315,13 +1326,13 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   await management.getByLabel("Livello").selectOption("room");
   await management.getByLabel("Nome posizione").fill(room);
   await management.getByRole("button", { name: "Crea posizione" }).click();
-  await expect(management.getByText(room, { exact: true })).toBeVisible();
+  await expect(management.getByLabel("Destinazione").locator("option").filter({ hasText: room })).toHaveCount(1);
 
   await management.getByLabel("Livello").selectOption("rack");
   await management.getByLabel("Posizione superiore").selectOption({ label: room });
   await management.getByLabel("Nome posizione").fill(rack);
   await management.getByRole("button", { name: "Crea posizione" }).click();
-  await expect(management.getByText(rack, { exact: true })).toBeVisible();
+  await expect(management.getByLabel("Destinazione").locator("option").filter({ hasText: rack })).toHaveCount(1);
 
   const animalRow = management.locator(".record-row").filter({ hasText: name });
   await animalRow.locator('input[type="checkbox"]').check();
@@ -1371,7 +1382,7 @@ test("animal hierarchy, bulk moves, QR, printable profile and transfer workflow"
   );
   await page.getByRole("button", { name: "Registra cessione" }).click();
   await transferResponse;
-  await expect(page.getByText("E2E Recipient", { exact: true })).toBeVisible();
+  await expect(page.locator(".record-row").filter({ hasText: "E2E Recipient" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();

@@ -11,7 +11,8 @@ const personalPrefixes = [
 ];
 const workspacePrefixes = [
   "/animals", "/feeding-sessions", "/feeding-entries", "/feeding",
-  "/aquariums", "/aviaries", "/companion-care",
+  "/aquariums", "/aviaries", "/birds", "/bird-breeding-pairs", "/aviary-maintenance",
+  "/quarantines", "/aquarium-treatments", "/companion-care",
   "/weights", "/sheds", "/animal-notes", "/health-records",
   "/tasks", "/reminder-rules", "/home", "/calendar",
   "/species-breeding-profiles", "/reproduction", "/reproduction-pairs",
@@ -30,7 +31,7 @@ function isBreedingPath(path: string): boolean {
     "/species-breeding-profiles", "/reproduction", "/reproduction-pairs",
     "/reproduction-statistics", "/reproduction-cycles", "/reproductive-events",
     "/incubators", "/incubation-logs", "/clutches", "/eggs", "/offspring-batches",
-    "/genetics", "/genetic-traits",
+    "/bird-breeding-pairs", "/genetics", "/genetic-traits",
   ].some((prefix) => startsWithPath(path, prefix)) ||
     (/^\/animals\/[^/]+\/(?:genetic-traits|genetic-history|pedigree|inbreeding|hatchling-care)$/.test(path));
 }
@@ -41,7 +42,8 @@ function canWriteAsOperator(path: string): boolean {
   if (["/animals/locations", "/animals/move", "/animals/filters"].some((prefix) => startsWithPath(path, prefix))) return true;
   if (/^\/animals\/[^/]+\/(?:weights|sheds|notes|health-records)$/.test(path)) return true;
   return [
-    "/aquariums", "/aviaries", "/companion-care",
+    "/aquariums", "/aviaries", "/birds", "/aviary-maintenance",
+    "/quarantines", "/aquarium-treatments", "/companion-care",
     "/feeding-sessions", "/feeding-entries", "/weights", "/sheds",
     "/animal-notes", "/health-records", "/tasks", "/reminder-rules",
   ].some((prefix) => startsWithPath(path, prefix));

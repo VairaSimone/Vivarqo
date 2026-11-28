@@ -469,7 +469,7 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <div className="animal-editor-photo-copy">
               <strong>{photoFile ? photoFile.name : (locale === "it" ? "Nessuna nuova immagine selezionata" : "No new image selected")}</strong>
               <span>{locale === "it" ? "JPG, PNG o WebP · massimo 5 MB" : "JPG, PNG or WebP · 5 MB maximum"}</span>
-              <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => selectPhoto(e.target.files?.[0] ?? null)} />
+              <Field label={locale === "it" ? "Fotografia" : "Photograph"}><Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => selectPhoto(e.target.files?.[0] ?? null)} /></Field>
             </div>
             {editing?.photoUrl && <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void removePhoto()}>{t("removePhoto")}</Button>}
           </div>

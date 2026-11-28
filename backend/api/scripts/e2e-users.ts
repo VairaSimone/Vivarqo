@@ -47,6 +47,10 @@ async function cleanAccounts() {
     await tx.task.deleteMany({ where: { userId: { in: userIds } } });
     await tx.reminderRule.deleteMany({ where: { userId: { in: userIds } } });
 
+    // Bird pairs and health records use restrictive references to animals/cycles.
+    await tx.birdBreedingPair.deleteMany({ where: { userId: { in: userIds } } });
+    await tx.healthRecord.deleteMany({ where: { animal: { is: ownedAnimals } } });
+
     // Reproduction records have restrictive parent/child relations.
     await tx.reproductiveEvent.deleteMany({
       where: {
@@ -70,9 +74,27 @@ async function cleanAccounts() {
 
     // Inventory movements restrict deleting their item.
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId: { in: userIds } } } } });
+    await tx.inventoryLot.deleteMany({ where: { item: { is: { userId: { in: userIds } } } } });
     await tx.inventoryItem.deleteMany({ where: { userId: { in: userIds } } });
 
+    // Transfer history is intentionally RESTRICT-linked to animals. Remove only
+    // fixture-owned transfer rows before deleting the corresponding test animals.
+    await tx.animalTransfer.deleteMany({ where: { userId: { in: userIds } } });
     await tx.animal.deleteMany({ where: ownedAnimals });
+    await tx.animalLocationMove.deleteMany({ where: { userId: { in: userIds } } });
+    // Location parents are RESTRICT-linked; remove nested fixture locations from leaves upward.
+    while (true) {
+      const leaves = await tx.animalLocation.findMany({
+        where: { userId: { in: userIds }, children: { none: {} } },
+        select: { id: true },
+      });
+      if (leaves.length === 0) {
+        const remaining = await tx.animalLocation.count({ where: { userId: { in: userIds } } });
+        if (remaining > 0) throw new Error("E2E fixture location tree contains a cycle or an unremovable parent reference");
+        break;
+      }
+      await tx.animalLocation.deleteMany({ where: { id: { in: leaves.map((leaf) => leaf.id) } } });
+    }
     await tx.user.deleteMany({ where: { id: { in: userIds } } });
   });
 }
@@ -94,6 +116,20 @@ try {
         accountStatus: "active",
       })),
     });
+
+    // A successful login must land on /today, not /setup. The application
+    // treats a missing AccountConfiguration as an incomplete onboarding flow.
+    const users = await prisma.user.findMany({
+      where: { email: { in: accounts.map((account) => account.email) } },
+      select: { id: true },
+    });
+    await prisma.accountConfiguration.createMany({
+      data: users.map((user) => ({
+        userId: user.id,
+        animalCategories: ["reptiles"],
+      })),
+    });
+
     process.stdout.write("Two isolated E2E accounts seeded.\\n");
   }
 } finally {

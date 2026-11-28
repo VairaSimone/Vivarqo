@@ -55,9 +55,13 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   }
   if (!validPassword) throw new AppError(401, "INVALID_CREDENTIALS", "The current password is incorrect");
 
-  const [animals, cycles, documents, exports, imports] = await Promise.all([
+  const [animals, cycles, eggs, documents, exports, imports] = await Promise.all([
     prisma.animal.findMany({ where: { userId }, select: { id: true, photoKey: true } }),
     prisma.reproductionCycle.findMany({ where: { userId }, select: { id: true } }),
+    prisma.egg.findMany({
+      where: { clutch: { is: { cycle: { is: { userId } } } } },
+      select: { photoKey: true },
+    }),
     prisma.document.findMany({ where: { userId }, select: { storageKey: true } }),
     prisma.exportJob.findMany({ where: { userId, storageKey: { not: null } }, select: { storageKey: true } }),
     prisma.importJob.findMany({ where: { userId }, select: { storageKey: true } }),
@@ -66,6 +70,7 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
   const cycleIds = cycles.map((cycle) => cycle.id);
   const storageKeys = [
     ...animals.flatMap((animal) => animal.photoKey ? [animal.photoKey] : []),
+    ...eggs.flatMap((egg) => egg.photoKey ? [egg.photoKey] : []),
     ...documents.map((document) => document.storageKey),
     ...exports.flatMap((job) => job.storageKey ? [job.storageKey] : []),
     // Import previews are persisted in PostgreSQL; this sentinel is not an object key.
@@ -99,7 +104,13 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.publicShare.deleteMany({ where: { userId } });
     await tx.financeEntry.deleteMany({ where: { userId } });
     await tx.document.deleteMany({ where: { userId } });
+    // These records use RESTRICT foreign keys to animals/cycles. Delete them
+    // explicitly before their parents; relying on User cascades is insufficient
+    // because account deletion keeps an anonymized tombstone row.
+    await tx.animalTransfer.deleteMany({ where: { userId } });
+    await tx.birdBreedingPair.deleteMany({ where: { userId } });
     if (animalIds.length) {
+      await tx.healthRecord.deleteMany({ where: { animalId: { in: animalIds } } });
       await tx.animalGeneticTrait.deleteMany({
         where: { OR: [{ animalId: { in: animalIds } }, { sourceAnimalId: { in: animalIds } }] },
       });
@@ -126,8 +137,24 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.task.deleteMany({ where: { userId } });
     await tx.reminderRule.deleteMany({ where: { userId } });
     await tx.stockMovement.deleteMany({ where: { item: { is: { userId } } } });
+    await tx.inventoryLot.deleteMany({ where: { item: { is: { userId } } } });
     await tx.inventoryItem.deleteMany({ where: { userId } });
     await tx.animal.deleteMany({ where: { userId } });
+    await tx.animalLocationMove.deleteMany({ where: { userId } });
+    // Locations form a self-referencing tree with RESTRICT parent links. Delete
+    // leaves first so nested rack/room structures are removed without disabling FK checks.
+    while (true) {
+      const leaves = await tx.animalLocation.findMany({
+        where: { userId, children: { none: {} } },
+        select: { id: true },
+      });
+      if (leaves.length === 0) {
+        const remaining = await tx.animalLocation.count({ where: { userId } });
+        if (remaining > 0) throw new AppError(409, "ACCOUNT_LOCATION_TREE_INVALID", "Account locations could not be safely removed");
+        break;
+      }
+      await tx.animalLocation.deleteMany({ where: { id: { in: leaves.map((leaf) => leaf.id) } } });
+    }
     await tx.pushDeliveryAttempt.deleteMany({ where: { userId } });
     await tx.notification.deleteMany({ where: { userId } });
     await tx.notificationPreferences.deleteMany({ where: { userId } });
@@ -137,6 +164,22 @@ export async function deleteUserAccount(userId: string, currentPassword: string)
     await tx.exportJob.deleteMany({ where: { userId } });
     await tx.auditEvent.deleteMany({ where: { userId } });
     await tx.subscription.deleteMany({ where: { userId } });
+    await tx.financeBudget.deleteMany({ where: { userId } });
+    await tx.financeRecurrence.deleteMany({ where: { userId } });
+    await tx.inventorySupplier.deleteMany({ where: { userId } });
+    await tx.speciesBreedingProfile.deleteMany({ where: { userId } });
+    await tx.geneticGene.deleteMany({ where: { userId } });
+    await tx.aquariumCompatibilityRule.deleteMany({ where: { userId } });
+    await tx.aquarium.deleteMany({ where: { userId } });
+    await tx.aviary.deleteMany({ where: { userId } });
+    await tx.incubator.deleteMany({ where: { userId } });
+    await tx.companionPolicy.deleteMany({ where: { userId } });
+    await tx.companionCareLog.deleteMany({ where: { userId } });
+    await tx.companionCareRecord.deleteMany({ where: { userId } });
+    await tx.accountConfiguration.deleteMany({ where: { userId } });
+    await tx.savedAnimalFilter.deleteMany({ where: { userId } });
+    await tx.workspaceMembership.deleteMany({ where: { OR: [{ ownerUserId: userId }, { collaboratorUserId: userId }] } });
+    await tx.workspaceInvitation.deleteMany({ where: { ownerUserId: userId } });
     await tx.authToken.deleteMany({ where: { userId } });
     await tx.userSession.deleteMany({ where: { userId } });
 

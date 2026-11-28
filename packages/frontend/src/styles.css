@@ -2613,7 +2613,7 @@ table tbody tr:hover { background: color-mix(in srgb, var(--accent-blue-bg) 48%,
 .animal-editor-section-heading h3 { margin: 0 0 3px; color: var(--text); font-size: 14px; font-weight: 750; letter-spacing: -.015em; }
 .animal-editor-section-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .animal-editor-required, .animal-editor-optional { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 650; white-space: nowrap; }
-.animal-editor-required { color: var(--accent-clay); }
+.animal-editor-required { color: var(--terracotta); }
 .animal-editor-photo { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 13px; border: 1px dashed var(--border-strong); border-radius: 11px; background: var(--surface-soft); }
 .animal-editor-photo > img, .animal-editor-photo-placeholder { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 64px; border-radius: 10px; object-fit: cover; background: var(--accent-teal-bg); color: var(--forest-2); }
 .animal-editor-photo-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
@@ -3676,12 +3676,12 @@ img, video, canvas, iframe { max-width: 100%; }
   --forest: #244b3c;
   --forest-2: #37634f;
   --sage: #a8bca7;
-  --terracotta: #b86f4f;
+  --terracotta: #8b4b34;
   --paper: #f5f3eb;
   --surface: #fffefa;
   --surface-soft: #edf2eb;
   --text: #26352d;
-  --muted: #64736a;
+  --muted: #5f6b62;
   --border: #dce4d9;
   --border-strong: #c5d2c4;
   --accent-blue: #527789;
@@ -3933,3 +3933,15 @@ kbd { font-size: 11px; }
   .ecosys-monitoring .panel-header .inline-actions select { min-width: 0; flex: 1; }
   .ecosys-ranges .inline-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Keep dashboard status variants readable against their darker terracotta/red surfaces. */
+.dashboard-intro-attention .eyebrow,
+.dashboard-intro-critical .eyebrow,
+.dashboard-intro-attention p,
+.dashboard-intro-critical p { color: #fff; }
+
+
+/* The dashboard tone can be normal, attention or critical. Keep every intro text token readable on the actual forest/terracotta surface. */
+.dashboard-intro .eyebrow,
+.dashboard-intro p { color: #fff; }
