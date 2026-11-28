@@ -3945,3 +3945,69 @@ kbd { font-size: 11px; }
 /* The dashboard tone can be normal, attention or critical. Keep every intro text token readable on the actual forest/terracotta surface. */
 .dashboard-intro .eyebrow,
 .dashboard-intro p { color: #fff; }
+
+
+/* Animal creation / edit wizard */
+.modal:has(.animal-wizard) { width: min(100%, 900px); max-height: min(92dvh, 960px); }
+.modal:has(.animal-wizard) .modal-content { padding: clamp(14px, 2.2vw, 24px); }
+.animal-wizard { gap: 16px; }
+.animal-wizard-intro { margin-bottom: 0; }
+.animal-wizard-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 4px 0 2px; }
+.animal-wizard-progress-step { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); color: var(--muted); }
+.animal-wizard-progress-step.current { border-color: color-mix(in srgb, var(--forest-2) 45%, var(--border)); background: color-mix(in srgb, var(--sage) 18%, var(--surface)); color: var(--forest-2); }
+.animal-wizard-progress-step.complete { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); color: var(--success); }
+.animal-wizard-progress-number { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-weight: 800; }
+.animal-wizard-progress-copy { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.animal-wizard-progress-copy strong { font-size: 13px; font-weight: 750; }
+.animal-wizard-progress-copy small { color: var(--muted); font-size: 11px; line-height: 1.3; }
+.animal-category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.animal-category-card { position: relative; display: flex; align-items: flex-start; gap: 11px; min-width: 0; min-height: 100px; padding: 14px 13px; border: 1px solid var(--border-strong); border-radius: 11px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease; }
+.animal-category-card:hover:not(:disabled) { border-color: var(--forest-2); background: var(--surface-soft); }
+.animal-category-card.selected { border-color: var(--forest-2); background: color-mix(in srgb, var(--sage) 17%, var(--surface)); box-shadow: inset 0 0 0 1px var(--forest-2); }
+.animal-category-card:disabled { opacity: 1; cursor: default; }
+.animal-category-emoji { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 10px; background: var(--surface-soft); font-size: 25px; line-height: 1; }
+.animal-category-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 5px; }
+.animal-category-copy strong { font-size: 14px; font-weight: 750; }
+.animal-category-copy small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.animal-category-check { position: absolute; top: 10px; right: 10px; color: var(--forest-2); }
+.animal-wizard-locked-note { margin: -4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.animal-wizard-section { margin: 0; }
+.animal-wizard-documents { background: var(--surface-soft); }
+.animal-wizard-review { display: flex; flex-direction: column; gap: 14px; padding: 17px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-soft); }
+.animal-wizard-review-kicker { color: var(--forest-2); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.animal-wizard-review h3 { margin: 4px 0 0; font-size: 16px; }
+.animal-wizard-review-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.animal-wizard-review-grid > div { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.animal-wizard-review-grid small { color: var(--muted); font-size: 11px; }
+.animal-wizard-review-grid strong { overflow-wrap: anywhere; font-size: 13px; font-weight: 700; }
+.animal-wizard-footer { position: sticky; bottom: -24px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px calc(clamp(14px, 2.2vw, 24px) * -1) calc(clamp(14px, 2.2vw, 24px) * -1); padding: 13px clamp(14px, 2.2vw, 24px); border-top: 1px solid var(--border); background: var(--surface); }
+.animal-wizard-footer-back, .animal-wizard-footer-next { display: flex; align-items: center; gap: 8px; }
+.animal-wizard-footer-next { justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .modal-backdrop:has(.animal-wizard) { padding: 8px; align-items: center; }
+  .modal:has(.animal-wizard) { width: 100%; max-height: 95dvh; border-radius: 12px; }
+  .modal:has(.animal-wizard) .modal-header { padding: 12px 14px; }
+  .modal:has(.animal-wizard) .modal-content { padding: 13px 13px 0; }
+  .animal-wizard { gap: 13px; }
+  .animal-wizard-progress { gap: 6px; }
+  .animal-wizard-progress-step { align-items: flex-start; flex-direction: column; gap: 5px; padding: 8px; }
+  .animal-wizard-progress-number { width: 26px; height: 26px; flex-basis: 26px; font-size: 10px; }
+  .animal-wizard-progress-copy strong { font-size: 12px; }
+  .animal-wizard-progress-copy small { font-size: 10px; }
+  .animal-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .animal-category-card { min-height: 96px; padding: 11px 10px; gap: 8px; }
+  .animal-category-emoji { width: 34px; height: 34px; flex-basis: 34px; font-size: 21px; }
+  .animal-category-copy strong { font-size: 13px; }
+  .animal-category-copy small { font-size: 11px; }
+  .animal-wizard-review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .animal-wizard-footer { bottom: 0; align-items: stretch; margin-inline: -13px; padding: 10px 13px calc(10px + env(safe-area-inset-bottom)); }
+  .animal-wizard-footer .btn { min-height: 42px; }
+  .animal-wizard-footer-next { gap: 5px; }
+}
+@media (max-width: 360px) {
+  .animal-category-grid { grid-template-columns: 1fr; }
+  .animal-category-card { min-height: 76px; }
+  .animal-wizard-footer { flex-direction: column-reverse; }
+  .animal-wizard-footer-back, .animal-wizard-footer-back .btn, .animal-wizard-footer-next, .animal-wizard-footer-next .btn { width: 100%; }
+  .animal-wizard-footer-next { display: grid; grid-template-columns: 1fr; }
+}

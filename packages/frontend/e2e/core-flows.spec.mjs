@@ -33,6 +33,16 @@ async function signIn(page, account) {
   await expect(page.getByRole("heading", { name: "Oggi", exact: true })).toBeVisible();
 }
 
+async function enableAllAnimalCategories(page) {
+  await page.goto("/settings/categories");
+  for (const name of ["Pesci", "Uccelli", "Cani e gatti"]) {
+    const category = page.getByRole("button", { name: new RegExp(name) });
+    if (await category.getAttribute("aria-pressed") !== "true") await category.click();
+  }
+  await page.getByRole("button", { name: "Conferma selezione" }).click();
+  await page.waitForURL(/\/settings(?:\?.*)?$/);
+}
+
 
 async function expectNoA11yViolations(page, context) {
   const results = await new AxeBuilder({ page })
@@ -337,6 +347,7 @@ test("responsive fixture: create an animal for detail-route coverage", async ({ 
 test("animal CSV import preview, confirmation and persisted result", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page, owner);
+  await enableAllAnimalCategories(page);
   await page.goto("/imports");
   await page.getByLabel("Tipo di dati").selectOption("animals");
   await page.getByLabel("Scegli CSV o XLSX").setInputFiles({

@@ -132,7 +132,7 @@ test("dog and cat profiles are validated, displayed and partially editable", asy
     response.request().method() === "PATCH" &&
     new URL(response.url()).pathname === "/api/v1/animals/" + dog.id
   );
-  await editDialog.getByRole("button", { name: "Salva", exact: true }).click();
+  await editDialog.getByRole("button", { name: "Salva modifiche", exact: true }).click();
   expect((await saveResponse).status()).toBe(200);
   const updatedDog = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals/" + dog.id).then((response) => response.json());
   expect(updatedDog.animal.domainProfile).toMatchObject({
@@ -152,6 +152,84 @@ test("dog and cat profiles are validated, displayed and partially editable", asy
   const preservedCat = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals/" + cat.id).then((response) => response.json());
   expect(preservedCat.animal.domainProfile).toMatchObject({ animalType: "cat", breed: "Europeo", indoorOutdoor: "indoor" });
 });
+
+test("animal creation wizard guides category changes and saves an initial weight", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/animals");
+
+  await page.locator(".page-header .page-actions").getByRole("button", { name: "Nuovo animale", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("navigation", { name: "Passaggi della procedura" })).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Continua", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Inserisci il nome dell'animale");
+
+  const name = "E2E Wizard Cat " + Date.now();
+  await dialog.getByLabel("Nome").fill(name);
+  await dialog.getByRole("button", { name: /Cani/ }).click();
+  await expect(dialog.getByLabel("Specie")).toHaveValue("Canis lupus familiaris");
+  await dialog.getByRole("button", { name: "Continua", exact: true }).click();
+
+  await dialog.getByLabel("Razza").fill("Labrador");
+  await dialog.getByLabel("Livello di attività").selectOption("high");
+  await expect(dialog.getByLabel("Accesso all'esterno")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Indietro", exact: true }).click();
+
+  await dialog.getByRole("button", { name: /Gatti/ }).click();
+  await expect(dialog.getByLabel("Specie")).toHaveValue("Felis catus");
+  await dialog.getByRole("button", { name: "Continua", exact: true }).click();
+  await expect(dialog.getByLabel("Razza")).toHaveValue("");
+  await expect(dialog.getByLabel("Accesso all'esterno")).toBeVisible();
+  await expect(dialog.getByLabel("Livello di attività")).toHaveCount(0);
+
+  await dialog.getByLabel("Razza").fill("Europeo");
+  await dialog.getByLabel("Accesso all'esterno").selectOption("indoor");
+  await dialog.getByLabel("Ambiente / posizione").fill("Casa");
+  await dialog.getByLabel("Peso").fill("1250");
+  await dialog.getByLabel("Data della pesatura").fill("2026-11-28");
+
+  await dialog.getByRole("button", { name: "Indietro", exact: true }).click();
+  await expect(dialog.getByLabel("Nome")).toHaveValue(name);
+  await expect(dialog.getByRole("button", { name: /Gatti/ })).toHaveAttribute("aria-pressed", "true");
+  await dialog.getByRole("button", { name: "Continua", exact: true }).click();
+  await expect(dialog.getByLabel("Razza")).toHaveValue("Europeo");
+  await expect(dialog.getByLabel("Peso")).toHaveValue("1250");
+  await dialog.getByRole("button", { name: "Continua", exact: true }).click();
+
+  await expect(dialog.getByRole("heading", { name: "Controlla la scheda prima di salvarla" })).toBeVisible();
+  const createRequest = page.waitForRequest((request) =>
+    request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/animals"
+  );
+  const createResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/v1/animals"
+  );
+  const weightResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && /^\/api\/v1\/animals\/[^/]+\/weights$/.test(new URL(response.url()).pathname)
+  );
+  await dialog.getByRole("button", { name: "Salta dettagli e salva", exact: true }).click();
+  const request = await createRequest;
+  const created = await createResponse;
+  expect(created.status(), await created.text()).toBe(201);
+  const payload = request.postDataJSON();
+  expect(payload).toMatchObject({
+    name,
+    category: "dogs_cats",
+    species: "Felis catus",
+    domainProfile: { animalType: "cat", breed: "Europeo", indoorOutdoor: "indoor" },
+    locationLabel: "Casa",
+  });
+  expect(payload.domainProfile).not.toHaveProperty("activityLevel");
+  expect(payload.domainProfile).not.toHaveProperty("enclosure");
+  expect(payload).not.toHaveProperty("morph");
+
+  const weight = await weightResponse;
+  expect(weight.status(), await weight.text()).toBe(201);
+  expect((await created.json()).animal.id).toBeTruthy();
+  await expect(dialog).not.toBeVisible();
+});
+
 
 test("animal list supports multi-selection and atomic bulk weight records", async ({ page }) => {
   await signIn(page);

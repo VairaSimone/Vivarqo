@@ -126,7 +126,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       ...editableAnimalFields,
       ...(getString(animal, "status") === "archived" ? {} : { status: editedStatus }),
       identifier: animalEditForm.identifier || null,
-      morph: animalEditForm.morph || null,
+      morph: animal?.category === "reptiles" ? (animalEditForm.morph || null) : undefined,
       geneticsNotes: animalEditForm.geneticsNotes || null,
       birthDate: animalEditForm.birthDate || null,
       acquiredDate: animalEditForm.acquiredDate || null,
@@ -497,7 +497,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <div className="animal-profile-main">
           <div className="animal-hero-title"><h1>{animalName}</h1><Badge tone={getString(animal, "status") === "active" ? "success" : "neutral"}>{t(`animalStatus_${getString(animal, "status")}`)}</Badge></div>
           <p className="animal-hero-meta">{getString(animal, "species") || "—"} <span>·</span> {getString(animal, "sex") ? t(getString(animal, "sex")) : "—"} <span>·</span> {getString(animal, "identifier") || t("identifierMissing")}</p>
-          {getString(animal, "morph") && <p className="animal-hero-morph">{getString(animal, "morph")}</p>}
+          {animal.category === "reptiles" && getString(animal, "morph") && <p className="animal-hero-morph">{getString(animal, "morph")}</p>}
         </div>
       </div>
       <div className="animal-hero-actions">
@@ -545,7 +545,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       </Panel>}
             <Panel><PanelHeader title={t("overview")} /><div className="detail-fields">
         <Detail label={t("identifier")} value={getString(animal, "identifier")} /><Detail label={t("species")} value={getString(animal, "species")} />
-        <Detail label={t("sex")} value={getString(animal, "sex") ? t(getString(animal, "sex")) : ""} /><Detail label={t("morph")} value={getString(animal, "morph")} />
+        <Detail label={t("sex")} value={getString(animal, "sex") ? t(getString(animal, "sex")) : ""} />{animal.category === "reptiles" && <Detail label={t("morph")} value={getString(animal, "morph")} />}
         <Detail label={t("birthDate")} value={formatDate(getString(animal, "birthDate"), locale)} /><Detail label={t("acquiredDate")} value={formatDate(getString(animal, "acquiredDate"), locale)} />
         <Detail label={t("location")} value={getString(animal, "locationLabel")} /><Detail label={t("previousBreeder")} value={getString(animal, "previousBreeder")} />
       </div></Panel>
@@ -556,8 +556,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       <Panel>
         <PanelHeader title={locale === "it" ? "Genealogia" : "Genealogy"} description={locale === "it" ? "Apri i genitori per consultare anche le generazioni precedenti." : "Open either parent to inspect earlier generations."} />
         <div className="detail-fields">
-          <div className="detail-field"><span>{locale === "it" ? "Madre" : "Mother"}</span>{animal.mother ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.mother!.id)}`)}>{animal.mother.name}{animal.mother.morph ? ` · ${animal.mother.morph}` : ""}</button> : <strong>{getString(animal, "motherDescription") || "—"}</strong>}</div>
-          <div className="detail-field"><span>{locale === "it" ? "Padre" : "Father"}</span>{animal.father ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.father!.id)}`)}>{animal.father.name}{animal.father.morph ? ` · ${animal.father.morph}` : ""}</button> : <strong>{getString(animal, "fatherDescription") || "—"}</strong>}</div>
+          <div className="detail-field"><span>{locale === "it" ? "Madre" : "Mother"}</span>{animal.mother ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.mother!.id)}`)}>{animal.mother.name}{animal.category === "reptiles" && animal.mother.morph ? ` · ${animal.mother.morph}` : ""}</button> : <strong>{getString(animal, "motherDescription") || "—"}</strong>}</div>
+          <div className="detail-field"><span>{locale === "it" ? "Padre" : "Father"}</span>{animal.father ? <button className="text-link" onClick={() => navigate(`/animals/${encodeURIComponent(animal.father!.id)}`)}>{animal.father.name}{animal.category === "reptiles" && animal.father.morph ? ` · ${animal.father.morph}` : ""}</button> : <strong>{getString(animal, "fatherDescription") || "—"}</strong>}</div>
           <div className="detail-field"><span>{locale === "it" ? "Covata di provenienza" : "Source clutch"}</span>{animal.originClutchId ? <button className="text-link" onClick={() => navigate(`/clutches/${encodeURIComponent(animal.originClutchId!)}`)}>{locale === "it" ? "Apri covata" : "Open clutch"}</button> : <strong>—</strong>}</div>
         </div>
         <p className="muted-note">{locale === "it" ? "La genealogia completa si esplora seguendo i collegamenti dei genitori, generazione dopo generazione." : "Explore the full pedigree by following parent links, generation by generation."}</p>
@@ -772,7 +772,7 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <Field label={t("identifier")}><Input maxLength={120} value={animalEditForm.identifier} onChange={(e) => setAnimalEditForm({ ...animalEditForm, identifier: e.target.value })} /></Field>
           <Field label={t("species")}><Input required maxLength={160} value={animalEditForm.species} onChange={(e) => setAnimalEditForm({ ...animalEditForm, species: e.target.value })} /></Field>
           <Field label={t("sex")}><Select value={animalEditForm.sex} onChange={(e) => setAnimalEditForm({ ...animalEditForm, sex: e.target.value })}><option value="unknown">{t("unknown")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option></Select></Field>
-          <Field label={t("morph")}><Input maxLength={200} value={animalEditForm.morph} onChange={(e) => setAnimalEditForm({ ...animalEditForm, morph: e.target.value })} /></Field>
+          {animal?.category === "reptiles" && <Field label={t("morph")}><Input maxLength={200} value={animalEditForm.morph} onChange={(e) => setAnimalEditForm({ ...animalEditForm, morph: e.target.value })} /></Field>}
           <Field label={t("location")}><Input maxLength={160} value={animalEditForm.locationLabel} onChange={(e) => setAnimalEditForm({ ...animalEditForm, locationLabel: e.target.value })} /></Field>
           <Field label={t("birthDate")}><Input type="date" value={animalEditForm.birthDate} onChange={(e) => setAnimalEditForm({ ...animalEditForm, birthDate: e.target.value })} /></Field>
           <Field label={t("acquiredDate")}><Input type="date" value={animalEditForm.acquiredDate} onChange={(e) => setAnimalEditForm({ ...animalEditForm, acquiredDate: e.target.value })} /></Field>
