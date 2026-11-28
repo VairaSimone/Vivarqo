@@ -84,12 +84,23 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   await expect(page.getByText(aviaryName + " updated", { exact: true })).toHaveCount(0);
 
   const animalName = "E2E Companion " + Date.now();
-  await createAnimal(page, animalName);
+  const companionAnimal = await createAnimal(page, animalName);
   await page.goto("/companion-care");
-  await expect(page.getByLabel("Animale")).toBeVisible();
+  const companionSelector = page.getByLabel("Animale");
+  await expect(companionSelector).toBeVisible();
+  await companionSelector.selectOption(companionAnimal.id);
+  await expect(companionSelector).toHaveValue(companionAnimal.id);
   await page.getByLabel("Descrizione").fill("Vaccino annuale E2E");
   await page.getByLabel("Data evento").fill("2026-11-26");
+  const careCreatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    new URL(response.url()).pathname === "/api/v1/companion-care"
+  );
   await page.getByRole("button", { name: "Registra evento" }).click();
+  const careResponse = await careCreatedResponse;
+  expect(careResponse.status(), await careResponse.text()).toBe(201);
+  const createdCare = await careResponse.json();
+  expect(createdCare.record.animalId).toBe(companionAnimal.id);
   await expect(page.getByText("Vaccino annuale E2E", { exact: true })).toBeVisible();
   const record = page.locator(".ecosys-reading").filter({ hasText: "Vaccino annuale E2E" });
   await record.getByRole("button", { name: "Modifica" }).click();

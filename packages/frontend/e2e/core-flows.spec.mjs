@@ -916,6 +916,10 @@ test("reproduction cycle, event, clutch, eggs, incubation and offspring persist"
   await conversionDialog.getByRole("button", { name: "Crea schede animali" }).click();
   const babiesResponse = await conversionResponsePromise;
   expect(babiesResponse.status(), await babiesResponse.text()).toBe(201);
+  const converted = await babiesResponse.json();
+  expect(converted.animals).toHaveLength(2);
+  expect(converted.animals.map((animal) => animal.originOffspringBatchId)).toEqual([batch.id, batch.id]);
+  expect(converted.animals.map((animal) => animal.originClutchId)).toEqual([clutch.id, clutch.id]);
   const animalsAfterConversion = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals?page=1&pageSize=100&status=active");
   const babyNames = (await animalsAfterConversion.json()).animals.map((item) => item.name);
   expect(babyNames).toEqual(expect.arrayContaining(["E2E Baby 1", "E2E Baby 2"]));
