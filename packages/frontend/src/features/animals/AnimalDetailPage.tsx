@@ -20,6 +20,8 @@ import { Alert, Badge, Button, DataTable, EmptyState, ErrorState, Field, Icon, I
 
 const sourceAnimalDetailEndpoint = (sourceId: string) => "/animals/" + encodeURIComponent(sourceId);
 
+const editableAnimalProfileKeys: Record<string, readonly string[]> = {"reptiles":["enclosure","brumation","feedingNotes"],"fish":["aquariumId","waterType","temperament","maxSizeCm","shoaling","diet"],"birds":["aviaryId","diet","tameness","flightStatus"],"dogs_cats":["animalType","breed","microchip","veterinarianName","veterinaryClinic","veterinaryPhone","veterinaryEmail","veterinaryAddress","allergies","chronicConditions","sterilized","vaccinationStatus","coatColor","indoorOutdoor","activityLevel","weightKg"]};
+
 export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale: Locale; navigate: (path: string) => void }) {
   const t = (key: string) => translate(locale, key);
   const animalResource = useResource<{ animal: AnimalDto }>(`/animals/${encodeURIComponent(id)}`);
@@ -32,7 +34,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const [animalEditForm, setAnimalEditForm] = useState({
     name: "", identifier: "", species: "", sex: "unknown", morph: "", geneticsNotes: "",
     birthDate: "", birthDateEstimated: false, acquiredDate: "", originDescription: "",
-    previousBreeder: "", locationLabel: "", status: "active", notes: ""
+    previousBreeder: "", locationLabel: "", status: "active", notes: "",
+    domainProfile: {} as Record<string, unknown>,
   });
   const [recordKind, setRecordKind] = useState<"weight" | "shed" | "note" | null>(null);
   const [recordEdit, setRecordEdit] = useState<CareRecordDto | null>(null);
@@ -93,6 +96,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   function openAnimalEdit() {
     if (!animal) return;
     setPhotoFile(null);
+    const domainProfile = { ...((animal.domainProfile ?? {}) as Record<string, unknown>) };
+    if (animal.category === "dogs_cats" && domainProfile.animalType !== "dog" && domainProfile.animalType !== "cat") {
+      domainProfile.animalType = /felis|gatt|\bcat\b/i.test(getString(animal, "species")) ? "cat" : "dog";
+    }
     setAnimalEditForm({
       name: getString(animal, "name"), identifier: getString(animal, "identifier"),
       species: getString(animal, "species"), sex: getString(animal, "sex", "unknown"),
@@ -104,7 +111,8 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       previousBreeder: getString(animal, "previousBreeder"),
       locationLabel: getString(animal, "locationLabel"),
       status: getString(animal, "status", "active"),
-      notes: getString(animal, "notes")
+      notes: getString(animal, "notes"),
+      domainProfile,
     });
     setAnimalEditError("");
     setAnimalEditModal(true);
@@ -125,7 +133,12 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       originDescription: animalEditForm.originDescription || null,
       previousBreeder: animalEditForm.previousBreeder || null,
       locationLabel: animalEditForm.locationLabel || null,
-      notes: animalEditForm.notes || null
+      notes: animalEditForm.notes || null,
+      domainProfile: Object.fromEntries(
+        Object.entries(animalEditForm.domainProfile)
+          .filter(([key]) => (editableAnimalProfileKeys[animal?.category ?? ""] ?? []).includes(key))
+          .map(([key, value]) => [key, value === "" ? null : value]),
+      ),
     };
     try {
       await api.patch("/animals/" + id, body);
@@ -138,6 +151,13 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
       setAnimalEditError(reason instanceof ApiError ? reason.message : t("operationFailed"));
     } finally { setAnimalEditBusy(false); }
   }
+
+  function updateAnimalEditProfile(key: string, value: unknown) {
+    setAnimalEditForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, [key]: value } }));
+  }
+  const editProfileValue = (key: string) => String(animalEditForm.domainProfile[key] ?? "");
+  const isEditingCompanion = animal?.category === "dogs_cats";
+  const editingCompanionType = animalEditForm.domainProfile.animalType === "cat" ? "cat" : "dog";
 
   function openRecord(kind: "weight" | "shed" | "note", existing?: CareRecordDto) {
     if (kind === "shed" && animal?.category !== "reptiles") return;
@@ -376,6 +396,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     tameness: { it: "Abitudine al contatto", en: "Tameness" },
     flightStatus: { it: "Capacità di volo", en: "Flight status" },
     breed: { it: "Razza", en: "Breed" },
+    animalType: { it: "Tipo animale", en: "Animal type" },
+    indoorOutdoor: { it: "Accesso all'esterno", en: "Outdoor access" },
+    activityLevel: { it: "Livello di attività", en: "Activity level" },
     microchip: { it: "Microchip", en: "Microchip" },
     veterinarianName: { it: "Veterinario", en: "Veterinarian" },
     veterinaryClinic: { it: "Clinica veterinaria", en: "Veterinary clinic" },
@@ -403,6 +426,9 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     tameness: { wild: locale === "it" ? "Selvatico" : "Wild", socialized: locale === "it" ? "Socializzato" : "Socialized", tame: locale === "it" ? "Addomesticato" : "Tame" },
     flightStatus: { full_flight: locale === "it" ? "Volo completo" : "Full flight", clipped: locale === "it" ? "Remiganti accorciate" : "Clipped", unknown: locale === "it" ? "Non noto" : "Unknown" },
     vaccinationStatus: { unknown: locale === "it" ? "Non noto" : "Unknown", not_up_to_date: locale === "it" ? "Da aggiornare" : "Not up to date", up_to_date: locale === "it" ? "In regola" : "Up to date" },
+    animalType: { dog: locale === "it" ? "Cane" : "Dog", cat: locale === "it" ? "Gatto" : "Cat" },
+    indoorOutdoor: { indoor: locale === "it" ? "Solo in casa" : "Indoor only", outdoor: locale === "it" ? "Solo esterno" : "Outdoor only", both: locale === "it" ? "Dentro e fuori" : "Indoor and outdoor" },
+    activityLevel: { low: locale === "it" ? "Basso" : "Low", moderate: locale === "it" ? "Moderato" : "Moderate", high: locale === "it" ? "Alto" : "High" },
     ringType: { none: locale === "it" ? "Nessuno" : "None", unspecified: locale === "it" ? "Non specificato" : "Unspecified", closed: locale === "it" ? "Anello chiuso" : "Closed ring", open: locale === "it" ? "Anello aperto" : "Open ring", microchip: "Microchip" },
   };
   function addProfileField(key: string, value: unknown) {
@@ -420,9 +446,14 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
     reptiles: ["enclosure", "brumation", "feedingNotes"],
     fish: ["waterType", "temperament", "maxSizeCm", "shoaling", "diet"],
     birds: ["diet", "tameness", "flightStatus"],
-    dogs_cats: ["breed", "microchip", "coatColor", "weightKg", "vaccinationStatus", "sterilized", "veterinarianName", "veterinaryClinic", "veterinaryPhone", "veterinaryEmail", "veterinaryAddress", "allergies", "chronicConditions"],
+    dogs_cats: ["animalType", "breed", "microchip", "coatColor", "weightKg", "vaccinationStatus", "sterilized", "indoorOutdoor", "activityLevel", "veterinarianName", "veterinaryClinic", "veterinaryPhone", "veterinaryEmail", "veterinaryAddress", "allergies", "chronicConditions"],
   };
-  for (const key of categoryProfileKeys[animal.category] ?? []) addProfileField(key, profile[key]);
+  for (const key of categoryProfileKeys[animal.category] ?? []) {
+    const value = key === "animalType" && profile.animalType == null
+      ? (/felis|gatt|\bcat\b/i.test(getString(animal, "species")) ? "cat" : "dog")
+      : profile[key];
+    addProfileField(key, value);
+  }
   if (animal.category === "birds" && birdProfile.data?.profile) {
     const bird = birdProfile.data.profile;
     for (const key of ["ringType", "ringNumber", "ringYear", "citesNumber", "citesAnnex", "citesAuthority", "citesIssuedAt", "citesExpiresAt"]) {
@@ -748,6 +779,50 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
           <Field label={t("previousBreeder")}><Input maxLength={160} value={animalEditForm.previousBreeder} onChange={(e) => setAnimalEditForm({ ...animalEditForm, previousBreeder: e.target.value })} /></Field>
           <Field label={t("status")}><Select disabled={isArchived} value={animalEditForm.status} onChange={(e) => setAnimalEditForm({ ...animalEditForm, status: e.target.value })}>{[...(isArchived ? ["archived"] : []), "active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t("animalStatus_" + value)}</option>)}</Select></Field>
         </div>
+        {animal && <section className="animal-editor-section">
+          <div className="animal-editor-section-heading"><div>
+            <h3>{locale === "it" ? "Dati specifici della categoria" : "Category-specific details"}</h3>
+            <p>{locale === "it" ? "Modifica qui gli stessi dati disponibili durante la creazione." : "Edit the same fields available during animal creation."}</p>
+          </div></div>
+          <div className="form-grid">
+            {animal.category === "reptiles" && <>
+              <Field label={locale === "it" ? "Alloggiamento / terrario" : "Enclosure"}><Input maxLength={120} value={editProfileValue("enclosure")} onChange={(e) => updateAnimalEditProfile("enclosure", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Brumazione" : "Brumation"}><Select value={editProfileValue("brumation")} onChange={(e) => updateAnimalEditProfile("brumation", e.target.value)}><option value="">{locale === "it" ? "Non registrata" : "Not recorded"}</option><option value="not_applicable">{locale === "it" ? "Non applicabile" : "Not applicable"}</option><option value="planned">{locale === "it" ? "Pianificata" : "Planned"}</option><option value="in_progress">{locale === "it" ? "In corso" : "In progress"}</option><option value="completed">{locale === "it" ? "Completata" : "Completed"}</option></Select></Field>
+              <Field label={locale === "it" ? "Note alimentazione" : "Feeding notes"}><Textarea rows={2} value={editProfileValue("feedingNotes")} onChange={(e) => updateAnimalEditProfile("feedingNotes", e.target.value)} /></Field>
+            </>}
+            {animal.category === "fish" && <>
+              <Field label={locale === "it" ? "Tipo d'acqua" : "Water type"}><Select value={editProfileValue("waterType")} onChange={(e) => updateAnimalEditProfile("waterType", e.target.value)}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="freshwater">{locale === "it" ? "Dolce" : "Freshwater"}</option><option value="saltwater">{locale === "it" ? "Marina" : "Saltwater"}</option><option value="brackish">{locale === "it" ? "Salmastra" : "Brackish"}</option></Select></Field>
+              <Field label={locale === "it" ? "Temperamento" : "Temperament"}><Input maxLength={120} value={editProfileValue("temperament")} onChange={(e) => updateAnimalEditProfile("temperament", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Dimensione adulta (cm)" : "Adult size (cm)"}><Input type="number" min="0.1" max="500" step="0.1" value={editProfileValue("maxSizeCm")} onChange={(e) => updateAnimalEditProfile("maxSizeCm", e.target.value === "" ? "" : Number(e.target.value))} /></Field>
+              <Field label={locale === "it" ? "Alimentazione" : "Diet"}><Input maxLength={160} value={editProfileValue("diet")} onChange={(e) => updateAnimalEditProfile("diet", e.target.value)} /></Field>
+              <label className="checkbox-field"><input type="checkbox" checked={Boolean(animalEditForm.domainProfile.shoaling)} onChange={(e) => updateAnimalEditProfile("shoaling", e.target.checked)} /><span>{locale === "it" ? "Specie gregaria" : "Shoaling species"}</span></label>
+            </>}
+            {animal.category === "birds" && <>
+              <Field label={locale === "it" ? "Alimentazione" : "Diet"}><Input maxLength={160} value={editProfileValue("diet")} onChange={(e) => updateAnimalEditProfile("diet", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Abitudine al contatto" : "Tameness"}><Select value={editProfileValue("tameness")} onChange={(e) => updateAnimalEditProfile("tameness", e.target.value)}><option value="">{locale === "it" ? "Non registrata" : "Not recorded"}</option><option value="wild">{locale === "it" ? "Selvatico" : "Wild"}</option><option value="socialized">{locale === "it" ? "Socializzato" : "Socialized"}</option><option value="tame">{locale === "it" ? "Addomesticato" : "Tame"}</option></Select></Field>
+              <Field label={locale === "it" ? "Capacità di volo" : "Flight status"}><Select value={editProfileValue("flightStatus")} onChange={(e) => updateAnimalEditProfile("flightStatus", e.target.value)}><option value="">{locale === "it" ? "Non registrata" : "Not recorded"}</option><option value="full_flight">{locale === "it" ? "Volo completo" : "Full flight"}</option><option value="clipped">{locale === "it" ? "Remiganti accorciate" : "Clipped"}</option><option value="unknown">{t("unknown")}</option></Select></Field>
+            </>}
+            {isEditingCompanion && <>
+              <Field label={locale === "it" ? "Tipo animale" : "Animal type"}><Input readOnly value={editingCompanionType === "cat" ? (locale === "it" ? "Gatto" : "Cat") : (locale === "it" ? "Cane" : "Dog")} /></Field>
+              <Field label={locale === "it" ? "Razza" : "Breed"}><Input maxLength={160} value={editProfileValue("breed")} onChange={(e) => updateAnimalEditProfile("breed", e.target.value)} /></Field>
+              <Field label="Microchip"><Input maxLength={40} value={editProfileValue("microchip")} onChange={(e) => updateAnimalEditProfile("microchip", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Colore mantello" : "Coat colour"}><Input maxLength={120} value={editProfileValue("coatColor")} onChange={(e) => updateAnimalEditProfile("coatColor", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Peso registrato (kg)" : "Recorded weight (kg)"}><Input type="number" min="0.001" max="250" step="0.001" value={editProfileValue("weightKg")} onChange={(e) => updateAnimalEditProfile("weightKg", e.target.value === "" ? "" : Number(e.target.value))} /></Field>
+              <Field label={locale === "it" ? "Vaccinazioni" : "Vaccination status"}><Select value={editProfileValue("vaccinationStatus")} onChange={(e) => updateAnimalEditProfile("vaccinationStatus", e.target.value)}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="unknown">{t("unknown")}</option><option value="not_up_to_date">{locale === "it" ? "Da aggiornare" : "Not up to date"}</option><option value="up_to_date">{locale === "it" ? "In regola" : "Up to date"}</option></Select></Field>
+              <label className="checkbox-field"><input type="checkbox" checked={Boolean(animalEditForm.domainProfile.sterilized)} onChange={(e) => updateAnimalEditProfile("sterilized", e.target.checked)} /><span>{locale === "it" ? "Sterilizzato" : "Neutered / spayed"}</span></label>
+              {editingCompanionType === "cat"
+                ? <Field label={locale === "it" ? "Accesso all'esterno" : "Outdoor access"}><Select value={editProfileValue("indoorOutdoor")} onChange={(e) => updateAnimalEditProfile("indoorOutdoor", e.target.value)}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="indoor">{locale === "it" ? "Solo in casa" : "Indoor only"}</option><option value="outdoor">{locale === "it" ? "Solo esterno" : "Outdoor only"}</option><option value="both">{locale === "it" ? "Dentro e fuori" : "Indoor and outdoor"}</option></Select></Field>
+                : <Field label={locale === "it" ? "Livello di attività" : "Activity level"}><Select value={editProfileValue("activityLevel")} onChange={(e) => updateAnimalEditProfile("activityLevel", e.target.value)}><option value="">{locale === "it" ? "Non registrato" : "Not recorded"}</option><option value="low">{locale === "it" ? "Basso" : "Low"}</option><option value="moderate">{locale === "it" ? "Moderato" : "Moderate"}</option><option value="high">{locale === "it" ? "Alto" : "High"}</option></Select></Field>}
+              <Field label={locale === "it" ? "Veterinario" : "Veterinarian"}><Input maxLength={160} value={editProfileValue("veterinarianName")} onChange={(e) => updateAnimalEditProfile("veterinarianName", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Clinica veterinaria" : "Veterinary clinic"}><Input maxLength={160} value={editProfileValue("veterinaryClinic")} onChange={(e) => updateAnimalEditProfile("veterinaryClinic", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Telefono veterinario" : "Veterinary phone"}><Input maxLength={40} value={editProfileValue("veterinaryPhone")} onChange={(e) => updateAnimalEditProfile("veterinaryPhone", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Email veterinario" : "Veterinary email"}><Input type="email" maxLength={254} value={editProfileValue("veterinaryEmail")} onChange={(e) => updateAnimalEditProfile("veterinaryEmail", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Indirizzo veterinario" : "Veterinary address"}><Input maxLength={300} value={editProfileValue("veterinaryAddress")} onChange={(e) => updateAnimalEditProfile("veterinaryAddress", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Allergie" : "Allergies"}><Textarea rows={2} maxLength={5000} value={editProfileValue("allergies")} onChange={(e) => updateAnimalEditProfile("allergies", e.target.value)} /></Field>
+              <Field label={locale === "it" ? "Patologie croniche" : "Chronic conditions"}><Textarea rows={2} maxLength={5000} value={editProfileValue("chronicConditions")} onChange={(e) => updateAnimalEditProfile("chronicConditions", e.target.value)} /></Field>
+            </>}
+          </div>
+        </section>}
         <Field label={t("geneticsNotes")}><Textarea rows={2} value={animalEditForm.geneticsNotes} onChange={(e) => setAnimalEditForm({ ...animalEditForm, geneticsNotes: e.target.value })} /></Field>
         <Field label={t("origin")}><Textarea rows={2} value={animalEditForm.originDescription} onChange={(e) => setAnimalEditForm({ ...animalEditForm, originDescription: e.target.value })} /></Field>
         <Field label={t("animalNotes")}><Textarea rows={3} value={animalEditForm.notes} onChange={(e) => setAnimalEditForm({ ...animalEditForm, notes: e.target.value })} /></Field>

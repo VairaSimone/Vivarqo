@@ -62,7 +62,7 @@ async function createAnimal(page, name, options = {}) {
 }
 
 
-test("animal creation requires category data and API PATCH cannot change category", async ({ page }) => {
+test("animal creation accepts empty category profiles and API PATCH cannot change category", async ({ page }) => {
   await signIn(page);
   await enableAllCategories(page);
 
@@ -75,17 +75,18 @@ test("animal creation requires category data and API PATCH cannot change categor
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf.csrfToken },
         body: JSON.stringify({
-          name: "E2E missing profile " + category + " " + Date.now(),
+          name: "E2E empty profile " + category + " " + Date.now(),
           species: "Test species",
           category,
           domainProfile: {},
         }),
       });
-      return response.status;
+      return { status: response.status, body: await response.json() };
     }));
     return results;
   });
-  expect(missingProfileStatuses).toEqual([400, 400, 400, 400]);
+  expect(missingProfileStatuses.map((item) => item.status)).toEqual([201, 201, 201, 201]);
+  for (const result of missingProfileStatuses) expect(result.body.animal.domainProfile).toEqual({});
 
   const animal = await createAnimal(page, "E2E immutable category " + Date.now(), {
     category: "dogs_cats",
@@ -106,6 +107,50 @@ test("animal creation requires category data and API PATCH cannot change categor
   expect(result.status).toBe(409);
   expect(result.persisted.animal.category).toBe("dogs_cats");
   expect(result.persisted.animal.domainProfile).toEqual({ vaccinationStatus: "unknown" });
+});
+
+test("dog and cat profiles are validated, displayed and partially editable", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+  const dog = await createAnimal(page, "E2E dog profile " + Date.now(), {
+    species: "Canis lupus familiaris",
+    domainProfile: { animalType: "dog", breed: "Labrador", activityLevel: "high" },
+  });
+  const cat = await createAnimal(page, "E2E cat profile " + Date.now(), {
+    species: "Felis catus",
+    domainProfile: { animalType: "cat", breed: "Europeo", indoorOutdoor: "indoor" },
+  });
+
+  await page.goto("/animals/" + encodeURIComponent(dog.id));
+  await expect(page.getByText("Cane", { exact: true })).toBeVisible();
+  await expect(page.getByText("Alto", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Modifica", exact: true }).click();
+  const editDialog = page.getByRole("dialog");
+  await editDialog.getByLabel("Razza").fill("Labrador Retriever");
+  await editDialog.getByLabel("Livello di attività").selectOption("moderate");
+  const saveResponse = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    new URL(response.url()).pathname === "/api/v1/animals/" + dog.id
+  );
+  await editDialog.getByRole("button", { name: "Salva", exact: true }).click();
+  expect((await saveResponse).status()).toBe(200);
+  const updatedDog = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals/" + dog.id).then((response) => response.json());
+  expect(updatedDog.animal.domainProfile).toMatchObject({
+    animalType: "dog", breed: "Labrador Retriever", activityLevel: "moderate",
+  });
+
+  await page.goto("/animals/" + encodeURIComponent(cat.id));
+  await expect(page.getByText("Gatto", { exact: true })).toBeVisible();
+  await expect(page.getByText("Solo in casa", { exact: true })).toBeVisible();
+
+  const csrf = await page.evaluate(async () => fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json()));
+  const invalidCatPatch = await page.context().request.patch("http://127.0.0.1:4173/api/v1/animals/" + cat.id, {
+    headers: { "X-CSRF-Token": csrf.csrfToken },
+    data: { domainProfile: { activityLevel: "high" } },
+  });
+  expect(invalidCatPatch.status()).toBe(400);
+  const preservedCat = await page.context().request.get("http://127.0.0.1:4173/api/v1/animals/" + cat.id).then((response) => response.json());
+  expect(preservedCat.animal.domainProfile).toMatchObject({ animalType: "cat", breed: "Europeo", indoorOutdoor: "indoor" });
 });
 
 test("animal list supports multi-selection and atomic bulk weight records", async ({ page }) => {

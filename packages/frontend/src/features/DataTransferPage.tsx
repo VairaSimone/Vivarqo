@@ -53,7 +53,7 @@ function ImportPage({ locale }: { locale: Locale }) {
   };
 
   const fieldLabels: Record<string, string> = locale === "it" ? {
-    name: "Nome", identifier: "Identificativo", species: "Specie", sex: "Sesso", morph: "Morph",
+    name: "Nome", identifier: "Identificativo", species: "Specie", animalType: "Tipo cane/gatto", sex: "Sesso", morph: "Morph",
     geneticsNotes: "Note genetiche", birthDate: "Data di nascita", birthDateEstimated: "Nascita stimata",
     acquiredDate: "Data acquisizione", originDescription: "Provenienza", previousBreeder: "Allevatore precedente",
     locationLabel: "Posizione", status: "Stato", notes: "Note", animalId: "ID animale",
@@ -72,7 +72,7 @@ function ImportPage({ locale }: { locale: Locale }) {
     recordedAt: "Data registrazione", bornOn: "Data nascita", count: "Numero piccoli",
     documentId: "ID documento", unitCostCents: "Costo unitario in centesimi", reference: "Riferimento"
   } : {
-    name: "Name", identifier: "Identifier", species: "Species", sex: "Sex", morph: "Morph",
+    name: "Name", identifier: "Identifier", species: "Species", animalType: "Dog/cat type", sex: "Sex", morph: "Morph",
     geneticsNotes: "Genetic notes", birthDate: "Birth date", birthDateEstimated: "Estimated birth date",
     acquiredDate: "Acquired date", originDescription: "Origin", previousBreeder: "Previous breeder",
     locationLabel: "Location", status: "Status", notes: "Notes", animalId: "Animal ID",

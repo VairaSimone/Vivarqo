@@ -60,6 +60,42 @@ export function validateAnimalDomainProfile(category: z.infer<typeof animalCateg
   return animalDomainProfiles[category].safeParse(profile ?? {});
 }
 
+const animalDomainProfileKeys: Record<z.infer<typeof animalCategorySchema>, readonly string[]> = {
+  reptiles: ["enclosure", "brumation", "feedingNotes"],
+  fish: ["aquariumId", "waterType", "temperament", "maxSizeCm", "shoaling", "diet"],
+  birds: ["aviaryId", "diet", "tameness", "flightStatus"],
+  dogs_cats: ["animalType", "breed", "microchip", "veterinarianName", "veterinaryClinic", "veterinaryPhone", "veterinaryEmail", "veterinaryAddress", "allergies", "chronicConditions", "sterilized", "vaccinationStatus", "coatColor", "indoorOutdoor", "activityLevel", "weightKg"],
+};
+
+/** Omitted profile keys stay untouched; null/blank explicitly clears one key. */
+export function mergeAnimalDomainProfile(
+  category: z.infer<typeof animalCategorySchema>,
+  current: unknown,
+  patch: unknown,
+) {
+  const currentRecord = typeof current === "object" && current !== null && !Array.isArray(current)
+    ? current as Record<string, unknown>
+    : {};
+  if (typeof patch !== "object" || patch === null || Array.isArray(patch)) {
+    return validateAnimalDomainProfile(category, patch);
+  }
+  const patchRecord = patch as Record<string, unknown>;
+  const allowedKeys = new Set(animalDomainProfileKeys[category]);
+  const unknownKey = Object.keys(patchRecord).find((key) => !allowedKeys.has(key));
+  if (unknownKey) return validateAnimalDomainProfile(category, { [unknownKey]: patchRecord[unknownKey] });
+
+  const merged: Record<string, unknown> = { ...currentRecord };
+  for (const [key, value] of Object.entries(patchRecord)) {
+    if (value === null || value === "" || value === undefined) delete merged[key];
+    else merged[key] = value;
+  }
+  const knownProfile = Object.fromEntries(Object.entries(merged).filter(([key]) => allowedKeys.has(key)));
+  const parsed = validateAnimalDomainProfile(category, knownProfile);
+  if (!parsed.success) return parsed;
+  const legacyFields = Object.fromEntries(Object.entries(merged).filter(([key]) => !allowedKeys.has(key)));
+  return { success: true as const, data: { ...legacyFields, ...parsed.data } };
+}
+
 export const animalStatusSchema = z.enum(["active", "sold", "transferred", "deceased", "archived"]);
 export const animalSexSchema = z.enum(["male", "female", "unknown"]);
 export const feedingOutcomeSchema = z.enum(["ate", "refused", "not_offered", "unknown"]);

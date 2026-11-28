@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAnimalSchema, validateAnimalDomainProfile } from "./animals.schemas.js";
+import { createAnimalSchema, mergeAnimalDomainProfile, validateAnimalDomainProfile } from "./animals.schemas.js";
 
 describe("multi-domain animal profiles", () => {
   it("allows creating an animal before optional category-specific details are known", () => {
@@ -72,6 +72,31 @@ describe("multi-domain animal profiles", () => {
       category: "dogs_cats",
       domainProfile: { animalType: "dog", activityLevel: "high" },
     }).success).toBe(true);
+  });
+
+  it("merges partial changes while preserving untouched and legacy values", () => {
+    const merged = mergeAnimalDomainProfile("dogs_cats", {
+      animalType: "dog", breed: "Labrador", activityLevel: "high", legacyField: "preserve me",
+    }, { activityLevel: "low" });
+    expect(merged.success).toBe(true);
+    if (merged.success) expect(merged.data).toMatchObject({
+      animalType: "dog", breed: "Labrador", activityLevel: "low", legacyField: "preserve me",
+    });
+  });
+
+  it("clears only explicitly cleared keys and preserves legacy profile values", () => {
+    const merged = mergeAnimalDomainProfile("dogs_cats", {
+      animalType: "cat", breed: "Europeo", indoorOutdoor: "indoor", legacyFlag: true,
+    }, { breed: null });
+    expect(merged.success).toBe(true);
+    if (merged.success) {
+      expect(merged.data).not.toHaveProperty("breed");
+      expect(merged.data).toMatchObject({ animalType: "cat", indoorOutdoor: "indoor", legacyFlag: true });
+    }
+  });
+
+  it("rejects new unsupported profile keys", () => {
+    expect(mergeAnimalDomainProfile("dogs_cats", {}, { arbitraryField: "invalid" }).success).toBe(false);
   });
 
   it("rejects companion fields that do not match the selected type", () => {

@@ -32,6 +32,8 @@ function getCompanionSpecies(type: CompanionType): string {
   return type === "cat" ? "Felis catus" : "Canis lupus familiaris";
 }
 
+const animalDomainProfileKeys: Record<string, readonly string[]> = {"reptiles":["enclosure","brumation","feedingNotes"],"fish":["aquariumId","waterType","temperament","maxSizeCm","shoaling","diet"],"birds":["aviaryId","diet","tameness","flightStatus"],"dogs_cats":["animalType","breed","microchip","veterinarianName","veterinaryClinic","veterinaryPhone","veterinaryEmail","veterinaryAddress","allergies","chronicConditions","sterilized","vaccinationStatus","coatColor","indoorOutdoor","activityLevel","weightKg"]};
+
 export function AnimalListPage({ locale, navigate, path }: { locale: Locale; navigate: (path: string) => void; path: string }) {
   const t = (key: string, values?: Record<string, string | number>) => translate(locale, key, values);
   const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
@@ -213,16 +215,19 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    const allowedProfileKeys = new Set(animalDomainProfileKeys[form.category] ?? []);
     const cleanDomainProfile = Object.fromEntries(
-      Object.entries(form.domainProfile).filter(([, value]) => value !== "" && value !== null && value !== undefined),
+      Object.entries(form.domainProfile).filter(([key, value]) => allowedProfileKeys.has(key) && value !== "" && value !== null && value !== undefined),
+    );
+    const profilePatch = Object.fromEntries(
+      Object.entries(form.domainProfile).filter(([key]) => allowedProfileKeys.has(key))
+        .map(([key, value]) => [key, value === "" ? null : value]),
     );
     setBusy(true);
     setError("");
     const body = {
       ...form,
-      // Do not retroactively block edits to legacy animals whose profile is empty.
-      // New animals and explicit profile updates still go through backend validation.
-      domainProfile: editing && Object.keys(cleanDomainProfile).length === 0 ? undefined : cleanDomainProfile,
+      domainProfile: editing ? (Object.keys(profilePatch).length ? profilePatch : undefined) : cleanDomainProfile,
       identifier: form.identifier || null, morph: form.morph || null,
       motherAnimalId: form.motherAnimalId || null, fatherAnimalId: form.fatherAnimalId || null,
       motherDescription: form.motherDescription || null, fatherDescription: form.fatherDescription || null,
@@ -419,40 +424,68 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     {bulkModal && <Modal title={t("bulkCreateAnimals")} onClose={() => setBulkModal(false)} wide>
       <form className="form-stack" onSubmit={async (event) => {
         event.preventDefault(); setBulkBusy(true); setBulkError("");
-        const parsed = bulkText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => line.split("|").map((value) => value.trim()));
+        const categoryByToken: Record<string, string> = {
+          reptiles: "reptiles", rettili: "reptiles", fish: "fish", pesci: "fish",
+          birds: "birds", uccelli: "birds", dogscats: "dogs_cats", caniegatti: "dogs_cats",
+          "dogscats:dog": "dogs_cats:dog", cane: "dogs_cats:dog", cani: "dogs_cats:dog",
+          "dogscats:cat": "dogs_cats:cat", gatto: "dogs_cats:cat", gatti: "dogs_cats:cat",
+        };
+        const normalizeToken = (value: string) => value.trim().toLocaleLowerCase("it-IT").replace(/[\s_-]+/g, "");
+        const parsed = bulkText.split("\n").map((line) => line.trim()).filter(Boolean)
+          .map((line) => line.split("|").map((value) => value.trim()));
+        const parsedAnimals: Array<Record<string, unknown>> = [];
         const invalidRow = parsed.findIndex((parts) => {
-          const hasCategory = parts.length === 7;
-          if ((parts.length !== 6 && !hasCategory) || !parts[0] || !parts[1]) return true;
-          const rowCategory = hasCategory ? parts[2] : bulkDefaultCategory;
+          if (parts.length < 2 || parts.length > 7 || !parts[0]) return true;
+          const categoryToken = categoryByToken[normalizeToken(parts[2] ?? "")];
+          const hasCategory = Boolean(categoryToken);
+          const selectedCategory = hasCategory ? categoryToken! : bulkDefaultCategory;
+          const rowCategory = selectedCategory.startsWith("dogs_cats:") ? "dogs_cats" : selectedCategory;
           if (!enabledCategories.includes(rowCategory)) return true;
-          const profileJson = hasCategory ? parts[6] : parts[5];
-          try {
-            const profile = JSON.parse(profileJson ?? "") as unknown;
-            return typeof profile !== "object" || profile === null || Array.isArray(profile);
-          } catch {
-            return true;
+
+          const sex = hasCategory ? (parts[3] ?? "") : (parts[2] ?? "");
+          const morph = hasCategory ? (parts[4] ?? "") : (parts[3] ?? "");
+          const identifier = hasCategory ? (parts[5] ?? "") : (parts[4] ?? "");
+          const profileJson = hasCategory ? (parts[6] ?? "") : (parts[5] ?? "");
+          if (sex && !["male", "female", "unknown", "maschio", "femmina", "sconosciuto"].includes(normalizeToken(sex))) return true;
+
+          let parsedProfile: unknown = {};
+          if (profileJson) {
+            try { parsedProfile = JSON.parse(profileJson) as unknown; }
+            catch { return true; }
+            if (typeof parsedProfile !== "object" || parsedProfile === null || Array.isArray(parsedProfile)) return true;
           }
+          const domainProfile = { ...(parsedProfile as Record<string, unknown>) };
+          let animalType: "dog" | "cat" | undefined;
+          if (selectedCategory === "dogs_cats:dog") animalType = "dog";
+          else if (selectedCategory === "dogs_cats:cat") animalType = "cat";
+          else if (rowCategory === "dogs_cats") {
+            if (domainProfile.animalType === "dog" || domainProfile.animalType === "cat") animalType = domainProfile.animalType;
+            else if (domainProfile.animalType === undefined || domainProfile.animalType === "") {
+              const speciesText = parts[1] ?? "";
+              animalType = /felis|gatt|\bcat\b/i.test(speciesText) ? "cat"
+                : /canis|cane|\bdog\b/i.test(speciesText) ? "dog" : "dog";
+            }
+          }
+          if (animalType) domainProfile.animalType = animalType;
+          const species = parts[1] || (rowCategory === "dogs_cats"
+            ? (animalType === "cat" ? "Felis catus" : "Canis lupus familiaris")
+            : "");
+          if (!species) return true;
+          parsedAnimals.push({
+            name: parts[0], species, category: rowCategory, domainProfile,
+            sex: normalizeToken(sex) === "maschio" ? "male" : normalizeToken(sex) === "femmina" ? "female" : (sex || "unknown"),
+            morph: morph || null, identifier: identifier || null,
+          });
+          return false;
         });
         if (invalidRow >= 0) {
           setBulkError(locale === "it"
-            ? `Riga ${invalidRow + 1} non valida: verifica i campi, la categoria abilitata e il JSON del profilo specifico.`
-            : `Row ${invalidRow + 1} is invalid: check the fields, enabled category and category profile JSON.`);
+            ? `Riga ${invalidRow + 1} non valida: controlla nome, specie, categoria abilitata, sesso e JSON facoltativo del profilo.`
+            : `Row ${invalidRow + 1} is invalid: check name, species, enabled category, sex and optional profile JSON.`);
           setBulkBusy(false);
           return;
         }
-        const payload = parsed.map((parts) => {
-          const [name, animalSpecies, third, fourth, fifth, sixth, seventh] = parts;
-          const hasCategory = parts.length === 7;
-          return {
-            name,
-            species: animalSpecies,
-            category: hasCategory ? third : bulkDefaultCategory,
-            domainProfile: JSON.parse((hasCategory ? seventh : sixth)!) as Record<string, unknown>,
-            sex: (hasCategory ? fourth : third) || "unknown",
-            morph: (hasCategory ? fifth : fourth) || null,
-            identifier: (hasCategory ? sixth : fifth) || null,
-          };
-        });
+        const payload = parsedAnimals;
         try {
           await api.post("/animals/bulk", { animals: payload });
           setBulkModal(false); setBulkText(""); resource.reload(); show(t("bulkAnimalsCreated", { count: payload.length }));
@@ -468,8 +501,8 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         <Field
           label={t("bulkAnimalRows")}
           hint={locale === "it"
-            ? "Senza categoria: nome | specie | sesso | morph | identificativo | {JSON profilo}. Con categoria: nome | specie | categoria | sesso | morph | identificativo | {JSON profilo}."
-            : "Without category: name | species | sex | morph | identifier | {profile JSON}. With category: name | species | category | sex | morph | identifier | {profile JSON}."}
+            ? "Senza categoria: nome | specie | sesso | morph | identificativo | {JSON profilo facoltativo}. Con categoria: nome | specie | categoria | sesso | morph | identificativo | {JSON profilo facoltativo}. Identificativo e JSON possono essere omessi."
+            : "Without category: name | species | sex | morph | identifier | {optional profile JSON}. With category: name | species | category | sex | morph | identifier | {optional profile JSON}. Identifier and JSON can be omitted."}
         >
           <Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder='Nala | Python regius | reptiles | female | Pastel | A-001 | {"enclosure":"Terrario 1"}' />
         </Field>

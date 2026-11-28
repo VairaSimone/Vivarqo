@@ -8,7 +8,7 @@ import { logger } from "../../logger.js";
 import { deletePrivateObject } from "../domain/private-storage.js";
 import { assertAnimalCapacity } from "../domain/billing-entitlements.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
-import { bulkAnimalsSchema, createAnimalSchema, pageQuerySchema, patchAnimalSchema, validateAnimalDomainProfile } from "./animals.schemas.js";
+import { bulkAnimalsSchema, createAnimalSchema, mergeAnimalDomainProfile, pageQuerySchema, patchAnimalSchema } from "./animals.schemas.js";
 
 function requestId(res: Response): string {
   return typeof res.locals.requestId === "string" ? res.locals.requestId : "unknown";
@@ -76,6 +76,9 @@ async function validateAnimalParents(
   childSpecies: string,
   childId?: string,
 ) {
+  if (motherAnimalId && fatherAnimalId && motherAnimalId === fatherAnimalId) {
+    throw new AppError(400, "INVALID_ANIMAL_PARENT", "The same animal cannot be both parents");
+  }
   const ids = [...new Set([motherAnimalId, fatherAnimalId].filter((id): id is string => Boolean(id)))];
   if (ids.length === 0) return;
   if (childId && ids.includes(childId)) throw new AppError(400, "INVALID_ANIMAL_PARENT", "An animal cannot be its own parent");
@@ -217,6 +220,10 @@ export function createAnimalRouter() {
     const auth = res.locals.auth as AuthContext;
     const input = parseBody(bulkAnimalsSchema, req.body);
     await Promise.all([...new Set(input.animals.map((animal) => animal.category))].map((category) => assertAnimalCategoryEnabled(auth.userId, category)));
+    // Keep parent compatibility, sex and pedigree-cycle rules identical to single creation.
+    for (const animal of input.animals) {
+      await validateAnimalParents(auth.userId, animal.motherAnimalId, animal.fatherAnimalId, animal.category, animal.species);
+    }
     const identifiers = input.animals.map((animal) => animal.identifier?.trim().toLocaleLowerCase("it-IT")).filter((value): value is string => Boolean(value));
     if (new Set(identifiers).size !== identifiers.length) {
       throw new AppError(400, "DUPLICATE_IDENTIFIERS_IN_REQUEST", "The request contains repeated animal identifiers");
@@ -279,20 +286,26 @@ export function createAnimalRouter() {
       id,
     );
     await assertAnimalCategoryEnabled(auth.userId, existing.category);
+    let mergedDomainProfile: Record<string, unknown> | undefined;
     if ("domainProfile" in input) {
-      const profile = validateAnimalDomainProfile(
+      const profile = mergeAnimalDomainProfile(
         existing.category as "reptiles" | "fish" | "birds" | "dogs_cats",
-        input.domainProfile ?? existing.domainProfile ?? {},
+        existing.domainProfile,
+        input.domainProfile ?? {},
       );
       if (!profile.success) {
         throw new AppError(400, "VALIDATION_ERROR", "Invalid category-specific animal profile", { issues: profile.error.issues });
       }
+      mergedDomainProfile = profile.data;
     }
     if (existing.status === "archived" && "status" in input) {
       throw new AppError(409, "ANIMAL_ARCHIVED", "Use the restore action before changing an archived animal status");
     }
 
-    const data: Record<string, unknown> = { ...input };
+    const data: Record<string, unknown> = {
+      ...input,
+      ...(mergedDomainProfile !== undefined ? { domainProfile: mergedDomainProfile } : {}),
+    };
     // Category is immutable; repeating the current category is a harmless no-op.
     delete data.category;
     if ("birthDate" in input) data.birthDate = input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null;

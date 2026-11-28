@@ -76,7 +76,7 @@ describe("reproduction lifecycle contracts", () => {
     expect(patchClutchSchema.safeParse({ targetHumidityMinPct: 80, targetHumidityMaxPct: 70 }).success).toBe(false);
   });
 
-  it("accepts individual hatchling genetics, notes and parent links", () => {
+  it("accepts hatchling data and shares common animal field limits", () => {
     const parentId = "c0a80101-0000-4000-8000-000000000001";
     const parsed = newAnimalSchema.safeParse({
       name: "Hatchling 1", species: "Python regius", sex: "female",
@@ -84,6 +84,9 @@ describe("reproduction lifecycle contracts", () => {
       notes: "First shed complete", motherAnimalId: parentId,
     });
     expect(parsed.success).toBe(true);
+    expect(newAnimalSchema.safeParse({ name: "Hatchling 2", species: "Python regius", geneticsNotes: "x".repeat(10_001) }).success).toBe(false);
+    expect(newAnimalSchema.safeParse({ name: "Hatchling 3", species: "Python regius", originDescription: "x".repeat(5_001) }).success).toBe(false);
+    expect(newAnimalSchema.safeParse({ name: "Hatchling 4", species: "Python regius", notes: "x".repeat(10_001) }).success).toBe(false);
   });
 });
 

@@ -342,7 +342,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   await page.getByLabel("Scegli CSV o XLSX").setInputFiles({
     name: "vivarqo-e2e-animals.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from("name,species,sex,morph\nE2E Imported Python,Python regius,unknown,Normal\n", "utf8")
+    buffer: Buffer.from("name,species,category,animalType,sex,morph\nE2E Imported Python,Python regius,reptiles,,unknown,Normal\nE2E Imported Cat,,dogs_cats,cat,female,\n", "utf8")
   });
 
   const previewResponsePromise = page.waitForResponse((response) =>
@@ -352,7 +352,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
   const previewResponse = await previewResponsePromise;
   expect(previewResponse.status()).toBe(201);
   const preview = await previewResponse.json();
-  expect(preview.validRows).toBe(1);
+  expect(preview.validRows).toBe(2);
   expect(preview.invalidRows).toBe(0);
   expect(preview.importId).toBeTruthy();
   await expect(page.getByText("E2E Imported Python", { exact: false })).toBeVisible();
@@ -372,6 +372,7 @@ test("animal CSV import preview, confirmation and persisted result", async ({ pa
 
   await page.goto("/animals");
   await expect(page.getByText("E2E Imported Python", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("E2E Imported Cat", { exact: true }).first()).toBeVisible();
 });
 
 

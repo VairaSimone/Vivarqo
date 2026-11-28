@@ -6,6 +6,7 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 import { assertAnimalCapacity } from "./billing-entitlements.js";
 import { deletePrivateObject } from "./private-storage.js";
 import { logger } from "../../logger.js";
+import { createAnimalSchema } from "../animals/animals.schemas.js";
 
 import {
   createCycleSchema,
@@ -1168,26 +1169,68 @@ export function createReproductionRouter() {
       await assertAnimalCapacity(tx, auth.userId, input.animals.length);
       const animals = [];
       for (const [index, animal] of input.animals.entries()) {
-        await assertOwnedAnimals(auth.userId, [animal.motherAnimalId, animal.fatherAnimalId]);
-        const category = await assertCycleParentSexes(
-          auth.userId,
-          animal.motherAnimalId ?? batch.cycle.parentAAnimalId,
-          animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
-        ) ?? "reptiles";
+        const motherAnimalId = animal.motherAnimalId ?? batch.cycle.parentAAnimalId;
+        const fatherAnimalId = animal.fatherAnimalId ?? batch.cycle.parentBAnimalId;
+        if (motherAnimalId && fatherAnimalId && motherAnimalId === fatherAnimalId) {
+          throw new AppError(400, "INVALID_ANIMAL_PARENT", "The same animal cannot be both parents");
+        }
+        await assertOwnedAnimals(auth.userId, [motherAnimalId, fatherAnimalId]);
+        const category = await assertCycleParentSexes(auth.userId, motherAnimalId, fatherAnimalId) ?? "reptiles";
         await assertReproductionCategoryEnabled(auth.userId, category);
+        const parentIds = [...new Set([motherAnimalId, fatherAnimalId].filter((value): value is string => Boolean(value)))];
+        if (parentIds.length) {
+          const parents = await tx.animal.findMany({
+            where: { userId: auth.userId, id: { in: parentIds } },
+            select: { id: true, species: true, category: true },
+          });
+          const incompatibleParent = parents.find((parent) =>
+            parent.category !== category ||
+            parent.species.trim().toLocaleLowerCase("it-IT") !== animal.species.trim().toLocaleLowerCase("it-IT"),
+          );
+          if (incompatibleParent) {
+            throw new AppError(400, "INCOMPATIBLE_ANIMAL_PARENT", "Parents and offspring must have the same category and species");
+          }
+        }
+        const generatedIdentifier = animal.identifier?.trim()
+          || `OFF-${batchId}-${String(index + 1).padStart(3, "0")}`;
+        const sharedAnimal = createAnimalSchema.safeParse({
+          name: animal.name, identifier: generatedIdentifier, species: animal.species, category,
+          sex: animal.sex, morph: animal.morph ?? null, domainProfile: {},
+          motherAnimalId: motherAnimalId ?? null, fatherAnimalId: fatherAnimalId ?? null,
+          birthDate: animal.birthDate ?? batch.bornOn.toISOString().slice(0, 10),
+          birthDateEstimated: animal.birthDateEstimated ?? false,
+          geneticsNotes: animal.geneticsNotes ?? null, notes: animal.notes ?? null,
+          locationLabel: animal.locationLabel ?? null, originDescription: animal.originDescription ?? null,
+          acquiredDate: animal.acquiredDate ?? null,
+        });
+        if (!sharedAnimal.success) {
+          throw new AppError(400, "VALIDATION_ERROR", "Offspring animal data is invalid", {
+            issues: sharedAnimal.error.issues.map((issue) => ({
+              path: issue.path.map(String).join("."), message: issue.message,
+            })),
+          });
+        }
+        const validated = sharedAnimal.data;
         const createdAnimal = await tx.animal.create({
           data: {
-            userId: auth.userId, category, originOffspringBatchId: batchId, name: animal.name,
-            // Stable, sequential, human-readable ID. The full batch UUID prevents collisions
-            // between separate clutches/batches; caller-supplied identifiers remain untouched.
-            identifier: animal.identifier?.trim() || `OFF-${batchId}-${String(index + 1).padStart(3, "0")}`, species: animal.species, sex: animal.sex, morph: animal.morph ?? null,
-            birthDate: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
-            birthDateEstimated: animal.birthDateEstimated ?? false,
-            geneticsNotes: animal.geneticsNotes ?? null, notes: animal.notes ?? null,
-            locationLabel: animal.locationLabel ?? null, originDescription: animal.originDescription ?? null,
-            acquiredDate: animal.acquiredDate ? validDate(animal.acquiredDate) : null,
-            motherAnimalId: animal.motherAnimalId ?? batch.cycle.parentAAnimalId,
-            fatherAnimalId: animal.fatherAnimalId ?? batch.cycle.parentBAnimalId,
+            userId: auth.userId,
+            name: validated.name,
+            identifier: validated.identifier ?? generatedIdentifier,
+            species: validated.species,
+            category: validated.category,
+            domainProfile: {},
+            sex: validated.sex,
+            morph: validated.morph ?? null,
+            birthDate: validated.birthDate ? validDate(validated.birthDate) : batch.bornOn,
+            birthDateEstimated: validated.birthDateEstimated,
+            geneticsNotes: validated.geneticsNotes ?? null,
+            notes: validated.notes ?? null,
+            locationLabel: validated.locationLabel ?? null,
+            originDescription: validated.originDescription ?? null,
+            acquiredDate: validated.acquiredDate ? validDate(validated.acquiredDate) : null,
+            motherAnimalId: validated.motherAnimalId ?? null,
+            fatherAnimalId: validated.fatherAnimalId ?? null,
+            originOffspringBatchId: batchId,
             originClutchId: batch.clutchId,
           },
         });
@@ -1196,7 +1239,7 @@ export function createReproductionRouter() {
           await tx.weightMeasurement.create({
             data: {
               animalId: createdAnimal.id,
-              measuredAt: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn,
+              measuredAt: createdAnimal.birthDate ?? batch.bornOn,
               weightG: animal.initialWeightG,
               notes: "Initial hatchling weight",
             },
@@ -1206,7 +1249,7 @@ export function createReproductionRouter() {
           if (!batch.clutchId) throw new AppError(400, "EGG_CLUTCH_REQUIRED", "This offspring batch is not linked to a clutch");
           const egg = await tx.egg.findFirst({ where: { id: animal.eggId, clutchId: batch.clutchId, offspringAnimalId: null } });
           if (!egg) throw new AppError(409, "EGG_ALREADY_LINKED", "The selected egg is no longer available");
-          await tx.egg.update({ where: { id: egg.id }, data: { status: "hatched", hatchedAt: animal.birthDate ? validDate(animal.birthDate) : batch.bornOn, offspringAnimalId: createdAnimal.id } });
+          await tx.egg.update({ where: { id: egg.id }, data: { status: "hatched", hatchedAt: createdAnimal.birthDate ?? batch.bornOn, offspringAnimalId: createdAnimal.id } });
           await tx.eggHistory.create({ data: { eggId: egg.id, status: "hatched", notes: "Hatchling linked during offspring conversion" } });
         }
       }

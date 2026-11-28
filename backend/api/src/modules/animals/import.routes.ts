@@ -32,6 +32,7 @@ const aliases: Record<string, string> = {
   identifier: "identifier", id: "identifier", codice: "identifier", codiceidentificativo: "identifier", identificativo: "identifier", numero: "identifier", numeroidentificativo: "identifier", tag: "identifier",
   species: "species", specie: "species", speciesname: "species", tipologia: "species",
   category: "category", categoria: "category", animalcategory: "category", categoriaanimale: "category",
+  animaltype: "animalType", tipoanimale: "animalType", tipologiaanimale: "animalType", sottotipoanimale: "animalType",
   domainprofile: "domainProfile", profilocategoria: "domainProfile", profilocategoriajson: "domainProfile", categoryprofile: "domainProfile",
   sex: "sex", sesso: "sex", gender: "sex",
   morph: "morph", morfo: "morph", morphologia: "morph", variante: "morph",
@@ -96,8 +97,16 @@ function convertValue(field: string, value: string): unknown {
       fish: "fish", pesci: "fish",
       birds: "birds", uccelli: "birds",
       dogscats: "dogs_cats", caniegatti: "dogs_cats", caniegatto: "dogs_cats",
+      dog: "dogs_cats:dog", cane: "dogs_cats:dog", cani: "dogs_cats:dog",
+      cat: "dogs_cats:cat", gatto: "dogs_cats:cat", gatti: "dogs_cats:cat",
     };
     return categories[normalized] ?? trimmed;
+  }
+  if (field === "animalType") {
+    const normalized = normalizeHeader(trimmed);
+    if (["dog", "cane", "cani"].includes(normalized)) return "dog";
+    if (["cat", "gatto", "gatti"].includes(normalized)) return "cat";
+    return trimmed || undefined;
   }
   if (field === "domainProfile") {
     if (!trimmed) return {};
@@ -131,11 +140,11 @@ function makePreview(
   selectedSheet: string | null,
   requestedMapping: unknown,
 ): { report: PreviewReport; mappedHeaders: Record<string, string> } {
-  const availableFields = ["name", "identifier", "species", "category", "domainProfile", "sex", "morph",
+  const availableFields = ["name", "identifier", "species", "category", "animalType", "domainProfile", "sex", "morph",
     "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription",
     "previousBreeder", "locationLabel", "status", "notes"];
   const mapping = resolveImportColumnMapping(
-    headers, aliases, availableFields, [["name"], ["species"], ["category"], ["domainProfile"]], requestedMapping,
+    headers, aliases, availableFields, [["name"], ["category"]], requestedMapping,
   );
   const mappedHeaders = mapping.mappedHeaders;
   const unmappedHeaders = mapping.unmappedHeaders;
@@ -147,6 +156,42 @@ function makePreview(
     const raw: Record<string, unknown> = {};
     for (const [field, header] of Object.entries(mappedHeaders)) {
       raw[field] = convertValue(field, row.values[header] ?? "");
+    }
+    let categorySubtype: "dog" | "cat" | null = null;
+    if (typeof raw.category === "string" && raw.category.startsWith("dogs_cats:")) {
+      categorySubtype = raw.category.endsWith(":cat") ? "cat" : "dog";
+      raw.category = "dogs_cats";
+    }
+    const suppliedType = raw.animalType;
+    delete raw.animalType;
+    const profileValue = raw.domainProfile;
+    if (profileValue === undefined) raw.domainProfile = {};
+    if (typeof profileValue === "object" && profileValue !== null && !Array.isArray(profileValue)) {
+      const profile = { ...(profileValue as Record<string, unknown>) };
+      if (categorySubtype) profile.animalType = categorySubtype;
+      if (suppliedType !== undefined) profile.animalType = suppliedType;
+      if (raw.category === "dogs_cats") {
+        let type = profile.animalType;
+        if (type === undefined || type === null || type === "") {
+          const speciesText = String(raw.species ?? "").toLocaleLowerCase("it-IT");
+          type = /felis|gatt|\bcat\b/.test(speciesText) ? "cat"
+            : /canis|cane|\bdog\b/.test(speciesText) ? "dog" : undefined;
+        }
+        if (type === "dog" || type === "cat") {
+          profile.animalType = type;
+          if (!raw.species) raw.species = type === "cat" ? "Felis catus" : "Canis lupus familiaris";
+        } else if (type === undefined) {
+          errors.push({
+            row: row.rowNumber,
+            column: mappedHeaders.animalType ?? mappedHeaders.category ?? "category",
+            reason: "Choose dog or cat for the dogs_cats category",
+          });
+          continue;
+        }
+      }
+      raw.domainProfile = profile;
+    } else if (profileValue !== undefined) {
+      raw.domainProfile = profileValue;
     }
     const parsed = createAnimalSchema.safeParse(raw);
     if (!parsed.success) {
@@ -278,7 +323,7 @@ export function createImportRouter() {
   const router = Router();
 
   const templateHeaders: Record<string, string[]> = {
-    animals: ["name", "identifier", "species", "category", "domainProfile", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"],
+    animals: ["name", "identifier", "species", "category", "animalType", "domainProfile", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"],
     weights: ["animalIdentifier", "measuredAt", "weightG", "notes"],
     sheds: ["animalIdentifier", "occurredAt", "outcome", "notes"],
     notes: ["animalIdentifier", "occurredAt", "title", "category", "body"],
@@ -297,7 +342,7 @@ export function createImportRouter() {
     if (!entity) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
     const headers = templateHeaders[entity];
     if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
-    const animalTemplateHeaders = ["Nome", "Identificativo", "Specie", "Categoria", "Profilo categoria (JSON)", "Sesso", "Morph", "Note genetiche", "Data di nascita", "Nascita stimata", "Data acquisizione", "Provenienza", "Allevatore precedente", "Rack / Posizione", "Stato", "Note"];
+    const animalTemplateHeaders = ["Nome", "Identificativo", "Specie", "Categoria", "Tipo cane/gatto", "Profilo categoria (JSON)", "Sesso", "Morph", "Note genetiche", "Data di nascita", "Nascita stimata", "Data acquisizione", "Provenienza", "Allevatore precedente", "Rack / Posizione", "Stato", "Note"];
     const outputHeaders = entity === "animals" ? animalTemplateHeaders : headers;
     const csv = "\uFEFF" + outputHeaders.map((header) => `"${header}"`).join(",") + "\r\n";
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -324,10 +369,10 @@ export function createImportRouter() {
       throw error;
     }
     const { report: preview } = previewResult;
-    const availableFields = ["name", "identifier", "species", "category", "domainProfile", "sex", "morph",
+    const availableFields = ["name", "identifier", "species", "category", "animalType", "domainProfile", "sex", "morph",
       "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription",
       "previousBreeder", "locationLabel", "status", "notes"];
-    const requiredFields = [["name"], ["species"], ["category"], ["domainProfile"]];
+    const requiredFields = [["name"], ["category"]];
     const configuration = await prisma.accountConfiguration.findUnique({
       where: { userId },
       select: { animalCategories: true },
