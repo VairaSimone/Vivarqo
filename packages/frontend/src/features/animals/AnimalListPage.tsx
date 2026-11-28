@@ -21,6 +21,17 @@ const emptyAnimal: AnimalForm = {
   birthDateEstimated: false, acquiredDate: "", originDescription: "", previousBreeder: "", locationLabel: "", status: "active", notes: ""
 };
 
+type CompanionType = "dog" | "cat";
+
+function getCompanionType(species: string, profile: Record<string, unknown>): CompanionType {
+  if (profile.animalType === "dog" || profile.animalType === "cat") return profile.animalType;
+  return /felis|gatt|cat/i.test(species) ? "cat" : "dog";
+}
+
+function getCompanionSpecies(type: CompanionType): string {
+  return type === "cat" ? "Felis catus" : "Canis lupus familiaris";
+}
+
 export function AnimalListPage({ locale, navigate, path }: { locale: Locale; navigate: (path: string) => void; path: string }) {
   const t = (key: string, values?: Record<string, string | number>) => translate(locale, key, values);
   const query = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?")) : "");
@@ -66,6 +77,9 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { toast, show } = useToast();
+  const isCompanion = form.category === "dogs_cats";
+  const companionType: CompanionType = form.domainProfile.animalType === "cat" ? "cat" : "dog";
+  const categorySelectionValue = isCompanion ? `dogs_cats:${companionType}` : form.category;
 
   useEffect(() => {
     let active = true;
@@ -78,7 +92,13 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         setEnabledCategories(categories);
         setBulkDefaultCategory((current) => current && categories.includes(current) ? current : categories[0] ?? "");
         setCategory((current) => current && categories.includes(current) ? current : "");
-        setForm((current) => ({ ...current, category: current.category && categories.includes(current.category) ? current.category : categories[0] ?? "" }));
+        setForm((current) => {
+          const nextCategory = current.category && categories.includes(current.category) ? current.category : categories[0] ?? "";
+          if (nextCategory === "dogs_cats" && !current.domainProfile.animalType) {
+            return { ...current, category: nextCategory, species: current.species || getCompanionSpecies("dog"), domainProfile: { ...current.domainProfile, animalType: "dog" } };
+          }
+          return { ...current, category: nextCategory };
+        });
       })
       .catch(() => {
         if (!active) return;
@@ -153,18 +173,35 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     setPage(1);
   }
 
-  function openCreate() { setEditing(null); setForm({ ...emptyAnimal, category: enabledCategories[0] ?? "" }); setPhotoFile(null); setError(""); setModal(true); }
+  function openCreate() {
+    setEditing(null);
+    const initialCategory = enabledCategories[0] ?? "";
+    setForm({
+      ...emptyAnimal,
+      category: initialCategory,
+      species: initialCategory === "dogs_cats" ? getCompanionSpecies("dog") : "",
+      domainProfile: initialCategory === "dogs_cats" ? { animalType: "dog" } : {},
+    });
+    setPhotoFile(null);
+    setError("");
+    setModal(true);
+  }
   function openEdit(animal: AnimalDto) {
     setEditing(animal);
     setPhotoFile(null);
     const animalWithDomain = animal as AnimalDto & { category?: string; domainProfile?: Record<string, unknown> | null };
+    const animalCategory = animalWithDomain.category ?? "reptiles";
     const domainProfile = { ...(animalWithDomain.domainProfile ?? {}) };
     // Bird identifiers now live only in BirdProfile. Strip the old JSON field
     // before submitting the full domainProfile during edits of legacy animals.
-    if (animalWithDomain.category === "birds") delete domainProfile.ringNumber;
+    if (animalCategory === "birds") delete domainProfile.ringNumber;
+    if (animalCategory === "dogs_cats") {
+      domainProfile.animalType = getCompanionType(getString(animal, "species"), domainProfile);
+    }
     setForm({
-      name: getString(animal, "name"), identifier: getString(animal, "identifier"), species: getString(animal, "species"),
-      category: animalWithDomain.category ?? "reptiles", domainProfile,
+      name: getString(animal, "name"), identifier: getString(animal, "identifier"),
+      species: getString(animal, "species") || (animalCategory === "dogs_cats" ? getCompanionSpecies(getCompanionType("", domainProfile)) : ""),
+      category: animalCategory, domainProfile,
       sex: getString(animal, "sex", "unknown"), morph: getString(animal, "morph"), motherAnimalId: getString(animal, "motherAnimalId"), fatherAnimalId: getString(animal, "fatherAnimalId"), motherDescription: getString(animal, "motherDescription"), fatherDescription: getString(animal, "fatherDescription"), geneticsNotes: getString(animal, "geneticsNotes"),
       birthDate: dateForInput(getString(animal, "birthDate") || null), birthDateEstimated: Boolean(animal.birthDateEstimated),
       acquiredDate: dateForInput(getString(animal, "acquiredDate") || null), originDescription: getString(animal, "originDescription"),
@@ -179,12 +216,6 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
     const cleanDomainProfile = Object.fromEntries(
       Object.entries(form.domainProfile).filter(([, value]) => value !== "" && value !== null && value !== undefined),
     );
-    if (!editing && Object.keys(cleanDomainProfile).length === 0) {
-      setError(locale === "it"
-        ? "Inserisci almeno un dato specifico della categoria. Gli identificativi restano facoltativi."
-        : "Enter at least one category-specific detail. Identification numbers remain optional.");
-      return;
-    }
     setBusy(true);
     setError("");
     const body = {
@@ -487,13 +518,61 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <span className="animal-editor-required">{locale === "it" ? "* Obbligatorio" : "* Required"}</span>
           </div>
           <div className="form-grid">
-            <Field label={locale === "it" ? "Categoria animale" : "Animal category"}><Select value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value, domainProfile: {}, motherAnimalId: "", fatherAnimalId: "" }))} disabled={Boolean(editing)}>{enabledCategories.map((value) => <option key={value} value={value}>{value === "dogs_cats" ? (locale === "it" ? "Cani e gatti" : "Dogs and cats") : value === "reptiles" ? (locale === "it" ? "Rettili" : "Reptiles") : value === "fish" ? (locale === "it" ? "Pesci" : "Fish") : (locale === "it" ? "Uccelli" : "Birds")}</option>)}</Select></Field>
+            <Field label={locale === "it" ? "Tipo di animale" : "Animal type"}>
+              <Select
+                value={categorySelectionValue}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  const selectedCompanion = value === "dogs_cats:dog" || value === "dogs_cats:cat";
+                  const selectedType: CompanionType | null = value === "dogs_cats:cat" ? "cat" : value === "dogs_cats:dog" ? "dog" : null;
+                  const nextCategory = selectedCompanion ? "dogs_cats" : value;
+                  setForm((current) => ({
+                    ...current,
+                    category: nextCategory,
+                    species: selectedType ? getCompanionSpecies(selectedType) : "",
+                    domainProfile: selectedType ? { animalType: selectedType } : {},
+                    morph: "",
+                    motherAnimalId: "",
+                    fatherAnimalId: "",
+                  }));
+                }}
+                disabled={Boolean(editing)}
+              >
+                {enabledCategories.map((value) => value === "dogs_cats"
+                  ? <optgroup key={value} label={locale === "it" ? "Cani e gatti" : "Dogs and cats"}>
+                      <option value="dogs_cats:dog">{locale === "it" ? "Cane" : "Dog"}</option>
+                      <option value="dogs_cats:cat">{locale === "it" ? "Gatto" : "Cat"}</option>
+                    </optgroup>
+                  : <option key={value} value={value}>{value === "reptiles" ? (locale === "it" ? "Rettili" : "Reptiles") : value === "fish" ? (locale === "it" ? "Pesci" : "Fish") : (locale === "it" ? "Uccelli" : "Birds")}</option>)}
+              </Select>
+            </Field>
             <Field label={t("name")}><Input required maxLength={120} placeholder={locale === "it" ? "Es. Nala" : "e.g. Nala"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-            <Field label={t("identifier")} hint={locale === "it" ? "Codice interno, microchip o numero identificativo." : "Internal code, microchip or identification number."}><Input maxLength={120} placeholder={locale === "it" ? "Es. VRQ-001" : "e.g. VRQ-001"} value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} /></Field>
-            <Field label={t("species")}><Input required maxLength={160} placeholder={locale === "it" ? "Es. Python regius" : "e.g. Python regius"} value={form.species} onChange={(e) => setForm((current) => ({ ...current, species: e.target.value, motherAnimalId: "", fatherAnimalId: "" }))} /></Field>
+            <Field label={isCompanion ? (locale === "it" ? "Codice interno" : "Internal code") : t("identifier")} hint={isCompanion
+              ? (locale === "it" ? "Identificativo interno facoltativo. Il microchip si registra nei dati sanitari qui sotto." : "Optional internal identifier. Record the microchip in the medical details below.")
+              : (locale === "it" ? "Codice interno o numero identificativo, se presente." : "Internal code or identification number, if available.")}>
+              <Input maxLength={120} placeholder={locale === "it" ? "Es. VRQ-001" : "e.g. VRQ-001"} value={form.identifier} onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
+            </Field>
+            {isCompanion
+              ? <Field label={t("species")} hint={locale === "it" ? "Specie impostata in base alla scelta Cane/Gatto; la razza si indica nei dati specifici." : "Species is set from Dog/Cat; enter the breed in the category details."}><Input value={form.species} readOnly /></Field>
+              : <Field label={t("species")}><Input required maxLength={160} placeholder={locale === "it" ? "Es. Python regius" : "e.g. Python regius"} value={form.species} onChange={(e) => setForm((current) => ({ ...current, species: e.target.value, motherAnimalId: "", fatherAnimalId: "" }))} /></Field>}
             <Field label={t("sex")}><Select value={form.sex} onChange={(e) => setForm({ ...form, sex: e.target.value })}><option value="unknown">{t("unknown")}</option><option value="male">{t("male")}</option><option value="female">{t("female")}</option></Select></Field>
-            <Field label={t("morph")} hint={locale === "it" ? "Morfologia o variante, se conosciuta." : "Morph or variant, if known."}><Input maxLength={200} placeholder={locale === "it" ? "Es. Pastel, Albino…" : "e.g. Pastel, Albino…"} value={form.morph} onChange={(e) => setForm({ ...form, morph: e.target.value })} /></Field>
-            <Field label={t("location")} hint={locale === "it" ? "Rack, terrario o area di stabulazione." : "Rack, terrarium or enclosure area."}><Input maxLength={160} placeholder={locale === "it" ? "Es. Rack 03" : "e.g. Rack 03"} value={form.locationLabel} onChange={(e) => setForm({ ...form, locationLabel: e.target.value })} /></Field>
+            {!isCompanion && <Field label={t("morph")} hint={locale === "it" ? "Morfologia, morph o variante, se conosciuta." : "Morph or variant, if known."}><Input maxLength={200} placeholder={locale === "it" ? "Es. Pastel, Albino…" : "e.g. Pastel, Albino…"} value={form.morph} onChange={(e) => setForm({ ...form, morph: e.target.value })} /></Field>}
+            <Field
+              label={form.category === "reptiles" ? (locale === "it" ? "Stabulazione / rack" : "Housing / rack")
+                : form.category === "fish" ? (locale === "it" ? "Acquario / vasca" : "Aquarium / tank")
+                : form.category === "birds" ? (locale === "it" ? "Voliera / gabbia" : "Aviary / cage")
+                : (locale === "it" ? "Ambiente / posizione" : "Living environment / location")}
+              hint={form.category === "reptiles" ? (locale === "it" ? "Rack, terrario o area di stabulazione." : "Rack, terrarium or enclosure area.")
+                : form.category === "fish" ? (locale === "it" ? "Acquario o vasca in cui vive l'esemplare." : "Aquarium or tank where the animal lives.")
+                : form.category === "birds" ? (locale === "it" ? "Voliera, gabbia o area di volo." : "Aviary, cage or flight area.")
+                : (locale === "it" ? "Casa, stanza, giardino o altro ambiente abituale." : "Home, room, garden or other usual environment.")}
+            >
+              <Input maxLength={160} placeholder={form.category === "reptiles" ? (locale === "it" ? "Es. Rack 03" : "e.g. Rack 03")
+                : form.category === "fish" ? (locale === "it" ? "Es. Acquario 1" : "e.g. Aquarium 1")
+                : form.category === "birds" ? (locale === "it" ? "Es. Voliera esterna" : "e.g. Outdoor aviary")
+                : (locale === "it" ? "Es. Casa / giardino" : "e.g. Home / garden")}
+                value={form.locationLabel} onChange={(e) => setForm({ ...form, locationLabel: e.target.value })} />
+            </Field>
           </div>
         </section>
 
@@ -503,9 +582,13 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <span className="animal-editor-section-icon"><Icon name="settings" size={17} /></span>
             <div>
               <h3>{locale === "it" ? "Dati specifici della categoria" : "Category-specific details"}</h3>
-              <p>{locale === "it"
-                ? "Inserisci almeno un dato specifico e significativo. Microchip, anello e altri identificativi non sono obbligatori."
-                : "Enter at least one meaningful category-specific detail. Microchips, rings and other identifiers are not mandatory."}</p>
+              <p>{form.category === "reptiles"
+                ? (locale === "it" ? "Terrario, brumazione e alimentazione: annota ciò che conosci e completa il resto in seguito." : "Enclosure, brumation and feeding: add what you know and complete the rest later.")
+                : form.category === "fish"
+                  ? (locale === "it" ? "Acqua, acquario, dimensioni e dieta: tutti i dettagli sono facoltativi." : "Water, aquarium, size and diet: all details are optional.")
+                  : form.category === "birds"
+                    ? (locale === "it" ? "Voliera, alimentazione, interazione e volo: tutti i dettagli sono facoltativi." : "Aviary, diet, tameness and flight: all details are optional.")
+                    : (locale === "it" ? "Razza, microchip, vaccinazioni e dati veterinari. Scegli Cane o Gatto per visualizzare i campi pertinenti." : "Breed, microchip, vaccination and veterinary details. Choose Dog or Cat to see the relevant fields.")}</p>
             </div>
           </div>
           <div className="form-grid">
@@ -530,6 +613,9 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
               <Field label={locale === "it" ? "Razza" : "Breed"}><Input maxLength={160} value={String(form.domainProfile.breed ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, breed: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Microchip" : "Microchip"}><Input maxLength={40} value={String(form.domainProfile.microchip ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, microchip: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Colore mantello" : "Coat colour"}><Input maxLength={120} value={String(form.domainProfile.coatColor ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, coatColor: e.target.value } }))} /></Field>
+              {companionType === "cat"
+                ? <Field label={locale === "it" ? "Accesso all'esterno" : "Outdoor access"}><Select value={String(form.domainProfile.indoorOutdoor ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, indoorOutdoor: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="indoor">{locale === "it" ? "Solo in casa" : "Indoor only"}</option><option value="outdoor">{locale === "it" ? "Solo esterno" : "Outdoor only"}</option><option value="both">{locale === "it" ? "Dentro e fuori" : "Indoor and outdoor"}</option></Select></Field>
+                : <Field label={locale === "it" ? "Livello di attività" : "Activity level"}><Select value={String(form.domainProfile.activityLevel ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, activityLevel: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="low">{locale === "it" ? "Basso" : "Low"}</option><option value="moderate">{locale === "it" ? "Moderato" : "Moderate"}</option><option value="high">{locale === "it" ? "Alto" : "High"}</option></Select></Field>}
               <Field label={locale === "it" ? "Peso (kg)" : "Weight (kg)"}><Input type="number" min="0.01" max="250" step="0.01" value={String(form.domainProfile.weightKg ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, weightKg: e.target.value === "" ? "" : Number(e.target.value) } }))} /></Field>
               <Field label={locale === "it" ? "Vaccinazioni" : "Vaccination status"}><Select value={String(form.domainProfile.vaccinationStatus ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, vaccinationStatus: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option><option value="not_up_to_date">{locale === "it" ? "Da aggiornare" : "Not up to date"}</option><option value="up_to_date">{locale === "it" ? "In regola" : "Up to date"}</option></Select></Field>
               <label className="checkbox-field"><input type="checkbox" checked={Boolean(form.domainProfile.sterilized)} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, sterilized: e.target.checked } }))} /><span>{locale === "it" ? "Sterilizzato" : "Neutered / spayed"}</span></label>
@@ -548,8 +634,10 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           <div className="animal-editor-section-heading">
             <span className="animal-editor-section-icon"><Icon name="git-branch" size={17} /></span>
             <div>
-              <h3>{locale === "it" ? "Genealogia e genitori" : "Pedigree and parents"}</h3>
-              <p>{locale === "it" ? "Collega genitori già presenti oppure annota quelli esterni alla piattaforma." : "Link existing parents or record parents outside the platform."}</p>
+              <h3>{isCompanion ? (locale === "it" ? "Pedigree e genitori" : "Pedigree and parents") : (locale === "it" ? "Genealogia e genitori" : "Pedigree and parents")}</h3>
+              <p>{isCompanion
+                ? (locale === "it" ? "Registra i genitori dell'animale per ricostruire il pedigree, se conosciuti." : "Record the animal's parents to build its pedigree, when known.")
+                : (locale === "it" ? "Collega genitori già presenti oppure annota quelli esterni alla piattaforma." : "Link existing parents or record parents outside the platform.")}</p>
             </div>
             <span className="animal-editor-optional">{locale === "it" ? "Facoltativa" : "Optional"}</span>
           </div>
@@ -557,12 +645,16 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <div className="animal-editor-parent-card">
               <div className="animal-editor-parent-title"><span className="animal-editor-parent-symbol">♀</span><div><strong>{locale === "it" ? "Madre" : "Mother"}</strong><small>{locale === "it" ? "Femmina" : "Female"}</small></div></div>
               <RemoteSelect label={locale === "it" ? "Seleziona dalla piattaforma" : "Select from platform"} value={form.motherAnimalId} onChange={(value) => setForm((current) => ({ ...current, motherAnimalId: value, motherDescription: value ? "" : current.motherDescription }))} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "all", sex: "female", category: form.category, speciesExact: form.species, sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
-              <Field label={locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph"}><Input maxLength={240} placeholder={locale === "it" ? "Es. Luna · Pastel het Clown" : "e.g. Luna · Pastel het Clown"} value={form.motherDescription} onChange={(e) => setForm((current) => ({ ...current, motherDescription: e.target.value, motherAnimalId: "" }))} /></Field>
+              <Field label={isCompanion ? (locale === "it" ? "Oppure nome e razza" : "Or external name and breed") : (locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph")}><Input maxLength={240} placeholder={isCompanion
+            ? (locale === "it" ? "Es. Luna · Maine Coon" : "e.g. Luna · Maine Coon")
+            : (locale === "it" ? "Es. Luna · Pastel het Clown" : "e.g. Luna · Pastel het Clown")} value={form.motherDescription} onChange={(e) => setForm((current) => ({ ...current, motherDescription: e.target.value, motherAnimalId: "" }))} /></Field>
             </div>
             <div className="animal-editor-parent-card">
               <div className="animal-editor-parent-title"><span className="animal-editor-parent-symbol">♂</span><div><strong>{locale === "it" ? "Padre" : "Father"}</strong><small>{locale === "it" ? "Maschio" : "Male"}</small></div></div>
               <RemoteSelect label={locale === "it" ? "Seleziona dalla piattaforma" : "Select from platform"} value={form.fatherAnimalId} onChange={(value) => setForm((current) => ({ ...current, fatherAnimalId: value, fatherDescription: value ? "" : current.fatherDescription }))} endpoint="/animals" responseKey="animals" secondaryKey="species" filters={{ status: "all", sex: "male", category: form.category, speciesExact: form.species, sort: "name" }} detailEndpoint={(id) => `/animals/${encodeURIComponent(id)}`} detailKey="animal" locale={locale} />
-              <Field label={locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph"}><Input maxLength={240} placeholder={locale === "it" ? "Es. Thor · Banana Pied" : "e.g. Thor · Banana Pied"} value={form.fatherDescription} onChange={(e) => setForm((current) => ({ ...current, fatherDescription: e.target.value, fatherAnimalId: "" }))} /></Field>
+              <Field label={isCompanion ? (locale === "it" ? "Oppure nome e razza" : "Or external name and breed") : (locale === "it" ? "Oppure nome e morph esterni" : "Or external name and morph")}><Input maxLength={240} placeholder={isCompanion
+            ? (locale === "it" ? "Es. Milo · Labrador" : "e.g. Milo · Labrador")
+            : (locale === "it" ? "Es. Thor · Banana Pied" : "e.g. Thor · Banana Pied")} value={form.fatherDescription} onChange={(e) => setForm((current) => ({ ...current, fatherDescription: e.target.value, fatherAnimalId: "" }))} /></Field>
             </div>
           </div>
           <p className="animal-editor-genealogy-hint">{locale === "it" ? "Se selezioni un genitore registrato, il collegamento alla sua scheda viene salvato. Il testo manuale serve per genitori non presenti in Vivarqo." : "Selecting a registered parent saves a link to its profile. Manual text is for parents not registered in Vivarqo."}</p>
@@ -603,7 +695,9 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           <div className="form-grid">
             <Field label={t("birthDate")}><Input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} /></Field>
             <Field label={t("acquiredDate")}><Input type="date" value={form.acquiredDate} onChange={(e) => setForm({ ...form, acquiredDate: e.target.value })} /></Field>
-            <Field label={t("previousBreeder")}><Input placeholder={locale === "it" ? "Nome dell'allevatore" : "Breeder name"} value={form.previousBreeder} onChange={(e) => setForm({ ...form, previousBreeder: e.target.value })} /></Field>
+            <Field label={isCompanion ? (locale === "it" ? "Proprietario precedente" : "Previous owner") : t("previousBreeder")}><Input placeholder={isCompanion
+              ? (locale === "it" ? "Nome del precedente proprietario" : "Previous owner's name")
+              : (locale === "it" ? "Nome dell'allevatore" : "Breeder name")} value={form.previousBreeder} onChange={(e) => setForm({ ...form, previousBreeder: e.target.value })} /></Field>
             {editing && <Field label={t("status")}><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["active", "sold", "transferred", "deceased"].map((value) => <option value={value} key={value}>{t(`animalStatus_${value}`)}</option>)}</Select></Field>}
           </div>
           <label className="checkbox-field animal-editor-estimated"><input type="checkbox" checked={form.birthDateEstimated} onChange={(e) => setForm({ ...form, birthDateEstimated: e.target.checked })} />{t("estimatedDate")}</label>
@@ -614,16 +708,22 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
           <div className="animal-editor-section-heading">
             <span className="animal-editor-section-icon"><Icon name="notebook-pen" size={17} /></span>
             <div>
-              <h3>{locale === "it" ? "Genetica e annotazioni" : "Genetics and notes"}</h3>
-              <p>{locale === "it" ? "Conserva dettagli utili per la gestione futura." : "Keep useful details for future care and management."}</p>
+              <h3>{isCompanion ? (locale === "it" ? "Annotazioni" : "Notes") : (locale === "it" ? "Genetica e annotazioni" : "Genetics and notes")}</h3>
+              <p>{isCompanion
+                ? (locale === "it" ? "Annota informazioni sanitarie, comportamentali o utili alla gestione quotidiana." : "Record health, behaviour or day-to-day care information.")
+                : (locale === "it" ? "Conserva dettagli genetici e informazioni utili per la gestione futura." : "Keep genetics and other useful care details.")}</p>
             </div>
             <span className="animal-editor-optional">{locale === "it" ? "Facoltativo" : "Optional"}</span>
           </div>
-          <Field label={t("geneticsNotes")}><Textarea rows={2} placeholder={locale === "it" ? "Genetica conosciuta, accoppiamenti, test…" : "Known genetics, pairings, tests…"} value={form.geneticsNotes} onChange={(e) => setForm({ ...form, geneticsNotes: e.target.value })} /></Field>
-          <Field label={t("animalNotes")}><Textarea rows={3} placeholder={locale === "it" ? "Note generali sull'esemplare…" : "General notes about this animal…"} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
+          {!isCompanion && <Field label={t("geneticsNotes")}><Textarea rows={2} placeholder={locale === "it" ? "Genetica conosciuta, accoppiamenti, test…" : "Known genetics, pairings, tests…"} value={form.geneticsNotes} onChange={(e) => setForm({ ...form, geneticsNotes: e.target.value })} /></Field>}
+          <Field label={isCompanion ? (locale === "it" ? "Note sanitarie e comportamentali" : "Health and behaviour notes") : t("animalNotes")}><Textarea rows={3} placeholder={isCompanion
+            ? (locale === "it" ? "Comportamento, terapie, esigenze particolari…" : "Behaviour, treatments, special needs…")
+            : (locale === "it" ? "Note generali sull'esemplare…" : "General notes about this animal…")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field>
         </section>
 
-        <div className="animal-editor-footer-note">{locale === "it" ? "I campi contrassegnati con * sono obbligatori. Tutti gli altri dettagli possono essere aggiunti o aggiornati in seguito." : "Fields marked with * are required. All other details can be added or updated later."}</div>
+        <div className="animal-editor-footer-note">{locale === "it"
+          ? "Sono obbligatori il nome e, per rettili, pesci e uccelli, la specie. Per cani e gatti la specie viene impostata dalla scelta iniziale. I dati specifici sono facoltativi."
+          : "Name and, for reptiles, fish and birds, species are required. For dogs and cats, species is set by the initial selection. Category-specific details are optional."}</div>
         <div className="modal-actions"><Button variant="secondary" type="button" onClick={() => setModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={busy}>{busy ? t("loading") : t("save")}</Button></div>
       </form>
     </Modal>}

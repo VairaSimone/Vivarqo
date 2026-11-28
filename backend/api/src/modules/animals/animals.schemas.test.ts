@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAnimalSchema, validateAnimalDomainProfile } from "./animals.schemas.js";
 
 describe("multi-domain animal profiles", () => {
-  it("requires at least one meaningful category-specific value for every category", () => {
+  it("allows creating an animal before optional category-specific details are known", () => {
     for (const category of ["reptiles", "fish", "birds", "dogs_cats"] as const) {
       expect(
         createAnimalSchema.safeParse({
@@ -12,7 +12,7 @@ describe("multi-domain animal profiles", () => {
           domainProfile: {},
         }).success,
         category,
-      ).toBe(false);
+      ).toBe(true);
     }
   });
 
@@ -21,7 +21,7 @@ describe("multi-domain animal profiles", () => {
       reptiles: { brumation: "not_applicable" },
       fish: { waterType: "saltwater" },
       birds: { flightStatus: "unknown" },
-      dogs_cats: { vaccinationStatus: "unknown" },
+      dogs_cats: { animalType: "cat", vaccinationStatus: "unknown", indoorOutdoor: "indoor" },
     } as const;
 
     for (const [category, domainProfile] of Object.entries(profiles)) {
@@ -37,14 +37,14 @@ describe("multi-domain animal profiles", () => {
     }
   });
 
-  it("counts explicit false values as meaningful data", () => {
+  it("accepts explicit false boolean profile values", () => {
     expect(validateAnimalDomainProfile("dogs_cats", { sterilized: false }).success).toBe(true);
     expect(validateAnimalDomainProfile("fish", { shoaling: false }).success).toBe(true);
   });
 
-  it("does not count blank strings as category-specific data", () => {
-    expect(validateAnimalDomainProfile("reptiles", { enclosure: "   " }).success).toBe(false);
-    expect(validateAnimalDomainProfile("birds", { diet: "" }).success).toBe(false);
+  it("allows optional category-specific text fields to remain blank", () => {
+    expect(validateAnimalDomainProfile("reptiles", { enclosure: "   " }).success).toBe(true);
+    expect(validateAnimalDomainProfile("birds", { diet: "" }).success).toBe(true);
   });
 
   it("rejects fields that do not belong to the selected category", () => {
@@ -59,12 +59,23 @@ describe("multi-domain animal profiles", () => {
     expect(validateAnimalDomainProfile("dogs_cats", { unknownField: "unsafe" }).success).toBe(false);
   });
 
-  it("accepts valid dog and cat-specific fields when the microchip is absent", () => {
+  it("accepts dog and cat profiles without requiring a microchip", () => {
     expect(createAnimalSchema.safeParse({
       name: "Luna",
-      species: "Gatto europeo",
+      species: "Felis catus",
       category: "dogs_cats",
-      domainProfile: { sterilized: true, vaccinationStatus: "up_to_date", weightKg: 4.2 },
+      domainProfile: { animalType: "cat", indoorOutdoor: "indoor", sterilized: true, vaccinationStatus: "up_to_date", weightKg: 4.2 },
     }).success).toBe(true);
+    expect(createAnimalSchema.safeParse({
+      name: "Thor",
+      species: "Canis lupus familiaris",
+      category: "dogs_cats",
+      domainProfile: { animalType: "dog", activityLevel: "high" },
+    }).success).toBe(true);
+  });
+
+  it("rejects companion fields that do not match the selected type", () => {
+    expect(validateAnimalDomainProfile("dogs_cats", { animalType: "cat", activityLevel: "high" }).success).toBe(false);
+    expect(validateAnimalDomainProfile("dogs_cats", { animalType: "dog", indoorOutdoor: "indoor" }).success).toBe(false);
   });
 });
