@@ -50,7 +50,7 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
   // Bird breeding pairs also use ReproductionCycle for shared clutch/egg history.
   // Resolve the category from the cycle's actual parents instead of treating every
   // cycle as a reptile-only record.
-  const cycleMatch = req.path.match(/^\\/reproduction-cycles(?:\\/([^/]+))?/);
+  const cycleMatch = req.path.match(/^\/reproduction-cycles(?:\/([^/]+))?/);
   if (cycleMatch) {
     let cycleCategories: string[] = ["reptiles", "birds"];
     if (cycleMatch[1]) {
