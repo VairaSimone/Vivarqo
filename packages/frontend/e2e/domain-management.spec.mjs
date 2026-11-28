@@ -101,14 +101,14 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   expect(careResponse.status(), await careResponse.text()).toBe(201);
   const createdCare = await careResponse.json();
   expect(createdCare.record.animalId).toBe(companionAnimal.id);
-  await expect(page.getByText("Vaccino annuale E2E", { exact: true })).toBeVisible();
   const record = page.locator(".ecosys-reading").filter({ hasText: "Vaccino annuale E2E" });
+  await expect(record).toBeVisible();
   await record.getByRole("button", { name: "Modifica" }).click();
   await page.getByLabel("Descrizione").fill("Vaccino aggiornato E2E");
   await page.getByRole("button", { name: "Salva modifiche" }).click();
-  await expect(page.getByText("Vaccino aggiornato E2E", { exact: true })).toBeVisible();
   const updatedRecord = page.locator(".ecosys-reading").filter({ hasText: "Vaccino aggiornato E2E" });
+  await expect(updatedRecord).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await updatedRecord.getByRole("button", { name: "Elimina" }).click();
-  await expect(page.getByText("Vaccino aggiornato E2E", { exact: true })).toHaveCount(0);
+  await expect(updatedRecord).toHaveCount(0);
 });
