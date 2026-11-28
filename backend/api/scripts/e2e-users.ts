@@ -47,8 +47,9 @@ async function cleanAccounts() {
     await tx.task.deleteMany({ where: { userId: { in: userIds } } });
     await tx.reminderRule.deleteMany({ where: { userId: { in: userIds } } });
 
-    // Bird pairs and health records use restrictive references to animals/cycles.
+    // Bird pairs, companion reproduction and health records use restrictive references to animals/cycles.
     await tx.birdBreedingPair.deleteMany({ where: { userId: { in: userIds } } });
+    await tx.companionReproduction.deleteMany({ where: { userId: { in: userIds } } });
     await tx.healthRecord.deleteMany({ where: { animal: { is: ownedAnimals } } });
 
     // Reproduction records have restrictive parent/child relations.

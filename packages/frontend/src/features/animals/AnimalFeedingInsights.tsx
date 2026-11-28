@@ -20,13 +20,20 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
   const it = locale === "it";
   const summary = useResource<FeedingSummary>(`/animals/${encodeURIComponent(id)}/feeding-summary`);
   const [interval, setInterval] = useState("");
+  const [intervalDirty, setIntervalDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { toast, show } = useToast();
 
   useEffect(() => {
-    if (summary.data) setInterval(summary.data.feedingIntervalDays == null ? "" : String(summary.data.feedingIntervalDays));
-  }, [summary.data?.feedingIntervalDays]);
+    if (summary.data && !intervalDirty) {
+      setInterval(summary.data.feedingIntervalDays == null ? "" : String(summary.data.feedingIntervalDays));
+    }
+  }, [summary.data?.feedingIntervalDays, intervalDirty]);
+
+  useEffect(() => {
+    setIntervalDirty(false);
+  }, [id]);
 
   async function saveInterval(event: FormEvent) {
     event.preventDefault();
@@ -34,6 +41,7 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
     setError("");
     try {
       await api.patch(`/animals/${encodeURIComponent(id)}`, { feedingIntervalDays: interval === "" ? null : Number(interval) });
+      setIntervalDirty(false);
       await summary.reload();
       show(it ? "Intervallo alimentare aggiornato." : "Feeding interval updated.");
     } catch (reason) {
@@ -60,7 +68,7 @@ export function AnimalFeedingInsights({ id, locale, readOnly }: { id: string; lo
     {!readOnly && <form className="feeding-interval-form" onSubmit={saveInterval}>
       {error && <Alert tone="danger">{error}</Alert>}
       <Field label={it ? "Intervallo previsto (giorni)" : "Expected interval (days)"} hint={it ? "Impostalo in base alla specie, all'età e al piano alimentare dell'animale. Lascia vuoto per non calcolare una previsione." : "Set this according to species, age and the animal's feeding plan. Leave empty to disable predictions."}>
-        <Input type="number" min="1" max="365" step="1" value={interval} onChange={(event) => setInterval(event.target.value)} placeholder={it ? "Non impostato" : "Not set"} />
+        <Input type="number" min="1" max="365" step="1" value={interval} onChange={(event) => { setInterval(event.target.value); setIntervalDirty(true); }} placeholder={it ? "Non impostato" : "Not set"} />
       </Field>
       <Button type="submit" size="sm" disabled={busy}>{busy ? (it ? "Salvataggio…" : "Saving…") : (it ? "Salva intervallo" : "Save interval")}</Button>
     </form>}

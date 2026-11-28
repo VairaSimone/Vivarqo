@@ -218,6 +218,7 @@ jobs:
       PORT: 3000
       CSRF_SECRET: ci-e2e-only-secret-never-use-outside-test-environment-2026
       PRIVATE_STORAGE_PATH: /tmp/vivarqo-e2e-private
+      BILLING_FREE_MAX_ANIMALS: "100"
     services:
       postgres:
         image: postgres:18

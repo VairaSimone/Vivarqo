@@ -20,6 +20,7 @@ const SettingsPage = lazy(() => import("../features/SettingsPage").then((module)
 const HelpCenterPage = lazy(() => import("../features/HelpCenterPage").then((module) => ({ default: module.HelpCenterPage })));
 const DataTransferPage = lazy(() => import("../features/DataTransferPage").then((module) => ({ default: module.DataTransferPage })));
 const PublicAnimalPage = lazy(() => import("../features/PublicAnimalPage").then((module) => ({ default: module.PublicAnimalPage })));
+const CompanionReproductionPage = lazy(() => import("../features/CompanionReproductionPage").then((module) => ({ default: module.CompanionReproductionPage })));
 const LegalPage = lazy(() => import("../features/LegalPage").then((module) => ({ default: module.LegalPage })));
 import type { DisplayPreferences, Locale, WeightUnit, TemperatureUnit, DateFormat } from "../lib/domain";
 import { setDisplayPreferences as applyDisplayPreferences } from "../lib/domain";
@@ -275,6 +276,7 @@ export function App() {
   else if (matches("/animals")) page = <AnimalsPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/aquariums") || matches("/aviaries")) page = <EcosystemsPage locale={locale} path={path} navigate={navigate} />;
   else if (matches("/companion-care")) page = <CompanionCarePage locale={locale} />;
+  else if (matches("/companion-reproduction")) page = <CompanionReproductionPage locale={locale} />;
   else if (matches("/feeding")) page = <CarePage locale={locale} path={path} timezone={timezone} />;
   else if (matches("/tasks") || matches("/calendar")) page = <OperationsPage locale={locale} path={path} timezone={timezone} navigate={navigate} />;
   else if (matches("/reproduction") || matches("/reproduction-cycles") || matches("/clutches")) page = <ReproductionPage locale={locale} path={path} navigate={navigate} />;

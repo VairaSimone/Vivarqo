@@ -92,7 +92,8 @@ export const isSubscriptionAccessExempt = (path: string) =>
   path.startsWith("/reproduction-statistics") || path.startsWith("/incubators") || path.startsWith("/clutches") ||
   path.startsWith("/eggs") || path.startsWith("/offspring-batches") || path.startsWith("/reproductive-events") ||
   path.startsWith("/incubation-logs") || path.startsWith("/genetic-traits") ||
-  path.startsWith("/aquariums") || path.startsWith("/aviaries") || path.startsWith("/companion-care");
+  path.startsWith("/aquariums") || path.startsWith("/aviaries") || path.startsWith("/companion-care") ||
+  path.startsWith("/companion-reproductions");
 export const subscriptionAccessGuard: RequestHandler = async (req, res, next) => {
   if (env.BILLING_ACCESS_MODE !== "subscription_required" || isSubscriptionAccessExempt(req.path)) { next(); return; }
   const auth = res.locals.auth as { userId: string } | undefined;

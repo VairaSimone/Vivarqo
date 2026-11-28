@@ -354,6 +354,10 @@ paths:
         - name: species
           in: query
           schema: { type: string }
+        - name: speciesExact
+          in: query
+          description: Filtra per corrispondenza esatta della specie, ignorando maiuscole e minuscole.
+          schema: { type: string, maxLength: 160 }
         - name: category
           in: query
           schema: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
@@ -4777,6 +4781,104 @@ paths:
           $ref: '#/components/responses/Error'
 
 
+  /api/v1/companion-reproductions:
+    get:
+      operationId: listCompanionReproductions
+      tags: [Reproduction]
+      summary: Elenca accoppiamenti, gravidanze e cucciolate di cani e gatti
+      responses:
+        '200':
+          description: Registri riproduttivi dell'account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanionReproductionsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createCompanionReproduction
+      tags: [Reproduction]
+      summary: Registra un accoppiamento per due cani o gatti compatibili
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-reproduction.routes.ts
+          symbol: companionReproductionCreateSchema
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanionReproductionCreateRequest'
+      responses:
+        '201':
+          description: Accoppiamento e relativo registro creati.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanionReproductionEnvelopeResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/companion-reproductions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      operationId: updateCompanionReproduction
+      tags: [Reproduction]
+      summary: Aggiorna stato della gravidanza, parto e conteggio della cucciolata
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        x-source-validation:
+          file: backend/api/src/modules/domain/companion-reproduction.routes.ts
+          symbol: companionReproductionPatchSchema
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanionReproductionPatchRequest'
+      responses:
+        '200':
+          description: Registro riproduttivo aggiornato.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanionReproductionEnvelopeResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteCompanionReproduction
+      tags: [Reproduction]
+      summary: Elimina un registro riproduttivo
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Registro eliminato.
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
   /api/v1/companion-care:
     get:
       operationId: listCompanionCareRecords
@@ -5871,7 +5973,7 @@ paths:
               type: object
               minProperties: 1
               properties:
-                ringType: { type: string, enum: [none, closed, open, microchip] }
+                ringType: { type: string, enum: [none, unspecified, closed, open, microchip] }
                 ringNumber: { type: [string, 'null'], maxLength: 80 }
                 ringYear: { type: [integer, 'null'], minimum: 1900, maximum: 2200 }
                 citesNumber: { type: [string, 'null'], maxLength: 120 }
@@ -6159,6 +6261,84 @@ components:
         email: { type: string, format: email, maxLength: 254 }
         currentPassword: { type: string, minLength: 1, maxLength: 128 }
         newPassword: { type: string, minLength: 12, maxLength: 128 }
+    CompanionReproductionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [femaleAnimalId, maleAnimalId, matedAt]
+      properties:
+        femaleAnimalId: { type: string, format: uuid }
+        maleAnimalId: { type: string, format: uuid }
+        matedAt: { type: string, format: date }
+        pregnancyConfirmedAt: { type: [string, 'null'], format: date }
+        expectedDueAt: { type: [string, 'null'], format: date }
+        deliveredAt: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [mated, pregnant, delivered, unsuccessful, cancelled], default: mated }
+        totalBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        liveBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        stillborn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        notes: { type: [string, 'null'], maxLength: 10000 }
+    CompanionReproductionPatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        matedAt: { type: string, format: date }
+        pregnancyConfirmedAt: { type: [string, 'null'], format: date }
+        expectedDueAt: { type: [string, 'null'], format: date }
+        deliveredAt: { type: [string, 'null'], format: date }
+        status: { type: string, enum: [mated, pregnant, delivered, unsuccessful, cancelled] }
+        totalBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        liveBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        stillborn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        notes: { type: [string, 'null'], maxLength: 10000 }
+    CompanionReproductionDto:
+      type: object
+      required: [id, femaleAnimalId, maleAnimalId, matedAt, pregnancyConfirmedAt, expectedDueAt, deliveredAt, status, totalBorn, liveBorn, stillborn, notes, createdAt, updatedAt, female, male]
+      properties:
+        id: { type: string, format: uuid }
+        femaleAnimalId: { type: string, format: uuid }
+        maleAnimalId: { type: string, format: uuid }
+        matedAt: { type: string, format: date-time }
+        pregnancyConfirmedAt: { type: [string, 'null'], format: date-time }
+        expectedDueAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        status: { type: string, enum: [mated, pregnant, delivered, unsuccessful, cancelled] }
+        totalBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        liveBorn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        stillborn: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        notes: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        female:
+          type: object
+          required: [id, name, species, sex]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            species: { type: string }
+            sex: { type: string, enum: [female] }
+        male:
+          type: object
+          required: [id, name, species, sex]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            species: { type: string }
+            sex: { type: string, enum: [male] }
+    CompanionReproductionEnvelopeResponse:
+      type: object
+      required: [record]
+      properties:
+        record:
+          $ref: '#/components/schemas/CompanionReproductionDto'
+    CompanionReproductionsResponse:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompanionReproductionDto'
     AnimalDomainProfile:
       oneOf:
         - type: object
@@ -6179,7 +6359,6 @@ components:
         - type: object
           additionalProperties: false
           properties:
-            ringNumber: { type: [string, 'null'], maxLength: 80 }
             aviaryId: { type: [string, 'null'], format: uuid }
             diet: { type: [string, 'null'], maxLength: 160 }
             tameness: { type: string, enum: [wild, socialized, tame] }
@@ -6193,6 +6372,13 @@ components:
             vaccinationStatus: { type: string, enum: [unknown, not_up_to_date, up_to_date] }
             coatColor: { type: [string, 'null'], maxLength: 120 }
             weightKg: { type: [number, 'null'], exclusiveMinimum: 0, maximum: 250 }
+            veterinarianName: { type: [string, 'null'], maxLength: 160 }
+            veterinaryClinic: { type: [string, 'null'], maxLength: 160 }
+            veterinaryPhone: { type: [string, 'null'], maxLength: 40 }
+            veterinaryEmail: { type: [string, 'null'], format: email, maxLength: 254 }
+            veterinaryAddress: { type: [string, 'null'], maxLength: 300 }
+            allergies: { type: [string, 'null'], maxLength: 5000 }
+            chronicConditions: { type: [string, 'null'], maxLength: 5000 }
     AnimalWrite:
       type: object
       additionalProperties: false

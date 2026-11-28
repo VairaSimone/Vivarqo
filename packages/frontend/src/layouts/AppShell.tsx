@@ -29,6 +29,7 @@ function groupsForCategories(categories: string[], sharedWorkspace = false): Arr
   if (has("fish")) animalItems.push({ path: "/aquariums", label: "navAquariums", icon: "box" });
   if (has("birds")) animalItems.push({ path: "/aviaries", label: "navAviaries", icon: "leaf" });
   if (has("dogs_cats")) animalItems.push({ path: "/companion-care", label: "navCompanionCare", icon: "check" });
+  if (has("dogs_cats")) animalItems.push({ path: "/companion-reproduction", label: "navBreeding", icon: "leaf" });
   return [
     { title: "navWorkspace", items: [
       { path: "/today", label: "navToday", icon: "home" },
@@ -56,7 +57,7 @@ function groupsForCategories(categories: string[], sharedWorkspace = false): Arr
 const routeTitles: Record<string, string> = {
   "/today": "navToday", "/calendar": "navCalendar", "/tasks": "navTasks",
   "/animals": "navAnimals", "/feeding": "navFeeding", "/reproduction": "navBreeding",
-  "/aquariums": "navAquariums", "/aviaries": "navAviaries", "/companion-care": "navCompanionCare",
+  "/aquariums": "navAquariums", "/aviaries": "navAviaries", "/companion-care": "navCompanionCare", "/companion-reproduction": "navBreeding",
   "/reproduction-cycles": "navBreeding", "/clutches": "navBreeding", "/genetics": "navGenetics",
   "/inventory": "navInventory", "/documents": "navDocuments", "/finance": "navFinance",
   "/notifications": "navNotifications", "/imports": "navImports", "/exports": "navExports",

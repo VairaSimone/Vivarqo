@@ -38,6 +38,7 @@ model User {
   aquariums               Aquarium[]
   aviaries                Aviary[]
   companionCareRecords    CompanionCareRecord[]
+  companionReproductions  CompanionReproduction[]
   companionCareLogs       CompanionCareLog[]
   companionPolicies       CompanionPolicy[]
   pushSubscriptions       PushSubscription[]
@@ -203,6 +204,8 @@ model Animal {
   aviaryAssignments      AviaryBird[]
   aviaryMovements        AviaryMovement[]
   companionCareRecords   CompanionCareRecord[]
+  companionReproductionsAsFemale CompanionReproduction[] @relation("CompanionReproductionFemale")
+  companionReproductionsAsMale   CompanionReproduction[] @relation("CompanionReproductionMale")
   companionCareLogs      CompanionCareLog[]
   companionPolicies      CompanionPolicy[]
   @@unique([id, userId], map: "animals_id_user_id_unique")
@@ -1212,6 +1215,31 @@ model AviaryBird {
   @@map("aviary_birds")
 }
 
+
+model CompanionReproduction {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String   @map("user_id") @db.Uuid
+  femaleAnimalId        String   @map("female_animal_id") @db.Uuid
+  maleAnimalId          String   @map("male_animal_id") @db.Uuid
+  matedAt               DateTime @map("mated_at") @db.Date
+  pregnancyConfirmedAt  DateTime? @map("pregnancy_confirmed_at") @db.Date
+  expectedDueAt         DateTime? @map("expected_due_at") @db.Date
+  deliveredAt           DateTime? @map("delivered_at") @db.Date
+  status                String   @default("mated") @db.VarChar(16)
+  totalBorn             Int?     @map("total_born")
+  liveBorn              Int?     @map("live_born")
+  stillborn             Int?
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  female                Animal   @relation("CompanionReproductionFemale", fields: [femaleAnimalId], references: [id], onDelete: Restrict)
+  male                  Animal   @relation("CompanionReproductionMale", fields: [maleAnimalId], references: [id], onDelete: Restrict)
+  @@index([userId, status, matedAt(sort: Desc)], map: "companion_reproductions_user_status_mated_idx")
+  @@index([femaleAnimalId, matedAt(sort: Desc)], map: "companion_reproductions_female_mated_idx")
+  @@index([maleAnimalId, matedAt(sort: Desc)], map: "companion_reproductions_male_mated_idx")
+  @@map("companion_reproductions")
+}
 
 model CompanionCareLog {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

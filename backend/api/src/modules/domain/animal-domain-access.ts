@@ -7,7 +7,8 @@ const categoryRoutes: Array<{ prefixes: string[]; category: string }> = [
   { prefixes: ["/aquariums"], category: "fish" },
   { prefixes: ["/aviaries", "/birds", "/bird-breeding-pairs", "/aviary-maintenance"], category: "birds" },
   { prefixes: ["/quarantines", "/aquarium-treatments"], category: "fish" },
-  { prefixes: ["/companion-care"], category: "dogs_cats" },
+  { prefixes: ["/sheds"], category: "reptiles" },
+  { prefixes: ["/companion-care", "/companion-reproductions"], category: "dogs_cats" },
   {
     prefixes: [
       "/reproduction", "/reproduction-pairs", "/species-breeding-profiles",
@@ -40,7 +41,7 @@ async function cycleCategoriesForUser(userId: string, cycleId: string) {
 }
 
 export function categoryForAnimalDomainPath(path: string): string | null {
-  if (/^\/animals\/[^/]+\/(?:genetic-traits|genetic-history|pedigree|inbreeding)$/.test(path)) {
+  if (/^\/animals\/[^/]+\/(?:genetic-traits|genetic-history|pedigree|inbreeding|sheds)$/.test(path)) {
     return "reptiles";
   }
   return categoryRoutes.find((item) => item.prefixes.some((prefix) => matchesPath(path, prefix)))?.category ?? null;
@@ -74,6 +75,14 @@ export const animalDomainAccessGuard: RequestHandler = async (req, res, next) =>
     select: { animalCategories: true },
   });
   const categories = configuration?.animalCategories ?? [];
+
+  if (req.path === "/care-records/bulk" && req.method === "POST" && req.body?.kind === "shed" && !categories.includes("reptiles")) {
+    next(new AppError(403, "ANIMAL_CATEGORY_NOT_ENABLED", "Enable reptiles to register shedding records", {
+      category: "reptiles",
+      settingsPath: "/settings/categories",
+    }));
+    return;
+  }
 
   let scopedCategories: string[] | null = null;
   let collectionScope = false;

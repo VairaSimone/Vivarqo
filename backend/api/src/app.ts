@@ -44,6 +44,7 @@ import { createEcosystemRouter } from "./modules/domain/ecosystems.routes.js";
 import { createAquariumManagementRouter } from "./modules/domain/aquarium-management.routes.js";
 import { createBirdManagementRouter } from "./modules/domain/bird-management.routes.js";
 import { createCompanionCareRouter } from "./modules/domain/companion-care.routes.js";
+import { createCompanionReproductionRouter } from "./modules/domain/companion-reproduction.routes.js";
 import { createCompanionCareExtrasRouter } from "./modules/domain/companion-care-extras.routes.js";
 import { animalDomainAccessGuard } from "./modules/domain/animal-domain-access.js";
 
@@ -136,6 +137,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api/v1", createAquariumManagementRouter());
   app.use("/api/v1", createBirdManagementRouter());
   app.use("/api/v1", createCompanionCareRouter());
+  app.use("/api/v1", createCompanionReproductionRouter());
   app.use("/api/v1", createCompanionCareExtrasRouter());
   app.use("/api/v1", createFinanceRouter());
   app.use("/api/v1", createNotificationRouter());

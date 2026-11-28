@@ -33,17 +33,23 @@ async function enableAllCategories(page) {
   await page.goto("/today");
 }
 
-async function createAnimal(page, name) {
-  const result = await page.evaluate(async ({ name }) => {
+async function createAnimal(page, name, options = {}) {
+  const result = await page.evaluate(async ({ name, options }) => {
     const csrf = await fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json());
     const response = await fetch("/api/v1/animals", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf.csrfToken },
-      body: JSON.stringify({ name, species: "Cane meticcio", category: "dogs_cats", sex: "unknown" })
+      body: JSON.stringify({
+        name,
+        species: options.species ?? "Cane meticcio",
+        category: options.category ?? "dogs_cats",
+        sex: options.sex ?? "unknown",
+        domainProfile: options.domainProfile ?? {},
+      })
     });
     return { status: response.status, body: await response.json() };
-  }, { name });
+  }, { name, options });
   expect(result.status, JSON.stringify(result.body)).toBe(201);
   return result.body.animal;
 }
@@ -108,7 +114,9 @@ test("bulk animal creation respects each row category", async ({ page }) => {
 test("companion animals do not expose reptile prey fields or shed actions", async ({ page }) => {
   await signIn(page);
   await enableAllCategories(page);
-  const dog = await createAnimal(page, "E2E Companion care " + Date.now());
+  const dog = await createAnimal(page, "E2E Companion care " + Date.now(), {
+    domainProfile: { breed: "Labrador", allergies: "Polline", chronicConditions: "Nessuna" },
+  });
 
   await page.goto("/feeding?create=1&animalId=" + encodeURIComponent(dog.id));
   const dialog = page.getByRole("dialog");
@@ -134,6 +142,39 @@ test("companion animals do not expose reptile prey fields or shed actions", asyn
   await expect(page.getByRole("button", { name: "Registra muta", exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "Storico cure" }).click();
   await expect(page.getByRole("heading", { name: "Registra muta", exact: true })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Panoramica" }).click();
+  await expect(page.getByText("Labrador", { exact: true })).toBeVisible();
+  await expect(page.getByText("Polline", { exact: true })).toBeVisible();
+
+  const protectedRequests = await page.evaluate(async ({ animalId }) => {
+    const csrf = await fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json());
+    async function request(path, method, body) {
+      const response = await fetch("/api/v1" + path, {
+        method,
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf.csrfToken },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      return { status: response.status, body: await response.json().catch(() => ({})) };
+    }
+    const now = new Date().toISOString();
+    return {
+      getSheds: await request("/animals/" + animalId + "/sheds", "GET"),
+      postShed: await request("/animals/" + animalId + "/sheds", "POST", { occurredAt: now, outcome: "complete" }),
+      bulkShed: await request("/care-records/bulk", "POST", { kind: "shed", animalIds: [animalId], occurredAt: now, outcome: "complete" }),
+      preyFields: await request("/feeding-sessions", "POST", {
+        performedAt: now,
+        entries: [{ animalId, outcome: "ate", preyState: "live" }],
+      }),
+    };
+  }, { animalId: dog.id });
+  expect(protectedRequests.getSheds.status).toBe(404);
+  expect(protectedRequests.postShed.status).toBe(404);
+  expect(protectedRequests.bulkShed.status).toBe(400);
+  expect(protectedRequests.bulkShed.body.code).toBe("SHED_REPTILE_ONLY");
+  expect(protectedRequests.preyFields.status).toBe(400);
+  expect(protectedRequests.preyFields.body.code).toBe("CATEGORY_FIELD_NOT_ALLOWED");
 });
 
 test("aquariums, aviaries and companion-care records support editing and archival", async ({ page }) => {
@@ -199,4 +240,66 @@ test("aquariums, aviaries and companion-care records support editing and archiva
   page.once("dialog", (dialog) => dialog.accept());
   await updatedRecord.getByRole("button", { name: "Elimina" }).click();
   await expect(updatedRecord).toHaveCount(0);
+});
+
+
+test("dogs and cats can track mating, pregnancy and litter outcomes", async ({ page }) => {
+  test.setTimeout(120_000);
+  await signIn(page);
+  await enableAllCategories(page);
+
+  const stamp = Date.now();
+  const female = await createAnimal(page, "E2E Mother " + stamp, { sex: "female" });
+  const male = await createAnimal(page, "E2E Father " + stamp, { sex: "male" });
+  const differentSpeciesMale = await createAnimal(page, "E2E Other species " + stamp, { sex: "male", species: "Gatto europeo" });
+
+  await page.goto("/companion-reproduction");
+  const femaleSelect = page.getByLabel("Femmina / madre");
+  const maleSelect = page.getByLabel("Maschio / padre");
+  await expect(femaleSelect.locator(`option[value="${female.id}"]`)).toHaveCount(1);
+  await expect(maleSelect.locator(`option[value="${male.id}"]`)).toHaveCount(1);
+  await expect(maleSelect.locator(`option[value="${differentSpeciesMale.id}"]`)).toHaveCount(0);
+  await femaleSelect.selectOption(female.id);
+  await maleSelect.selectOption(male.id);
+  await page.getByLabel("Data accoppiamento").fill("2026-11-20");
+  await page.getByLabel("Stato").selectOption("pregnant");
+  await page.getByLabel("Gravidanza confermata il").fill("2026-11-24");
+  await page.getByLabel("Data presunta parto").fill("2027-01-20");
+
+  const createdResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/v1/companion-reproductions"
+  );
+  await page.getByRole("button", { name: "Salva registro" }).click();
+  const created = await createdResponse;
+  expect(created.status(), await created.text()).toBe(201);
+  const createdBody = await created.json();
+  expect(createdBody.record.femaleAnimalId).toBe(female.id);
+  expect(createdBody.record.maleAnimalId).toBe(male.id);
+
+  const pregnantRow = page.locator(".ecosys-reading").filter({ hasText: "Gravidanza confermata" });
+  await expect(pregnantRow).toBeVisible();
+  await pregnantRow.getByRole("button", { name: "Modifica" }).click();
+  await page.getByLabel("Stato").selectOption("delivered");
+  await page.getByLabel("Data parto").fill("2027-01-18");
+  await page.getByLabel("Cuccioli totali").fill("4");
+  await page.getByLabel("Nati vivi").fill("4");
+  await page.getByLabel("Nati morti").fill("0");
+
+  const updatedResponse = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" &&
+    new URL(response.url()).pathname === "/api/v1/companion-reproductions/" + createdBody.record.id
+  );
+  await page.getByRole("button", { name: "Salva registro" }).click();
+  const updated = await updatedResponse;
+  expect(updated.status(), await updated.text()).toBe(200);
+  const updatedBody = await updated.json();
+  expect(updatedBody.record.status).toBe("delivered");
+  expect(updatedBody.record.totalBorn).toBe(4);
+  expect(updatedBody.record.liveBorn).toBe(4);
+
+  const deliveredRow = page.locator(".ecosys-reading").filter({ hasText: "Parto completato" });
+  await expect(deliveredRow).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await deliveredRow.getByRole("button", { name: "Elimina" }).click();
+  await expect(deliveredRow).toHaveCount(0);
 });

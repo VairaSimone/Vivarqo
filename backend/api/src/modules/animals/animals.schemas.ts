@@ -24,7 +24,6 @@ const animalDomainProfiles = {
     diet: nullableText(160),
   }).strict(),
   birds: z.object({
-    ringNumber: nullableText(80),
     aviaryId: z.string().uuid().nullable().optional(),
     diet: nullableText(160),
     tameness: z.enum(["wild", "socialized", "tame"]).optional(),

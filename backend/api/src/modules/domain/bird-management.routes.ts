@@ -6,7 +6,7 @@ import { requireSession, type AuthContext } from "../auth/session.js";
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => { const parsed = new Date(value + "T00:00:00.000Z"); return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value; }, "Invalid calendar date");
 const profileSchema = z.object({
-  ringType: z.enum(["none", "closed", "open", "microchip"]).optional(),
+  ringType: z.enum(["none", "unspecified", "closed", "open", "microchip"]).optional(),
   ringNumber: z.string().trim().max(80).nullable().optional(),
   ringYear: z.number().int().min(1900).max(2200).nullable().optional(),
   citesNumber: z.string().trim().max(120).nullable().optional(),

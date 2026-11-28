@@ -71,6 +71,11 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const traits = useResource<{ traits: GeneticTraitDto[] }>(animal?.category === "reptiles" && tab === "traits" ? `/animals/${id}/genetic-traits?page=1&pageSize=100` : null);
   const hatchlingCare = useResource<{ care: { firstFeedingAt: string | null; firstFeedingAccepted: boolean | null; firstShedAt: string | null; readyForRehomingAt: string | null; availabilityStatus: "not_available" | "available" | "reserved" | "transferred"; healthStatus: "unknown" | "healthy" | "monitoring" | "treatment"; healthNotes: string | null; notes: string | null } | null; feedingCount: number; acceptedFeedings: number; weights: WeightDto[]; sheds: ShedDto[] }>(animal?.originOffspringBatchId ? `/animals/${id}/hatchling-care` : null);
   const share = useResource<{ share: PublicShareDto }>(animal && tab === "share" ? `/animals/${id}/public-share` : null);
+  const birdProfile = useResource<{ profile: {
+    ringType: string; ringNumber: string | null; ringYear: number | null;
+    citesNumber: string | null; citesAnnex: string | null; citesAuthority: string | null;
+    citesIssuedAt: string | null; citesExpiresAt: string | null;
+  } | null }>(animal?.category === "birds" && tab === "overview" ? `/birds/${encodeURIComponent(id)}/profile` : null);
 
   useEffect(() => {
     setTab("overview");
@@ -357,6 +362,73 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
   const latestWeight = summaryWeights.data?.weights?.[0];
   const latestFeedingSession = summaryFeedings.data?.sessions?.[0];
   const latestFeedingEntry = latestFeedingSession?.entries.find((entry) => getString(entry, "animalId") === id);
+  const profile = (animal.domainProfile ?? {}) as Record<string, unknown>;
+  const profileFields: Array<{ label: string; value: string }> = [];
+  const profileLabels: Record<string, { it: string; en: string }> = {
+    enclosure: { it: "Alloggiamento / terrario", en: "Enclosure" },
+    brumation: { it: "Brumazione", en: "Brumation" },
+    feedingNotes: { it: "Note alimentazione", en: "Feeding notes" },
+    waterType: { it: "Tipo d'acqua", en: "Water type" },
+    temperament: { it: "Temperamento", en: "Temperament" },
+    maxSizeCm: { it: "Dimensione adulta", en: "Adult size" },
+    shoaling: { it: "Specie gregaria", en: "Shoaling species" },
+    diet: { it: "Alimentazione", en: "Diet" },
+    tameness: { it: "Abitudine al contatto", en: "Tameness" },
+    flightStatus: { it: "Capacità di volo", en: "Flight status" },
+    breed: { it: "Razza", en: "Breed" },
+    microchip: { it: "Microchip", en: "Microchip" },
+    veterinarianName: { it: "Veterinario", en: "Veterinarian" },
+    veterinaryClinic: { it: "Clinica veterinaria", en: "Veterinary clinic" },
+    veterinaryPhone: { it: "Telefono veterinario", en: "Veterinary phone" },
+    veterinaryEmail: { it: "Email veterinario", en: "Veterinary email" },
+    veterinaryAddress: { it: "Indirizzo veterinario", en: "Veterinary address" },
+    allergies: { it: "Allergie", en: "Allergies" },
+    chronicConditions: { it: "Patologie croniche", en: "Chronic conditions" },
+    sterilized: { it: "Sterilizzato", en: "Neutered / spayed" },
+    vaccinationStatus: { it: "Vaccinazioni", en: "Vaccination status" },
+    coatColor: { it: "Colore mantello", en: "Coat colour" },
+    weightKg: { it: "Peso", en: "Weight" },
+    ringType: { it: "Tipo identificativo", en: "Identification type" },
+    ringNumber: { it: "Numero anello", en: "Ring number" },
+    ringYear: { it: "Anno anello", en: "Ring year" },
+    citesNumber: { it: "Numero CITES", en: "CITES number" },
+    citesAnnex: { it: "Allegato CITES", en: "CITES annex" },
+    citesAuthority: { it: "Autorità CITES", en: "CITES authority" },
+    citesIssuedAt: { it: "Rilascio CITES", en: "CITES issue date" },
+    citesExpiresAt: { it: "Scadenza CITES", en: "CITES expiry date" },
+  };
+  const profileEnums: Record<string, Record<string, string>> = {
+    brumation: { not_applicable: locale === "it" ? "Non applicabile" : "Not applicable", planned: locale === "it" ? "Pianificata" : "Planned", in_progress: locale === "it" ? "In corso" : "In progress", completed: locale === "it" ? "Completata" : "Completed" },
+    waterType: { freshwater: locale === "it" ? "Acqua dolce" : "Freshwater", saltwater: locale === "it" ? "Marina" : "Saltwater", brackish: locale === "it" ? "Salmastra" : "Brackish" },
+    tameness: { wild: locale === "it" ? "Selvatico" : "Wild", socialized: locale === "it" ? "Socializzato" : "Socialized", tame: locale === "it" ? "Addomesticato" : "Tame" },
+    flightStatus: { full_flight: locale === "it" ? "Volo completo" : "Full flight", clipped: locale === "it" ? "Remiganti accorciate" : "Clipped", unknown: locale === "it" ? "Non noto" : "Unknown" },
+    vaccinationStatus: { unknown: locale === "it" ? "Non noto" : "Unknown", not_up_to_date: locale === "it" ? "Da aggiornare" : "Not up to date", up_to_date: locale === "it" ? "In regola" : "Up to date" },
+    ringType: { none: locale === "it" ? "Nessuno" : "None", unspecified: locale === "it" ? "Non specificato" : "Unspecified", closed: locale === "it" ? "Anello chiuso" : "Closed ring", open: locale === "it" ? "Anello aperto" : "Open ring", microchip: "Microchip" },
+  };
+  function addProfileField(key: string, value: unknown) {
+    if (value === null || value === undefined || value === "") return;
+    let formatted: string;
+    if (typeof value === "boolean") formatted = value ? (locale === "it" ? "Sì" : "Yes") : (locale === "it" ? "No" : "No");
+    else if (typeof value === "number") formatted = key === "weightKg" ? value + " kg" : key === "maxSizeCm" ? value + " cm" : String(value);
+    else if (typeof value === "string") {
+      formatted = profileEnums[key]?.[value] ?? value.replace(/_/g, " ");
+      if ((key === "citesIssuedAt" || key === "citesExpiresAt") && value) formatted = formatDate(value, locale);
+    } else return;
+    profileFields.push({ label: profileLabels[key]?.[locale] ?? key, value: formatted });
+  }
+  const categoryProfileKeys: Record<string, string[]> = {
+    reptiles: ["enclosure", "brumation", "feedingNotes"],
+    fish: ["waterType", "temperament", "maxSizeCm", "shoaling", "diet"],
+    birds: ["diet", "tameness", "flightStatus"],
+    dogs_cats: ["breed", "microchip", "coatColor", "weightKg", "vaccinationStatus", "sterilized", "veterinarianName", "veterinaryClinic", "veterinaryPhone", "veterinaryEmail", "veterinaryAddress", "allergies", "chronicConditions"],
+  };
+  for (const key of categoryProfileKeys[animal.category] ?? []) addProfileField(key, profile[key]);
+  if (animal.category === "birds" && birdProfile.data?.profile) {
+    const bird = birdProfile.data.profile;
+    for (const key of ["ringType", "ringNumber", "ringYear", "citesNumber", "citesAnnex", "citesAuthority", "citesIssuedAt", "citesExpiresAt"]) {
+      addProfileField(key, bird[key as keyof typeof bird]);
+    }
+  }
   const tabItems = [
     ["overview", t("overview")], ["history", t("careHistory")], ["health", locale === "it" ? "Salute" : "Health"], ...(animal.category === "reptiles" ? [["reptile-care", locale === "it" ? "Cura rettili" : "Reptile care"]] : []), ["documents", t("documentsTab")],
     ...(animal.category === "reptiles" ? [["traits", t("traits")]] : []), ["share", t("publicShare")]
@@ -446,6 +518,10 @@ export function AnimalDetailPage({ id, locale, navigate }: { id: string; locale:
         <Detail label={t("birthDate")} value={formatDate(getString(animal, "birthDate"), locale)} /><Detail label={t("acquiredDate")} value={formatDate(getString(animal, "acquiredDate"), locale)} />
         <Detail label={t("location")} value={getString(animal, "locationLabel")} /><Detail label={t("previousBreeder")} value={getString(animal, "previousBreeder")} />
       </div></Panel>
+      {profileFields.length > 0 && <Panel>
+        <PanelHeader title={locale === "it" ? "Dati specifici della categoria" : "Category-specific details"} />
+        <div className="detail-fields">{profileFields.map((field) => <Detail key={field.label} label={field.label} value={field.value} />)}</div>
+      </Panel>}
       <Panel>
         <PanelHeader title={locale === "it" ? "Genealogia" : "Genealogy"} description={locale === "it" ? "Apri i genitori per consultare anche le generazioni precedenti." : "Open either parent to inspect earlier generations."} />
         <div className="detail-fields">

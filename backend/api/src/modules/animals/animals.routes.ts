@@ -130,6 +130,7 @@ export function createAnimalRouter() {
     const sex = typeof req.query.sex === "string" ? req.query.sex : undefined;
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 160) : "";
     const species = typeof req.query.species === "string" ? req.query.species.trim().slice(0, 160) : "";
+    const speciesExact = typeof req.query.speciesExact === "string" ? req.query.speciesExact.trim().slice(0, 160) : "";
     const category = typeof req.query.category === "string" ? req.query.category : "";
     const morph = typeof req.query.morph === "string" ? req.query.morph.trim().slice(0, 200) : "";
     const location = typeof req.query.location === "string" ? req.query.location.trim().slice(0, 160) : "";
@@ -154,7 +155,8 @@ export function createAnimalRouter() {
     if (status && status !== "all") where.status = status;
     else if (!status) where.status = "active";
     if (sex) where.sex = sex;
-    if (species) where.species = { contains: species, mode: "insensitive" };
+    if (speciesExact) where.species = { equals: speciesExact, mode: "insensitive" };
+    else if (species) where.species = { contains: species, mode: "insensitive" };
     if (morph) where.morph = { contains: morph, mode: "insensitive" };
     if (location) where.locationLabel = { contains: location, mode: "insensitive" };
     if (q) {
@@ -360,6 +362,8 @@ export function createAnimalRouter() {
             traitsAsSource: true,
             aviaryAssignments: true,
             aviaryMovements: true,
+            companionReproductionsAsFemale: true,
+            companionReproductionsAsMale: true,
           },
         },
         publicShare: true,

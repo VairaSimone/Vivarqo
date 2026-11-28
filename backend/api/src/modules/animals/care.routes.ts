@@ -48,6 +48,14 @@ async function getOwnedAnimal(userId: string, animalId: string, writable = false
   return animal;
 }
 
+async function getOwnedReptile(userId: string, animalId: string, writable = false) {
+  const animal = await getOwnedAnimal(userId, animalId, writable);
+  if (animal.category !== "reptiles") {
+    throw new AppError(404, "ANIMAL_NOT_FOUND", "Reptile not found");
+  }
+  return animal;
+}
+
 function pageOptions(query: unknown) {
   return parseBody(pageQuerySchema, query);
 }
@@ -61,8 +69,8 @@ export function createCareRouter() {
     const created = await prisma.$transaction(async (tx) => {
       // Lock the selected rows until commit so an archive/status change cannot
       // race the active-animal validation and leave records on an inactive animal.
-      const owned = await tx.$queryRaw<Array<{ id: string; status: string; archived_at: Date | null }>>`
-        SELECT id::text AS id, status, archived_at
+      const owned = await tx.$queryRaw<Array<{ id: string; status: string; archived_at: Date | null; category: string }>>`
+        SELECT id::text AS id, status, archived_at, category
         FROM animals
         WHERE user_id = ${auth.userId}::uuid AND id = ANY(${input.animalIds}::uuid[])
         ORDER BY id
@@ -73,6 +81,9 @@ export function createCareRouter() {
       }
       if (owned.some((animal) => animal.status !== "active" || animal.archived_at !== null)) {
         throw new AppError(409, "ANIMAL_NOT_ACTIVE", "Bulk care records can only be added to active animals");
+      }
+      if (input.kind === "shed" && owned.some((animal) => animal.category !== "reptiles")) {
+        throw new AppError(400, "SHED_REPTILE_ONLY", "Shedding records can only be added to reptiles");
       }
 
       if (input.kind === "weight") {
@@ -193,11 +204,26 @@ export function createCareRouter() {
     const created = await prisma.$transaction(async (tx) => {
       const owned = await tx.animal.findMany({
         where: { userId: auth.userId, id: { in: ids } },
-        select: { id: true, status: true, archivedAt: true },
+        select: { id: true, category: true, status: true, archivedAt: true },
       });
       if (owned.length !== ids.length) throw new AppError(404, "ANIMAL_NOT_FOUND", "One or more animals were not found");
       if (owned.some((animal) => animal.status !== "active" || animal.archivedAt !== null)) {
         throw new AppError(409, "ANIMAL_NOT_ACTIVE", "Feeding sessions can only contain active animals");
+      }
+
+      const categoriesByAnimalId = new Map(owned.map((animal) => [animal.id, animal.category]));
+      const rawEntries = Array.isArray(req.body?.entries) ? req.body.entries as Array<Record<string, unknown>> : [];
+      const preyOnlyFields = ["preyState", "inventoryItemId", "inventoryQuantity"] as const;
+      const invalidPreyEntry = rawEntries.find((entry) => {
+        const animalId = typeof entry?.animalId === "string" ? entry.animalId : "";
+        return categoriesByAnimalId.get(animalId) !== "reptiles"
+          && preyOnlyFields.some((field) => Object.prototype.hasOwnProperty.call(entry, field));
+      });
+      if (invalidPreyEntry) {
+        throw new AppError(400, "CATEGORY_FIELD_NOT_ALLOWED", "Prey condition and prey inventory fields are only available for reptiles", {
+          animalId: typeof invalidPreyEntry.animalId === "string" ? invalidPreyEntry.animalId : null,
+          fields: preyOnlyFields,
+        });
       }
 
       const session = await tx.feedingSession.create({
@@ -339,9 +365,20 @@ export function createCareRouter() {
     const entry = await prisma.$transaction(async (tx) => {
       const owned = await tx.feedingEntry.findFirst({
         where: { id, session: { is: { userId: auth.userId } }, animal: { is: { userId: auth.userId } } },
-        include: { session: { select: { id: true, performedAt: true, notes: true } } },
+        include: {
+          session: { select: { id: true, performedAt: true, notes: true } },
+          animal: { select: { category: true } },
+        },
       });
       if (!owned) throw new AppError(404, "FEEDING_ENTRY_NOT_FOUND", "Feeding entry not found");
+      const preyOnlyFields = ["preyState", "inventoryItemId", "inventoryQuantity"] as const;
+      if (owned.animal.category !== "reptiles" &&
+        preyOnlyFields.some((field) => Object.prototype.hasOwnProperty.call(req.body ?? {}, field))) {
+        throw new AppError(400, "CATEGORY_FIELD_NOT_ALLOWED", "Prey condition and prey inventory fields are only available for reptiles", {
+          animalId: owned.animalId,
+          fields: preyOnlyFields,
+        });
+      }
 
       const stockFieldsChanged = input.outcome !== undefined || input.inventoryItemId !== undefined || input.inventoryQuantity !== undefined;
       if (stockFieldsChanged && owned.inventoryDeducted && owned.inventoryItemId && owned.inventoryQuantity) {
@@ -553,7 +590,7 @@ export function createCareRouter() {
   router.get("/animals/:animalId/sheds", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
-    await getOwnedAnimal(auth.userId, animalId);
+    await getOwnedReptile(auth.userId, animalId);
     const page = pageOptions(req.query);
     const [total, sheds] = await Promise.all([
       prisma.shedRecord.count({ where: { animalId } }),
@@ -570,7 +607,7 @@ export function createCareRouter() {
   router.post("/animals/:animalId/sheds", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const animalId = parseUuid(req.params.animalId!, "animalId");
-    await getOwnedAnimal(auth.userId, animalId, true);
+    await getOwnedReptile(auth.userId, animalId, true);
     const input = parseBody(shedSchema, req.body);
     const shed = await prisma.$transaction(async (tx) => {
       const created = await tx.shedRecord.create({ data: { animalId, occurredAt: new Date(input.occurredAt), outcome: input.outcome, notes: input.notes ?? null } });
@@ -584,7 +621,7 @@ export function createCareRouter() {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
     const input = parseBody(patchShedSchema, req.body);
-    const existing = await prisma.shedRecord.findFirst({ where: { id, animal: { is: { userId: auth.userId } } } });
+    const existing = await prisma.shedRecord.findFirst({ where: { id, animal: { is: { userId: auth.userId, category: "reptiles" } } } });
     if (!existing) throw new AppError(404, "SHED_NOT_FOUND", "Shed record not found");
     const shed = await prisma.shedRecord.update({
       where: { id },
@@ -596,7 +633,7 @@ export function createCareRouter() {
   router.delete("/sheds/:id", requireSession, async (req, res) => {
     const auth = res.locals.auth as AuthContext;
     const id = parseUuid(req.params.id!);
-    const existing = await prisma.shedRecord.findFirst({ where: { id, animal: { is: { userId: auth.userId } } }, select: { id: true } });
+    const existing = await prisma.shedRecord.findFirst({ where: { id, animal: { is: { userId: auth.userId, category: "reptiles" } } }, select: { id: true } });
     if (!existing) throw new AppError(404, "SHED_NOT_FOUND", "Shed record not found");
     await prisma.shedRecord.delete({ where: { id } });
     res.status(204).send();

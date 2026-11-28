@@ -4,8 +4,8 @@ export type AnimalCategoryDto = "reptiles" | "fish" | "birds" | "dogs_cats";
 export type AnimalDomainProfileDto =
   | { enclosure?: string | null; brumation?: "not_applicable" | "planned" | "in_progress" | "completed"; feedingNotes?: string | null }
   | { aquariumId?: string | null; waterType?: "freshwater" | "saltwater" | "brackish"; temperament?: string | null; maxSizeCm?: number | null; shoaling?: boolean; diet?: string | null }
-  | { ringNumber?: string | null; aviaryId?: string | null; diet?: string | null; tameness?: "wild" | "socialized" | "tame"; flightStatus?: "full_flight" | "clipped" | "unknown" }
-  | { breed?: string | null; microchip?: string | null; sterilized?: boolean; vaccinationStatus?: "unknown" | "not_up_to_date" | "up_to_date"; coatColor?: string | null; weightKg?: number | null };
+  | { aviaryId?: string | null; diet?: string | null; tameness?: "wild" | "socialized" | "tame"; flightStatus?: "full_flight" | "clipped" | "unknown" }
+  | { breed?: string | null; microchip?: string | null; veterinarianName?: string | null; veterinaryClinic?: string | null; veterinaryPhone?: string | null; veterinaryEmail?: string | null; veterinaryAddress?: string | null; allergies?: string | null; chronicConditions?: string | null; sterilized?: boolean; vaccinationStatus?: "unknown" | "not_up_to_date" | "up_to_date"; coatColor?: string | null; weightKg?: number | null };
 
 export interface AnimalDto {
   id: string;
