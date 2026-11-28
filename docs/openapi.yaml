@@ -474,6 +474,12 @@ paths:
                 $ref: '#/components/schemas/AnimalEnvelopeResponse'
         '400':
           $ref: '#/components/responses/Error'
+        '409':
+          description: Il tentativo di cambiare categoria è rifiutato per preservare profili e relazioni di dominio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       operationId: deleteAnimalsById
       tags: [Animals]
@@ -6340,15 +6346,34 @@ components:
           items:
             $ref: '#/components/schemas/CompanionReproductionDto'
     AnimalDomainProfile:
+      description: >
+        Deve contenere almeno un valore significativo appartenente alla categoria:
+        reptiles richiede uno tra enclosure, brumation o feedingNotes; fish uno tra
+        aquariumId, waterType, temperament, maxSizeCm, shoaling o diet; birds uno
+        tra aviaryId, diet, tameness o flightStatus; dogs_cats uno tra breed,
+        microchip, veterinario, vaccinazioni, sterilizzazione, mantello, peso,
+        allergie o patologie croniche. Stringhe vuote e null non soddisfano il minimo.
+        Gli identificativi (microchip, anello e codici analoghi) non sono obbligatori.
       oneOf:
         - type: object
           additionalProperties: false
+          anyOf:
+            - required: [enclosure]
+            - required: [brumation]
+            - required: [feedingNotes]
           properties:
             enclosure: { type: [string, 'null'], maxLength: 120 }
             brumation: { type: string, enum: [not_applicable, planned, in_progress, completed] }
             feedingNotes: { type: [string, 'null'], maxLength: 2000 }
         - type: object
           additionalProperties: false
+          anyOf:
+            - required: [aquariumId]
+            - required: [waterType]
+            - required: [temperament]
+            - required: [maxSizeCm]
+            - required: [shoaling]
+            - required: [diet]
           properties:
             aquariumId: { type: [string, 'null'], format: uuid }
             waterType: { type: string, enum: [freshwater, saltwater, brackish] }
@@ -6358,6 +6383,11 @@ components:
             diet: { type: [string, 'null'], maxLength: 160 }
         - type: object
           additionalProperties: false
+          anyOf:
+            - required: [aviaryId]
+            - required: [diet]
+            - required: [tameness]
+            - required: [flightStatus]
           properties:
             aviaryId: { type: [string, 'null'], format: uuid }
             diet: { type: [string, 'null'], maxLength: 160 }
@@ -6365,6 +6395,20 @@ components:
             flightStatus: { type: string, enum: [full_flight, clipped, unknown] }
         - type: object
           additionalProperties: false
+          anyOf:
+            - required: [breed]
+            - required: [microchip]
+            - required: [veterinarianName]
+            - required: [veterinaryClinic]
+            - required: [veterinaryPhone]
+            - required: [veterinaryEmail]
+            - required: [veterinaryAddress]
+            - required: [allergies]
+            - required: [chronicConditions]
+            - required: [sterilized]
+            - required: [vaccinationStatus]
+            - required: [coatColor]
+            - required: [weightKg]
           properties:
             breed: { type: [string, 'null'], maxLength: 160 }
             microchip: { type: [string, 'null'], maxLength: 40 }
@@ -6382,13 +6426,16 @@ components:
     AnimalWrite:
       type: object
       additionalProperties: false
-      required: [name, species]
+      required: [name, species, domainProfile]
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
         category: { type: string, enum: [reptiles, fish, birds, dogs_cats], default: reptiles }
-        domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
+        domainProfile:
+          allOf:
+            - $ref: '#/components/schemas/AnimalDomainProfile'
+          description: Almeno un valore significativo del profilo della categoria è obbligatorio.
         sex: { type: string, enum: [male, female, unknown], default: unknown }
         morph: { type: [string, 'null'], maxLength: 200 }
         geneticsNotes: { type: [string, 'null'], maxLength: 10000 }
@@ -6403,13 +6450,13 @@ components:
         notes: { type: [string, 'null'], maxLength: 10000 }
     AnimalPatch:
       type: object
+      description: La categoria è immutabile dopo la creazione. Gli aggiornamenti del profilo devono contenere almeno un valore significativo; le schede legacy senza profilo possono essere modificate omettendo domainProfile.
       additionalProperties: false
       minProperties: 1
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         identifier: { type: [string, 'null'], maxLength: 120 }
         species: { type: string, minLength: 1, maxLength: 160 }
-        category: { type: string, enum: [reptiles, fish, birds, dogs_cats] }
         domainProfile: { $ref: '#/components/schemas/AnimalDomainProfile' }
         sex: { type: string, enum: [male, female, unknown] }
         morph: { type: [string, 'null'], maxLength: 200 }

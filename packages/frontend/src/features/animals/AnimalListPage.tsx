@@ -176,11 +176,22 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    const cleanDomainProfile = Object.fromEntries(
+      Object.entries(form.domainProfile).filter(([, value]) => value !== "" && value !== null && value !== undefined),
+    );
+    if (!editing && Object.keys(cleanDomainProfile).length === 0) {
+      setError(locale === "it"
+        ? "Inserisci almeno un dato specifico della categoria. Gli identificativi restano facoltativi."
+        : "Enter at least one category-specific detail. Identification numbers remain optional.");
+      return;
+    }
     setBusy(true);
     setError("");
     const body = {
       ...form,
-      domainProfile: Object.fromEntries(Object.entries(form.domainProfile).filter(([, value]) => value !== "" && value !== null && value !== undefined)),
+      // Do not retroactively block edits to legacy animals whose profile is empty.
+      // New animals and explicit profile updates still go through backend validation.
+      domainProfile: editing && Object.keys(cleanDomainProfile).length === 0 ? undefined : cleanDomainProfile,
       identifier: form.identifier || null, morph: form.morph || null,
       motherAnimalId: form.motherAnimalId || null, fatherAnimalId: form.fatherAnimalId || null,
       motherDescription: form.motherDescription || null, fatherDescription: form.fatherDescription || null,
@@ -379,25 +390,33 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
         event.preventDefault(); setBulkBusy(true); setBulkError("");
         const parsed = bulkText.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => line.split("|").map((value) => value.trim()));
         const invalidRow = parsed.findIndex((parts) => {
-          if (parts.length < 2 || parts.length > 6 || !parts[0] || !parts[1]) return true;
-          const rowCategory = parts.length === 6 ? parts[2] : bulkDefaultCategory;
-          return !enabledCategories.includes(rowCategory);
+          const hasCategory = parts.length === 7;
+          if ((parts.length !== 6 && !hasCategory) || !parts[0] || !parts[1]) return true;
+          const rowCategory = hasCategory ? parts[2] : bulkDefaultCategory;
+          if (!enabledCategories.includes(rowCategory)) return true;
+          const profileJson = hasCategory ? parts[6] : parts[5];
+          try {
+            const profile = JSON.parse(profileJson ?? "") as unknown;
+            return typeof profile !== "object" || profile === null || Array.isArray(profile);
+          } catch {
+            return true;
+          }
         });
         if (invalidRow >= 0) {
           setBulkError(locale === "it"
-            ? `Riga ${invalidRow + 1} non valida: controlla il numero di campi e che la categoria sia abilitata.`
-            : `Row ${invalidRow + 1} is invalid: check the number of columns and make sure its category is enabled.`);
+            ? `Riga ${invalidRow + 1} non valida: verifica i campi, la categoria abilitata e il JSON del profilo specifico.`
+            : `Row ${invalidRow + 1} is invalid: check the fields, enabled category and category profile JSON.`);
           setBulkBusy(false);
           return;
         }
         const payload = parsed.map((parts) => {
-          const [name, animalSpecies, third, fourth, fifth, sixth] = parts;
-          const hasCategory = parts.length === 6;
+          const [name, animalSpecies, third, fourth, fifth, sixth, seventh] = parts;
+          const hasCategory = parts.length === 7;
           return {
             name,
             species: animalSpecies,
             category: hasCategory ? third : bulkDefaultCategory,
-            domainProfile: {},
+            domainProfile: JSON.parse((hasCategory ? seventh : sixth)!) as Record<string, unknown>,
             sex: (hasCategory ? fourth : third) || "unknown",
             morph: (hasCategory ? fifth : fourth) || null,
             identifier: (hasCategory ? sixth : fifth) || null,
@@ -415,7 +434,14 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             {enabledCategories.map((value) => <option key={value} value={value}>{value === "dogs_cats" ? (locale === "it" ? "Cani e gatti" : "Dogs and cats") : value === "reptiles" ? (locale === "it" ? "Rettili" : "Reptiles") : value === "fish" ? (locale === "it" ? "Pesci" : "Fish") : (locale === "it" ? "Uccelli" : "Birds")}</option>)}
           </Select>
         </Field>
-        <Field label={t("bulkAnimalRows")} hint={t("bulkInputHint")}><Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Nala | Python regius | reptiles | female | Pastel | A-001" /></Field>
+        <Field
+          label={t("bulkAnimalRows")}
+          hint={locale === "it"
+            ? "Senza categoria: nome | specie | sesso | morph | identificativo | {JSON profilo}. Con categoria: nome | specie | categoria | sesso | morph | identificativo | {JSON profilo}."
+            : "Without category: name | species | sex | morph | identifier | {profile JSON}. With category: name | species | category | sex | morph | identifier | {profile JSON}."}
+        >
+          <Textarea required rows={8} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder='Nala | Python regius | reptiles | female | Pastel | A-001 | {"enclosure":"Terrario 1"}' />
+        </Field>
         <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setBulkModal(false)}>{t("cancel")}</Button><Button type="submit" disabled={bulkBusy || enabledCategories.length === 0}>{bulkBusy ? t("loading") : t("create")}</Button></div>
       </form>
     </Modal>}
@@ -477,17 +503,19 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             <span className="animal-editor-section-icon"><Icon name="settings" size={17} /></span>
             <div>
               <h3>{locale === "it" ? "Dati specifici della categoria" : "Category-specific details"}</h3>
-              <p>{locale === "it" ? "Campi dedicati alla gestione di questo tipo di animale." : "Fields tailored to this animal category."}</p>
+              <p>{locale === "it"
+                ? "Inserisci almeno un dato specifico e significativo. Microchip, anello e altri identificativi non sono obbligatori."
+                : "Enter at least one meaningful category-specific detail. Microchips, rings and other identifiers are not mandatory."}</p>
             </div>
           </div>
           <div className="form-grid">
             {form.category === "reptiles" && <>
               <Field label={locale === "it" ? "Alloggiamento / terrario" : "Enclosure"}><Input maxLength={120} value={String(form.domainProfile.enclosure ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, enclosure: e.target.value } }))} /></Field>
-              <Field label={locale === "it" ? "Brumazione" : "Brumation"}><Select value={String(form.domainProfile.brumation ?? "not_applicable")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, brumation: e.target.value } }))}><option value="not_applicable">{locale === "it" ? "Non applicabile" : "Not applicable"}</option><option value="planned">{locale === "it" ? "Pianificata" : "Planned"}</option><option value="in_progress">{locale === "it" ? "In corso" : "In progress"}</option><option value="completed">{locale === "it" ? "Completata" : "Completed"}</option></Select></Field>
+              <Field label={locale === "it" ? "Brumazione" : "Brumation"}><Select value={String(form.domainProfile.brumation ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, brumation: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="not_applicable">{locale === "it" ? "Non applicabile" : "Not applicable"}</option><option value="planned">{locale === "it" ? "Pianificata" : "Planned"}</option><option value="in_progress">{locale === "it" ? "In corso" : "In progress"}</option><option value="completed">{locale === "it" ? "Completata" : "Completed"}</option></Select></Field>
               <Field label={locale === "it" ? "Note alimentazione" : "Feeding notes"}><Textarea rows={2} value={String(form.domainProfile.feedingNotes ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, feedingNotes: e.target.value } }))} /></Field>
             </>}
             {form.category === "fish" && <>
-              <Field label={locale === "it" ? "Tipo d'acqua" : "Water type"}><Select value={String(form.domainProfile.waterType ?? "freshwater")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, waterType: e.target.value } }))}><option value="freshwater">{locale === "it" ? "Dolce" : "Freshwater"}</option><option value="saltwater">{locale === "it" ? "Marina" : "Saltwater"}</option><option value="brackish">{locale === "it" ? "Salmastra" : "Brackish"}</option></Select></Field>
+              <Field label={locale === "it" ? "Tipo d'acqua" : "Water type"}><Select value={String(form.domainProfile.waterType ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, waterType: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="freshwater">{locale === "it" ? "Dolce" : "Freshwater"}</option><option value="saltwater">{locale === "it" ? "Marina" : "Saltwater"}</option><option value="brackish">{locale === "it" ? "Salmastra" : "Brackish"}</option></Select></Field>
               <Field label={locale === "it" ? "Temperamento" : "Temperament"}><Input maxLength={120} value={String(form.domainProfile.temperament ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, temperament: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Dimensione adulta (cm)" : "Adult size (cm)"}><Input type="number" min="0.1" max="500" step="0.1" value={String(form.domainProfile.maxSizeCm ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, maxSizeCm: e.target.value === "" ? "" : Number(e.target.value) } }))} /></Field>
               <Field label={locale === "it" ? "Alimentazione" : "Diet"}><Input maxLength={160} value={String(form.domainProfile.diet ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, diet: e.target.value } }))} /></Field>
@@ -495,15 +523,15 @@ export function AnimalListPage({ locale, navigate, path }: { locale: Locale; nav
             </>}
             {form.category === "birds" && <>
               <Field label={locale === "it" ? "Alimentazione" : "Diet"}><Input maxLength={160} value={String(form.domainProfile.diet ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, diet: e.target.value } }))} /></Field>
-              <Field label={locale === "it" ? "Abitudine al contatto" : "Tameness"}><Select value={String(form.domainProfile.tameness ?? "wild")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, tameness: e.target.value } }))}><option value="wild">{locale === "it" ? "Selvatico" : "Wild"}</option><option value="socialized">{locale === "it" ? "Socializzato" : "Socialized"}</option><option value="tame">{locale === "it" ? "Addomesticato" : "Tame"}</option></Select></Field>
-              <Field label={locale === "it" ? "Capacità di volo" : "Flight status"}><Select value={String(form.domainProfile.flightStatus ?? "unknown")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, flightStatus: e.target.value } }))}><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option><option value="full_flight">{locale === "it" ? "Volo completo" : "Full flight"}</option><option value="clipped">{locale === "it" ? "Remiganti accorciate" : "Clipped"}</option></Select></Field>
+              <Field label={locale === "it" ? "Abitudine al contatto" : "Tameness"}><Select value={String(form.domainProfile.tameness ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, tameness: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="wild">{locale === "it" ? "Selvatico" : "Wild"}</option><option value="socialized">{locale === "it" ? "Socializzato" : "Socialized"}</option><option value="tame">{locale === "it" ? "Addomesticato" : "Tame"}</option></Select></Field>
+              <Field label={locale === "it" ? "Capacità di volo" : "Flight status"}><Select value={String(form.domainProfile.flightStatus ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, flightStatus: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option><option value="full_flight">{locale === "it" ? "Volo completo" : "Full flight"}</option><option value="clipped">{locale === "it" ? "Remiganti accorciate" : "Clipped"}</option></Select></Field>
             </>}
             {form.category === "dogs_cats" && <>
               <Field label={locale === "it" ? "Razza" : "Breed"}><Input maxLength={160} value={String(form.domainProfile.breed ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, breed: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Microchip" : "Microchip"}><Input maxLength={40} value={String(form.domainProfile.microchip ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, microchip: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Colore mantello" : "Coat colour"}><Input maxLength={120} value={String(form.domainProfile.coatColor ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, coatColor: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Peso (kg)" : "Weight (kg)"}><Input type="number" min="0.01" max="250" step="0.01" value={String(form.domainProfile.weightKg ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, weightKg: e.target.value === "" ? "" : Number(e.target.value) } }))} /></Field>
-              <Field label={locale === "it" ? "Vaccinazioni" : "Vaccination status"}><Select value={String(form.domainProfile.vaccinationStatus ?? "unknown")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, vaccinationStatus: e.target.value } }))}><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option><option value="not_up_to_date">{locale === "it" ? "Da aggiornare" : "Not up to date"}</option><option value="up_to_date">{locale === "it" ? "In regola" : "Up to date"}</option></Select></Field>
+              <Field label={locale === "it" ? "Vaccinazioni" : "Vaccination status"}><Select value={String(form.domainProfile.vaccinationStatus ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, vaccinationStatus: e.target.value } }))}><option value="">{locale === "it" ? "Seleziona…" : "Select…"}</option><option value="unknown">{locale === "it" ? "Non noto" : "Unknown"}</option><option value="not_up_to_date">{locale === "it" ? "Da aggiornare" : "Not up to date"}</option><option value="up_to_date">{locale === "it" ? "In regola" : "Up to date"}</option></Select></Field>
               <label className="checkbox-field"><input type="checkbox" checked={Boolean(form.domainProfile.sterilized)} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, sterilized: e.target.checked } }))} /><span>{locale === "it" ? "Sterilizzato" : "Neutered / spayed"}</span></label>
               <Field label={locale === "it" ? "Veterinario" : "Veterinarian"}><Input maxLength={160} value={String(form.domainProfile.veterinarianName ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, veterinarianName: e.target.value } }))} /></Field>
               <Field label={locale === "it" ? "Clinica veterinaria" : "Veterinary clinic"}><Input maxLength={160} value={String(form.domainProfile.veterinaryClinic ?? "")} onChange={(e) => setForm((current) => ({ ...current, domainProfile: { ...current.domainProfile, veterinaryClinic: e.target.value } }))} /></Field>

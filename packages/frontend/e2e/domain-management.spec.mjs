@@ -35,6 +35,13 @@ async function enableAllCategories(page) {
 
 async function createAnimal(page, name, options = {}) {
   const result = await page.evaluate(async ({ name, options }) => {
+    const category = options.category ?? "dogs_cats";
+    const defaultProfiles = {
+      reptiles: { brumation: "not_applicable" },
+      fish: { waterType: "freshwater" },
+      birds: { flightStatus: "unknown" },
+      dogs_cats: { vaccinationStatus: "unknown" },
+    };
     const csrf = await fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json());
     const response = await fetch("/api/v1/animals", {
       method: "POST",
@@ -43,9 +50,9 @@ async function createAnimal(page, name, options = {}) {
       body: JSON.stringify({
         name,
         species: options.species ?? "Cane meticcio",
-        category: options.category ?? "dogs_cats",
+        category,
         sex: options.sex ?? "unknown",
-        domainProfile: options.domainProfile ?? {},
+        domainProfile: options.domainProfile ?? defaultProfiles[category] ?? {},
       })
     });
     return { status: response.status, body: await response.json() };
@@ -54,6 +61,52 @@ async function createAnimal(page, name, options = {}) {
   return result.body.animal;
 }
 
+
+test("animal creation requires category data and API PATCH cannot change category", async ({ page }) => {
+  await signIn(page);
+  await enableAllCategories(page);
+
+  const missingProfileStatuses = await page.evaluate(async () => {
+    const csrf = await fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json());
+    const categories = ["reptiles", "fish", "birds", "dogs_cats"];
+    const results = await Promise.all(categories.map(async (category) => {
+      const response = await fetch("/api/v1/animals", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf.csrfToken },
+        body: JSON.stringify({
+          name: "E2E missing profile " + category + " " + Date.now(),
+          species: "Test species",
+          category,
+          domainProfile: {},
+        }),
+      });
+      return response.status;
+    }));
+    return results;
+  });
+  expect(missingProfileStatuses).toEqual([400, 400, 400, 400]);
+
+  const animal = await createAnimal(page, "E2E immutable category " + Date.now(), {
+    category: "dogs_cats",
+    domainProfile: { vaccinationStatus: "unknown" },
+  });
+  const result = await page.evaluate(async (animalId) => {
+    const csrf = await fetch("/api/v1/auth/csrf", { credentials: "same-origin" }).then((response) => response.json());
+    const response = await fetch("/api/v1/animals/" + encodeURIComponent(animalId), {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf.csrfToken },
+      body: JSON.stringify({ category: "reptiles" }),
+    });
+    const persisted = await fetch("/api/v1/animals/" + encodeURIComponent(animalId), { credentials: "same-origin" })
+      .then((item) => item.json());
+    return { status: response.status, persisted };
+  }, animal.id);
+  expect(result.status).toBe(409);
+  expect(result.persisted.animal.category).toBe("dogs_cats");
+  expect(result.persisted.animal.domainProfile).toEqual({ vaccinationStatus: "unknown" });
+});
 
 test("animal list supports multi-selection and atomic bulk weight records", async ({ page }) => {
   await signIn(page);

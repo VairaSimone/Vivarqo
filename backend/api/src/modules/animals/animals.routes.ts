@@ -261,7 +261,14 @@ export function createAnimalRouter() {
     const input = parseBody(patchAnimalSchema, req.body);
     const existing = await prisma.animal.findFirst({ where: { id, userId: auth.userId } });
     if (!existing) throw new AppError(404, "ANIMAL_NOT_FOUND", "Animal not found");
-    const resultingCategory = input.category ?? existing.category;
+    if (input.category && input.category !== existing.category) {
+      throw new AppError(
+        409,
+        "ANIMAL_CATEGORY_IMMUTABLE",
+        "An animal category cannot be changed after creation. Create a new animal in the target category and archive the original to preserve its history and module associations.",
+        { currentCategory: existing.category, requestedCategory: input.category },
+      );
+    }
     const resultingSpecies = input.species ?? existing.species;
     await validateAnimalParents(
       auth.userId,
@@ -272,18 +279,22 @@ export function createAnimalRouter() {
       id,
     );
     await assertAnimalCategoryEnabled(auth.userId, existing.category);
-    if (input.category) await assertAnimalCategoryEnabled(auth.userId, input.category);
-    if ("domainProfile" in input || input.category) {
-      const profileValue = input.domainProfile ?? (input.category ? {} : existing.domainProfile ?? {});
-      const profile = validateAnimalDomainProfile(resultingCategory as "reptiles" | "fish" | "birds" | "dogs_cats", profileValue);
-      if (!profile.success) throw new AppError(400, "VALIDATION_ERROR", "Invalid category-specific animal profile", { issues: profile.error.issues });
-      if (input.category && !("domainProfile" in input)) input.domainProfile = {};
+    if ("domainProfile" in input) {
+      const profile = validateAnimalDomainProfile(
+        existing.category as "reptiles" | "fish" | "birds" | "dogs_cats",
+        input.domainProfile ?? existing.domainProfile ?? {},
+      );
+      if (!profile.success) {
+        throw new AppError(400, "VALIDATION_ERROR", "Invalid category-specific animal profile", { issues: profile.error.issues });
+      }
     }
     if (existing.status === "archived" && "status" in input) {
       throw new AppError(409, "ANIMAL_ARCHIVED", "Use the restore action before changing an archived animal status");
     }
 
     const data: Record<string, unknown> = { ...input };
+    // Category is immutable; repeating the current category is a harmless no-op.
+    delete data.category;
     if ("birthDate" in input) data.birthDate = input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null;
     if ("acquiredDate" in input) data.acquiredDate = input.acquiredDate ? new Date(`${input.acquiredDate}T00:00:00.000Z`) : null;
     try {

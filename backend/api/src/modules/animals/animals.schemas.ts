@@ -9,12 +9,24 @@ const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").refin
 
 
 export const animalCategorySchema = z.enum(["reptiles", "fish", "birds", "dogs_cats"]);
+function hasMeaningfulProfileValues(values: readonly unknown[]): boolean {
+  return values.some((value) => {
+    if (typeof value === "string") return value.trim().length > 0;
+    return value !== undefined && value !== null;
+  });
+}
+
 const animalDomainProfiles = {
+  // At least one useful husbandry datum is needed; identifiers are never mandatory.
   reptiles: z.object({
     enclosure: nullableText(120),
     brumation: z.enum(["not_applicable", "planned", "in_progress", "completed"]).optional(),
     feedingNotes: z.string().trim().max(2_000).nullable().optional(),
-  }).strict(),
+  }).strict().superRefine((profile, ctx) => {
+    if (!hasMeaningfulProfileValues([profile.enclosure, profile.brumation, profile.feedingNotes])) {
+      ctx.addIssue({ code: "custom", message: "At least one category-specific field must contain a value" });
+    }
+  }),
   fish: z.object({
     aquariumId: z.string().uuid().nullable().optional(),
     waterType: z.enum(["freshwater", "saltwater", "brackish"]).optional(),
@@ -22,13 +34,24 @@ const animalDomainProfiles = {
     maxSizeCm: z.coerce.number().positive().max(500).nullable().optional(),
     shoaling: z.boolean().optional(),
     diet: nullableText(160),
-  }).strict(),
+  }).strict().superRefine((profile, ctx) => {
+    if (!hasMeaningfulProfileValues([
+      profile.aquariumId, profile.waterType, profile.temperament,
+      profile.maxSizeCm, profile.shoaling, profile.diet,
+    ])) {
+      ctx.addIssue({ code: "custom", message: "At least one category-specific field must contain a value" });
+    }
+  }),
   birds: z.object({
     aviaryId: z.string().uuid().nullable().optional(),
     diet: nullableText(160),
     tameness: z.enum(["wild", "socialized", "tame"]).optional(),
     flightStatus: z.enum(["full_flight", "clipped", "unknown"]).optional(),
-  }).strict(),
+  }).strict().superRefine((profile, ctx) => {
+    if (!hasMeaningfulProfileValues([profile.aviaryId, profile.diet, profile.tameness, profile.flightStatus])) {
+      ctx.addIssue({ code: "custom", message: "At least one category-specific field must contain a value" });
+    }
+  }),
   dogs_cats: z.object({
     breed: nullableText(160),
     microchip: nullableText(40),
@@ -43,7 +66,16 @@ const animalDomainProfiles = {
     vaccinationStatus: z.enum(["unknown", "not_up_to_date", "up_to_date"]).optional(),
     coatColor: nullableText(120),
     weightKg: z.coerce.number().positive().max(250).nullable().optional(),
-  }).strict(),
+  }).strict().superRefine((profile, ctx) => {
+    if (!hasMeaningfulProfileValues([
+      profile.breed, profile.microchip, profile.veterinarianName, profile.veterinaryClinic,
+      profile.veterinaryPhone, profile.veterinaryEmail, profile.veterinaryAddress,
+      profile.allergies, profile.chronicConditions, profile.sterilized,
+      profile.vaccinationStatus, profile.coatColor, profile.weightKg,
+    ])) {
+      ctx.addIssue({ code: "custom", message: "At least one category-specific field must contain a value" });
+    }
+  }),
 } as const;
 
 export function validateAnimalDomainProfile(category: z.infer<typeof animalCategorySchema>, profile: unknown) {

@@ -3,6 +3,7 @@ import type { NextFunction } from "express";
 import type { Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../errors/app-error.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../db/prisma.js";
 import { requireSession, type AuthContext } from "../auth/session.js";
 import { persistentRateLimit } from "../../middleware/persistent-rate-limit.js";
@@ -30,6 +31,8 @@ const aliases: Record<string, string> = {
   name: "name", nome: "name", nomedisplay: "name", nomevisualizzato: "name", nomeanimale: "name", animalname: "name", animal: "name",
   identifier: "identifier", id: "identifier", codice: "identifier", codiceidentificativo: "identifier", identificativo: "identifier", numero: "identifier", numeroidentificativo: "identifier", tag: "identifier",
   species: "species", specie: "species", speciesname: "species", tipologia: "species",
+  category: "category", categoria: "category", animalcategory: "category", categoriaanimale: "category",
+  domainprofile: "domainProfile", profilocategoria: "domainProfile", profilocategoriajson: "domainProfile", categoryprofile: "domainProfile",
   sex: "sex", sesso: "sex", gender: "sex",
   morph: "morph", morfo: "morph", morphologia: "morph", variante: "morph",
   geneticsnotes: "geneticsNotes", annotazionigenetiche: "geneticsNotes", genetica: "geneticsNotes", geneticnotes: "geneticsNotes",
@@ -86,6 +89,24 @@ export function normalizeImportDate(value: string): string {
 
 function convertValue(field: string, value: string): unknown {
   const trimmed = value.trim();
+  if (field === "category") {
+    const normalized = normalizeHeader(trimmed);
+    const categories: Record<string, string> = {
+      reptiles: "reptiles", rettili: "reptiles",
+      fish: "fish", pesci: "fish",
+      birds: "birds", uccelli: "birds",
+      dogscats: "dogs_cats", caniegatti: "dogs_cats", caniegatto: "dogs_cats",
+    };
+    return categories[normalized] ?? trimmed;
+  }
+  if (field === "domainProfile") {
+    if (!trimmed) return {};
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return trimmed;
+    }
+  }
   if (field === "birthDate" || field === "acquiredDate") return trimmed ? normalizeImportDate(trimmed) : undefined;
   if (field === "birthDateEstimated") {
     if (!trimmed) return false;
@@ -110,10 +131,11 @@ function makePreview(
   selectedSheet: string | null,
   requestedMapping: unknown,
 ): { report: PreviewReport; mappedHeaders: Record<string, string> } {
-  const availableFields = ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate",
-    "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"];
+  const availableFields = ["name", "identifier", "species", "category", "domainProfile", "sex", "morph",
+    "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription",
+    "previousBreeder", "locationLabel", "status", "notes"];
   const mapping = resolveImportColumnMapping(
-    headers, aliases, availableFields, [["name"], ["species"]], requestedMapping,
+    headers, aliases, availableFields, [["name"], ["species"], ["category"], ["domainProfile"]], requestedMapping,
   );
   const mappedHeaders = mapping.mappedHeaders;
   const unmappedHeaders = mapping.unmappedHeaders;
@@ -179,9 +201,33 @@ export async function processQueuedAnimalImport(jobId: string, userId: string, l
       ? await tx.animal.findMany({ where: { userId, identifier: { in: identifiers, mode: "insensitive" } }, select: { identifier: true } })
       : [];
     const existingSet = new Set(existing.map((animal) => animal.identifier?.toLocaleLowerCase("it-IT")));
+    const configuration = await tx.accountConfiguration.findUnique({
+      where: { userId },
+      select: { animalCategories: true },
+    });
+    const enabledCategories = new Set(configuration?.animalCategories ?? []);
     const finalErrors = [...report.errors];
     const animalsToCreate = report.validRows.filter((row) => {
-      const identifier = row.animal.identifier;
+      const validated = createAnimalSchema.safeParse(row.animal);
+      if (!validated.success) {
+        for (const issue of validated.error.issues) {
+          finalErrors.push({
+            row: row.rowNumber,
+            column: String(issue.path[0] ?? "row"),
+            reason: issue.message,
+          });
+        }
+        return false;
+      }
+      if (!enabledCategories.has(validated.data.category)) {
+        finalErrors.push({
+          row: row.rowNumber,
+          column: "category",
+          reason: "This animal category is not enabled for the account",
+        });
+        return false;
+      }
+      const identifier = validated.data.identifier;
       if (identifier && existingSet.has(identifier.toLocaleLowerCase("it-IT"))) {
         finalErrors.push({ row: row.rowNumber, column: "identifier", reason: "This identifier already exists in your account at confirmation time" });
         return false;
@@ -193,6 +239,7 @@ export async function processQueuedAnimalImport(jobId: string, userId: string, l
       ? await tx.animal.createManyAndReturn({
           data: animalsToCreate.map(({ animal: input }) => ({
             userId, name: input.name, identifier: input.identifier ?? null, species: input.species,
+            category: input.category, domainProfile: input.domainProfile as Prisma.InputJsonValue,
             sex: input.sex, morph: input.morph ?? null, geneticsNotes: input.geneticsNotes ?? null,
             birthDate: input.birthDate ? new Date(`${input.birthDate}T00:00:00.000Z`) : null,
             birthDateEstimated: input.birthDateEstimated,
@@ -231,7 +278,7 @@ export function createImportRouter() {
   const router = Router();
 
   const templateHeaders: Record<string, string[]> = {
-    animals: ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"],
+    animals: ["name", "identifier", "species", "category", "domainProfile", "sex", "morph", "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"],
     weights: ["animalIdentifier", "measuredAt", "weightG", "notes"],
     sheds: ["animalIdentifier", "occurredAt", "outcome", "notes"],
     notes: ["animalIdentifier", "occurredAt", "title", "category", "body"],
@@ -250,7 +297,7 @@ export function createImportRouter() {
     if (!entity) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
     const headers = templateHeaders[entity];
     if (!headers) throw new AppError(404, "IMPORT_TEMPLATE_NOT_FOUND", "Import template not found");
-    const animalTemplateHeaders = ["Nome", "Identificativo", "Specie", "Sesso", "Morph", "Note genetiche", "Data di nascita", "Nascita stimata", "Data acquisizione", "Provenienza", "Allevatore precedente", "Rack / Posizione", "Stato", "Note"];
+    const animalTemplateHeaders = ["Nome", "Identificativo", "Specie", "Categoria", "Profilo categoria (JSON)", "Sesso", "Morph", "Note genetiche", "Data di nascita", "Nascita stimata", "Data acquisizione", "Provenienza", "Allevatore precedente", "Rack / Posizione", "Stato", "Note"];
     const outputHeaders = entity === "animals" ? animalTemplateHeaders : headers;
     const csv = "\uFEFF" + outputHeaders.map((header) => `"${header}"`).join(",") + "\r\n";
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -277,9 +324,24 @@ export function createImportRouter() {
       throw error;
     }
     const { report: preview } = previewResult;
-    const availableFields = ["name", "identifier", "species", "sex", "morph", "geneticsNotes", "birthDate",
-      "birthDateEstimated", "acquiredDate", "originDescription", "previousBreeder", "locationLabel", "status", "notes"];
-    const requiredFields = [["name"], ["species"]];
+    const availableFields = ["name", "identifier", "species", "category", "domainProfile", "sex", "morph",
+      "geneticsNotes", "birthDate", "birthDateEstimated", "acquiredDate", "originDescription",
+      "previousBreeder", "locationLabel", "status", "notes"];
+    const requiredFields = [["name"], ["species"], ["category"], ["domainProfile"]];
+    const configuration = await prisma.accountConfiguration.findUnique({
+      where: { userId },
+      select: { animalCategories: true },
+    });
+    const enabledCategories = new Set(configuration?.animalCategories ?? []);
+    preview.validRows = preview.validRows.filter((row) => {
+      if (enabledCategories.has(row.animal.category)) return true;
+      preview.errors.push({
+        row: row.rowNumber,
+        column: previewResult.mappedHeaders.category ?? "category",
+        reason: "This animal category is not enabled for the account",
+      });
+      return false;
+    });
 
     const identifiers = preview.validRows
       .map((row) => row.animal.identifier)
