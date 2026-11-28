@@ -618,6 +618,11 @@ export function createImportRouter() {
         missingFields: report.missingFields,
       });
     }
+    if (report.validRows.length === 0) {
+      throw new AppError(409, "IMPORT_NO_VALID_ROWS", "There are no valid rows to import", {
+        invalidRows: report.errors.length,
+      });
+    }
     if (report.potentialDuplicates.length > 0 && !body.data.allowPossibleDuplicates) {
       throw new AppError(409, "IMPORT_DUPLICATES_REQUIRE_CONFIRMATION", "Possible name/species duplicates require explicit confirmation", {
         possibleDuplicates: report.potentialDuplicates,
